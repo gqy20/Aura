@@ -1,0 +1,56 @@
+# Built application
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+release/
+
+# Gradle
+.gradle/
+build/
+local.properties
+
+# Signing
+*.jks
+*.keystore
+!debug.keystore
+
+# Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+/captures/
+.externalNativeBuild/
+.cxx/
+mobile/
+
+# Kotlin
+*.kotlin_module
+
+# Log
+*.log
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Environment
+.env
+*.env.local
+secrets.properties
+
+# Test results
+app/build/reports/
