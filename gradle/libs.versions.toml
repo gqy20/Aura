@@ -46,6 +46,7 @@ androidx-test-ext-junit = "1.2.1"
 espresso = "3.6.1"
 turbine = "1.1.0"
 mockk = "1.13.13"
+robolectric = "4.14.1"
 
 [libraries]
 # --- Compose UI ---
@@ -100,10 +101,14 @@ koog-agents = { group = "ai.koog", name = "koog-agents", version.ref = "koog" }
 
 # --- Testing ---
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-core = { group = "androidx.test", name = "core", version = "1.6.1" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
+coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version = "1.8.1" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [bundles]
 compose = ["compose-ui", "compose-material3", "compose-navigation", "compose-viewmodel"]

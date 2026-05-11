@@ -1,0 +1,49 @@
+package com.xiaoqi.companion.data.datastore
+
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.xiaoqi.companion.data.db.converter.LlmProvider
+import com.xiaoqi.companion.data.db.converter.ThemeMode
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+class AppPreferences(private val dataStore: DataStore<Preferences>) {
+
+    val apiKey: Flow<String?> = dataStore.data.map { it[Keys.apiKey] }
+    val currentCompanionId: Flow<String> = dataStore.data.map { it[Keys.currentCompanionId] ?: "" }
+    val themeMode: Flow<ThemeMode> = dataStore.data.map {
+        ThemeMode.valueOf(it[Keys.themeMode] ?: defaultThemeMode.name)
+    }
+    val voiceEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.voiceEnabled] ?: true }
+    val notificationEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.notificationEnabled] ?: true }
+    val llmProvider: Flow<LlmProvider> = dataStore.data.map {
+        LlmProvider.valueOf(it[Keys.llmProvider] ?: defaultLlmProvider.name)
+    }
+    val modelName: Flow<String> = dataStore.data.map { it[Keys.modelName] ?: "glm-5v-turbo" }
+
+    suspend fun setApiKey(value: String?) { dataStore.edit { if (value != null) it[Keys.apiKey] = value else it.remove(Keys.apiKey) } }
+    suspend fun setCurrentCompanionId(value: String) { dataStore.edit { it[Keys.currentCompanionId] = value } }
+    suspend fun setThemeMode(value: ThemeMode) { dataStore.edit { it[Keys.themeMode] = value.name } }
+    suspend fun setVoiceEnabled(value: Boolean) { dataStore.edit { it[Keys.voiceEnabled] = value } }
+    suspend fun setNotificationEnabled(value: Boolean) { dataStore.edit { it[Keys.notificationEnabled] = value } }
+    suspend fun setLlmProvider(value: LlmProvider) { dataStore.edit { it[Keys.llmProvider] = value.name } }
+    suspend fun setModelName(value: String) { dataStore.edit { it[Keys.modelName] = value } }
+
+    object Keys {
+        val apiKey = stringPreferencesKey("api_key")
+        val currentCompanionId = stringPreferencesKey("current_companion_id")
+        val themeMode = stringPreferencesKey("theme_mode")
+        val voiceEnabled = booleanPreferencesKey("voice_enabled")
+        val notificationEnabled = booleanPreferencesKey("notification_enabled")
+        val llmProvider = stringPreferencesKey("llm_provider")
+        val modelName = stringPreferencesKey("model_name")
+    }
+
+    companion object {
+        val defaultThemeMode = ThemeMode.SYSTEM
+        val defaultLlmProvider = LlmProvider.GLM
+    }
+}

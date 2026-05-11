@@ -62,3 +62,14 @@ app/build/reports/
 screenshot_*.png
 
 PROFILE*
+
+# Auto-generated agent files
+AGENTS.md
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
+error.log
+
+# Room schema (exported but tracked separately)
+# app/schemas/ is intentionally committed
