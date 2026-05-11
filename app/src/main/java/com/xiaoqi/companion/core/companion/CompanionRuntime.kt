@@ -8,11 +8,12 @@ import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.MessageRepository
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 
-class CompanionRuntime(
+open class CompanionRuntime @Inject constructor(
     private val configRepository: ConfigRepository,
     private val koogAgentFactory: KoogAgentFactory,
     private val promptBuilder: PromptBuilder,
@@ -22,7 +23,7 @@ class CompanionRuntime(
     private val relationshipModel: RelationshipModel,
 ) {
 
-    suspend fun send(input: UserInput): Flow<AgentEvent> = flow {
+    open suspend fun send(input: UserInput): Flow<AgentEvent> = flow {
         try {
             // 1. Build prompt with context
             val prompt = promptBuilder.build(

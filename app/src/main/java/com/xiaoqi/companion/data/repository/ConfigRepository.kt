@@ -2,6 +2,7 @@ package com.xiaoqi.companion.data.repository
 
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -23,7 +24,7 @@ interface ConfigRepository {
     suspend fun setModelName(name: String)
 }
 
-class ConfigRepositoryImpl(private val prefs: AppPreferences) : ConfigRepository {
+class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences) : ConfigRepository {
 
     override val apiKey get() = prefs.apiKey
     override val llmProvider get() = prefs.llmProvider

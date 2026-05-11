@@ -7,10 +7,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.ThemeMode
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class AppPreferences(private val dataStore: DataStore<Preferences>) {
+class AppPreferences @Inject constructor(private val dataStore: DataStore<Preferences>) {
 
     val apiKey: Flow<String?> = dataStore.data.map { it[Keys.apiKey] }
     val currentCompanionId: Flow<String> = dataStore.data.map { it[Keys.currentCompanionId] ?: "" }
