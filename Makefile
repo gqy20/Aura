@@ -9,7 +9,7 @@
 # --- 默认目标 ---
 help:
 	@echo ""
-	@echo "  Companion Agent - Makefile Commands"
+	@echo "  Aura (奥拉) - Makefile Commands"
 	@echo "  =================================="
 	@echo ""
 	@echo "  Build:"
