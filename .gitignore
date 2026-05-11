@@ -25,6 +25,7 @@ local.properties
 *.jks
 *.keystore
 !debug.keystore
+keystore.properties
 
 # Android Studio
 .idea/

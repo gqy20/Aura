@@ -1,5 +1,14 @@
 # Android 项目 - 开发环境
 
+## 工具优先级
+
+**信息检索/调研时，工具使用优先级（从高到低）：**
+1. **`gh` (GitHub CLI)** — 搜索 issue、PR、release notes、代码
+2. **Playwright CLI** (`mcp__playwright__*`) — 浏览器自动化，抓取网页内容
+3. MCP 工具 / Web Search — 仅在前两者不可用时使用
+
+> 原因：gh 和 Playwright 更稳定、可控，不依赖第三方 API 配额。
+
 ## 工具路径
 
 ### ADB_Cli — Android 调试工具集
