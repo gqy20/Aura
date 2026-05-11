@@ -1,0 +1,11 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.gradle text eol=lf
+*.kts text eol=lf
+*.kt text eol=lf
+*.xml text eol=lf
+*.properties text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+Makefile text eol=lf
+.gradlele text eol=lf

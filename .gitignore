@@ -52,6 +52,9 @@ Desktop.ini
 *.env.local
 secrets.properties
 
+# Generated metadata files
+*-metadata.xml
+
 # Test results
 app/build/reports/
 
