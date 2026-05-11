@@ -57,6 +57,8 @@ secrets.properties
 
 # Test results
 app/build/reports/
+app/build/test-results/
+build/test-run.log
 
 # Makefile generated screenshots
 screenshot_*.png
@@ -70,6 +72,9 @@ AGENTS.md
 hs_err_pid*.log
 replay_pid*.log
 error.log
+
+# Playwright MCP
+.playwright-mcp/
 
 # Room schema (exported but tracked separately)
 # app/schemas/ is intentionally committed

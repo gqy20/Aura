@@ -1,40 +1,21 @@
 package com.xiaoqi.companion.data.db.dao
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.xiaoqi.companion.data.db.CompanionDatabase
-import kotlinx.coroutines.flow.first
+import com.xiaoqi.companion.data.db.BaseDaoTest
 import kotlinx.coroutines.test.runTest
 import app.cash.turbine.test
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
 import java.util.UUID
 
-@RunWith(AndroidJUnit4::class)
-@Config(sdk = [34])
-class AgentStateDaoTest {
+class AgentStateDaoTest : BaseDaoTest() {
 
-    private lateinit var db: CompanionDatabase
     private lateinit var dao: AgentStateDao
 
-    @Before
-    fun setup() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = Room.inMemoryDatabaseBuilder(context, CompanionDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+    override fun initDaos() {
         dao = db.agentStateDao()
     }
-
-    @After
-    fun teardown() { db.close() }
 
     @Test
     fun observeByCompanionId_returnsState() = runTest {

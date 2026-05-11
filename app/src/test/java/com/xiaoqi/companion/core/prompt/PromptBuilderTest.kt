@@ -5,17 +5,12 @@ import com.xiaoqi.companion.core.prompt.templates.SystemPersona
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Test
 
 class PromptBuilderTest {
 
     private val builder = PromptBuilder()
-
-    @Before
-    fun setUp() {
-        initSystemPersonaFromYaml()
-    }
 
     // --- System prompt includes persona ---
 
@@ -128,7 +123,9 @@ class PromptBuilderTest {
     }
 
     companion object {
-        private fun initSystemPersonaFromYaml() {
+        @JvmStatic
+        @BeforeClass
+        fun initSystemPersonaFromYaml() {
             val yaml = """
                 name: "Companion"
 
