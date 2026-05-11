@@ -1,4 +1,12 @@
 # Add project specific ProGuard rules here.
--keep class com.xiaoqi.companion.** { *; }
 -dontwarn kotlinx.serialization.**
--keepattributes *Annotation*
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+-keepclassmembers class **$$serializer { *; }
+-keepclassmembers class ** {
+    public static ** Companion;
+}
+
+-keepclasseswithmembers class ** {
+    kotlinx.serialization.KSerializer serializer(...);
+}

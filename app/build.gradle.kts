@@ -77,7 +77,7 @@ dependencies {
     implementation(libs.compose.activity)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation(libs.coroutines.android)
 
     // DI
     implementation(libs.hilt.android)

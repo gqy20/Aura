@@ -60,3 +60,5 @@ app/build/reports/
 
 # Makefile generated screenshots
 screenshot_*.png
+
+PROFILE*
