@@ -54,3 +54,6 @@ secrets.properties
 
 # Test results
 app/build/reports/
+
+# Makefile generated screenshots
+screenshot_*.png
