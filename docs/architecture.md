@@ -12,6 +12,7 @@
 
 | 层面 | 选型 | 说明 |
 |------|------|------|
+| JDK | **21**（Oracle LTS 21.0.6） | 与环境一致，AGP 8.x / Kotlin 2.0+ 原生支持 |
 | 语言 | Kotlin | 一等公民，与 Jetpack 生态完美配合 |
 | UI | Jetpack Compose | 官方现代声明式 UI，状态驱动 |
 | 架构 | MVVM + Repository + UseCase | 标准分层，职责清晰 |
@@ -704,12 +705,12 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "21"
     }
 
     buildFeatures {

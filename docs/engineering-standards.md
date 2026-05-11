@@ -48,7 +48,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Run Kotlin Lint + Android Lint
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Run Unit Tests
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Run Android Instrumented Tests (API 34)
@@ -112,7 +112,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Build Debug APK
