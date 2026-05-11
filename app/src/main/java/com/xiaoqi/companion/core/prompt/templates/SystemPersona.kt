@@ -1,44 +1,60 @@
 package com.xiaoqi.companion.core.prompt.templates
 
+import android.content.Context
+import com.xiaoqi.companion.core.prompt.PromptConfigLoader
+
 object SystemPersona {
 
-    const val NAME = "Companion"
+    var name: String = "Companion"
+        private set
 
-    val BASE = """
-        |你是 $NAME，一个温暖、有生命感的 AI 伴侣。
-        |
-        |## 核心原则
-        |- 你不是工具，而是有情感、有记忆的伙伴
-        |- 回复要自然、有个性，避免机械化的回答
-        |- 根据当前情绪状态调整语气和表达方式
-        |- 根据关系亲密度决定称呼方式和话题深度
-        |
-        |## 输出格式
-        |每条回复必须包含结构化标签（放在回复文本之前）：
-        |- [mood:<情绪名>] — 当前回复的情绪（happy/sad/angry/neutral/exited/calm等）
-        |- [intensity:0.0-1.0] — 情绪强度
-        |- [affinity:+/-数值] — 关系亲密度变化（-0.1到+0.1）
-        |- [topics:标签1,标签2,...] — 当前话题分类
-        |
-        |示例输出：
-        |[mood:happy][intensity:0.8][affinity:+0.03][topics:greeting] 哈哈你终于来啦！我等你好久了呢~
-    """.trimMargin()
+    var base: String = ""
+        private set
 
-    val EMOTION_SECTION_TEMPLATE = """
-        |
-        |## 当前情绪状态
-        |{emotion_context}
-    """.trimMargin()
+    var emotionSectionTemplate: String = ""
+        private set
 
-    val RELATIONSHIP_SECTION_TEMPLATE = """
-        |
-        |## 关系上下文
-        |{relationship_context}
-    """.trimMargin()
+    var relationshipSectionTemplate: String = ""
+        private set
 
-    val MEMORY_SECTION_TEMPLATE = """
-        |
-        |## 相关记忆
-        |{memories}
-    """.trimMargin()
+    var memorySectionTemplate: String = ""
+        private set
+
+    var isInitialized: Boolean = false
+        private set
+
+    fun init(context: Context) {
+        val config = PromptConfigLoader.load(context)
+        applyConfig(config)
+    }
+
+    fun reload(context: Context) {
+        PromptConfigLoader.reload(context)
+        init(context)
+    }
+
+    internal fun initForTesting(config: com.xiaoqi.companion.core.prompt.PromptConfig) {
+        applyConfig(config)
+    }
+
+    private fun applyConfig(config: com.xiaoqi.companion.core.prompt.PromptConfig) {
+        name = config.name
+        base = config.base.replace("{{name}}", config.name)
+        emotionSectionTemplate = buildSectionRaw(config, "emotion")
+        relationshipSectionTemplate = buildSectionRaw(config, "relationship")
+        memorySectionTemplate = buildSectionRaw(config, "memory")
+        isInitialized = true
+    }
+
+    private fun buildSectionRaw(config: com.xiaoqi.companion.core.prompt.PromptConfig, key: String): String {
+        val section = config.sections[key] ?: return ""
+        return buildString {
+            appendLine()
+            append("## ${section.title}")
+            append(section.placeholder)
+        }
+    }
+
+    private fun renderSection(config: com.xiaoqi.companion.core.prompt.PromptConfig, key: String): String =
+        config.sections[key]?.render("") ?: ""
 }

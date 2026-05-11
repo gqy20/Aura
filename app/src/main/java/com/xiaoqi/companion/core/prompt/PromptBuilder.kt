@@ -38,19 +38,19 @@ class PromptBuilder {
         relationshipContext: String?,
         memories: List<String>,
     ): String {
-        val sb = StringBuilder(SystemPersona.BASE)
+        val sb = StringBuilder(SystemPersona.base)
 
         emotionContext?.let {
-            sb.append(SystemPersona.EMOTION_SECTION_TEMPLATE.replace("{emotion_context}", it))
+            sb.append(SystemPersona.emotionSectionTemplate.replace("{emotion_context}", it))
         }
 
         relationshipContext?.let {
-            sb.append(SystemPersona.RELATIONSHIP_SECTION_TEMPLATE.replace("{relationship_context}", it))
+            sb.append(SystemPersona.relationshipSectionTemplate.replace("{relationship_context}", it))
         }
 
         if (memories.isNotEmpty()) {
             val memoryText = memories.joinToString("\n")
-            sb.append(SystemPersona.MEMORY_SECTION_TEMPLATE.replace("{memories}", memoryText))
+            sb.append(SystemPersona.memorySectionTemplate.replace("{memories}", memoryText))
         }
 
         return sb.toString()
