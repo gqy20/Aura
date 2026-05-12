@@ -10,6 +10,7 @@ import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.db.CompanionDatabase
 import com.xiaoqi.companion.data.db.dao.MessageDao
+import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -47,9 +48,15 @@ object DataModule {
             context,
             CompanionDatabase::class.java,
             "companion.db",
-        ).build()
+        )
+            .addMigrations(CompanionDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides
     fun provideMessageDao(database: CompanionDatabase): MessageDao =
         database.messageDao()
+
+    @Provides
+    fun provideToolCallDao(database: CompanionDatabase): ToolCallDao =
+        database.toolCallDao()
 }
