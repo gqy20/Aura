@@ -1,27 +1,32 @@
 package com.xiaoqi.companion.core.companion
 
+import ai.koog.agents.core.agent.AIAgent
+import ai.koog.agents.core.agent.ToolCalls
+import ai.koog.agents.core.dsl.extension.HistoryCompressionStrategy
+import ai.koog.agents.ext.agent.HistoryCompressionConfig
+import ai.koog.agents.ext.agent.singleRunStrategyWithHistoryCompression
 import ai.koog.prompt.dsl.prompt
-import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.executor.model.PromptExecutor
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.AttachmentContent
 import ai.koog.prompt.message.ContentPart
-import ai.koog.prompt.streaming.StreamFrame
-import com.xiaoqi.companion.core.llm.AnthropicMessagesLLMClientFactory
+import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
+import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.data.repository.LlmConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.flow
 
 @Singleton
 class KoogAgentFactoryImpl @Inject constructor(
-    private val clientFactory: AnthropicMessagesLLMClientFactory,
+    private val executorFactory: KoogPromptExecutorFactory,
+    private val toolRegistry: AgentToolRegistry,
 ) : KoogAgentFactory {
 
     override fun create(config: LlmConfig): KoogAgentWrapper {
@@ -34,12 +39,8 @@ class KoogAgentFactoryImpl @Inject constructor(
         )
         return KoogPromptExecutorWrapper(
             config = config,
-            executor = MultiLLMPromptExecutor(
-                clientFactory.create(
-                    apiKey = config.apiKey,
-                    baseUrl = config.baseUrl,
-                )
-            ),
+            executor = executorFactory.create(config),
+            toolRegistry = toolRegistry,
         )
     }
 }
@@ -47,6 +48,7 @@ class KoogAgentFactoryImpl @Inject constructor(
 private class KoogPromptExecutorWrapper(
     private val config: LlmConfig,
     private val executor: PromptExecutor,
+    private val toolRegistry: AgentToolRegistry,
 ) : KoogAgentWrapper {
 
     private val model = LLModel(
@@ -60,19 +62,39 @@ private class KoogPromptExecutorWrapper(
     )
 
     override suspend fun run(prompt: BuiltPrompt): String =
-        executor.execute(prompt.toKoogPrompt(), model)
-            .joinToString("") { it.content }
+        createAgent(prompt).run(prompt.userMessage)
 
     override fun runStreaming(prompt: BuiltPrompt): Flow<String> =
-        executor.executeStreaming(prompt.toKoogPrompt(), model).mapNotNull { frame ->
-            when (frame) {
-                is StreamFrame.TextDelta -> frame.text
-                else -> null
-            }
+        flow {
+            emit(run(prompt))
         }
+
+    private fun createAgent(prompt: BuiltPrompt) =
+        AIAgent.builder()
+            .promptExecutor(executor)
+            .llmModel(model)
+            .prompt(prompt.toKoogAgentPrompt())
+            .toolRegistry(toolRegistry.create())
+            .maxIterations(MAX_AGENT_ITERATIONS)
+            .id("companion-agent-${config.provider.name.lowercase()}")
+            .graphStrategy(
+                singleRunStrategyWithHistoryCompression(
+                    HistoryCompressionConfig(
+                        isHistoryTooBig = { false },
+                        compressionStrategy = HistoryCompressionStrategy.NoCompression,
+                        retrievalModel = model,
+                    ),
+                    ToolCalls.SEQUENTIAL,
+                )
+            )
+            .build()
+
+    private companion object {
+        const val MAX_AGENT_ITERATIONS = 6
+    }
 }
 
-private fun BuiltPrompt.toKoogPrompt() = prompt("companion-chat") {
+private fun BuiltPrompt.toKoogAgentPrompt() = prompt("companion-chat") {
     system(systemPrompt)
     if (hasImage && imageBase64 != null) {
         user {

@@ -6,6 +6,10 @@ import com.xiaoqi.companion.core.companion.KoogAgentFactory
 import com.xiaoqi.companion.core.companion.KoogAgentFactoryImpl
 import com.xiaoqi.companion.core.companion.RelationshipModel
 import com.xiaoqi.companion.core.companion.RelationshipModelImpl
+import com.xiaoqi.companion.core.llm.DefaultKoogPromptExecutorFactory
+import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
+import com.xiaoqi.companion.core.tools.AgentToolRegistry
+import com.xiaoqi.companion.core.tools.CompanionToolRegistry
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.ConfigRepositoryImpl
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -31,6 +35,14 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindKoogAgentFactory(factory: KoogAgentFactoryImpl): KoogAgentFactory
+
+    @Binds
+    @Singleton
+    abstract fun bindKoogPromptExecutorFactory(factory: DefaultKoogPromptExecutorFactory): KoogPromptExecutorFactory
+
+    @Binds
+    @Singleton
+    abstract fun bindAgentToolRegistry(registry: CompanionToolRegistry): AgentToolRegistry
 
     @Binds
     @Singleton

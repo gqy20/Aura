@@ -2,6 +2,7 @@ package com.xiaoqi.companion.core.tools
 
 import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.data.db.converter.MemoryType
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
@@ -11,24 +12,34 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-class SaveMemoryTool @Inject constructor(
+class SaveMemoryTool(
     private val memoryDao: MemoryDao,
     private val recorder: ToolCallRecorder,
     private val sessionIdProvider: () -> String = { "default" },
 ) : SimpleTool<SaveMemoryTool.Args>(
-    Args.serializer(),
+    typeToken<Args>(),
     name = "save_memory",
     description = "Save an important user fact, preference, or episode into long-term memory.",
 ) {
 
     @Serializable
     data class Args(
-        @LLMDescription("The memory content to save. Keep it concise and factual.")
+        @param:LLMDescription("The memory content to save. Keep it concise and factual.")
         val content: String,
-        @LLMDescription("Memory type. Use FACT, EPISODE, or PROCEDURAL.")
+        @param:LLMDescription("Memory type. Use FACT, EPISODE, or PROCEDURAL.")
         val type: String = "FACT",
-        @LLMDescription("Importance from 0.0 to 1.0.")
+        @param:LLMDescription("Importance from 0.0 to 1.0.")
         val importance: Float = 0.5f,
+    )
+
+    @Inject
+    constructor(
+        memoryDao: MemoryDao,
+        recorder: ToolCallRecorder,
+    ) : this(
+        memoryDao = memoryDao,
+        recorder = recorder,
+        sessionIdProvider = { "default" },
     )
 
     override suspend fun execute(args: Args): String {
