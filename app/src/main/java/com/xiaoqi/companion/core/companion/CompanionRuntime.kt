@@ -6,6 +6,7 @@ import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.PromptBuilder
+import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
 import java.net.SocketTimeoutException
@@ -20,6 +21,7 @@ open class CompanionRuntime @Inject constructor(
     private val promptBuilder: PromptBuilder,
     private val outputParser: OutputParser,
     private val messageRepository: MessageRepository,
+    private val memoryDao: MemoryDao,
     private val emotionMachine: EmotionStateMachine,
     private val relationshipModel: RelationshipModel,
 ) {
@@ -34,17 +36,24 @@ open class CompanionRuntime @Inject constructor(
                 "hasImage" to (input is UserInput.Vision),
             )
 
+            val memories = memoryDao.getPromptMemories(PROMPT_MEMORY_LIMIT)
             val prompt = promptBuilder.build(
                 input = input,
                 emotionContext = emotionMachine.getContext(),
                 relationshipContext = relationshipModel.contextModifier(),
+                memories = memories.map { it.content },
             )
+            val memoryAccessedAt = System.currentTimeMillis()
+            memories.forEach { memory ->
+                memoryDao.updateLastAccessed(memory.id, memoryAccessedAt)
+            }
             AppLogger.debug(
                 LogTags.Runtime,
                 "prompt_built",
                 "systemLength" to prompt.systemPrompt.length,
                 "userMessageLength" to prompt.userMessage.length,
                 "hasImage" to prompt.hasImage,
+                "memoryCount" to memories.size,
             )
 
             val config = configRepository.getCurrentLlmConfig().first()
@@ -117,5 +126,6 @@ open class CompanionRuntime @Inject constructor(
 
     private companion object {
         const val DEFAULT_SESSION_ID = "default"
+        const val PROMPT_MEMORY_LIMIT = 8
     }
 }

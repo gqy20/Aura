@@ -84,6 +84,17 @@ class MemoryDaoTest : BaseDaoTest() {
     }
 
     @Test
+    fun getPromptMemories_ordersByImportanceThenLastAccessedAndLimits() = runTest {
+        dao.insert(makeMemory(id = "low", content = "low", importance = 0.2f, lastAccessed = 9_000L))
+        dao.insert(makeMemory(id = "oldImportant", content = "old", importance = 0.9f, lastAccessed = 1_000L))
+        dao.insert(makeMemory(id = "recentImportant", content = "recent", importance = 0.9f, lastAccessed = 8_000L))
+
+        val items = dao.getPromptMemories(limit = 2)
+
+        assertEquals(listOf("recent", "old"), items.map { it.content })
+    }
+
+    @Test
     fun deleteById_removesMemory() = runTest {
         dao.insert(makeMemory(id = "m1"))
         dao.deleteById("m1")

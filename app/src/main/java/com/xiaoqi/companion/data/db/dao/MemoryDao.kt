@@ -28,6 +28,9 @@ interface MemoryDao {
     @Query("SELECT * FROM memories WHERE timestamp >= :after ORDER BY timestamp DESC LIMIT :limit")
     fun observeRecent(after: Long, limit: Int): Flow<List<MemoryEntity>>
 
+    @Query("SELECT * FROM memories ORDER BY importance DESC, lastAccessed DESC LIMIT :limit")
+    suspend fun getPromptMemories(limit: Int): List<MemoryEntity>
+
     @Query("DELETE FROM memories WHERE id = :id")
     suspend fun deleteById(id: String)
 }

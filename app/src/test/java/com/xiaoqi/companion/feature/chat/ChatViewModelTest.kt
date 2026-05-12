@@ -6,6 +6,7 @@ import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.UserInput
+import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -55,6 +56,7 @@ class ChatViewModelTest {
         promptBuilder = mockk(),
         outputParser = OutputParser(),
         messageRepository = messageRepo,
+        memoryDao = mockk<MemoryDao>(relaxed = true),
         emotionMachine = mockk(relaxed = true),
         relationshipModel = mockk(relaxed = true),
     ) {
