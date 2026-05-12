@@ -61,26 +61,34 @@ class AnthropicMessagesLLMClient(
         tools: List<ToolDescriptor>,
     ): List<Message.Response> {
         val startedAt = System.currentTimeMillis()
-        val response = executeRequest(prompt, model, stream = false)
-        val text = extractTextFromMessageResponse(response)
+        val response = executeRequest(prompt, model, stream = false, tools = tools)
         val usage = response["usage"]?.jsonObject
-        AppLogger.info(
-            LogTags.Llm,
-            "request_completed",
-            "model" to model.id,
-            "stream" to false,
-            "durationMs" to (System.currentTimeMillis() - startedAt),
-            "responseLength" to text.length,
-            "inputTokens" to usage?.get("input_tokens")?.jsonPrimitive?.intOrNull,
-            "outputTokens" to usage?.get("output_tokens")?.jsonPrimitive?.intOrNull,
-        )
-        return listOf(
-            Message.Assistant(
-                content = text,
-                metaInfo = responseMetaInfo(usage),
-                finishReason = response["stop_reason"]?.jsonPrimitive?.contentOrNull,
-            )
-        )
+        val stopReason = response["stop_reason"]?.jsonPrimitive?.contentOrNull
+
+        val responses = when (stopReason) {
+            "tool_use" -> extractToolUseResponses(response, usage)
+            else -> {
+                val text = extractTextFromMessageResponse(response)
+                AppLogger.info(
+                    LogTags.Llm,
+                    "request_completed",
+                    "model" to model.id,
+                    "stream" to false,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                    "responseLength" to text.length,
+                    "inputTokens" to usage?.get("input_tokens")?.jsonPrimitive?.intOrNull,
+                    "outputTokens" to usage?.get("output_tokens")?.jsonPrimitive?.intOrNull,
+                )
+                listOf(
+                    Message.Assistant(
+                        content = text,
+                        metaInfo = responseMetaInfo(usage),
+                        finishReason = stopReason,
+                    )
+                )
+            }
+        }
+        return responses
     }
 
     override fun executeStreaming(
@@ -89,9 +97,11 @@ class AnthropicMessagesLLMClient(
         tools: List<ToolDescriptor>,
     ): Flow<StreamFrame> = callbackFlow {
         val startedAt = System.currentTimeMillis()
-        val request = buildRequest(prompt, model, stream = true)
+        val request = buildRequest(prompt, model, stream = true, tools = tools)
         var fullText = ""
         var finishReason: String? = null
+        var currentToolName: String? = null
+        var currentToolInput = StringBuilder()
 
         launch(Dispatchers.IO) {
             try {
@@ -118,18 +128,44 @@ class AnthropicMessagesLLMClient(
                         if (data == "[DONE]") break
 
                         val parsed = parseSseData(data)
+                        if (parsed.isToolUseBlock && parsed.toolName != null) {
+                            currentToolName = parsed.toolName
+                            currentToolInput = StringBuilder()
+                            AppLogger.debug(LogTags.Llm, "stream_tool_start", "tool" to parsed.toolName)
+                        }
+                        if (parsed.toolInput != null) {
+                            currentToolInput.append(parsed.toolInput)
+                        }
                         if (parsed.deltaText != null) {
                             fullText += parsed.deltaText
                             trySend(StreamFrame.TextDelta(parsed.deltaText, null))
                         }
                         if (parsed.finishReason != null) {
                             finishReason = parsed.finishReason
+                            if (currentToolName != null) {
+                                AppLogger.info(
+                                    LogTags.Llm,
+                                    "stream_tool_completed",
+                                    "tool" to currentToolName,
+                                    "inputLength" to currentToolInput.length,
+                                )
+                                currentToolName = null
+                            }
                         }
                     }
                 }
 
                 if (fullText.isNotEmpty()) {
                     trySend(StreamFrame.TextComplete(fullText, null))
+                }
+
+                if (finishReason == "tool_use" && currentToolName != null) {
+                    AppLogger.info(
+                        LogTags.Llm,
+                        "stream_tool_use_final",
+                        "tool" to currentToolName,
+                        "input" to currentToolInput.toString(),
+                    )
                 }
                 AppLogger.info(
                     LogTags.Llm,
@@ -158,10 +194,10 @@ class AnthropicMessagesLLMClient(
         (httpClient as? Closeable)?.close()
     }
 
-    private suspend fun executeRequest(prompt: Prompt, model: LLModel, stream: Boolean): JsonObject =
+    private suspend fun executeRequest(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): JsonObject =
         withContext(Dispatchers.IO) {
             val startedAt = System.currentTimeMillis()
-            val request = buildRequest(prompt, model, stream)
+            val request = buildRequest(prompt, model, stream, tools)
             httpClient.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
@@ -180,10 +216,10 @@ class AnthropicMessagesLLMClient(
             }
         }
 
-    private fun buildRequest(prompt: Prompt, model: LLModel, stream: Boolean): Request {
+    private fun buildRequest(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): Request {
         require(baseUrl.isNotBlank()) { "LLM_BASE_URL is not configured" }
         require(apiKey.isNotBlank()) { "LLM_API_KEY is not configured" }
-        val body = buildRequestBody(prompt, model, stream)
+        val body = buildRequestBody(prompt, model, stream, tools)
         AppLogger.debug(
             LogTags.Llm,
             "request_built",
@@ -202,7 +238,7 @@ class AnthropicMessagesLLMClient(
             .build()
     }
 
-    private fun buildRequestBody(prompt: Prompt, model: LLModel, stream: Boolean): JsonObject =
+    private fun buildRequestBody(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): JsonObject =
         buildJsonObject {
             put("model", model.id)
             put("max_tokens", prompt.params.maxTokens ?: model.maxOutputTokens?.toInt() ?: DEFAULT_MAX_TOKENS)
@@ -227,7 +263,38 @@ class AnthropicMessagesLLMClient(
                         }
                 }
             )
+
+            if (tools.isNotEmpty()) {
+                put("tools", buildJsonArray {
+                    tools.forEach { tool ->
+                        add(buildJsonObject {
+                            put("name", tool.name)
+                            put("description", tool.description)
+                            put("input_schema", tool.toAnthropicInputSchema())
+                        })
+                    }
+                })
+            }
         }
+
+    private fun ToolDescriptor.toAnthropicInputSchema(): JsonObject {
+        val allParams = requiredParameters + optionalParameters
+        val requiredNames = requiredParameters.map { it.name }.toSet()
+        return buildJsonObject {
+            put("type", JsonPrimitive("object"))
+            put("properties", buildJsonObject {
+                allParams.forEach { param ->
+                    put(param.name, buildJsonObject {
+                        put("type", JsonPrimitive(param.type.toString()))
+                        put("description", JsonPrimitive(param.description))
+                    })
+                }
+            })
+            if (requiredNames.isNotEmpty()) {
+                put("required", buildJsonArray { requiredNames.forEach { add(JsonPrimitive(it)) } })
+            }
+        }
+    }
 
     private fun Message.toAnthropicMessage(): JsonObject =
         buildJsonObject {
@@ -294,6 +361,21 @@ class AnthropicMessagesLLMClient(
             ?.joinToString("")
             .orEmpty()
 
+    private fun extractToolUseResponses(response: JsonObject, usage: JsonObject?): List<Message.Response> =
+        response["content"]?.jsonArray
+            ?.mapNotNull { block ->
+                val blockObj = block.jsonObject
+                if (blockObj["type"]?.jsonPrimitive?.contentOrNull == "tool_use") {
+                    Message.Tool.Call(
+                        id = blockObj["id"]?.jsonPrimitive?.contentOrNull ?: "",
+                        tool = blockObj["name"]?.jsonPrimitive?.contentOrNull ?: "",
+                        content = blockObj["input"]?.toString() ?: "{}",
+                        metaInfo = responseMetaInfo(usage),
+                    )
+                } else null
+            }
+            ?: emptyList()
+
     private fun parseSseData(data: String): ParsedSse {
         val event = runCatching { json.parseToJsonElement(data).jsonObject }.getOrNull()
             ?: return ParsedSse()
@@ -304,10 +386,25 @@ class AnthropicMessagesLLMClient(
                     ?.get("stop_reason")?.jsonPrimitive?.contentOrNull
             )
         }
+        if (type == "content_block_start") {
+            val block = event["content_block"]?.jsonObject ?: return ParsedSse()
+            if (block["type"]?.jsonPrimitive?.contentOrNull == "tool_use") {
+                return ParsedSse(
+                    isToolUseBlock = true,
+                    toolName = block["name"]?.jsonPrimitive?.contentOrNull,
+                )
+            }
+            return ParsedSse()
+        }
         if (type != "content_block_delta") return ParsedSse()
 
         val delta = event["delta"]?.jsonObject ?: return ParsedSse()
-        return ParsedSse(deltaText = delta["text"]?.jsonPrimitive?.contentOrNull)
+        val deltaType = delta["type"]?.jsonPrimitive?.contentOrNull
+        return when (deltaType) {
+            "text_delta" -> ParsedSse(deltaText = delta["text"]?.jsonPrimitive?.contentOrNull)
+            "input_json_delta" -> ParsedSse(toolInput = delta["partial_json"]?.jsonPrimitive?.contentOrNull)
+            else -> ParsedSse()
+        }
     }
 
     private fun responseMetaInfo(usage: JsonObject?): ResponseMetaInfo =
@@ -320,6 +417,9 @@ class AnthropicMessagesLLMClient(
     private data class ParsedSse(
         val deltaText: String? = null,
         val finishReason: String? = null,
+        val toolName: String? = null,
+        val toolInput: String? = null,
+        val isToolUseBlock: Boolean = false,
     )
 
     private companion object {

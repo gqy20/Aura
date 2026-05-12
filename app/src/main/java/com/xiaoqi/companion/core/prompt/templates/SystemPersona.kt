@@ -20,6 +20,9 @@ object SystemPersona {
     var memorySectionTemplate: String = ""
         private set
 
+    var toolsSectionTemplate: String = ""
+        private set
+
     var isInitialized: Boolean = false
         private set
 
@@ -43,6 +46,7 @@ object SystemPersona {
         emotionSectionTemplate = buildSectionRaw(config, "emotion")
         relationshipSectionTemplate = buildSectionRaw(config, "relationship")
         memorySectionTemplate = buildSectionRaw(config, "memory")
+        toolsSectionTemplate = buildSectionRaw(config, "tools")
         isInitialized = true
     }
 

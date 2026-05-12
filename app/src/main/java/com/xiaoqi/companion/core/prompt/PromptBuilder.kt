@@ -64,6 +64,10 @@ class PromptBuilder {
             sb.append(SystemPersona.memorySectionTemplate.replace("{memories}", memoryText))
         }
 
+        if (SystemPersona.toolsSectionTemplate.isNotEmpty()) {
+            sb.append(SystemPersona.toolsSectionTemplate)
+        }
+
         return sb.toString()
     }
 }
