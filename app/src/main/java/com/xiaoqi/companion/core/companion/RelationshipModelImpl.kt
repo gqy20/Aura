@@ -1,8 +1,11 @@
 package com.xiaoqi.companion.core.companion
 
 import com.xiaoqi.companion.core.companion.model.InteractionSignal
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "Companion-Relation"
 
 @Singleton
 class RelationshipModelImpl @Inject constructor() : RelationshipModel {
@@ -11,7 +14,11 @@ class RelationshipModelImpl @Inject constructor() : RelationshipModel {
         private set
 
     override suspend fun update(signal: InteractionSignal) {
+        val previous = currentLevel
         currentLevel = (currentLevel + signal.affinityDelta).coerceIn(0f, 1f)
+        if (signal.affinityDelta != 0f) {
+            Timber.tag(TAG).d("Relationship: %.2f -> %.2f (delta=%.2f)", previous, currentLevel, signal.affinityDelta)
+        }
     }
 
     override fun contextModifier(): String {

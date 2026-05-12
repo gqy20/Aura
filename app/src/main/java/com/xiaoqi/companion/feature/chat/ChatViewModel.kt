@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.UserInput
+import timber.log.Timber
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -14,6 +15,10 @@ import java.util.UUID
 class ChatViewModel(
     private val runtime: CompanionRuntime,
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "Companion-Chat"
+    }
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
@@ -63,6 +68,7 @@ class ChatViewModel(
                             }
                         }
                         is AgentEvent.Complete -> {
+                            Timber.tag(TAG).d("Agent response received, length=%d", event.parsed.textReply.length)
                             _uiState.update { state ->
                                 val updated = state.messages.map { msg ->
                                     if (msg.id == assistantId) msg.copy(
@@ -74,7 +80,7 @@ class ChatViewModel(
                             }
                         }
                         is AgentEvent.Error -> {
-                            // Remove streaming placeholder and set error
+                            Timber.tag(TAG).w("Agent error: %s", event.error)
                             _uiState.update { state ->
                                 val filtered = state.messages.filter { it.id != assistantId }
                                 state.copy(
@@ -86,7 +92,8 @@ class ChatViewModel(
                         }
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "send failed for input: '%s'", trimmed)
                 _uiState.update { it.copy(isLoading = false, error = "发送失败，请重试") }
             }
         }

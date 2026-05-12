@@ -2,9 +2,12 @@ package com.xiaoqi.companion.data.repository
 
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
+import timber.log.Timber
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+
+private const val TAG = "Companion-Config"
 
 data class LlmConfig(
     val provider: LlmProvider,
@@ -33,6 +36,9 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
 
     override fun getCurrentLlmConfig(): Flow<LlmConfig> =
         combine(prefs.llmProvider, prefs.apiKey, prefs.modelName) { provider, key, model ->
+            if (key.isNullOrEmpty()) {
+                Timber.tag(TAG).w("API key is not set — LLM calls will fail")
+            }
             LlmConfig(
                 provider = provider,
                 baseUrl = when (provider) {

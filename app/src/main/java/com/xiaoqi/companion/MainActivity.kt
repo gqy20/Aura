@@ -30,6 +30,11 @@ import java.util.UUID
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        private const val TAG = "Companion-LLM"
+    }
+
     private val uiState = MutableStateFlow(ChatUiState())
     private val scope = CoroutineScope(Dispatchers.Main)
 
@@ -68,7 +73,7 @@ class MainActivity : ComponentActivity() {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
 
-        Timber.d("sendMessage: text='$trimmed', model=${BuildConfig.ANTHROPIC_MODEL}, url=${BuildConfig.ANTHROPIC_BASE_URL}, key=${BuildConfig.ANTHROPIC_API_KEY.take(10)}...")
+        Timber.tag(TAG).d("sendMessage: text='%s', model=%s, url=%s", trimmed, BuildConfig.ANTHROPIC_MODEL, BuildConfig.ANTHROPIC_BASE_URL)
 
         val userMsg = ChatMessage(id = UUID.randomUUID().toString(), role = "USER", content = trimmed)
         val assistantId = UUID.randomUUID().toString()
@@ -83,17 +88,15 @@ class MainActivity : ComponentActivity() {
         scope.launch {
             try {
                 var assistantContent = ""
-                Timber.d("Starting API call...")
+                Timber.tag(TAG).d("Starting API call...")
                 val chatPrompt = prompt("chat") {
                     system("你是 Aura，一个友好温暖的 AI 伙伴。用中文简洁回答。")
                     user(trimmed)
                 }
 
                 client.executeStreaming(chatPrompt, glmModel).collect { frame ->
-                    Timber.d("StreamFrame: $frame")
                     when (frame) {
                         is StreamFrame.TextDelta -> {
-                            Timber.d("TextDelta: '${frame.text}'")
                             assistantContent += frame.text
                             val captured = assistantContent
                             uiState.update { state ->
@@ -104,7 +107,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         is StreamFrame.End -> {
-                            Timber.d("Stream ended. Total content: '$assistantContent'")
+                            Timber.tag(TAG).d("Stream ended, content length=%d", assistantContent.length)
                             uiState.update { state ->
                                 val updated = state.messages.map { msg ->
                                     if (msg.id == assistantId) msg.copy(isStreaming = false) else msg
@@ -112,12 +115,12 @@ class MainActivity : ComponentActivity() {
                                 state.copy(messages = updated, isLoading = false)
                             }
                         }
-                        else -> { Timber.d("Other frame: ${frame::class.simpleName}") }
+                        else -> { /* ignore other frame types */ }
                     }
                 }
-                Timber.d("Collection completed normally")
+                Timber.tag(TAG).d("Collection completed normally")
             } catch (e: Exception) {
-                Timber.e(e, "API call failed")
+                Timber.tag(TAG).e(e, "API call failed")
                 uiState.update { state ->
                     val filtered = state.messages.filter { it.id != assistantId }
                     filtered.let {

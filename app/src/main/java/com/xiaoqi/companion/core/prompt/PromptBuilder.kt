@@ -2,6 +2,9 @@ package com.xiaoqi.companion.core.prompt
 
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.prompt.templates.SystemPersona
+import timber.log.Timber
+
+private const val TAG = "Companion-Prompt"
 
 data class BuiltPrompt(
     val systemPrompt: String,
@@ -20,6 +23,8 @@ class PromptBuilder {
         memories: List<String> = emptyList(),
     ): BuiltPrompt {
         val systemPrompt = buildSystemPrompt(emotionContext, relationshipContext, memories)
+        Timber.tag(TAG).d("Built prompt: system length=%d, hasEmotion=%s, hasRelation=%s, memories=%d",
+            systemPrompt.length, emotionContext != null, relationshipContext != null, memories.size)
         return when (input) {
             is UserInput.Text -> BuiltPrompt(systemPrompt, input.content)
             is UserInput.Vision -> BuiltPrompt(
