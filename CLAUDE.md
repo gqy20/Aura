@@ -1,5 +1,106 @@
 # Android 项目 - 开发环境
 
+## 项目文档
+
+- **[Koog API 参考](docs/koog-api-reference.md)** — 从 Gradle 缓存 JAR (`javap -p -s`) 提取的 Koog v0.8.0 完整 API 签名，覆盖 Agent/Builder/Strategy/Service/Tool/Pipeline/Prompt&LLM 等 15 个模块，含架构图和类型签名表。
+- **[Koog ↔ Android 集成指南](docs/koog-android-integration.md)** — Koog 在 Android 上的集成方案：当前项目审计（Stub 工厂/MainActivity 反模式/URL 不一致）、两阶段实现策略（非流式验证 → 流式生产）、线程规则（禁止 runBlocking/KG-750 死锁）、生命周期模式、完整可运行代码。
+
+## Compose UI: Window Insets 速查
+
+> 来源：[Android 官方 - About window insets](https://developer.android.com/develop/ui/compose/system/insets) + [Set up window insets](https://developer.android.com/develop/ui/compose/system/insets-ui)
+
+### 核心概念
+
+**Insets** = 系统 UI（状态栏/导航栏/键盘/刘海）占用的空间信息，用于确保应用内容不被遮挡。Android 15 (SDK 35+) **强制 edge-to-edge**，必须处理 insets。
+
+### 常用 Inset 类型
+
+| 类型 | 含义 | 聊天场景 |
+|------|------|---------|
+| `WindowInsets.statusBars` | 顶部状态栏 | 确保内容不被状态栏遮挡 |
+| `WindowInsets.navigationBars` | 底部/侧边导航栏 | 确保输入框不被导航栏遮挡 |
+| `WindowInsets.ime` | 软键盘高度 | **聊天界面核心** — 键盘弹出时推动列表 |
+| `WindowInsets.displayCutout` | 刘海/挖孔屏 | 避免内容进入刘海区域 |
+| `WindowInsets.safeDrawing` | statusBars + navigationBars + captionBar 并集 | 最常用的"安全区域" |
+
+### Compose Modifier 一览
+
+```kotlin
+// Padding 方式（最常用）— 将 inset 值作为内边距
+Modifier.safeDrawingPadding()                              // 四周安全区域
+Modifier.statusBarsPadding()                               // 仅顶部
+Modifier.navigationBarsPadding()                           // 仅底部（导航栏）
+Modifier.imePadding()                                      // 键盘高度作为 padding
+Modifier.windowInsetsPadding(WindowInsets.systemBars)      // 指定任意 inset 类型
+
+// 尺寸方式 — 将 inset 值设为组件尺寸（常用于 Spacer）
+Modifier.windowInsetsTopHeight(WindowInsets.statusBars)    // 顶部 spacer = 状态栏高度
+Modifier.windowInsetsBottomHeight(WindowInsets.ime)        // 底部 spacer = 键盘高度
+
+// 消费方式 — 标记 inset 已被处理（不施加 padding，仅标记）
+Modifier.consumeWindowInsets(WindowInsets.systemBars)
+```
+
+### Inset Consumption（消费机制）
+
+Inset padding modifiers 会自动 **consume（消费）** 已使用的 inset 部分，嵌套的子组件不会重复计算同一块空间：
+
+```
+Column(Modifier.imePadding()) {          // 外层消费了 IME inset
+    LazyColumn { ... }                   // 内部不再重复 IME padding
+    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.systemBars))
+    // ↑ 当 IME 打开时此 Spacer 高度 → 0（已被 imePadding 消费）
+    //   当 IME 关闭时此 Spacer 高度 → 导航栏高度
+}
+```
+
+> **关键**: LazyColumn 中最后一个 TextField 上方用 `Spacer + windowInsetsBottomHeight(systemBars)` 而非 `contentPadding`，否则 IME 弹出时可能遮住输入框。
+
+### 聊天界面推荐模式
+
+```kotlin
+// ChatScreen — 键盘安全的聊天布局
+Column(Modifier.fillMaxSize().imePadding()) {
+    // 消息列表 — 占据剩余空间，键盘弹出时自动收缩
+    LazyColumn(
+        modifier = Modifier.weight(1f),
+        reverseLayout = true,           // 最新消息在底部
+    ) {
+        items(messages) { MessageBubble(it) }
+        // 底部留出系统导航栏空间（IME 关闭时生效）
+        item {
+            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.systemBars))
+        }
+    }
+
+    // 输入栏 — 固定底部，始终可见
+    ChatInputBar(
+        onSendMessage = { ... },
+    )
+}
+```
+
+### Edge-to-edge 启用
+
+```kotlin
+// Activity.onCreate()
+override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    enableEdgeToEdge()   // Android 15+ 强制，低版本推荐启用
+    setContent { /* ... */ }
+}
+```
+
+### 与 Compose Phase 的关系
+
+Inset 值在 **composition 之后、layout 之前** 更新。内置 Modifier 已延迟到 layout 阶段读取，确保同帧生效。如直接在 composition 中读 `WindowInsets.asPaddingValues()` 可能有一帧延迟，优先使用上述 Modifier。
+
+---
+
+## 参考文档
+
+- **[开源项目参考](docs/reference-android-ai-projects.md)** — 与本项目技术栈相似的 Android AI 聊天/陪伴开源项目调研（Operit / skydoves-chatgpt-android / gpt_mobile 等），含架构对比和借鉴建议。
+
 ## 工具优先级
 
 **信息检索/调研时，工具使用优先级（从高到低）：**
