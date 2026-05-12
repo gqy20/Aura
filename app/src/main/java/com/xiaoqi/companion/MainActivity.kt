@@ -9,6 +9,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
+import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
+import ai.koog.prompt.dsl.prompt
+import ai.koog.prompt.llm.LLMProvider
+import ai.koog.prompt.llm.LLModel
+import ai.koog.prompt.streaming.StreamFrame
 import com.xiaoqi.companion.feature.chat.ChatScreenContent
 import com.xiaoqi.companion.feature.chat.ChatMessage
 import com.xiaoqi.companion.feature.chat.ChatUiState
@@ -25,6 +31,18 @@ import java.util.UUID
 class MainActivity : ComponentActivity() {
     private val uiState = MutableStateFlow(ChatUiState())
     private val scope = CoroutineScope(Dispatchers.Main)
+
+    private val glmModel = LLModel(
+        id = BuildConfig.ANTHROPIC_MODEL,
+        provider = LLMProvider.Anthropic,
+    )
+
+    private val client by lazy {
+        AnthropicLLMClient(
+            apiKey = BuildConfig.ANTHROPIC_API_KEY,
+            settings = AnthropicClientSettings(baseUrl = BuildConfig.ANTHROPIC_BASE_URL),
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,12 +78,47 @@ class MainActivity : ComponentActivity() {
         }
 
         scope.launch {
-            kotlinx.coroutines.delay(600)
-            uiState.update { state ->
-                val updated = state.messages.map { msg ->
-                    if (msg.id == assistantId) msg.copy(content = "Echo: $trimmed", isStreaming = false) else msg
+            try {
+                var assistantContent = ""
+                val chatPrompt = prompt("chat") {
+                    system("你是 Aura，一个友好温暖的 AI 伙伴。用中文简洁回答。")
+                    user(trimmed)
                 }
-                state.copy(messages = updated, isLoading = false)
+
+                client.executeStreaming(chatPrompt, glmModel).collect { frame ->
+                    when (frame) {
+                        is StreamFrame.TextDelta -> {
+                            assistantContent += frame.text
+                            val captured = assistantContent
+                            uiState.update { state ->
+                                val updated = state.messages.map { msg ->
+                                    if (msg.id == assistantId) msg.copy(content = captured) else msg
+                                }
+                                state.copy(messages = updated)
+                            }
+                        }
+                        is StreamFrame.End -> {
+                            uiState.update { state ->
+                                val updated = state.messages.map { msg ->
+                                    if (msg.id == assistantId) msg.copy(isStreaming = false) else msg
+                                }
+                                state.copy(messages = updated, isLoading = false)
+                            }
+                        }
+                        else -> {}
+                    }
+                }
+            } catch (e: Exception) {
+                uiState.update { state ->
+                    val filtered = state.messages.filter { it.id != assistantId }
+                    filtered.let {
+                        state.copy(
+                            messages = it,
+                            isLoading = false,
+                            error = e.message ?: "请求失败，请重试",
+                        )
+                    }
+                }
             }
         }
     }

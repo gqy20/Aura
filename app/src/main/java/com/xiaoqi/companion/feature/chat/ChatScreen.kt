@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -111,6 +111,7 @@ fun ChatScreenContent(
                 inputText = uiState.inputText,
                 onInputTextChanged = onInputTextChanged,
                 onSendMessage = onSendMessage,
+                modifier = Modifier.imePadding(),
             )
         }
     }
@@ -128,10 +129,11 @@ private fun InputBar(
     inputText: String,
     onInputTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         tonalElevation = 3.dp,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

@@ -29,6 +29,17 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val envFile = rootProject.file(".env")
+        val envProps = Properties()
+        if (envFile.exists()) envProps.load(envFile.inputStream())
+
+        val anthropicApiKey = envProps.getProperty("ANTHROPIC_AUTH_TOKEN") ?: System.getenv("ANTHROPIC_AUTH_TOKEN") ?: ""
+        val anthropicBaseUrl = envProps.getProperty("ANTHROPIC_BASE_URL") ?: System.getenv("ANTHROPIC_BASE_URL") ?: "https://open.bigmodel.cn/api/anthropic"
+        val anthropicModel = envProps.getProperty("ANTHROPIC_MODEL") ?: System.getenv("ANTHROPIC_MODEL") ?: "glm-5v-turbo"
+        buildConfigField("String", "ANTHROPIC_API_KEY", "\"$anthropicApiKey\"")
+        buildConfigField("String", "ANTHROPIC_BASE_URL", "\"$anthropicBaseUrl\"")
+        buildConfigField("String", "ANTHROPIC_MODEL", "\"$anthropicModel\"")
     }
 
     // Signing: use release keystore if keystore.properties exists, otherwise fallback to debug
