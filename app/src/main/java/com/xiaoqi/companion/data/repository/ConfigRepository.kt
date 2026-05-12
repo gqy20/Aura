@@ -1,14 +1,13 @@
 package com.xiaoqi.companion.data.repository
 
 import com.xiaoqi.companion.BuildConfig
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
-import timber.log.Timber
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-
-private const val TAG = "Companion-Config"
 
 data class LlmConfig(
     val provider: LlmProvider,
@@ -37,9 +36,15 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
 
     override fun getCurrentLlmConfig(): Flow<LlmConfig> =
         combine(prefs.llmProvider, prefs.apiKey, prefs.modelName) { provider, key, model ->
+            val resolvedModel = model.ifBlank { BuildConfig.LLM_MODEL }
             val resolvedKey = key?.takeIf { it.isNotBlank() } ?: BuildConfig.LLM_API_KEY
             if (resolvedKey.isEmpty()) {
-                Timber.tag(TAG).w("API key is not set — LLM calls will fail")
+                AppLogger.warn(
+                    LogTags.Config,
+                    "api_key_missing",
+                    "provider" to provider,
+                    "model" to resolvedModel,
+                )
             }
             LlmConfig(
                 provider = provider,
@@ -48,10 +53,15 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
                     LlmProvider.KIMI -> "https://api.moonshot.cn/v1"
                 },
                 apiKey = resolvedKey,
-                modelName = model.ifBlank { BuildConfig.LLM_MODEL },
+                modelName = resolvedModel,
             )
         }
 
-    override suspend fun setApiKey(key: String?) { prefs.setApiKey(key) }
-    override suspend fun setModelName(name: String) { prefs.setModelName(name) }
+    override suspend fun setApiKey(key: String?) {
+        prefs.setApiKey(key)
+    }
+
+    override suspend fun setModelName(name: String) {
+        prefs.setModelName(name)
+    }
 }

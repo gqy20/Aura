@@ -10,15 +10,14 @@ import ai.koog.prompt.message.AttachmentContent
 import ai.koog.prompt.message.ContentPart
 import ai.koog.prompt.streaming.StreamFrame
 import com.xiaoqi.companion.core.llm.AnthropicMessagesLLMClientFactory
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.data.repository.LlmConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapNotNull
-import timber.log.Timber
-
-private const val TAG = "Companion-Agent"
 
 @Singleton
 class KoogAgentFactoryImpl @Inject constructor(
@@ -26,7 +25,13 @@ class KoogAgentFactoryImpl @Inject constructor(
 ) : KoogAgentFactory {
 
     override fun create(config: LlmConfig): KoogAgentWrapper {
-        Timber.tag(TAG).d("Creating Anthropic Messages agent: provider=%s, model=%s", config.provider, config.modelName)
+        AppLogger.debug(
+            LogTags.Llm,
+            "agent_created",
+            "provider" to config.provider,
+            "model" to config.modelName,
+            "hasApiKey" to config.apiKey.isNotBlank(),
+        )
         return KoogPromptExecutorWrapper(
             config = config,
             executor = MultiLLMPromptExecutor(

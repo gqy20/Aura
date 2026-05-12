@@ -1,11 +1,10 @@
 package com.xiaoqi.companion.core.companion
 
 import com.xiaoqi.companion.core.companion.model.InteractionSignal
-import timber.log.Timber
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private const val TAG = "Companion-Relation"
 
 @Singleton
 class RelationshipModelImpl @Inject constructor() : RelationshipModel {
@@ -17,7 +16,15 @@ class RelationshipModelImpl @Inject constructor() : RelationshipModel {
         val previous = currentLevel
         currentLevel = (currentLevel + signal.affinityDelta).coerceIn(0f, 1f)
         if (signal.affinityDelta != 0f) {
-            Timber.tag(TAG).d("Relationship: %.2f -> %.2f (delta=%.2f)", previous, currentLevel, signal.affinityDelta)
+            AppLogger.debug(
+                LogTags.Relation,
+                "relationship_level_changed",
+                "previousLevel" to previous,
+                "currentLevel" to currentLevel,
+                "delta" to signal.affinityDelta,
+                "topicCount" to signal.topicTags.size,
+                "isDeepConversation" to signal.isDeepConversation,
+            )
         }
     }
 

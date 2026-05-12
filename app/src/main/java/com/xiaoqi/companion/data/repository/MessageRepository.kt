@@ -1,13 +1,13 @@
 package com.xiaoqi.companion.data.repository
 
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogFieldSanitizer
+import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
-import com.xiaoqi.companion.data.db.converter.MessageRole
-import timber.log.Timber
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
-
-private const val TAG = "Companion-Repo"
 
 interface MessageRepository {
     fun getMessagesBySession(sessionId: String): Flow<List<MessageEntity>>
@@ -21,8 +21,13 @@ class MessageRepositoryImpl @Inject constructor(private val dao: MessageDao) : M
         dao.observeBySession(sessionId)
 
     override suspend fun sendMessage(sessionId: String, content: String, imageBase64: String?) {
-        Timber.tag(TAG).d("sendMessage: session=%s, content length=%d, hasImage=%s",
-            sessionId, content.length, imageBase64 != null)
+        AppLogger.debug(
+            LogTags.Repo,
+            "message_insert_started",
+            "sessionHash" to LogFieldSanitizer.hash(sessionId),
+            "contentLength" to content.length,
+            "hasImage" to (imageBase64 != null),
+        )
         dao.insert(
             MessageEntity(
                 id = java.util.UUID.randomUUID().toString(),
@@ -36,7 +41,11 @@ class MessageRepositoryImpl @Inject constructor(private val dao: MessageDao) : M
     }
 
     override suspend fun deleteSession(sessionId: String) {
-        Timber.tag(TAG).d("deleteSession: session=%s", sessionId)
+        AppLogger.info(
+            LogTags.Repo,
+            "session_delete_started",
+            "sessionHash" to LogFieldSanitizer.hash(sessionId),
+        )
         dao.deleteBySession(sessionId)
     }
 }

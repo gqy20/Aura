@@ -91,7 +91,7 @@ devices:
 	adb devices -l
 
 logcat:
-	adb logcat -s "Companion*" "*:S" | head -100
+	adb logcat | grep -E "Companion\.(App|Chat|Runtime|LLM|Prompt|Parser|Repo|Config|Emotion|Relation|DB)" | head -100
 
 logcat-clear:
 	adb logcat -c

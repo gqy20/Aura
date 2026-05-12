@@ -43,6 +43,7 @@ mobile/
 
 # Log
 *.log
+full_log.txt
 
 # OS
 Thumbs.db
@@ -63,11 +64,18 @@ build/test-run.log
 
 # Makefile generated screenshots
 screenshot_*.png
+screen_*.png
+
+# Device/UI dumps
+ui*.xml
 
 PROFILE*
 
 # Auto-generated agent files
 AGENTS.md
+
+# Local assistant/tool state
+.claude/
 
 # JVM crash logs
 hs_err_pid*.log

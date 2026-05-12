@@ -4,9 +4,8 @@ import com.xiaoqi.companion.core.companion.model.AgentAction
 import com.xiaoqi.companion.core.companion.model.EmotionSignal
 import com.xiaoqi.companion.core.companion.model.InteractionSignal
 import com.xiaoqi.companion.core.companion.model.ParsedOutput
-import timber.log.Timber
-
-private const val TAG = "Companion-Parse"
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 
 class OutputParser {
 
@@ -19,7 +18,7 @@ class OutputParser {
 
     fun parse(raw: String?): ParsedOutput {
         if (raw.isNullOrEmpty()) {
-            Timber.tag(TAG).w("parse called with null/empty input")
+            AppLogger.warn(LogTags.Parser, "parse_empty_input")
             return ParsedOutput()
         }
 
@@ -47,9 +46,16 @@ class OutputParser {
             }.toList(),
         )
 
-        Timber.tag(TAG).d("Parsed: mood=%s, intensity=%.2f, affinity=%.2f, actions=%d",
-            result.emotionSignal.mood, result.emotionSignal.intensity,
-            result.interactionSignal.affinityDelta, result.actions.size)
+        AppLogger.debug(
+            LogTags.Parser,
+            "parse_completed",
+            "rawLength" to raw.length,
+            "replyLength" to result.textReply.length,
+            "mood" to result.emotionSignal.mood,
+            "intensity" to result.emotionSignal.intensity,
+            "affinityDelta" to result.interactionSignal.affinityDelta,
+            "actionCount" to result.actions.size,
+        )
 
         return result
     }

@@ -11,6 +11,8 @@ import ai.koog.prompt.message.ContentPart
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import javax.inject.Inject
 import kotlin.time.Clock
 import kotlinx.coroutines.Dispatchers
@@ -57,9 +59,20 @@ class AnthropicMessagesLLMClient(
         model: LLModel,
         tools: List<ToolDescriptor>,
     ): List<Message.Response> {
+        val startedAt = System.currentTimeMillis()
         val response = executeRequest(prompt, model, stream = false)
         val text = extractTextFromMessageResponse(response)
         val usage = response["usage"]?.jsonObject
+        AppLogger.info(
+            LogTags.Llm,
+            "request_completed",
+            "model" to model.id,
+            "stream" to false,
+            "durationMs" to (System.currentTimeMillis() - startedAt),
+            "responseLength" to text.length,
+            "inputTokens" to usage?.get("input_tokens")?.jsonPrimitive?.intOrNull,
+            "outputTokens" to usage?.get("output_tokens")?.jsonPrimitive?.intOrNull,
+        )
         return listOf(
             Message.Assistant(
                 content = text,
@@ -74,6 +87,7 @@ class AnthropicMessagesLLMClient(
         model: LLModel,
         tools: List<ToolDescriptor>,
     ): Flow<StreamFrame> = flow {
+        val startedAt = System.currentTimeMillis()
         val request = buildRequest(prompt, model, stream = true)
         var fullText = ""
         var finishReason: String? = null
@@ -81,8 +95,15 @@ class AnthropicMessagesLLMClient(
         withContext(Dispatchers.IO) {
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    val body = response.body?.string().orEmpty()
-                    throw RuntimeException("HTTP ${response.code}: $body")
+                    AppLogger.warn(
+                        LogTags.Llm,
+                        "stream_request_http_error",
+                        "statusCode" to response.code,
+                        "model" to model.id,
+                        "durationMs" to (System.currentTimeMillis() - startedAt),
+                    )
+                    response.body?.close()
+                    throw RuntimeException("HTTP ${response.code}")
                 }
 
                 val source = response.body?.source() ?: return@withContext
@@ -108,6 +129,14 @@ class AnthropicMessagesLLMClient(
         if (fullText.isNotEmpty()) {
             emit(StreamFrame.TextComplete(fullText, null))
         }
+        AppLogger.info(
+            LogTags.Llm,
+            "stream_request_completed",
+            "model" to model.id,
+            "durationMs" to (System.currentTimeMillis() - startedAt),
+            "responseLength" to fullText.length,
+            "finishReason" to finishReason,
+        )
         emit(StreamFrame.End(finishReason, ResponseMetaInfo(clock.now())))
     }.flowOn(Dispatchers.IO)
 
@@ -122,11 +151,21 @@ class AnthropicMessagesLLMClient(
 
     private suspend fun executeRequest(prompt: Prompt, model: LLModel, stream: Boolean): JsonObject =
         withContext(Dispatchers.IO) {
+            val startedAt = System.currentTimeMillis()
             val request = buildRequest(prompt, model, stream)
             httpClient.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw RuntimeException("HTTP ${response.code}: $body")
+                    AppLogger.warn(
+                        LogTags.Llm,
+                        "request_http_error",
+                        "statusCode" to response.code,
+                        "model" to model.id,
+                        "stream" to stream,
+                        "durationMs" to (System.currentTimeMillis() - startedAt),
+                        "errorBodyLength" to body.length,
+                    )
+                    throw RuntimeException("HTTP ${response.code}")
                 }
                 json.parseToJsonElement(body).jsonObject
             }
@@ -136,6 +175,15 @@ class AnthropicMessagesLLMClient(
         require(baseUrl.isNotBlank()) { "LLM_BASE_URL is not configured" }
         require(apiKey.isNotBlank()) { "LLM_API_KEY is not configured" }
         val body = buildRequestBody(prompt, model, stream)
+        AppLogger.debug(
+            LogTags.Llm,
+            "request_built",
+            "model" to model.id,
+            "stream" to stream,
+            "systemMessageCount" to prompt.messages.filterIsInstance<Message.System>().size,
+            "messageCount" to prompt.messages.count { it !is Message.System },
+            "hasApiKey" to apiKey.isNotBlank(),
+        )
         return Request.Builder()
             .url("${baseUrl.trimEnd('/')}/v1/messages")
             .header("x-api-key", apiKey)
