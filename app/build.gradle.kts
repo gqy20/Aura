@@ -16,6 +16,7 @@ room {
 android {
     namespace = "com.xiaoqi.companion"
     compileSdk = libs.versions.compileSdk.get().toInt()
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.xiaoqi.companion"
@@ -92,6 +93,8 @@ dependencies {
     implementation(libs.compose.navigation)
     implementation(libs.compose.viewmodel)
     implementation(libs.compose.activity)
+    implementation(libs.compose.material.icons.extended)
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 
     // Coroutines
     implementation(libs.coroutines.android)

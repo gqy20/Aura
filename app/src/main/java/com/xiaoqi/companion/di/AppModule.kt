@@ -35,8 +35,4 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindKoogAgentFactory(factory: KoogAgentFactory): KoogAgentFactory
-
-    @Binds
-    @Singleton
-    abstract fun bindCompanionRuntime(runtime: CompanionRuntime): CompanionRuntime
 }
