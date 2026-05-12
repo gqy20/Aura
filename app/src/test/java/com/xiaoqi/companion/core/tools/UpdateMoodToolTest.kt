@@ -1,7 +1,6 @@
 package com.xiaoqi.companion.core.tools
 
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
-import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -13,12 +12,10 @@ import org.junit.Test
 class UpdateMoodToolTest {
 
     private val moodSnapshotDao: MoodSnapshotDao = mockk(relaxed = true)
-    private val toolCallDao: ToolCallDao = mockk(relaxed = true)
-    private val recorder = ToolCallRecorder(toolCallDao)
 
     @Test
     fun execute_savesMoodSnapshot() = runTest {
-        val tool = UpdateMoodTool(moodSnapshotDao, recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateMoodTool(moodSnapshotDao, companionIdProvider = { "comp-1" })
 
         val result = tool.execute(
             UpdateMoodTool.Args(
@@ -41,7 +38,7 @@ class UpdateMoodToolTest {
 
     @Test
     fun execute_handlesOptionalTrigger() = runTest {
-        val tool = UpdateMoodTool(moodSnapshotDao, recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateMoodTool(moodSnapshotDao, companionIdProvider = { "comp-1" })
 
         tool.execute(UpdateMoodTool.Args(mood = "calm"))
 
@@ -54,7 +51,7 @@ class UpdateMoodToolTest {
 
     @Test
     fun execute_coercesIntensityRange() = runTest {
-        val tool = UpdateMoodTool(moodSnapshotDao, recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateMoodTool(moodSnapshotDao, companionIdProvider = { "comp-1" })
 
         tool.execute(UpdateMoodTool.Args(mood = "excited", intensity = 5f))
 
@@ -66,19 +63,17 @@ class UpdateMoodToolTest {
     }
 
     @Test
-    fun execute_recordsToolCall() = runTest {
-        val tool = UpdateMoodTool(moodSnapshotDao, recorder, companionIdProvider = { "comp-1" })
+    fun execute_keepsToolImplementationFocusedOnMoodPersistence() = runTest {
+        val tool = UpdateMoodTool(moodSnapshotDao, companionIdProvider = { "comp-1" })
 
         tool.execute(UpdateMoodTool.Args(mood = "sad"))
 
-        coVerify {
-            toolCallDao.insert(match { it.toolName == "update_mood" && it.status == "RUNNING" })
-        }
+        coVerify { moodSnapshotDao.insert(any()) }
     }
 
     @Test
     fun descriptor_exposesKoogToolMetadata() {
-        val tool = UpdateMoodTool(mockk(), recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateMoodTool(mockk(), companionIdProvider = { "comp-1" })
 
         assertEquals("update_mood", tool.name)
         val desc = tool.descriptor.description

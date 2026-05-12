@@ -2,9 +2,7 @@ package com.xiaoqi.companion.core.tools
 
 import com.xiaoqi.companion.data.db.converter.MemoryType
 import com.xiaoqi.companion.data.db.dao.MemoryDao
-import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
-import com.xiaoqi.companion.data.db.entity.ToolCallEntity
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -15,15 +13,11 @@ import org.junit.Test
 class SaveMemoryToolTest {
 
     private val memoryDao: MemoryDao = mockk(relaxed = true)
-    private val toolCallDao: ToolCallDao = mockk(relaxed = true)
-    private val recorder = ToolCallRecorder(toolCallDao)
 
     @Test
-    fun execute_savesMemoryAndRecordsToolCall() = runTest {
+    fun execute_savesMemory() = runTest {
         val tool = SaveMemoryTool(
             memoryDao = memoryDao,
-            recorder = recorder,
-            sessionIdProvider = { "session" },
         )
 
         val result = tool.execute(
@@ -35,21 +29,6 @@ class SaveMemoryToolTest {
         )
 
         assertTrue(result.contains("saved"))
-        coVerify {
-            toolCallDao.insert(match<ToolCallEntity> {
-                it.sessionId == "session" &&
-                    it.toolName == "save_memory" &&
-                    it.argumentsJson.contains("jasmine tea") &&
-                    it.status == "RUNNING"
-            })
-            toolCallDao.updateResult(
-                id = any(),
-                status = "SUCCESS",
-                resultJson = match { it.contains("memoryId") },
-                errorMessage = null,
-                completedAt = any(),
-            )
-        }
         coVerify {
             memoryDao.insert(match<MemoryEntity> {
                 it.type == MemoryType.FACT &&
@@ -64,8 +43,6 @@ class SaveMemoryToolTest {
     fun descriptor_exposesKoogToolMetadata() {
         val tool = SaveMemoryTool(
             memoryDao = memoryDao,
-            recorder = recorder,
-            sessionIdProvider = { "session" },
         )
 
         assertEquals("save_memory", tool.name)

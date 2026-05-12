@@ -9,13 +9,9 @@ import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
-class SaveMemoryTool(
+class SaveMemoryTool @Inject constructor(
     private val memoryDao: MemoryDao,
-    private val recorder: ToolCallRecorder,
-    private val sessionIdProvider: () -> String = { "default" },
 ) : SimpleTool<SaveMemoryTool.Args>(
     typeToken<Args>(),
     name = "save_memory",
@@ -32,43 +28,21 @@ class SaveMemoryTool(
         val importance: Float = 0.5f,
     )
 
-    @Inject
-    constructor(
-        memoryDao: MemoryDao,
-        recorder: ToolCallRecorder,
-    ) : this(
-        memoryDao = memoryDao,
-        recorder = recorder,
-        sessionIdProvider = { "default" },
-    )
-
     override suspend fun execute(args: Args): String {
         val normalizedType = runCatching { MemoryType.valueOf(args.type.uppercase()) }
             .getOrDefault(MemoryType.FACT)
         val safeImportance = args.importance.coerceIn(0f, 1f)
-        val argumentsJson = json.encodeToString(args)
-
-        return recorder.record(
-            sessionId = sessionIdProvider(),
-            toolName = name,
-            argumentsJson = argumentsJson,
-        ) {
-            val memoryId = UUID.randomUUID().toString()
-            memoryDao.insert(
-                MemoryEntity(
-                    id = memoryId,
-                    type = normalizedType,
-                    content = args.content,
-                    source = "tool:save_memory",
-                    importance = safeImportance,
-                    timestamp = System.currentTimeMillis(),
-                )
+        val memoryId = UUID.randomUUID().toString()
+        memoryDao.insert(
+            MemoryEntity(
+                id = memoryId,
+                type = normalizedType,
+                content = args.content,
+                source = "tool:save_memory",
+                importance = safeImportance,
+                timestamp = System.currentTimeMillis(),
             )
-            """{"status":"saved","memoryId":"$memoryId"}"""
-        }
-    }
-
-    private companion object {
-        val json = Json { encodeDefaults = true }
+        )
+        return """{"status":"saved","memoryId":"$memoryId"}"""
     }
 }

@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.companion
 
+import com.xiaoqi.companion.core.companion.model.AgentToolCall
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.data.repository.LlmConfig
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +20,25 @@ interface KoogAgentFactory {
 
 sealed class KoogAgentEvent {
     data class TextDelta(val text: String) : KoogAgentEvent()
+    data class ToolCallUpdated(val call: AgentToolCall) : KoogAgentEvent()
     data class ToolStarted(val name: String) : KoogAgentEvent()
     data class ToolFinished(val name: String) : KoogAgentEvent()
+
+    companion object {
+        fun toolStarted(name: String, callId: String? = null): ToolCallUpdated =
+            ToolCallUpdated(AgentToolCall(name = name, status = ToolCallStatus.STARTED, callId = callId))
+
+        fun toolSucceeded(name: String, callId: String? = null): ToolCallUpdated =
+            ToolCallUpdated(AgentToolCall(name = name, status = ToolCallStatus.SUCCEEDED, callId = callId))
+
+        fun toolFailed(name: String, callId: String? = null, errorMessage: String? = null): ToolCallUpdated =
+            ToolCallUpdated(
+                AgentToolCall(
+                    name = name,
+                    status = ToolCallStatus.FAILED,
+                    callId = callId,
+                    errorMessage = errorMessage,
+                )
+            )
+    }
 }

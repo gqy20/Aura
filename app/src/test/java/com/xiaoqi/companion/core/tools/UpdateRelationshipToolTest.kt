@@ -1,7 +1,6 @@
 package com.xiaoqi.companion.core.tools
 
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
-import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -14,8 +13,6 @@ import org.junit.Test
 class UpdateRelationshipToolTest {
 
     private val agentStateDao: AgentStateDao = mockk(relaxed = true)
-    private val toolCallDao: ToolCallDao = mockk(relaxed = true)
-    private val recorder = ToolCallRecorder(toolCallDao)
 
     @Test
     fun execute_updatesExistingRelationship() = runTest {
@@ -25,7 +22,7 @@ class UpdateRelationshipToolTest {
         )
         coEvery { agentStateDao.getByCompanionId("comp-1") } returns existing
 
-        val tool = UpdateRelationshipTool(agentStateDao, recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateRelationshipTool(agentStateDao, companionIdProvider = { "comp-1" })
         val result = tool.execute(UpdateRelationshipTool.Args(delta = 0.1f, reason = "User shared a personal story"))
 
         assertTrue(result.contains("updated"))
@@ -38,7 +35,7 @@ class UpdateRelationshipToolTest {
     fun execute_createsNewStateWhenNoneExists() = runTest {
         coEvery { agentStateDao.getByCompanionId("comp-1") } returns null
 
-        val tool = UpdateRelationshipTool(agentStateDao, recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateRelationshipTool(agentStateDao, companionIdProvider = { "comp-1" })
         tool.execute(UpdateRelationshipTool.Args(delta = 0.3f))
 
         coVerify {
@@ -56,7 +53,7 @@ class UpdateRelationshipToolTest {
         )
         coEvery { agentStateDao.getByCompanionId("comp-1") } returns existing
 
-        val tool = UpdateRelationshipTool(agentStateDao, recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateRelationshipTool(agentStateDao, companionIdProvider = { "comp-1" })
         tool.execute(UpdateRelationshipTool.Args(delta = 0.5f))  // 0.8 + 0.5 = 1.3 -> coerced to 1.0
 
         coVerify { agentStateDao.updateRelationshipLevel("comp-1", 1.0f, any()) }
@@ -70,7 +67,7 @@ class UpdateRelationshipToolTest {
         )
         coEvery { agentStateDao.getByCompanionId("comp-1") } returns existing
 
-        val tool = UpdateRelationshipTool(agentStateDao, recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateRelationshipTool(agentStateDao, companionIdProvider = { "comp-1" })
         tool.execute(UpdateRelationshipTool.Args(delta = -0.2f, reason = "User was upset"))
 
         coVerify { agentStateDao.updateRelationshipLevel("comp-1", 0.5f, any()) }
@@ -78,7 +75,7 @@ class UpdateRelationshipToolTest {
 
     @Test
     fun descriptor_exposesKoogToolMetadata() {
-        val tool = UpdateRelationshipTool(mockk(), recorder, companionIdProvider = { "comp-1" })
+        val tool = UpdateRelationshipTool(mockk(), companionIdProvider = { "comp-1" })
 
         assertEquals("update_relationship", tool.name)
         val desc = tool.descriptor.description

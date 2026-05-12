@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogFieldSanitizer
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
@@ -22,6 +24,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val runtime: CompanionRuntime,
+    private val toolDisplayRegistry: ToolDisplayRegistry,
 ) : ViewModel() {
 
     companion object {
@@ -114,11 +117,23 @@ class ChatViewModel @Inject constructor(
                                 it.copy(content = assistantContent)
                             }
                         }
+                        is AgentEvent.ToolCallUpdated -> {
+                            updateAssistantToolStatus(
+                                assistantId,
+                                toolDisplayRegistry.label(event.call.name, event.call.status),
+                            )
+                        }
                         is AgentEvent.ToolStarted -> {
-                            updateAssistantToolStatus(assistantId, toolStatusLabel(event.name, isDone = false))
+                            updateAssistantToolStatus(
+                                assistantId,
+                                toolDisplayRegistry.label(event.name, ToolCallStatus.STARTED),
+                            )
                         }
                         is AgentEvent.ToolFinished -> {
-                            updateAssistantToolStatus(assistantId, toolStatusLabel(event.name, isDone = true))
+                            updateAssistantToolStatus(
+                                assistantId,
+                                toolDisplayRegistry.label(event.name, ToolCallStatus.SUCCEEDED),
+                            )
                         }
                         is AgentEvent.Complete -> {
                             idleTimeoutJob?.cancel()
@@ -183,12 +198,6 @@ class ChatViewModel @Inject constructor(
     private fun updateAssistantToolStatus(assistantId: String, status: String) {
         updateAssistantMessage(assistantId) { it.copy(toolStatus = status) }
     }
-
-    private fun toolStatusLabel(name: String, isDone: Boolean): String =
-        when (name) {
-            "save_memory" -> if (isDone) "Memory saved" else "Saving memory"
-            else -> if (isDone) "Tool finished" else "Using tool"
-        }
 
     private fun formatError(error: AgentError): String =
         when (error) {

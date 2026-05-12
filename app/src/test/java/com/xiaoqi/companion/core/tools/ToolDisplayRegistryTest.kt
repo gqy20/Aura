@@ -1,0 +1,26 @@
+package com.xiaoqi.companion.core.tools
+
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class ToolDisplayRegistryTest {
+
+    private val registry = ToolDisplayRegistry()
+
+    @Test
+    fun label_returnsSpecificLabelsForRegisteredTools() {
+        assertEquals("Saving memory", registry.label("save_memory", ToolCallStatus.STARTED))
+        assertEquals("Memory saved", registry.label("save_memory", ToolCallStatus.SUCCEEDED))
+        assertEquals("Searching memory", registry.label("search_memory", ToolCallStatus.STARTED))
+        assertEquals("Mood updated", registry.label("update_mood", ToolCallStatus.SUCCEEDED))
+        assertEquals("Relationship update failed", registry.label("update_relationship", ToolCallStatus.FAILED))
+    }
+
+    @Test
+    fun label_returnsGenericLabelsForUnknownTool() {
+        assertEquals("Using tool", registry.label("unknown", ToolCallStatus.STARTED))
+        assertEquals("Tool finished", registry.label("unknown", ToolCallStatus.SUCCEEDED))
+        assertEquals("Tool failed", registry.label("unknown", ToolCallStatus.FAILED))
+    }
+}

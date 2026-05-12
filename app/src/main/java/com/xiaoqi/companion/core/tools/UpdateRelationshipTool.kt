@@ -7,13 +7,10 @@ import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import java.util.UUID
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 class UpdateRelationshipTool(
     private val agentStateDao: AgentStateDao,
-    private val recorder: ToolCallRecorder,
     private val companionIdProvider: () -> String = { "default" },
 ) : SimpleTool<UpdateRelationshipTool.Args>(
     typeToken<Args>(),
@@ -24,10 +21,8 @@ class UpdateRelationshipTool(
     @Inject
     constructor(
         agentStateDao: AgentStateDao,
-        recorder: ToolCallRecorder,
     ) : this(
         agentStateDao = agentStateDao,
-        recorder = recorder,
         companionIdProvider = { "default" },
     )
 
@@ -40,37 +35,26 @@ class UpdateRelationshipTool(
     )
 
     override suspend fun execute(args: Args): String {
-        val argumentsJson = json.encodeToString(args)
-        return recorder.record(
-            sessionId = companionIdProvider(),
-            toolName = name,
-            argumentsJson = argumentsJson,
-        ) {
-            val companionId = companionIdProvider()
-            val existing = agentStateDao.getByCompanionId(companionId)
-            val now = System.currentTimeMillis()
-            val newLevel = ((existing?.relationshipLevel ?: 0f) + args.delta).coerceIn(0f, 1f)
+        val companionId = companionIdProvider()
+        val existing = agentStateDao.getByCompanionId(companionId)
+        val now = System.currentTimeMillis()
+        val newLevel = ((existing?.relationshipLevel ?: 0f) + args.delta).coerceIn(0f, 1f)
 
-            if (existing != null) {
-                agentStateDao.updateRelationshipLevel(companionId, newLevel, now)
-            } else {
-                agentStateDao.insert(
-                    AgentStateEntity(
-                        id = UUID.randomUUID().toString(),
-                        companionId = companionId,
-                        mood = "",
-                        relationshipLevel = newLevel,
-                        createdAt = now,
-                        updatedAt = now,
-                    )
+        if (existing != null) {
+            agentStateDao.updateRelationshipLevel(companionId, newLevel, now)
+        } else {
+            agentStateDao.insert(
+                AgentStateEntity(
+                    id = UUID.randomUUID().toString(),
+                    companionId = companionId,
+                    mood = "",
+                    relationshipLevel = newLevel,
+                    createdAt = now,
+                    updatedAt = now,
                 )
-            }
-
-            """{"status":"updated","level":$newLevel,"delta":${args.delta}}"""
+            )
         }
-    }
 
-    private companion object {
-        val json = Json { encodeDefaults = true }
+        return """{"status":"updated","level":$newLevel,"delta":${args.delta}}"""
     }
 }

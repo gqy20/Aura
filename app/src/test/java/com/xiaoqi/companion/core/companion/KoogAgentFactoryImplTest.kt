@@ -9,6 +9,8 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
+import com.xiaoqi.companion.core.companion.model.AgentToolCall
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
@@ -18,6 +20,7 @@ import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
+import com.xiaoqi.companion.data.db.entity.ToolCallEntity
 import com.xiaoqi.companion.data.repository.LlmConfig
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -36,9 +39,8 @@ class KoogAgentFactoryImplTest {
     private val toolCallDao: ToolCallDao = mockk(relaxed = true)
     private val saveMemoryTool = SaveMemoryTool(
         memoryDao = memoryDao,
-        recorder = ToolCallRecorder(toolCallDao),
-        sessionIdProvider = { "default" },
     )
+    private val toolCallRecorder = ToolCallRecorder(toolCallDao)
 
     @Test
     fun run_usesKoogAgentToolLoopWithRegisteredTools() = runTest {
@@ -47,6 +49,7 @@ class KoogAgentFactoryImplTest {
             executorFactory = object : KoogPromptExecutorFactory {
                 override fun create(config: LlmConfig): PromptExecutor = executor
             },
+            toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
                     ToolRegistry.builder()
@@ -70,6 +73,18 @@ class KoogAgentFactoryImplTest {
                 it.content == "User likes jasmine tea" &&
                     it.source == "tool:save_memory"
             })
+            toolCallDao.insert(match<ToolCallEntity> {
+                it.id == "call-1" &&
+                    it.toolName == "save_memory" &&
+                    it.status == "RUNNING"
+            })
+            toolCallDao.updateResult(
+                id = "call-1",
+                status = "SUCCESS",
+                resultJson = match { it.contains("memoryId") },
+                errorMessage = null,
+                completedAt = any(),
+            )
         }
     }
 
@@ -80,6 +95,7 @@ class KoogAgentFactoryImplTest {
             executorFactory = object : KoogPromptExecutorFactory {
                 override fun create(config: LlmConfig): PromptExecutor = executor
             },
+            toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
                     ToolRegistry.builder()
@@ -95,9 +111,37 @@ class KoogAgentFactoryImplTest {
             )
         ).toList()
 
-        assertTrue(events.contains(KoogAgentEvent.ToolStarted("save_memory")))
-        assertTrue(events.contains(KoogAgentEvent.ToolFinished("save_memory")))
+        assertTrue(events.any {
+            val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
+            call?.name == "save_memory" &&
+                call.status == ToolCallStatus.STARTED &&
+                call.callId == "call-1" &&
+                call.argumentsJson?.contains("jasmine tea") == true
+        })
+        assertTrue(events.any {
+            val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
+            call?.name == "save_memory" &&
+                call.status == ToolCallStatus.SUCCEEDED &&
+                call.callId == "call-1" &&
+                call.resultJson?.contains("memoryId") == true
+        })
         assertTrue(events.contains(KoogAgentEvent.TextDelta("remembered")))
+        coVerify {
+            toolCallDao.insert(match<ToolCallEntity> {
+                it.id == "call-1" &&
+                    it.sessionId == "default" &&
+                    it.toolName == "save_memory" &&
+                    it.argumentsJson.contains("jasmine tea") &&
+                    it.status == "RUNNING"
+            })
+            toolCallDao.updateResult(
+                id = "call-1",
+                status = "SUCCESS",
+                resultJson = match { it.contains("memoryId") },
+                errorMessage = null,
+                completedAt = any(),
+            )
+        }
     }
 
     private class ToolCallingPromptExecutor : PromptExecutor() {

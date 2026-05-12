@@ -5,7 +5,10 @@ import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
+import com.xiaoqi.companion.core.companion.model.AgentToolCall
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
+import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
@@ -73,8 +76,8 @@ class ChatViewModelTest {
                 emit(AgentEvent.Error(AgentError.ApiError("API error")))
             } else {
                 if (emitToolEvents) {
-                    emit(AgentEvent.ToolStarted("save_memory"))
-                    emit(AgentEvent.ToolFinished("save_memory"))
+                    emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)))
+                    emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
                 }
                 val parsed = OutputParser().parse(rawResponse)
                 emit(AgentEvent.Complete(parsed))
@@ -86,7 +89,7 @@ class ChatViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeRuntime = FakeCompanionRuntime(configRepo, messageRepo)
-        viewModel = ChatViewModel(fakeRuntime)
+        viewModel = ChatViewModel(fakeRuntime, ToolDisplayRegistry())
     }
 
     @After

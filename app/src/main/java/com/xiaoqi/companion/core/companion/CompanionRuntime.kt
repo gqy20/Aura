@@ -75,6 +75,7 @@ open class CompanionRuntime @Inject constructor(
                         rawResponse += event.text
                         emit(AgentEvent.Streaming(event.text))
                     }
+                    is KoogAgentEvent.ToolCallUpdated -> emit(AgentEvent.ToolCallUpdated(event.call))
                     is KoogAgentEvent.ToolStarted -> emit(AgentEvent.ToolStarted(event.name))
                     is KoogAgentEvent.ToolFinished -> emit(AgentEvent.ToolFinished(event.name))
                 }

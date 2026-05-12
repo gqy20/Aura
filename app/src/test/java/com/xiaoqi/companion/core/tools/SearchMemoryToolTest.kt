@@ -2,7 +2,6 @@ package com.xiaoqi.companion.core.tools
 
 import com.xiaoqi.companion.data.db.converter.MemoryType
 import com.xiaoqi.companion.data.db.dao.MemoryDao
-import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -16,8 +15,6 @@ import org.junit.Test
 class SearchMemoryToolTest {
 
     private val memoryDao: MemoryDao = mockk()
-    private val toolCallDao: ToolCallDao = mockk(relaxed = true)
-    private val recorder = ToolCallRecorder(toolCallDao)
 
     @Test
     fun execute_returnsMatchingMemoriesByQuery() = runTest {
@@ -27,7 +24,7 @@ class SearchMemoryToolTest {
         )
         coEvery { memoryDao.observeAll() } returns flowOf(memories)
 
-        val tool = SearchMemoryTool(memoryDao, recorder, sessionIdProvider = { "s1" })
+        val tool = SearchMemoryTool(memoryDao)
         val result = tool.execute(SearchMemoryTool.Args(query = "jasmine"))
 
         assertTrue(result.contains("jasmine tea"))
@@ -42,7 +39,7 @@ class SearchMemoryToolTest {
         )
         coEvery { memoryDao.observeAll() } returns flowOf(memories)
 
-        val tool = SearchMemoryTool(memoryDao, recorder, sessionIdProvider = { "s1" })
+        val tool = SearchMemoryTool(memoryDao)
         val result = tool.execute(SearchMemoryTool.Args(query = "cat", type = "FACT"))
 
         assertTrue(result.contains("Likes cats"))
@@ -58,7 +55,7 @@ class SearchMemoryToolTest {
         )
         coEvery { memoryDao.observeAll() } returns flowOf(memories)
 
-        val tool = SearchMemoryTool(memoryDao, recorder, sessionIdProvider = { "s1" })
+        val tool = SearchMemoryTool(memoryDao)
         val result = tool.execute(SearchMemoryTool.Args(query = "cat", limit = 2))
 
         val count = "\"count\":2"
@@ -69,7 +66,7 @@ class SearchMemoryToolTest {
     fun execute_returnsEmptyWhenNoMatch() = runTest {
         coEvery { memoryDao.observeAll() } returns flowOf(emptyList())
 
-        val tool = SearchMemoryTool(memoryDao, recorder, sessionIdProvider = { "s1" })
+        val tool = SearchMemoryTool(memoryDao)
         val result = tool.execute(SearchMemoryTool.Args(query = "nonexistent"))
 
         assertTrue(result.contains("\"count\":0"))
@@ -77,7 +74,7 @@ class SearchMemoryToolTest {
 
     @Test
     fun descriptor_exposesKoogToolMetadata() {
-        val tool = SearchMemoryTool(mockk(), recorder, sessionIdProvider = { "s1" })
+        val tool = SearchMemoryTool(mockk())
 
         assertEquals("search_memory", tool.name)
         val desc = tool.descriptor.description

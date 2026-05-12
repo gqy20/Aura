@@ -3,9 +3,11 @@ package com.xiaoqi.companion.core.companion
 import app.cash.turbine.test
 import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.AgentError
+import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.EmotionSignal
 import com.xiaoqi.companion.core.companion.model.InteractionSignal
 import com.xiaoqi.companion.core.companion.model.ParsedOutput
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.prompt.PromptBuilder
@@ -80,8 +82,8 @@ class CompanionRuntimeTest {
                 override fun runEvents(prompt: BuiltPrompt) = flow {
                     if (shouldFail) throw RuntimeException("API error")
                     if (emitToolEvents) {
-                        emit(KoogAgentEvent.ToolStarted("save_memory"))
-                        emit(KoogAgentEvent.ToolFinished("save_memory"))
+                        emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)))
+                        emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
                     }
                     emit(KoogAgentEvent.TextDelta(responseText))
                 }
@@ -194,8 +196,14 @@ class CompanionRuntimeTest {
     fun send_agentToolEvents_emitsObservableToolEvents() = runTest {
         val factory = FakeKoogAgentFactory().apply { emitToolEvents = true }
         makeRuntime(factory).send(UserInput.Text("remember this")).test {
-            assertEquals(AgentEvent.ToolStarted("save_memory"), awaitItem())
-            assertEquals(AgentEvent.ToolFinished("save_memory"), awaitItem())
+            assertEquals(
+                AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)),
+                awaitItem(),
+            )
+            assertEquals(
+                AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)),
+                awaitItem(),
+            )
             assertTrue(awaitItem() is AgentEvent.Streaming)
             assertTrue(awaitItem() is AgentEvent.Complete)
             cancelAndIgnoreRemainingEvents()

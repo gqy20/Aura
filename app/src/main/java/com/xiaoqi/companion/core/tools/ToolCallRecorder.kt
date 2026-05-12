@@ -8,6 +8,50 @@ import javax.inject.Inject
 class ToolCallRecorder @Inject constructor(
     private val dao: ToolCallDao,
 ) {
+    suspend fun start(
+        sessionId: String,
+        callId: String,
+        toolName: String,
+        argumentsJson: String,
+    ) {
+        dao.insert(
+            ToolCallEntity(
+                id = callId,
+                sessionId = sessionId,
+                toolName = toolName,
+                argumentsJson = argumentsJson,
+                status = "RUNNING",
+                createdAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    suspend fun succeed(
+        callId: String,
+        resultJson: String,
+    ) {
+        dao.updateResult(
+            id = callId,
+            status = "SUCCESS",
+            resultJson = resultJson,
+            errorMessage = null,
+            completedAt = System.currentTimeMillis(),
+        )
+    }
+
+    suspend fun fail(
+        callId: String,
+        errorMessage: String?,
+    ) {
+        dao.updateResult(
+            id = callId,
+            status = "FAILED",
+            resultJson = "",
+            errorMessage = errorMessage,
+            completedAt = System.currentTimeMillis(),
+        )
+    }
+
     suspend fun record(
         sessionId: String,
         toolName: String,
@@ -15,36 +59,19 @@ class ToolCallRecorder @Inject constructor(
         block: suspend () -> String,
     ): String {
         val id = UUID.randomUUID().toString()
-        val startedAt = System.currentTimeMillis()
-        dao.insert(
-            ToolCallEntity(
-                id = id,
-                sessionId = sessionId,
-                toolName = toolName,
-                argumentsJson = argumentsJson,
-                status = "RUNNING",
-                createdAt = startedAt,
-            )
+        start(
+            sessionId = sessionId,
+            callId = id,
+            toolName = toolName,
+            argumentsJson = argumentsJson,
         )
 
         return try {
             val result = block()
-            dao.updateResult(
-                id = id,
-                status = "SUCCESS",
-                resultJson = result,
-                errorMessage = null,
-                completedAt = System.currentTimeMillis(),
-            )
+            succeed(callId = id, resultJson = result)
             result
         } catch (e: Throwable) {
-            dao.updateResult(
-                id = id,
-                status = "FAILED",
-                resultJson = "",
-                errorMessage = e.message ?: e::class.java.simpleName,
-                completedAt = System.currentTimeMillis(),
-            )
+            fail(callId = id, errorMessage = e.message ?: e::class.java.simpleName)
             throw e
         }
     }

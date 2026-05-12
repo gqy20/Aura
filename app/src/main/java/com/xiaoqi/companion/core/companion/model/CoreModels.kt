@@ -22,10 +22,26 @@ sealed class UserInput {
 
 sealed class AgentEvent {
     data class Streaming(val delta: String) : AgentEvent()
+    data class ToolCallUpdated(val call: AgentToolCall) : AgentEvent()
     data class ToolStarted(val name: String) : AgentEvent()
     data class ToolFinished(val name: String) : AgentEvent()
     data class Complete(val parsed: ParsedOutput) : AgentEvent()
     data class Error(val error: AgentError) : AgentEvent()
+}
+
+data class AgentToolCall(
+    val name: String,
+    val status: ToolCallStatus,
+    val callId: String? = null,
+    val argumentsJson: String? = null,
+    val resultJson: String? = null,
+    val errorMessage: String? = null,
+)
+
+enum class ToolCallStatus {
+    STARTED,
+    SUCCEEDED,
+    FAILED,
 }
 
 sealed class AgentError {

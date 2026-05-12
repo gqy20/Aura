@@ -17,8 +17,11 @@ import ai.koog.prompt.streaming.StreamFrame
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.core.companion.model.AgentToolCall
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
+import com.xiaoqi.companion.core.tools.ToolCallRecorder
 import com.xiaoqi.companion.data.repository.LlmConfig
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,6 +35,7 @@ import kotlinx.coroutines.channels.awaitClose
 class KoogAgentFactoryImpl @Inject constructor(
     private val executorFactory: KoogPromptExecutorFactory,
     private val toolRegistry: AgentToolRegistry,
+    private val toolCallRecorder: ToolCallRecorder,
 ) : KoogAgentFactory {
 
     override fun create(config: LlmConfig): KoogAgentWrapper {
@@ -46,6 +50,7 @@ class KoogAgentFactoryImpl @Inject constructor(
             config = config,
             executor = executorFactory.create(config),
             toolRegistry = toolRegistry,
+            toolCallRecorder = toolCallRecorder,
         )
     }
 }
@@ -54,6 +59,7 @@ private class KoogPromptExecutorWrapper(
     private val config: LlmConfig,
     private val executor: PromptExecutor,
     private val toolRegistry: AgentToolRegistry,
+    private val toolCallRecorder: ToolCallRecorder,
 ) : KoogAgentWrapper {
 
     private val model = LLModel(
@@ -77,12 +83,8 @@ private class KoogPromptExecutorWrapper(
     override fun runEvents(prompt: BuiltPrompt): Flow<KoogAgentEvent> = callbackFlow {
         var hasStreamingText = false
         val observer = object : KoogAgentObserver {
-            override fun onToolStarted(name: String) {
-                trySend(KoogAgentEvent.ToolStarted(name))
-            }
-
-            override fun onToolFinished(name: String) {
-                trySend(KoogAgentEvent.ToolFinished(name))
+            override fun onToolUpdated(call: AgentToolCall) {
+                trySend(KoogAgentEvent.ToolCallUpdated(call))
             }
 
             override fun onTextDelta(text: String) {
@@ -125,17 +127,71 @@ private class KoogPromptExecutorWrapper(
                 )
             )
             .install {
-                observer ?: return@install
                 install(EventHandler.Feature) {
                     onToolCallStarting { context ->
-                        observer.onToolStarted(context.toolName)
+                        val callId = context.toolCallId?.ifBlank { context.eventId } ?: context.eventId
+                        val argumentsJson = context.toolArgs.toString()
+                        toolCallRecorder.start(
+                            sessionId = DEFAULT_SESSION_ID,
+                            callId = callId,
+                            toolName = context.toolName,
+                            argumentsJson = argumentsJson,
+                        )
+                        observer?.onToolUpdated(
+                            AgentToolCall(
+                                name = context.toolName,
+                                status = ToolCallStatus.STARTED,
+                                callId = callId,
+                                argumentsJson = argumentsJson,
+                            )
+                        )
                     }
                     onToolCallCompleted { context ->
-                        observer.onToolFinished(context.toolName)
+                        val callId = context.toolCallId?.ifBlank { context.eventId } ?: context.eventId
+                        val argumentsJson = context.toolArgs.toString()
+                        val resultJson = context.toolResult.toString()
+                        toolCallRecorder.succeed(callId = callId, resultJson = resultJson)
+                        observer?.onToolUpdated(
+                            AgentToolCall(
+                                name = context.toolName,
+                                status = ToolCallStatus.SUCCEEDED,
+                                callId = callId,
+                                argumentsJson = argumentsJson,
+                                resultJson = resultJson,
+                            )
+                        )
+                    }
+                    onToolCallFailed { context ->
+                        val callId = context.toolCallId?.ifBlank { context.eventId } ?: context.eventId
+                        val argumentsJson = context.toolArgs.toString()
+                        toolCallRecorder.fail(callId = callId, errorMessage = context.message)
+                        observer?.onToolUpdated(
+                            AgentToolCall(
+                                name = context.toolName,
+                                status = ToolCallStatus.FAILED,
+                                callId = callId,
+                                argumentsJson = argumentsJson,
+                                errorMessage = context.message,
+                            )
+                        )
+                    }
+                    onToolValidationFailed { context ->
+                        val callId = context.toolCallId?.ifBlank { context.eventId } ?: context.eventId
+                        val argumentsJson = context.toolArgs.toString()
+                        toolCallRecorder.fail(callId = callId, errorMessage = context.message)
+                        observer?.onToolUpdated(
+                            AgentToolCall(
+                                name = context.toolName,
+                                status = ToolCallStatus.FAILED,
+                                callId = callId,
+                                argumentsJson = argumentsJson,
+                                errorMessage = context.message,
+                            )
+                        )
                     }
                     onLLMStreamingFrameReceived { context ->
                         when (val frame = context.streamFrame) {
-                            is StreamFrame.TextDelta -> observer.onTextDelta(frame.text)
+                            is StreamFrame.TextDelta -> observer?.onTextDelta(frame.text)
                             else -> Unit
                         }
                     }
@@ -145,12 +201,12 @@ private class KoogPromptExecutorWrapper(
 
     private companion object {
         const val MAX_AGENT_ITERATIONS = 6
+        const val DEFAULT_SESSION_ID = "default"
     }
 }
 
 private interface KoogAgentObserver {
-    fun onToolStarted(name: String)
-    fun onToolFinished(name: String)
+    fun onToolUpdated(call: AgentToolCall)
     fun onTextDelta(text: String)
 }
 
