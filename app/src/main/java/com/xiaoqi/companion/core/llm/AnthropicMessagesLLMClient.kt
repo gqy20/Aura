@@ -16,9 +16,10 @@ import com.xiaoqi.companion.core.logging.LogTags
 import javax.inject.Inject
 import kotlin.time.Clock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -86,59 +87,67 @@ class AnthropicMessagesLLMClient(
         prompt: Prompt,
         model: LLModel,
         tools: List<ToolDescriptor>,
-    ): Flow<StreamFrame> = flow {
+    ): Flow<StreamFrame> = callbackFlow {
         val startedAt = System.currentTimeMillis()
         val request = buildRequest(prompt, model, stream = true)
         var fullText = ""
         var finishReason: String? = null
 
-        withContext(Dispatchers.IO) {
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    AppLogger.warn(
-                        LogTags.Llm,
-                        "stream_request_http_error",
-                        "statusCode" to response.code,
-                        "model" to model.id,
-                        "durationMs" to (System.currentTimeMillis() - startedAt),
-                    )
-                    response.body?.close()
-                    throw RuntimeException("HTTP ${response.code}")
+        launch(Dispatchers.IO) {
+            try {
+                httpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        AppLogger.warn(
+                            LogTags.Llm,
+                            "stream_request_http_error",
+                            "statusCode" to response.code,
+                            "model" to model.id,
+                            "durationMs" to (System.currentTimeMillis() - startedAt),
+                        )
+                        response.body?.close()
+                        close(RuntimeException("HTTP ${response.code}"))
+                        return@launch
+                    }
+
+                    val source = response.body?.source() ?: run { close(); return@launch }
+                    while (!source.exhausted()) {
+                        val line = source.readUtf8Line() ?: continue
+                        if (!line.startsWith("data: ")) continue
+
+                        val data = line.removePrefix("data: ").trim()
+                        if (data == "[DONE]") break
+
+                        val parsed = parseSseData(data)
+                        if (parsed.deltaText != null) {
+                            fullText += parsed.deltaText
+                            trySend(StreamFrame.TextDelta(parsed.deltaText, null))
+                        }
+                        if (parsed.finishReason != null) {
+                            finishReason = parsed.finishReason
+                        }
+                    }
                 }
 
-                val source = response.body?.source() ?: return@withContext
-                while (!source.exhausted()) {
-                    val line = source.readUtf8Line() ?: continue
-                    if (!line.startsWith("data: ")) continue
-
-                    val data = line.removePrefix("data: ").trim()
-                    if (data == "[DONE]") break
-
-                    val parsed = parseSseData(data)
-                    if (parsed.deltaText != null) {
-                        fullText += parsed.deltaText
-                        emit(StreamFrame.TextDelta(parsed.deltaText, null))
-                    }
-                    if (parsed.finishReason != null) {
-                        finishReason = parsed.finishReason
-                    }
+                if (fullText.isNotEmpty()) {
+                    trySend(StreamFrame.TextComplete(fullText, null))
                 }
+                AppLogger.info(
+                    LogTags.Llm,
+                    "stream_request_completed",
+                    "model" to model.id,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                    "responseLength" to fullText.length,
+                    "finishReason" to finishReason,
+                )
+                trySend(StreamFrame.End(finishReason, ResponseMetaInfo(clock.now())))
+                close()
+            } catch (e: Exception) {
+                close(e)
             }
         }
 
-        if (fullText.isNotEmpty()) {
-            emit(StreamFrame.TextComplete(fullText, null))
-        }
-        AppLogger.info(
-            LogTags.Llm,
-            "stream_request_completed",
-            "model" to model.id,
-            "durationMs" to (System.currentTimeMillis() - startedAt),
-            "responseLength" to fullText.length,
-            "finishReason" to finishReason,
-        )
-        emit(StreamFrame.End(finishReason, ResponseMetaInfo(clock.now())))
-    }.flowOn(Dispatchers.IO)
+        awaitClose { httpClient.dispatcher.executorService.shutdown() }
+    }
 
     override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
         ModerationResult(false, emptyMap())

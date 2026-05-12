@@ -12,15 +12,22 @@ import com.xiaoqi.companion.core.logging.LogTags
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val runtime: CompanionRuntime,
 ) : ViewModel() {
+
+    companion object {
+        private const val STREAMING_IDLE_TIMEOUT_MS = 30_000L
+    }
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
@@ -64,9 +71,27 @@ class ChatViewModel @Inject constructor(
                     state.copy(messages = state.messages + ChatMessage(assistantId, "ASSISTANT", "", isStreaming = true))
                 }
 
+                var idleTimeoutJob: Job? = null
+                var timedOut = false
+                fun resetIdleTimer() {
+                    timedOut = false
+                    idleTimeoutJob?.cancel()
+                    idleTimeoutJob = launch {
+                        delay(STREAMING_IDLE_TIMEOUT_MS)
+                        timedOut = true
+                        AppLogger.warn(
+                            LogTags.Chat,
+                            "streaming_idle_timeout",
+                            "requestHash" to LogFieldSanitizer.hash(requestId),
+                            "timeoutMs" to STREAMING_IDLE_TIMEOUT_MS,
+                        )
+                    }
+                }
+
                 runtime.send(UserInput.Text(trimmed)).collect { event ->
                     when (event) {
                         is AgentEvent.Streaming -> {
+                            resetIdleTimer()
                             assistantContent += event.delta
                             _uiState.update { state ->
                                 val updated = state.messages.map { msg ->
@@ -76,6 +101,7 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is AgentEvent.Complete -> {
+                            idleTimeoutJob?.cancel()
                             AppLogger.info(
                                 LogTags.Chat,
                                 "message_send_completed",
@@ -97,6 +123,7 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is AgentEvent.Error -> {
+                            idleTimeoutJob?.cancel()
                             AppLogger.warn(
                                 LogTags.Chat,
                                 "agent_error_received",
@@ -112,6 +139,17 @@ class ChatViewModel @Inject constructor(
                                 )
                             }
                         }
+                    }
+                }
+
+                if (timedOut) {
+                    _uiState.update { state ->
+                        val filtered = state.messages.filter { it.id != assistantId }
+                        state.copy(
+                            messages = filtered,
+                            isLoading = false,
+                            error = "响应超时，请重试",
+                        )
                     }
                 }
             } catch (e: Exception) {

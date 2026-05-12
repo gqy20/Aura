@@ -33,6 +33,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -58,8 +60,9 @@ fun ChatScreenContent(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val messages = uiState.messages
+    val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
 
-    LaunchedEffect(messages.size) {
+    LaunchedEffect(messages.size, lastContentLength) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
@@ -99,18 +102,11 @@ fun ChatScreenContent(
                 }
             }
 
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(8.dp),
-                )
-            }
-
             InputBar(
                 inputText = uiState.inputText,
                 onInputTextChanged = onInputTextChanged,
                 onSendMessage = onSendMessage,
+                isLoading = uiState.isLoading && uiState.messages.none { it.role == "ASSISTANT" && it.isStreaming },
                 modifier = Modifier.imePadding(),
             )
         }
@@ -129,6 +125,7 @@ private fun InputBar(
     inputText: String,
     onInputTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -147,16 +144,23 @@ private fun InputBar(
                 maxLines = 4,
                 shape = MaterialTheme.shapes.large,
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = onSendMessage,
-                enabled = inputText.isNotBlank(),
-                modifier = Modifier.semantics { contentDescription = "Send" },
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = null,
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp).padding(4.dp),
+                    strokeWidth = 2.dp,
                 )
+            } else {
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = onSendMessage,
+                    enabled = inputText.isNotBlank(),
+                    modifier = Modifier.semantics { contentDescription = "Send" },
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = null,
+                    )
+                }
             }
         }
     }
