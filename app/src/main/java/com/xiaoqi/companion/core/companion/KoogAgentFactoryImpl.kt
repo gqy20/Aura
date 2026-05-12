@@ -5,6 +5,7 @@ import ai.koog.agents.core.agent.ToolCalls
 import ai.koog.agents.core.dsl.extension.HistoryCompressionStrategy
 import ai.koog.agents.ext.agent.HistoryCompressionConfig
 import ai.koog.agents.ext.agent.singleRunStrategyWithHistoryCompression
+import ai.koog.agents.features.eventHandler.feature.EventHandler
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.model.PromptExecutor
 import ai.koog.prompt.llm.LLMCapability
@@ -12,6 +13,7 @@ import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.AttachmentContent
 import ai.koog.prompt.message.ContentPart
+import ai.koog.prompt.streaming.StreamFrame
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
@@ -21,7 +23,10 @@ import com.xiaoqi.companion.data.repository.LlmConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.channels.awaitClose
 
 @Singleton
 class KoogAgentFactoryImpl @Inject constructor(
@@ -62,14 +67,46 @@ private class KoogPromptExecutorWrapper(
     )
 
     override suspend fun run(prompt: BuiltPrompt): String =
-        createAgent(prompt).run(prompt.userMessage)
+        createAgent(prompt, observer = null).run(prompt.userMessage)
 
     override fun runStreaming(prompt: BuiltPrompt): Flow<String> =
-        flow {
-            emit(run(prompt))
+        runEvents(prompt).mapNotNull { event ->
+            (event as? KoogAgentEvent.TextDelta)?.text
         }
 
-    private fun createAgent(prompt: BuiltPrompt) =
+    override fun runEvents(prompt: BuiltPrompt): Flow<KoogAgentEvent> = callbackFlow {
+        var hasStreamingText = false
+        val observer = object : KoogAgentObserver {
+            override fun onToolStarted(name: String) {
+                trySend(KoogAgentEvent.ToolStarted(name))
+            }
+
+            override fun onToolFinished(name: String) {
+                trySend(KoogAgentEvent.ToolFinished(name))
+            }
+
+            override fun onTextDelta(text: String) {
+                hasStreamingText = true
+                trySend(KoogAgentEvent.TextDelta(text))
+            }
+        }
+
+        val job = launch {
+            try {
+                val response = createAgent(prompt, observer).run(prompt.userMessage)
+                if (!hasStreamingText) {
+                    trySend(KoogAgentEvent.TextDelta(response))
+                }
+                close()
+            } catch (e: Throwable) {
+                close(e)
+            }
+        }
+
+        awaitClose { job.cancel() }
+    }
+
+    private fun createAgent(prompt: BuiltPrompt, observer: KoogAgentObserver?) =
         AIAgent.builder()
             .promptExecutor(executor)
             .llmModel(model)
@@ -87,11 +124,34 @@ private class KoogPromptExecutorWrapper(
                     ToolCalls.SEQUENTIAL,
                 )
             )
+            .install {
+                observer ?: return@install
+                install(EventHandler.Feature) {
+                    onToolCallStarting { context ->
+                        observer.onToolStarted(context.toolName)
+                    }
+                    onToolCallCompleted { context ->
+                        observer.onToolFinished(context.toolName)
+                    }
+                    onLLMStreamingFrameReceived { context ->
+                        when (val frame = context.streamFrame) {
+                            is StreamFrame.TextDelta -> observer.onTextDelta(frame.text)
+                            else -> Unit
+                        }
+                    }
+                }
+            }
             .build()
 
     private companion object {
         const val MAX_AGENT_ITERATIONS = 6
     }
+}
+
+private interface KoogAgentObserver {
+    fun onToolStarted(name: String)
+    fun onToolFinished(name: String)
+    fun onTextDelta(text: String)
 }
 
 private fun BuiltPrompt.toKoogAgentPrompt() = prompt("companion-chat") {

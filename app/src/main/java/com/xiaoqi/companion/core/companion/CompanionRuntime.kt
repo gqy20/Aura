@@ -60,9 +60,15 @@ open class CompanionRuntime @Inject constructor(
             messageRepository.sendMessage(sessionId = DEFAULT_SESSION_ID, content = input.content)
 
             var rawResponse = ""
-            agent.runStreaming(prompt).collect { delta ->
-                rawResponse += delta
-                emit(AgentEvent.Streaming(delta))
+            agent.runEvents(prompt).collect { event ->
+                when (event) {
+                    is KoogAgentEvent.TextDelta -> {
+                        rawResponse += event.text
+                        emit(AgentEvent.Streaming(event.text))
+                    }
+                    is KoogAgentEvent.ToolStarted -> emit(AgentEvent.ToolStarted(event.name))
+                    is KoogAgentEvent.ToolFinished -> emit(AgentEvent.ToolFinished(event.name))
+                }
             }
             if (rawResponse.isEmpty()) {
                 rawResponse = agent.run(prompt)

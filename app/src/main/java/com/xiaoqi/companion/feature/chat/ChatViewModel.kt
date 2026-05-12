@@ -100,6 +100,8 @@ class ChatViewModel @Inject constructor(
                                 state.copy(messages = updated)
                             }
                         }
+                        is AgentEvent.ToolStarted,
+                        is AgentEvent.ToolFinished -> Unit
                         is AgentEvent.Complete -> {
                             idleTimeoutJob?.cancel()
                             AppLogger.info(

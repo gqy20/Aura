@@ -22,6 +22,8 @@ sealed class UserInput {
 
 sealed class AgentEvent {
     data class Streaming(val delta: String) : AgentEvent()
+    data class ToolStarted(val name: String) : AgentEvent()
+    data class ToolFinished(val name: String) : AgentEvent()
     data class Complete(val parsed: ParsedOutput) : AgentEvent()
     data class Error(val error: AgentError) : AgentEvent()
 }

@@ -24,6 +24,7 @@ import io.mockk.mockk
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,7 +62,7 @@ class KoogAgentFactoryImplTest {
             )
         )
 
-        assertEquals("记住了。", response)
+        assertEquals("remembered", response)
         assertTrue(executor.toolNamesPerCall.first().contains("save_memory"))
         assertEquals(2, executor.toolNamesPerCall.size)
         coVerify {
@@ -70,6 +71,33 @@ class KoogAgentFactoryImplTest {
                     it.source == "tool:save_memory"
             })
         }
+    }
+
+    @Test
+    fun runEvents_emitsKoogToolLifecycleEvents() = runTest {
+        val executor = ToolCallingPromptExecutor()
+        val factory = KoogAgentFactoryImpl(
+            executorFactory = object : KoogPromptExecutorFactory {
+                override fun create(config: LlmConfig): PromptExecutor = executor
+            },
+            toolRegistry = object : AgentToolRegistry {
+                override fun create(): ToolRegistry =
+                    ToolRegistry.builder()
+                        .tool(saveMemoryTool)
+                        .build()
+            },
+        )
+
+        val events = factory.create(testConfig).runEvents(
+            BuiltPrompt(
+                systemPrompt = "You are a companion. Use tools when useful.",
+                userMessage = "Please remember that I like jasmine tea.",
+            )
+        ).toList()
+
+        assertTrue(events.contains(KoogAgentEvent.ToolStarted("save_memory")))
+        assertTrue(events.contains(KoogAgentEvent.ToolFinished("save_memory")))
+        assertTrue(events.contains(KoogAgentEvent.TextDelta("remembered")))
     }
 
     private class ToolCallingPromptExecutor : PromptExecutor() {
@@ -91,7 +119,7 @@ class KoogAgentFactoryImplTest {
                     )
                 )
             } else {
-                listOf(Message.Assistant("记住了。", ResponseMetaInfo(Clock.System.now())))
+                listOf(Message.Assistant("remembered", ResponseMetaInfo(Clock.System.now())))
             }
         }
 

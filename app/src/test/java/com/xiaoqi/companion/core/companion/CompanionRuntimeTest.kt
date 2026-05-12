@@ -55,6 +55,7 @@ class CompanionRuntimeTest {
         var lastConfig: com.xiaoqi.companion.data.repository.LlmConfig? = null
         var responseText = "[mood:happy][intensity:0.7] 你好呀！"
         var shouldFail = false
+        var emitToolEvents = false
 
         override fun create(config: com.xiaoqi.companion.data.repository.LlmConfig): KoogAgentWrapper {
             lastConfig = config
@@ -67,6 +68,15 @@ class CompanionRuntimeTest {
                 override fun runStreaming(prompt: BuiltPrompt) = flow {
                     if (shouldFail) throw RuntimeException("API error")
                     emit(responseText)
+                }
+
+                override fun runEvents(prompt: BuiltPrompt) = flow {
+                    if (shouldFail) throw RuntimeException("API error")
+                    if (emitToolEvents) {
+                        emit(KoogAgentEvent.ToolStarted("save_memory"))
+                        emit(KoogAgentEvent.ToolFinished("save_memory"))
+                    }
+                    emit(KoogAgentEvent.TextDelta(responseText))
                 }
             }
         }
@@ -96,7 +106,7 @@ class CompanionRuntimeTest {
 
     @Test
     fun send_passesCorrectLlmConfigToFactory() = runTest {
-        val factory = FakeKoogAgentFactory()
+        val factory = FakeKoogAgentFactory().apply { emitToolEvents = true }
         makeRuntime(factory).send(UserInput.Text("hi")).test {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
@@ -171,5 +181,16 @@ class CompanionRuntimeTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify { promptBuilder.build(match<UserInput> { it is UserInput.Vision }, any(), any(), any()) }
+    }
+    @Test
+    fun send_agentToolEvents_emitsObservableToolEvents() = runTest {
+        val factory = FakeKoogAgentFactory().apply { emitToolEvents = true }
+        makeRuntime(factory).send(UserInput.Text("remember this")).test {
+            assertEquals(AgentEvent.ToolStarted("save_memory"), awaitItem())
+            assertEquals(AgentEvent.ToolFinished("save_memory"), awaitItem())
+            assertTrue(awaitItem() is AgentEvent.Streaming)
+            assertTrue(awaitItem() is AgentEvent.Complete)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }
