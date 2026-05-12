@@ -9,7 +9,7 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.AttachmentContent
 import ai.koog.prompt.message.ContentPart
 import ai.koog.prompt.streaming.StreamFrame
-import com.xiaoqi.companion.core.llm.AnthropicCompatLLMClientFactory
+import com.xiaoqi.companion.core.llm.AnthropicMessagesLLMClientFactory
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.data.repository.LlmConfig
 import javax.inject.Inject
@@ -22,11 +22,11 @@ private const val TAG = "Companion-Agent"
 
 @Singleton
 class KoogAgentFactoryImpl @Inject constructor(
-    private val clientFactory: AnthropicCompatLLMClientFactory,
+    private val clientFactory: AnthropicMessagesLLMClientFactory,
 ) : KoogAgentFactory {
 
     override fun create(config: LlmConfig): KoogAgentWrapper {
-        Timber.tag(TAG).d("Creating Anthropic-compatible agent: provider=%s, model=%s", config.provider, config.modelName)
+        Timber.tag(TAG).d("Creating Anthropic Messages agent: provider=%s, model=%s", config.provider, config.modelName)
         return KoogPromptExecutorWrapper(
             config = config,
             executor = MultiLLMPromptExecutor(

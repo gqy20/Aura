@@ -34,21 +34,9 @@ android {
         val envProps = Properties()
         if (envFile.exists()) envProps.load(envFile.inputStream())
 
-        val llmApiKey = envProps.getProperty("LLM_API_KEY")
-            ?: envProps.getProperty("ANTHROPIC_AUTH_TOKEN")
-            ?: System.getenv("LLM_API_KEY")
-            ?: System.getenv("ANTHROPIC_AUTH_TOKEN")
-            ?: ""
-        val llmBaseUrl = envProps.getProperty("LLM_BASE_URL")
-            ?: envProps.getProperty("ANTHROPIC_BASE_URL")
-            ?: System.getenv("LLM_BASE_URL")
-            ?: System.getenv("ANTHROPIC_BASE_URL")
-            ?: "https://open.bigmodel.cn/api/anthropic"
-        val llmModel = envProps.getProperty("LLM_MODEL")
-            ?: envProps.getProperty("ANTHROPIC_MODEL")
-            ?: System.getenv("LLM_MODEL")
-            ?: System.getenv("ANTHROPIC_MODEL")
-            ?: "glm-5v-turbo"
+        val llmApiKey = envProps.getProperty("LLM_API_KEY") ?: System.getenv("LLM_API_KEY") ?: ""
+        val llmBaseUrl = envProps.getProperty("LLM_BASE_URL") ?: System.getenv("LLM_BASE_URL") ?: ""
+        val llmModel = envProps.getProperty("LLM_MODEL") ?: System.getenv("LLM_MODEL") ?: "glm-5v-turbo"
         buildConfigField("String", "LLM_API_KEY", "\"$llmApiKey\"")
         buildConfigField("String", "LLM_BASE_URL", "\"$llmBaseUrl\"")
         buildConfigField("String", "LLM_MODEL", "\"$llmModel\"")

@@ -41,14 +41,14 @@ import java.util.concurrent.TimeUnit
 private const val DEFAULT_MAX_TOKENS = 1024
 private const val ANTHROPIC_VERSION = "2023-06-01"
 
-class AnthropicCompatLLMClient(
+class AnthropicMessagesLLMClient(
     private val apiKey: String,
     private val baseUrl: String,
     private val httpClient: OkHttpClient = defaultHttpClient(),
     private val clock: Clock = Clock.System,
 ) : LLMClient() {
 
-    override val clientName: String = "anthropic-compatible"
+    override val clientName: String = "anthropic-messages"
 
     override fun llmProvider(): LLMProvider = LLMProvider.Anthropic
 
@@ -133,6 +133,8 @@ class AnthropicCompatLLMClient(
         }
 
     private fun buildRequest(prompt: Prompt, model: LLModel, stream: Boolean): Request {
+        require(baseUrl.isNotBlank()) { "LLM_BASE_URL is not configured" }
+        require(apiKey.isNotBlank()) { "LLM_API_KEY is not configured" }
         val body = buildRequestBody(prompt, model, stream)
         return Request.Builder()
             .url("${baseUrl.trimEnd('/')}/v1/messages")
@@ -273,7 +275,7 @@ class AnthropicCompatLLMClient(
     }
 }
 
-class AnthropicCompatLLMClientFactory @Inject constructor() {
-    fun create(apiKey: String, baseUrl: String): AnthropicCompatLLMClient =
-        AnthropicCompatLLMClient(apiKey = apiKey, baseUrl = baseUrl)
+class AnthropicMessagesLLMClientFactory @Inject constructor() {
+    fun create(apiKey: String, baseUrl: String): AnthropicMessagesLLMClient =
+        AnthropicMessagesLLMClient(apiKey = apiKey, baseUrl = baseUrl)
 }
