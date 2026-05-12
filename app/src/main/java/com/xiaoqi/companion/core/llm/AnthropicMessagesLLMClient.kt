@@ -66,7 +66,20 @@ class AnthropicMessagesLLMClient(
         val stopReason = response["stop_reason"]?.jsonPrimitive?.contentOrNull
 
         val responses = when (stopReason) {
-            "tool_use" -> extractToolUseResponses(response, usage)
+            "tool_use" -> {
+                val toolResponses = extractToolUseResponses(response, usage)
+                AppLogger.info(
+                    LogTags.Llm,
+                    "response_tool_use",
+                    "model" to model.id,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                    "toolCount" to toolResponses.size,
+                    "toolNames" to toolResponses.mapNotNull { (it as? Message.Tool.Call)?.tool }.joinToString(","),
+                    "inputTokens" to usage?.get("input_tokens")?.jsonPrimitive?.intOrNull,
+                    "outputTokens" to usage?.get("output_tokens")?.jsonPrimitive?.intOrNull,
+                )
+                toolResponses
+            }
             else -> {
                 val text = extractTextFromMessageResponse(response)
                 AppLogger.info(
@@ -75,6 +88,7 @@ class AnthropicMessagesLLMClient(
                     "model" to model.id,
                     "stream" to false,
                     "durationMs" to (System.currentTimeMillis() - startedAt),
+                    "stopReason" to (stopReason ?: "null"),
                     "responseLength" to text.length,
                     "inputTokens" to usage?.get("input_tokens")?.jsonPrimitive?.intOrNull,
                     "outputTokens" to usage?.get("output_tokens")?.jsonPrimitive?.intOrNull,
@@ -366,13 +380,27 @@ class AnthropicMessagesLLMClient(
             ?.mapNotNull { block ->
                 val blockObj = block.jsonObject
                 if (blockObj["type"]?.jsonPrimitive?.contentOrNull == "tool_use") {
+                    val toolId = blockObj["id"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val toolName = blockObj["name"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val toolInput = blockObj["input"]?.toString() ?: "{}"
+                    AppLogger.debug(
+                        LogTags.Llm,
+                        "extracted_tool_call",
+                        "toolId" to toolId,
+                        "toolName" to toolName,
+                        "inputLength" to toolInput.length,
+                        "inputPreview" to toolInput.take(200),
+                    )
                     Message.Tool.Call(
-                        id = blockObj["id"]?.jsonPrimitive?.contentOrNull ?: "",
-                        tool = blockObj["name"]?.jsonPrimitive?.contentOrNull ?: "",
-                        content = blockObj["input"]?.toString() ?: "{}",
+                        id = toolId,
+                        tool = toolName,
+                        content = toolInput,
                         metaInfo = responseMetaInfo(usage),
                     )
                 } else null
+            }
+            ?.also {
+                AppLogger.debug(LogTags.Llm, "tool_calls_extracted", "count" to it.size)
             }
             ?: emptyList()
 

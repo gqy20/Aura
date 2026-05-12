@@ -11,6 +11,8 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogFieldSanitizer
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
+import com.xiaoqi.companion.data.repository.ToolCallRepository
+import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
@@ -25,14 +27,27 @@ import kotlinx.coroutines.launch
 class ChatViewModel @Inject constructor(
     private val runtime: CompanionRuntime,
     private val toolDisplayRegistry: ToolDisplayRegistry,
+    private val toolCallRepository: ToolCallRepository,
 ) : ViewModel() {
 
     companion object {
+        private const val DEFAULT_SESSION_ID = "default"
+        private const val RECENT_TOOL_CALL_LIMIT = 3
         private const val STREAMING_IDLE_TIMEOUT_MS = 30_000L
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
+
+    init {
+        viewModelScope.launch {
+            toolCallRepository.observeBySession(DEFAULT_SESSION_ID).collect { calls ->
+                _uiState.update { state ->
+                    state.copy(toolCalls = calls.take(RECENT_TOOL_CALL_LIMIT).map { it.toChatToolCall() })
+                }
+            }
+        }
+    }
 
     fun updateInputText(text: String) {
         _uiState.update { it.copy(inputText = text) }
@@ -198,6 +213,19 @@ class ChatViewModel @Inject constructor(
     private fun updateAssistantToolStatus(assistantId: String, status: String) {
         updateAssistantMessage(assistantId) { it.copy(toolStatus = status) }
     }
+
+    private fun ToolCallSnapshot.toChatToolCall(): ChatToolCall =
+        ChatToolCall(
+            id = id,
+            label = toolDisplayRegistry.label(toolName, status),
+            status = when (status) {
+                ToolCallStatus.STARTED -> "Running"
+                ToolCallStatus.SUCCEEDED -> "Done"
+                ToolCallStatus.FAILED -> "Failed"
+            },
+            durationMs = durationMs,
+            errorMessage = errorMessage,
+        )
 
     private fun formatError(error: AgentError): String =
         when (error) {

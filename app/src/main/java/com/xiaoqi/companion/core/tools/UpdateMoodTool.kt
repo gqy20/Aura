@@ -6,8 +6,10 @@ import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity
 import java.util.UUID
-import kotlinx.serialization.Serializable
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 
 class UpdateMoodTool(
     private val moodSnapshotDao: MoodSnapshotDao,
@@ -36,19 +38,20 @@ class UpdateMoodTool(
         val intensity: Float = 0.5f,
     )
 
-    override suspend fun execute(args: Args): String {
-        val safeIntensity = args.intensity.coerceIn(0f, 1f)
-        val snapshotId = UUID.randomUUID().toString()
-        moodSnapshotDao.insert(
-            MoodSnapshotEntity(
-                id = snapshotId,
-                companionId = companionIdProvider(),
-                mood = args.mood,
-                trigger = args.trigger,
-                intensity = safeIntensity,
-                timestamp = System.currentTimeMillis(),
+    override suspend fun execute(args: Args): String =
+        withContext(Dispatchers.IO) {
+            val safeIntensity = args.intensity.coerceIn(0f, 1f)
+            val snapshotId = UUID.randomUUID().toString()
+            moodSnapshotDao.insert(
+                MoodSnapshotEntity(
+                    id = snapshotId,
+                    companionId = companionIdProvider(),
+                    mood = args.mood,
+                    trigger = args.trigger,
+                    intensity = safeIntensity,
+                    timestamp = System.currentTimeMillis(),
+                )
             )
-        )
-        return """{"status":"saved","snapshotId":"$snapshotId","mood":"${args.mood}"}"""
-    }
+            """{"status":"saved","snapshotId":"$snapshotId","mood":"${args.mood}"}"""
+        }
 }

@@ -35,9 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
@@ -102,6 +103,7 @@ fun ChatScreenContent(
                 }
             }
 
+            ToolCallStrip(toolCalls = uiState.toolCalls)
             InputBar(
                 inputText = uiState.inputText,
                 onInputTextChanged = onInputTextChanged,
@@ -116,6 +118,36 @@ fun ChatScreenContent(
         LaunchedEffect(error) {
             snackbarHostState.showSnackbar(error)
             onClearError()
+        }
+    }
+}
+
+@Composable
+private fun ToolCallStrip(toolCalls: List<ChatToolCall>) {
+    if (toolCalls.isEmpty()) return
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        toolCalls.forEach { call ->
+            Surface(
+                tonalElevation = 2.dp,
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Text(
+                    text = buildString {
+                        append(call.label)
+                        call.durationMs?.let { append(" ${it}ms") }
+                    },
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

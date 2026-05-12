@@ -13,11 +13,15 @@ import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.MessageRepository
+import com.xiaoqi.companion.data.repository.ToolCallRepository
+import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.resetMain
@@ -31,10 +35,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
 
     private lateinit var viewModel: ChatViewModel
     private lateinit var fakeRuntime: FakeCompanionRuntime
+    private lateinit var toolCallRepository: FakeToolCallRepository
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val configRepo: ConfigRepository = mockk {
@@ -49,6 +55,12 @@ class ChatViewModelTest {
     }
 
     private val messageRepo: MessageRepository = mockk(relaxed = true)
+
+    private class FakeToolCallRepository : ToolCallRepository {
+        val calls = MutableStateFlow<List<ToolCallSnapshot>>(emptyList())
+
+        override fun observeBySession(sessionId: String) = calls
+    }
 
     private class FakeCompanionRuntime(
         configRepo: ConfigRepository,
@@ -89,7 +101,8 @@ class ChatViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeRuntime = FakeCompanionRuntime(configRepo, messageRepo)
-        viewModel = ChatViewModel(fakeRuntime, ToolDisplayRegistry())
+        toolCallRepository = FakeToolCallRepository()
+        viewModel = ChatViewModel(fakeRuntime, ToolDisplayRegistry(), toolCallRepository)
     }
 
     @After
@@ -181,4 +194,41 @@ class ChatViewModelTest {
         val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
         assertEquals("Memory saved", assistant.toolStatus)
     }
+
+    @Test
+    fun init_observesRecentToolCalls() = runTest {
+        toolCallRepository.calls.value = listOf(
+            toolCallSnapshot("1", "save_memory", ToolCallStatus.SUCCEEDED, completedAt = 1_100L),
+            toolCallSnapshot("2", "search_memory", ToolCallStatus.STARTED),
+            toolCallSnapshot("3", "update_mood", ToolCallStatus.FAILED, errorMessage = "bad args"),
+            toolCallSnapshot("4", "update_relationship", ToolCallStatus.SUCCEEDED),
+        )
+
+        val calls = viewModel.uiState.value.toolCalls
+        assertEquals(3, calls.size)
+        assertEquals("Memory saved", calls[0].label)
+        assertEquals("Done", calls[0].status)
+        assertEquals(100L, calls[0].durationMs)
+        assertEquals("Searching memory", calls[1].label)
+        assertEquals("Failed", calls[2].status)
+        assertEquals("bad args", calls[2].errorMessage)
+    }
+
+    private fun toolCallSnapshot(
+        id: String,
+        toolName: String,
+        status: ToolCallStatus,
+        completedAt: Long? = null,
+        errorMessage: String? = null,
+    ) = ToolCallSnapshot(
+        id = id,
+        sessionId = "default",
+        toolName = toolName,
+        status = status,
+        argumentsJson = "{}",
+        resultJson = null,
+        errorMessage = errorMessage,
+        startedAt = 1_000L,
+        completedAt = completedAt,
+    )
 }

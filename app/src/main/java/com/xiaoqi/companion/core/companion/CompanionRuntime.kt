@@ -11,9 +11,13 @@ import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
 import java.net.SocketTimeoutException
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 open class CompanionRuntime @Inject constructor(
     private val configRepository: ConfigRepository,
@@ -25,7 +29,7 @@ open class CompanionRuntime @Inject constructor(
     private val emotionMachine: EmotionStateMachine,
     private val relationshipModel: RelationshipModel,
 ) {
-    open suspend fun send(input: UserInput): Flow<AgentEvent> = flow {
+    open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
         val startedAt = System.currentTimeMillis()
         try {
             AppLogger.info(
@@ -69,20 +73,24 @@ open class CompanionRuntime @Inject constructor(
             messageRepository.sendMessage(sessionId = DEFAULT_SESSION_ID, content = input.content)
 
             var rawResponse = ""
-            agent.runEvents(prompt).collect { event ->
-                when (event) {
-                    is KoogAgentEvent.TextDelta -> {
-                        rawResponse += event.text
-                        emit(AgentEvent.Streaming(event.text))
+            val job = launch(Dispatchers.IO) {
+                agent.runEvents(prompt).collect { event ->
+                    when (event) {
+                        is KoogAgentEvent.TextDelta -> {
+                            rawResponse += event.text
+                            trySend(AgentEvent.Streaming(event.text))
+                        }
+                        is KoogAgentEvent.ToolCallUpdated -> trySend(AgentEvent.ToolCallUpdated(event.call))
+                        is KoogAgentEvent.ToolStarted -> trySend(AgentEvent.ToolStarted(event.name))
+                        is KoogAgentEvent.ToolFinished -> trySend(AgentEvent.ToolFinished(event.name))
                     }
-                    is KoogAgentEvent.ToolCallUpdated -> emit(AgentEvent.ToolCallUpdated(event.call))
-                    is KoogAgentEvent.ToolStarted -> emit(AgentEvent.ToolStarted(event.name))
-                    is KoogAgentEvent.ToolFinished -> emit(AgentEvent.ToolFinished(event.name))
+                }
+                if (rawResponse.isEmpty()) {
+                    rawResponse = agent.run(prompt)
                 }
             }
-            if (rawResponse.isEmpty()) {
-                rawResponse = agent.run(prompt)
-            }
+            job.join()
+
             AppLogger.debug(
                 LogTags.Llm,
                 "response_received",
@@ -107,7 +115,7 @@ open class CompanionRuntime @Inject constructor(
                 "durationMs" to (System.currentTimeMillis() - startedAt),
                 "replyLength" to parsed.textReply.length,
             )
-            emit(AgentEvent.Complete(parsed))
+            trySend(AgentEvent.Complete(parsed))
         } catch (e: Exception) {
             AppLogger.error(
                 LogTags.Runtime,
@@ -121,8 +129,9 @@ open class CompanionRuntime @Inject constructor(
                 is SocketTimeoutException -> AgentError.NetworkTimeout
                 else -> AgentError.ApiError(e.message ?: "Unknown error")
             }
-            emit(AgentEvent.Error(error))
+            trySend(AgentEvent.Error(error))
         }
+        awaitClose {  }
     }
 
     private companion object {

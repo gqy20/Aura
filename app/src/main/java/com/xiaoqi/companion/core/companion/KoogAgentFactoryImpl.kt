@@ -200,7 +200,7 @@ private class KoogPromptExecutorWrapper(
             .build()
 
     private companion object {
-        const val MAX_AGENT_ITERATIONS = 6
+        const val MAX_AGENT_ITERATIONS = 12
         const val DEFAULT_SESSION_ID = "default"
     }
 }

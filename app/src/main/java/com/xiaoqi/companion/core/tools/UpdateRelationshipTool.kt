@@ -6,8 +6,10 @@ import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import java.util.UUID
-import kotlinx.serialization.Serializable
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 
 class UpdateRelationshipTool(
     private val agentStateDao: AgentStateDao,
@@ -34,27 +36,28 @@ class UpdateRelationshipTool(
         val reason: String? = null,
     )
 
-    override suspend fun execute(args: Args): String {
-        val companionId = companionIdProvider()
-        val existing = agentStateDao.getByCompanionId(companionId)
-        val now = System.currentTimeMillis()
-        val newLevel = ((existing?.relationshipLevel ?: 0f) + args.delta).coerceIn(0f, 1f)
+    override suspend fun execute(args: Args): String =
+        withContext(Dispatchers.IO) {
+            val companionId = companionIdProvider()
+            val existing = agentStateDao.getByCompanionId(companionId)
+            val now = System.currentTimeMillis()
+            val newLevel = ((existing?.relationshipLevel ?: 0f) + args.delta).coerceIn(0f, 1f)
 
-        if (existing != null) {
-            agentStateDao.updateRelationshipLevel(companionId, newLevel, now)
-        } else {
-            agentStateDao.insert(
-                AgentStateEntity(
-                    id = UUID.randomUUID().toString(),
-                    companionId = companionId,
-                    mood = "",
-                    relationshipLevel = newLevel,
-                    createdAt = now,
-                    updatedAt = now,
+            if (existing != null) {
+                agentStateDao.updateRelationshipLevel(companionId, newLevel, now)
+            } else {
+                agentStateDao.insert(
+                    AgentStateEntity(
+                        id = UUID.randomUUID().toString(),
+                        companionId = companionId,
+                        mood = "",
+                        relationshipLevel = newLevel,
+                        createdAt = now,
+                        updatedAt = now,
+                    )
                 )
-            )
-        }
+            }
 
-        return """{"status":"updated","level":$newLevel,"delta":${args.delta}}"""
-    }
+            """{"status":"updated","level":$newLevel,"delta":${args.delta}}"""
+        }
 }
