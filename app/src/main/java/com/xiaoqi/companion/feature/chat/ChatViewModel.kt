@@ -5,14 +5,17 @@ import androidx.lifecycle.viewModelScope
 import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.UserInput
+import dagger.hilt.android.lifecycle.HiltViewModel
 import timber.log.Timber
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-class ChatViewModel(
+@HiltViewModel
+class ChatViewModel @Inject constructor(
     private val runtime: CompanionRuntime,
 ) : ViewModel() {
 

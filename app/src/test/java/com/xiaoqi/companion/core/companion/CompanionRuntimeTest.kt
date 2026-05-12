@@ -15,6 +15,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -62,6 +63,11 @@ class CompanionRuntimeTest {
                     if (shouldFail) throw RuntimeException("API error")
                     return responseText
                 }
+
+                override fun runStreaming(prompt: BuiltPrompt) = flow {
+                    if (shouldFail) throw RuntimeException("API error")
+                    emit(responseText)
+                }
             }
         }
     }
@@ -80,6 +86,7 @@ class CompanionRuntimeTest {
     fun send_textInput_emitsCompleteEvent() = runTest {
         val factory = FakeKoogAgentFactory()
         makeRuntime(factory).send(UserInput.Text("hello")).test {
+            assertTrue(awaitItem() is AgentEvent.Streaming)
             val event = awaitItem()
             assertTrue(event is AgentEvent.Complete)
             assertEquals("你好！", (event as AgentEvent.Complete).parsed.textReply)

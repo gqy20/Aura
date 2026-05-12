@@ -48,7 +48,14 @@ open class CompanionRuntime @Inject constructor(
             messageRepository.sendMessage(sessionId = "default", content = input.content)
 
             // 4. Call LLM
-            val rawResponse = agent.run(prompt)
+            var rawResponse = ""
+            agent.runStreaming(prompt).collect { delta ->
+                rawResponse += delta
+                emit(AgentEvent.Streaming(delta))
+            }
+            if (rawResponse.isEmpty()) {
+                rawResponse = agent.run(prompt)
+            }
             Timber.tag(TAG).d("LLM raw response length=%d", rawResponse.length)
 
             // 5. Parse output

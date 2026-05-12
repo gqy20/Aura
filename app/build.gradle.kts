@@ -34,12 +34,24 @@ android {
         val envProps = Properties()
         if (envFile.exists()) envProps.load(envFile.inputStream())
 
-        val anthropicApiKey = envProps.getProperty("ANTHROPIC_AUTH_TOKEN") ?: System.getenv("ANTHROPIC_AUTH_TOKEN") ?: ""
-        val anthropicBaseUrl = envProps.getProperty("ANTHROPIC_BASE_URL") ?: System.getenv("ANTHROPIC_BASE_URL") ?: "https://open.bigmodel.cn/api/anthropic"
-        val anthropicModel = envProps.getProperty("ANTHROPIC_MODEL") ?: System.getenv("ANTHROPIC_MODEL") ?: "glm-5v-turbo"
-        buildConfigField("String", "ANTHROPIC_API_KEY", "\"$anthropicApiKey\"")
-        buildConfigField("String", "ANTHROPIC_BASE_URL", "\"$anthropicBaseUrl\"")
-        buildConfigField("String", "ANTHROPIC_MODEL", "\"$anthropicModel\"")
+        val llmApiKey = envProps.getProperty("LLM_API_KEY")
+            ?: envProps.getProperty("ANTHROPIC_AUTH_TOKEN")
+            ?: System.getenv("LLM_API_KEY")
+            ?: System.getenv("ANTHROPIC_AUTH_TOKEN")
+            ?: ""
+        val llmBaseUrl = envProps.getProperty("LLM_BASE_URL")
+            ?: envProps.getProperty("ANTHROPIC_BASE_URL")
+            ?: System.getenv("LLM_BASE_URL")
+            ?: System.getenv("ANTHROPIC_BASE_URL")
+            ?: "https://open.bigmodel.cn/api/anthropic"
+        val llmModel = envProps.getProperty("LLM_MODEL")
+            ?: envProps.getProperty("ANTHROPIC_MODEL")
+            ?: System.getenv("LLM_MODEL")
+            ?: System.getenv("ANTHROPIC_MODEL")
+            ?: "glm-5v-turbo"
+        buildConfigField("String", "LLM_API_KEY", "\"$llmApiKey\"")
+        buildConfigField("String", "LLM_BASE_URL", "\"$llmBaseUrl\"")
+        buildConfigField("String", "LLM_MODEL", "\"$llmModel\"")
     }
 
     // Signing: use release keystore if keystore.properties exists, otherwise fallback to debug
