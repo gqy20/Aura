@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -63,29 +62,47 @@ class ChatViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            try {
-                var assistantContent = ""
-                val assistantId = UUID.randomUUID().toString()
+            val assistantId = UUID.randomUUID().toString()
+            var assistantContent = ""
+            var idleTimeoutJob: Job? = null
+            var timedOut = false
 
-                _uiState.update { state ->
-                    state.copy(messages = state.messages + ChatMessage(assistantId, "ASSISTANT", "", isStreaming = true))
+            fun resetIdleTimer() {
+                timedOut = false
+                idleTimeoutJob?.cancel()
+                idleTimeoutJob = launch {
+                    delay(STREAMING_IDLE_TIMEOUT_MS)
+                    timedOut = true
+                    AppLogger.warn(
+                        LogTags.Chat,
+                        "streaming_idle_timeout",
+                        "requestHash" to LogFieldSanitizer.hash(requestId),
+                        "timeoutMs" to STREAMING_IDLE_TIMEOUT_MS,
+                    )
                 }
+            }
 
-                var idleTimeoutJob: Job? = null
-                var timedOut = false
-                fun resetIdleTimer() {
-                    timedOut = false
-                    idleTimeoutJob?.cancel()
-                    idleTimeoutJob = launch {
-                        delay(STREAMING_IDLE_TIMEOUT_MS)
-                        timedOut = true
-                        AppLogger.warn(
-                            LogTags.Chat,
-                            "streaming_idle_timeout",
-                            "requestHash" to LogFieldSanitizer.hash(requestId),
-                            "timeoutMs" to STREAMING_IDLE_TIMEOUT_MS,
+            fun finishWithError(message: String) {
+                idleTimeoutJob?.cancel()
+                _uiState.update { state ->
+                    state.copy(
+                        messages = state.messages.filter { it.id != assistantId },
+                        isLoading = false,
+                        error = message,
+                    )
+                }
+            }
+
+            try {
+                _uiState.update { state ->
+                    state.copy(
+                        messages = state.messages + ChatMessage(
+                            id = assistantId,
+                            role = "ASSISTANT",
+                            content = "",
+                            isStreaming = true,
                         )
-                    }
+                    )
                 }
 
                 runtime.send(UserInput.Text(trimmed)).collect { event ->
@@ -93,15 +110,16 @@ class ChatViewModel @Inject constructor(
                         is AgentEvent.Streaming -> {
                             resetIdleTimer()
                             assistantContent += event.delta
-                            _uiState.update { state ->
-                                val updated = state.messages.map { msg ->
-                                    if (msg.id == assistantId) msg.copy(content = assistantContent) else msg
-                                }
-                                state.copy(messages = updated)
+                            updateAssistantMessage(assistantId) {
+                                it.copy(content = assistantContent)
                             }
                         }
-                        is AgentEvent.ToolStarted,
-                        is AgentEvent.ToolFinished -> Unit
+                        is AgentEvent.ToolStarted -> {
+                            updateAssistantToolStatus(assistantId, toolStatusLabel(event.name, isDone = false))
+                        }
+                        is AgentEvent.ToolFinished -> {
+                            updateAssistantToolStatus(assistantId, toolStatusLabel(event.name, isDone = true))
+                        }
                         is AgentEvent.Complete -> {
                             idleTimeoutJob?.cancel()
                             AppLogger.info(
@@ -110,49 +128,28 @@ class ChatViewModel @Inject constructor(
                                 "requestHash" to LogFieldSanitizer.hash(requestId),
                                 "replyLength" to event.parsed.textReply.length,
                             )
-                            _uiState.update { state ->
-                                val updated = state.messages.map { msg ->
-                                    if (msg.id == assistantId) {
-                                        msg.copy(
-                                            content = event.parsed.textReply,
-                                            isStreaming = false,
-                                        )
-                                    } else {
-                                        msg
-                                    }
-                                }
-                                state.copy(messages = updated, isLoading = false)
+                            updateAssistantMessage(assistantId) {
+                                it.copy(
+                                    content = event.parsed.textReply,
+                                    isStreaming = false,
+                                )
                             }
+                            _uiState.update { it.copy(isLoading = false) }
                         }
                         is AgentEvent.Error -> {
-                            idleTimeoutJob?.cancel()
                             AppLogger.warn(
                                 LogTags.Chat,
                                 "agent_error_received",
                                 "requestHash" to LogFieldSanitizer.hash(requestId),
                                 "errorType" to event.error::class.simpleName,
                             )
-                            _uiState.update { state ->
-                                val filtered = state.messages.filter { it.id != assistantId }
-                                state.copy(
-                                    messages = filtered,
-                                    isLoading = false,
-                                    error = formatError(event.error),
-                                )
-                            }
+                            finishWithError(formatError(event.error))
                         }
                     }
                 }
 
                 if (timedOut) {
-                    _uiState.update { state ->
-                        val filtered = state.messages.filter { it.id != assistantId }
-                        state.copy(
-                            messages = filtered,
-                            isLoading = false,
-                            error = "响应超时，请重试",
-                        )
-                    }
+                    finishWithError("Response timed out. Please try again.")
                 }
             } catch (e: Exception) {
                 AppLogger.error(
@@ -162,7 +159,7 @@ class ChatViewModel @Inject constructor(
                     "requestHash" to LogFieldSanitizer.hash(requestId),
                     "textLength" to trimmed.length,
                 )
-                _uiState.update { it.copy(isLoading = false, error = "发送失败，请重试") }
+                finishWithError("Send failed. Please try again.")
             }
         }
     }
@@ -171,11 +168,33 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
 
+    private fun updateAssistantMessage(
+        assistantId: String,
+        transform: (ChatMessage) -> ChatMessage,
+    ) {
+        _uiState.update { state ->
+            val updated = state.messages.map { msg ->
+                if (msg.id == assistantId) transform(msg) else msg
+            }
+            state.copy(messages = updated)
+        }
+    }
+
+    private fun updateAssistantToolStatus(assistantId: String, status: String) {
+        updateAssistantMessage(assistantId) { it.copy(toolStatus = status) }
+    }
+
+    private fun toolStatusLabel(name: String, isDone: Boolean): String =
+        when (name) {
+            "save_memory" -> if (isDone) "Memory saved" else "Saving memory"
+            else -> if (isDone) "Tool finished" else "Using tool"
+        }
+
     private fun formatError(error: AgentError): String =
         when (error) {
-            is AgentError.NetworkTimeout -> "网络超时，请检查连接"
-            is AgentError.RateLimited -> "请求过于频繁，请稍后再试"
-            is AgentError.ApiError -> error.message ?: "未知错误"
-            else -> "出错了，请重试"
+            is AgentError.NetworkTimeout -> "Network timed out. Check your connection."
+            is AgentError.RateLimited -> "Too many requests. Try again later."
+            is AgentError.ApiError -> error.message
+            is AgentError.ParseError -> error.reason
         }
 }

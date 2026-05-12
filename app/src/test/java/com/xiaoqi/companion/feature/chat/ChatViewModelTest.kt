@@ -60,6 +60,7 @@ class ChatViewModelTest {
     ) {
         var rawResponse = "[mood:happy][intensity:0.7] 你好呀！"
         var shouldFail = false
+        var emitToolEvents = false
         var sendCalled = false
         var lastInput: UserInput? = null
 
@@ -69,6 +70,10 @@ class ChatViewModelTest {
             if (shouldFail) {
                 emit(AgentEvent.Error(AgentError.ApiError("API error")))
             } else {
+                if (emitToolEvents) {
+                    emit(AgentEvent.ToolStarted("save_memory"))
+                    emit(AgentEvent.ToolFinished("save_memory"))
+                }
                 val parsed = OutputParser().parse(rawResponse)
                 emit(AgentEvent.Complete(parsed))
             }
@@ -160,5 +165,15 @@ class ChatViewModelTest {
     fun updateInputText_reflectsInState() = runTest {
         viewModel.updateInputText("new text")
         viewModel.uiState.test { assertEquals("new text", awaitItem().inputText); cancelAndIgnoreRemainingEvents() }
+    }
+
+    @Test
+    fun sendMessage_toolEvents_showStatusOnAssistantBubble() = runTest {
+        fakeRuntime.emitToolEvents = true
+
+        viewModel.sendMessage("remember tea")
+
+        val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
+        assertEquals("Memory saved", assistant.toolStatus)
     }
 }

@@ -44,6 +44,22 @@ class MessageBubbleTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Thinking...▌").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Thinking......").assertIsDisplayed()
+    }
+
+    @Test
+    fun assistantMessage_displaysToolStatus() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "I will remember that.",
+                    toolStatus = "Memory saved",
+                )
+            )
+        }
+
+        composeTestRule.onNodeWithText("Memory saved").assertIsDisplayed()
     }
 }
