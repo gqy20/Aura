@@ -9,7 +9,10 @@ import androidx.room.Room
 import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.db.CompanionDatabase
+import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
+import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import dagger.Module
 import dagger.Provides
@@ -59,4 +62,16 @@ object DataModule {
     @Provides
     fun provideToolCallDao(database: CompanionDatabase): ToolCallDao =
         database.toolCallDao()
+
+    @Provides
+    fun provideMemoryDao(database: CompanionDatabase): MemoryDao =
+        database.memoryDao()
+
+    @Provides
+    fun provideMoodSnapshotDao(database: CompanionDatabase): MoodSnapshotDao =
+        database.moodSnapshotDao()
+
+    @Provides
+    fun provideAgentStateDao(database: CompanionDatabase): AgentStateDao =
+        database.agentStateDao()
 }
