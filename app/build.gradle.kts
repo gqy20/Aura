@@ -139,6 +139,9 @@ dependencies {
     // Logging
     implementation(libs.timber)
 
+    // Networking
+    implementation(libs.okhttp)
+
     // Agent Framework: Koog
     implementation(libs.koog.agents)
 
