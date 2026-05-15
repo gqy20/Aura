@@ -2,6 +2,7 @@ package com.xiaoqi.companion.core.companion
 
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.agent.ToolCalls
+import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.dsl.extension.HistoryCompressionStrategy
 import ai.koog.agents.ext.agent.HistoryCompressionConfig
 import ai.koog.agents.ext.agent.singleRunStrategyWithHistoryCompression
@@ -113,7 +114,7 @@ private class KoogPromptExecutorWrapper(
             .promptExecutor(executor)
             .llmModel(model)
             .prompt(prompt.toKoogAgentPrompt())
-            .toolRegistry(toolRegistry.create())
+            .toolRegistry(if (prompt.hasImage) ToolRegistry.EMPTY else toolRegistry.create())
             .maxIterations(MAX_AGENT_ITERATIONS)
             .id("companion-agent-${config.provider.name.lowercase()}")
             .graphStrategy(

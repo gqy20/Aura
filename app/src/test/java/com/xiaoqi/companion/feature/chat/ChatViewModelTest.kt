@@ -47,6 +47,7 @@ class ChatViewModelTest {
     private lateinit var viewModel: ChatViewModel
     private lateinit var fakeRuntime: FakeCompanionRuntime
     private lateinit var toolCallRepository: FakeToolCallRepository
+    private lateinit var imageProcessor: FakeChatImageProcessor
     private lateinit var memoryDao: MemoryDao
     private lateinit var agentStateDao: AgentStateDao
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -115,11 +116,25 @@ class ChatViewModelTest {
         }
     }
 
+    private class FakeChatImageProcessor : ChatImageProcessor {
+        var shouldFail = false
+
+        override suspend fun prepare(uriString: String): PreparedChatImage {
+            if (shouldFail) error("bad image")
+            return PreparedChatImage(
+                uriString = uriString,
+                imageBase64 = "prepared-base64",
+                mediaType = "image/jpeg",
+            )
+        }
+    }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeRuntime = FakeCompanionRuntime(configRepo, messageRepo)
         toolCallRepository = FakeToolCallRepository()
+        imageProcessor = FakeChatImageProcessor()
         memoryDao = mockk(relaxed = true) {
             every { observeAll() } returns flowOf(emptyList())
         }
@@ -131,6 +146,7 @@ class ChatViewModelTest {
             ToolDisplayRegistry(),
             toolCallRepository,
             configRepo,
+            imageProcessor,
             messageRepo,
             memoryDao,
             agentStateDao,
@@ -180,6 +196,48 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun attachImage_preparesImageAndSendMessageUsesVisionInput() = runTest {
+        viewModel.attachImage("content://image/1")
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.pendingImage)
+
+        viewModel.sendMessage("看这个")
+
+        val input = fakeRuntime.lastInput
+        assertTrue(input is UserInput.Vision)
+        input as UserInput.Vision
+        assertEquals("看这个", input.text)
+        assertEquals("prepared-base64", input.imageBase64)
+        assertNull(viewModel.uiState.value.pendingImage)
+        assertTrue(viewModel.uiState.value.messages.any { it.imageUri == "content://image/1" })
+    }
+
+    @Test
+    fun sendMessage_withImageOnlyUsesDefaultVisionPrompt() = runTest {
+        viewModel.attachImage("content://image/2")
+        advanceUntilIdle()
+
+        viewModel.sendMessage("")
+
+        val input = fakeRuntime.lastInput
+        assertTrue(input is UserInput.Vision)
+        assertTrue((input as UserInput.Vision).text.contains("请看这张图片"))
+    }
+
+    @Test
+    fun attachImage_whenProcessorFailsShowsError() = runTest {
+        imageProcessor.shouldFail = true
+
+        viewModel.attachImage("content://image/bad")
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.pendingImage)
+        assertEquals("图片处理失败，请换一张试试。", viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isPreparingImage)
+    }
+
+    @Test
     fun sendMessage_blocksWhenConfigIsNotReady() = runTest {
         val blockedConfigRepo: ConfigRepository = mockk {
             every { observeLlmConfigStatus() } returns flowOf(
@@ -205,6 +263,7 @@ class ChatViewModelTest {
             ToolDisplayRegistry(),
             toolCallRepository,
             blockedConfigRepo,
+            imageProcessor,
             messageRepo,
             memoryDao,
             agentStateDao,

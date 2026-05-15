@@ -1,5 +1,9 @@
 package com.xiaoqi.companion.feature.chat
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +24,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -45,11 +52,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 
 @Composable
@@ -68,6 +80,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onSettingsProviderChanged = { viewModel.updateSettingsProvider(it) },
         onSettingsModelNameChanged = { viewModel.updateSettingsModelName(it) },
         onSaveSettings = { viewModel.saveSettings() },
+        onAttachImage = { viewModel.attachImage(it.toString()) },
+        onRemoveImage = { viewModel.removePendingImage() },
     )
 }
 
@@ -85,9 +99,16 @@ fun ChatScreenContent(
     onSettingsProviderChanged: (LlmProvider) -> Unit,
     onSettingsModelNameChanged: (String) -> Unit,
     onSaveSettings: () -> Unit,
+    onAttachImage: (Uri) -> Unit,
+    onRemoveImage: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        uri?.let(onAttachImage)
+    }
     val messages = uiState.messages
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
 
@@ -143,6 +164,14 @@ fun ChatScreenContent(
                 inputText = uiState.inputText,
                 onInputTextChanged = onInputTextChanged,
                 onSendMessage = onSendMessage,
+                pendingImage = uiState.pendingImage,
+                isPreparingImage = uiState.isPreparingImage,
+                onPickImage = {
+                    imagePicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                onRemoveImage = onRemoveImage,
                 isLoading = uiState.isLoading && uiState.messages.none { it.role == "ASSISTANT" && it.isStreaming },
                 isConfigReady = uiState.configStatus.isReady,
                 modifier = Modifier.imePadding(),
@@ -556,6 +585,10 @@ private fun InputBar(
     inputText: String,
     onInputTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
+    pendingImage: ChatImageAttachment?,
+    isPreparingImage: Boolean,
+    onPickImage: () -> Unit,
+    onRemoveImage: () -> Unit,
     isLoading: Boolean = false,
     isConfigReady: Boolean = true,
     modifier: Modifier = Modifier,
@@ -564,36 +597,91 @@ private fun InputBar(
         tonalElevation = 3.dp,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = onInputTextChanged,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Enter message...") },
-                maxLines = 4,
-                shape = MaterialTheme.shapes.large,
-            )
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp).padding(4.dp),
-                    strokeWidth = 2.dp,
+            pendingImage?.let {
+                PendingImagePreview(
+                    imageUri = it.uriString,
+                    onRemoveImage = onRemoveImage,
                 )
-            } else {
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
-                    onClick = onSendMessage,
-                    enabled = inputText.isNotBlank() && isConfigReady,
-                    modifier = Modifier.semantics { contentDescription = "Send" },
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedIconButton(
+                    onClick = onPickImage,
+                    enabled = !isLoading && !isPreparingImage,
+                    modifier = Modifier.semantics { contentDescription = "Pick image" },
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        imageVector = Icons.Default.Add,
                         contentDescription = null,
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = onInputTextChanged,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Enter message...") },
+                    maxLines = 4,
+                    shape = MaterialTheme.shapes.large,
+                )
+                if (isLoading || isPreparingImage) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp).padding(4.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = onSendMessage,
+                        enabled = (inputText.isNotBlank() || pendingImage != null) && isConfigReady,
+                        modifier = Modifier.semantics { contentDescription = "Send" },
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = null,
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun PendingImagePreview(
+    imageUri: String,
+    onRemoveImage: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .heightIn(max = 148.dp)
+            .widthIn(max = 190.dp),
+    ) {
+        AsyncImage(
+            model = imageUri,
+            contentDescription = "Selected image",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .height(132.dp)
+                .width(176.dp)
+                .clip(RoundedCornerShape(8.dp)),
+        )
+        IconButton(
+            onClick = onRemoveImage,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .semantics { contentDescription = "Remove image" },
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
         }
     }
 }

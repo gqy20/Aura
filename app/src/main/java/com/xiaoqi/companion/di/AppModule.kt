@@ -16,6 +16,8 @@ import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.MessageRepositoryImpl
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepositoryImpl
+import com.xiaoqi.companion.feature.chat.AndroidChatImageProcessor
+import com.xiaoqi.companion.feature.chat.ChatImageProcessor
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -57,4 +59,8 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindToolCallRepository(repository: ToolCallRepositoryImpl): ToolCallRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindChatImageProcessor(processor: AndroidChatImageProcessor): ChatImageProcessor
 }

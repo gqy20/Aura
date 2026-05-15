@@ -144,6 +144,36 @@ class KoogAgentFactoryImplTest {
         }
     }
 
+    @Test
+    fun run_withVisionPromptDisablesTools() = runTest {
+        val executor = VisionPromptExecutor()
+        val factory = KoogAgentFactoryImpl(
+            executorFactory = object : KoogPromptExecutorFactory {
+                override fun create(config: LlmConfig): PromptExecutor = executor
+            },
+            toolCallRecorder = toolCallRecorder,
+            toolRegistry = object : AgentToolRegistry {
+                override fun create(): ToolRegistry =
+                    ToolRegistry.builder()
+                        .tool(saveMemoryTool)
+                        .build()
+            },
+        )
+
+        val response = factory.create(testConfig).run(
+            BuiltPrompt(
+                systemPrompt = "You are a companion.",
+                userMessage = "看一下这张图",
+                hasImage = true,
+                imageBase64 = "base64-image",
+                imageMediaType = "image/jpeg",
+            )
+        )
+
+        assertEquals("这是一张图片。", response)
+        assertEquals(listOf(emptyList<String>()), executor.toolNamesPerCall)
+    }
+
     private class ToolCallingPromptExecutor : PromptExecutor() {
         val toolNamesPerCall = mutableListOf<List<String>>()
 
@@ -165,6 +195,30 @@ class KoogAgentFactoryImplTest {
             } else {
                 listOf(Message.Assistant("remembered", ResponseMetaInfo(Clock.System.now())))
             }
+        }
+
+        override fun executeStreaming(
+            prompt: Prompt,
+            model: LLModel,
+            tools: List<ToolDescriptor>,
+        ): Flow<StreamFrame> = emptyFlow()
+
+        override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
+            ModerationResult(isHarmful = false, categories = emptyMap())
+
+        override fun close() = Unit
+    }
+
+    private class VisionPromptExecutor : PromptExecutor() {
+        val toolNamesPerCall = mutableListOf<List<String>>()
+
+        override suspend fun execute(
+            prompt: Prompt,
+            model: LLModel,
+            tools: List<ToolDescriptor>,
+        ): List<Message.Response> {
+            toolNamesPerCall += tools.map { it.name }
+            return listOf(Message.Assistant("这是一张图片。", ResponseMetaInfo(Clock.System.now())))
         }
 
         override fun executeStreaming(

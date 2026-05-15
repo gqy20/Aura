@@ -39,6 +39,7 @@ class ChatViewModel @Inject constructor(
     private val toolDisplayRegistry: ToolDisplayRegistry,
     private val toolCallRepository: ToolCallRepository,
     private val configRepository: ConfigRepository,
+    private val imageProcessor: ChatImageProcessor,
     private val messageRepository: MessageRepository,
     private val memoryDao: MemoryDao,
     private val agentStateDao: AgentStateDao,
@@ -111,9 +112,52 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(inputText = text) }
     }
 
+    fun attachImage(uriString: String?) {
+        if (uriString.isNullOrBlank()) return
+        _uiState.update {
+            it.copy(
+                isPreparingImage = true,
+                error = null,
+            )
+        }
+        viewModelScope.launch {
+            try {
+                val prepared = imageProcessor.prepare(uriString)
+                _uiState.update {
+                    it.copy(
+                        pendingImage = ChatImageAttachment(
+                            uriString = prepared.uriString,
+                            imageBase64 = prepared.imageBase64,
+                            mediaType = prepared.mediaType,
+                        ),
+                        isPreparingImage = false,
+                    )
+                }
+            } catch (e: Exception) {
+                AppLogger.warn(
+                    LogTags.Chat,
+                    "image_prepare_failed",
+                    "message" to (e.message ?: e::class.simpleName.orEmpty()),
+                )
+                _uiState.update {
+                    it.copy(
+                        pendingImage = null,
+                        isPreparingImage = false,
+                        error = "图片处理失败，请换一张试试。",
+                    )
+                }
+            }
+        }
+    }
+
+    fun removePendingImage() {
+        _uiState.update { it.copy(pendingImage = null, isPreparingImage = false) }
+    }
+
     fun sendMessage(text: String) {
         val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
+        val attachment = _uiState.value.pendingImage
+        if (trimmed.isEmpty() && attachment == null) return
         val configStatus = _uiState.value.configStatus
         if (!configStatus.isReady) {
             _uiState.update {
@@ -128,17 +172,21 @@ class ChatViewModel @Inject constructor(
             "message_send_started",
             "requestHash" to LogFieldSanitizer.hash(requestId),
             "textLength" to trimmed.length,
+            "hasImage" to (attachment != null),
         )
 
+        val userContent = trimmed.ifBlank { "请看这张图片，并结合我们的对话自然回应。" }
         val userMsg = ChatMessage(
             id = UUID.randomUUID().toString(),
             role = "USER",
-            content = trimmed,
+            content = userContent,
+            imageUri = attachment?.uriString,
         )
         _uiState.update {
             it.copy(
                 messages = it.messages + userMsg,
                 inputText = "",
+                pendingImage = null,
                 isLoading = true,
                 error = null,
             )
@@ -188,7 +236,17 @@ class ChatViewModel @Inject constructor(
                     )
                 }
 
-                runtime.send(UserInput.Text(trimmed)).collect { event ->
+                val userInput = if (attachment != null) {
+                    UserInput.Vision(
+                        text = userContent,
+                        imageBase64 = attachment.imageBase64,
+                        mediaType = attachment.mediaType,
+                    )
+                } else {
+                    UserInput.Text(userContent)
+                }
+
+                runtime.send(userInput).collect { event ->
                     when (event) {
                         is AgentEvent.Streaming -> {
                             resetIdleTimer()

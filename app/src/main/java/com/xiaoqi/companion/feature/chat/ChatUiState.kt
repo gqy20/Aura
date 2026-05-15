@@ -6,6 +6,7 @@ data class ChatMessage(
     val id: String,
     val role: String, // "USER" or "ASSISTANT"
     val content: String,
+    val imageUri: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val isStreaming: Boolean = false,
     val toolStatus: String? = null,
@@ -48,6 +49,12 @@ data class ChatConfigStatus(
     val modelName: String = "glm-5v-turbo",
 )
 
+data class ChatImageAttachment(
+    val uriString: String,
+    val imageBase64: String,
+    val mediaType: String = "image/jpeg",
+)
+
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val toolCalls: List<ChatToolCall> = emptyList(),
@@ -60,6 +67,8 @@ data class ChatUiState(
     val settingsProvider: LlmProvider = LlmProvider.GLM,
     val settingsModelName: String = "glm-5v-turbo",
     val settingsMessage: String? = null,
+    val pendingImage: ChatImageAttachment? = null,
+    val isPreparingImage: Boolean = false,
     val isLoading: Boolean = false,
     val inputText: String = "",
     val error: String? = null,
