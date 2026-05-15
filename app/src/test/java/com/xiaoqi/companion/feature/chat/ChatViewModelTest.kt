@@ -10,6 +10,7 @@ import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -41,6 +42,7 @@ class ChatViewModelTest {
     private lateinit var viewModel: ChatViewModel
     private lateinit var fakeRuntime: FakeCompanionRuntime
     private lateinit var toolCallRepository: FakeToolCallRepository
+    private lateinit var memoryDao: MemoryDao
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val configRepo: ConfigRepository = mockk {
@@ -54,7 +56,9 @@ class ChatViewModelTest {
         )
     }
 
-    private val messageRepo: MessageRepository = mockk(relaxed = true)
+    private val messageRepo: MessageRepository = mockk(relaxed = true) {
+        every { getMessagesBySession("default") } returns flowOf(emptyList())
+    }
 
     private class FakeToolCallRepository : ToolCallRepository {
         val calls = MutableStateFlow<List<ToolCallSnapshot>>(emptyList())
@@ -102,7 +106,16 @@ class ChatViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeRuntime = FakeCompanionRuntime(configRepo, messageRepo)
         toolCallRepository = FakeToolCallRepository()
-        viewModel = ChatViewModel(fakeRuntime, ToolDisplayRegistry(), toolCallRepository)
+        memoryDao = mockk(relaxed = true) {
+            every { observeAll() } returns flowOf(emptyList())
+        }
+        viewModel = ChatViewModel(
+            fakeRuntime,
+            ToolDisplayRegistry(),
+            toolCallRepository,
+            messageRepo,
+            memoryDao,
+        )
     }
 
     @After

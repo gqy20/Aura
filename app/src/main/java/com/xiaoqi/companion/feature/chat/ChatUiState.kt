@@ -17,9 +17,32 @@ data class ChatToolCall(
     val errorMessage: String? = null,
 )
 
+data class CompanionStatus(
+    val mood: String = "neutral",
+    val intensity: Float = 0.5f,
+    val relationshipLevel: Float = 0f,
+) {
+    val relationshipLabel: String
+        get() = when {
+            relationshipLevel >= 0.8f -> "非常亲密"
+            relationshipLevel >= 0.5f -> "比较熟悉"
+            relationshipLevel >= 0.2f -> "刚认识不久"
+            else -> "陌生"
+        }
+}
+
+data class ChatMemory(
+    val id: String,
+    val content: String,
+    val type: String,
+    val importance: Float,
+)
+
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val toolCalls: List<ChatToolCall> = emptyList(),
+    val memories: List<ChatMemory> = emptyList(),
+    val status: CompanionStatus = CompanionStatus(),
     val isLoading: Boolean = false,
     val inputText: String = "",
     val error: String? = null,

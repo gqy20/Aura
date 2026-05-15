@@ -98,6 +98,10 @@ open class CompanionRuntime @Inject constructor(
             )
 
             val parsed = outputParser.parse(rawResponse)
+            messageRepository.saveAssistantMessage(
+                sessionId = DEFAULT_SESSION_ID,
+                content = parsed.textReply,
+            )
             AppLogger.debug(
                 LogTags.Runtime,
                 "response_parsed",

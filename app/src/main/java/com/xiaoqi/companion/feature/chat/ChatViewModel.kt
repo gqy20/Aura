@@ -11,6 +11,11 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogFieldSanitizer
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
+import com.xiaoqi.companion.data.db.converter.MessageRole
+import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.entity.MemoryEntity
+import com.xiaoqi.companion.data.db.entity.MessageEntity
+import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +33,8 @@ class ChatViewModel @Inject constructor(
     private val runtime: CompanionRuntime,
     private val toolDisplayRegistry: ToolDisplayRegistry,
     private val toolCallRepository: ToolCallRepository,
+    private val messageRepository: MessageRepository,
+    private val memoryDao: MemoryDao,
 ) : ViewModel() {
 
     companion object {
@@ -40,6 +47,26 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState
 
     init {
+        viewModelScope.launch {
+            messageRepository.getMessagesBySession(DEFAULT_SESSION_ID).collect { messages ->
+                _uiState.update { state ->
+                    if (state.isLoading || state.messages.any { it.isStreaming }) {
+                        state
+                    } else {
+                        state.copy(messages = messages.map { it.toChatMessage() })
+                    }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            memoryDao.observeAll().collect { memories ->
+                _uiState.update { state ->
+                    state.copy(memories = memories.take(5).map { it.toChatMemory() })
+                }
+            }
+        }
+
         viewModelScope.launch {
             toolCallRepository.observeBySession(DEFAULT_SESSION_ID).collect { calls ->
                 _uiState.update { state ->
@@ -164,7 +191,16 @@ class ChatViewModel @Inject constructor(
                                     isStreaming = false,
                                 )
                             }
-                            _uiState.update { it.copy(isLoading = false) }
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    status = it.status.after(
+                                        mood = event.parsed.emotionSignal.mood,
+                                        intensity = event.parsed.emotionSignal.intensity,
+                                        affinityDelta = event.parsed.interactionSignal.affinityDelta,
+                                    ),
+                                )
+                            }
                         }
                         is AgentEvent.Error -> {
                             AppLogger.warn(
@@ -234,4 +270,35 @@ class ChatViewModel @Inject constructor(
             is AgentError.ApiError -> error.message
             is AgentError.ParseError -> error.reason
         }
+
+    private fun MessageEntity.toChatMessage(): ChatMessage =
+        ChatMessage(
+            id = id,
+            role = when (role) {
+                MessageRole.USER -> "USER"
+                MessageRole.ASSISTANT -> "ASSISTANT"
+                MessageRole.SYSTEM -> "SYSTEM"
+            },
+            content = content,
+            timestamp = timestamp,
+        )
+
+    private fun MemoryEntity.toChatMemory(): ChatMemory =
+        ChatMemory(
+            id = id,
+            content = content,
+            type = type.name,
+            importance = importance,
+        )
+
+    private fun CompanionStatus.after(
+        mood: String,
+        intensity: Float,
+        affinityDelta: Float,
+    ): CompanionStatus =
+        copy(
+            mood = mood.ifBlank { this.mood },
+            intensity = intensity.coerceIn(0f, 1f),
+            relationshipLevel = (relationshipLevel + affinityDelta).coerceIn(0f, 1f),
+        )
 }

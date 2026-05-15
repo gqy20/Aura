@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 interface MessageRepository {
     fun getMessagesBySession(sessionId: String): Flow<List<MessageEntity>>
     suspend fun sendMessage(sessionId: String, content: String, imageBase64: String? = null)
+    suspend fun saveAssistantMessage(sessionId: String, content: String)
     suspend fun deleteSession(sessionId: String)
 }
 
@@ -35,6 +36,24 @@ class MessageRepositoryImpl @Inject constructor(private val dao: MessageDao) : M
                 role = MessageRole.USER,
                 content = content,
                 imageBase64 = imageBase64,
+                timestamp = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    override suspend fun saveAssistantMessage(sessionId: String, content: String) {
+        AppLogger.debug(
+            LogTags.Repo,
+            "assistant_message_insert_started",
+            "sessionHash" to LogFieldSanitizer.hash(sessionId),
+            "contentLength" to content.length,
+        )
+        dao.insert(
+            MessageEntity(
+                id = java.util.UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                role = MessageRole.ASSISTANT,
+                content = content,
                 timestamp = System.currentTimeMillis(),
             )
         )

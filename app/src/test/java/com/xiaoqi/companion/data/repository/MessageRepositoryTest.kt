@@ -48,6 +48,22 @@ class MessageRepositoryTest {
     }
 
     @Test
+    fun saveAssistantMessage_insertsWithAssistantRoleAndTimestamp() = runTest {
+        val dao: MessageDao = mockk(relaxed = true) {
+            coEvery { insert(any()) } returns Unit
+        }
+
+        val repo = MessageRepositoryImpl(dao)
+        repo.saveAssistantMessage(sessionId = "s1", content = "hello back")
+
+        coVerify {
+            dao.insert(match<MessageEntity> {
+                it.role == MessageRole.ASSISTANT && it.content == "hello back" && it.sessionId == "s1"
+            })
+        }
+    }
+
+    @Test
     fun deleteSession_delegatesToDao() = runTest {
         val dao: MessageDao = mockk(relaxed = true) {
             coEvery { deleteBySession(any()) } returns Unit
