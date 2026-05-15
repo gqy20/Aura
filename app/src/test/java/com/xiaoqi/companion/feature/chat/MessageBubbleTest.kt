@@ -1,7 +1,9 @@
 package com.xiaoqi.companion.feature.chat
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import org.junit.Rule
 import org.junit.Test
@@ -61,5 +63,37 @@ class MessageBubbleTest {
         }
 
         composeTestRule.onNodeWithText("Memory saved").assertIsDisplayed()
+    }
+
+    @Test
+    fun assistantMessage_rendersMarkdownInlineContent() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "This is **important** and `local`.",
+                )
+            )
+        }
+
+        composeTestRule.onNodeWithText("This is important and local.").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("This is **important** and `local`.").assertCountEquals(0)
+    }
+
+    @Test
+    fun assistantMessage_rendersMarkdownCodeBlock() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "Try this:\n\n```kotlin\nval aura = true\n```",
+                )
+            )
+        }
+
+        composeTestRule.onNodeWithText("Try this:").assertIsDisplayed()
+        composeTestRule.onNodeWithText("val aura = true").assertIsDisplayed()
     }
 }

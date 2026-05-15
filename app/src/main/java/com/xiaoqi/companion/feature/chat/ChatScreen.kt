@@ -24,10 +24,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -41,6 +41,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,10 +51,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
@@ -119,6 +118,7 @@ fun ChatScreenContent(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
@@ -140,18 +140,14 @@ fun ChatScreenContent(
                         .fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        "Start a conversation",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    EmptyChatState()
                 }
             } else {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(messages, key = { it.id }) { message ->
                         MessageBubble(message = message)
@@ -159,7 +155,7 @@ fun ChatScreenContent(
                 }
             }
 
-            ToolCallStrip(toolCalls = uiState.toolCalls)
+            ToolActivityLine(toolCalls = uiState.toolCalls)
             InputBar(
                 inputText = uiState.inputText,
                 onInputTextChanged = onInputTextChanged,
@@ -209,6 +205,41 @@ fun ChatScreenContent(
 }
 
 @Composable
+private fun EmptyChatState() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(horizontal = 32.dp),
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.74f),
+            shape = CircleShape,
+            modifier = Modifier.size(56.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "A",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+        Text(
+            text = "奥拉在这里",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = "说一句今天的事，或者发张图给她看看。",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun CompanionHeader(
     status: CompanionStatus,
     configStatus: ChatConfigStatus,
@@ -219,58 +250,72 @@ private fun CompanionHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
-            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            tonalElevation = 1.dp,
+            shape = RoundedCornerShape(18.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = CircleShape,
+                    modifier = Modifier.size(38.dp),
                 ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "A",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "情绪：${status.mood}",
-                        style = MaterialTheme.typography.labelLarge,
+                        text = "奥拉",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "关系：${status.relationshipLabel}",
-                        style = MaterialTheme.typography.labelLarge,
+                        text = "${status.mood} · ${status.relationshipLabel}",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                LinearProgressIndicator(
-                    progress = { status.relationshipLevel.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                IconButton(
+                    onClick = onOpenMemoryRoom,
+                    modifier = Modifier.semantics { contentDescription = "Open memories" },
+                ) {
+                    Text(
+                        text = memories.size.toString(),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                IconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.semantics { contentDescription = "Open settings" },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
-        ConfigStatusCard(status = configStatus, onOpenSettings = onOpenSettings)
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AssistChip(
-                onClick = onOpenMemoryRoom,
-                label = { Text("记忆房间 ${memories.size}") },
-            )
-            memories.take(3).forEach { memory ->
-                MemoryChip(memory = memory)
-            }
+        if (!configStatus.isReady) {
+            ConfigStatusCard(status = configStatus, onOpenSettings = onOpenSettings)
         }
     }
 }
@@ -282,11 +327,7 @@ private fun ConfigStatusCard(
 ) {
     ElevatedCard(
         colors = CardDefaults.elevatedCardColors(
-            containerColor = if (status.isReady) {
-                MaterialTheme.colorScheme.surface
-            } else {
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.68f)
-            },
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.56f),
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -299,7 +340,7 @@ private fun ConfigStatusCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (status.isReady) "模型已就绪" else "需要配置模型",
+                    text = "需要配置模型",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -316,15 +357,11 @@ private fun ConfigStatusCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = if (status.isReady) "Ready" else status.detail,
+                    text = status.detail,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (status.isReady) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
+                    color = MaterialTheme.colorScheme.error,
                 )
-                Button(onClick = onOpenSettings) {
+                TextButton(onClick = onOpenSettings) {
                     Text("设置")
                 }
             }
@@ -362,7 +399,7 @@ private fun SettingsDialog(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "配置真实模型调用；API Key 只会保存在本机。",
+                        text = "API Key 只保存在本机。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -391,8 +428,8 @@ private fun SettingsDialog(
 
                 Text(
                     text = when (provider) {
-                        LlmProvider.GLM -> "Base URL 来自 LLM_BASE_URL，默认模型 glm-5v-turbo。"
-                        LlmProvider.KIMI -> "Base URL 使用 https://api.moonshot.cn/v1。"
+                        LlmProvider.GLM -> "默认模型 glm-5v-turbo。"
+                        LlmProvider.KIMI -> "使用 Moonshot 兼容接口。"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -419,7 +456,7 @@ private fun SettingsDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    Button(onClick = onDismiss) {
+                    TextButton(onClick = onDismiss) {
                         Text("取消")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -428,32 +465,6 @@ private fun SettingsDialog(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun MemoryChip(memory: ChatMemory) {
-    Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.62f),
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.widthIn(max = 260.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = "记忆 ${memory.type}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.tertiary,
-            )
-            Text(
-                text = memory.content,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-            )
         }
     }
 }
@@ -488,12 +499,12 @@ private fun MemoryRoomDialog(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "奥拉目前记住的长期信息",
+                            text = "奥拉记住的长期信息",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Button(onClick = onDismiss) {
+                    TextButton(onClick = onDismiss) {
                         Text("关闭")
                     }
                 }
@@ -537,7 +548,7 @@ private fun MemoryRoomItem(memory: ChatMemory) {
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = "${memory.type} · importance ${String.format("%.2f", memory.importance)}",
+                text = "${memory.type} · 重要度 ${String.format("%.2f", memory.importance)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -551,31 +562,26 @@ private fun MemoryRoomItem(memory: ChatMemory) {
 }
 
 @Composable
-private fun ToolCallStrip(toolCalls: List<ChatToolCall>) {
+private fun ToolActivityLine(toolCalls: List<ChatToolCall>) {
     if (toolCalls.isEmpty()) return
+    val latestCall = toolCalls.last()
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 18.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.Start,
     ) {
-        toolCalls.forEach { call ->
-            Surface(
-                tonalElevation = 2.dp,
-                shape = MaterialTheme.shapes.small,
-            ) {
-                Text(
-                    text = buildString {
-                        append(call.label)
-                        call.durationMs?.let { append(" ${it}ms") }
-                    },
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
+            shape = RoundedCornerShape(999.dp),
+        ) {
+            Text(
+                text = latestCall.label,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -594,11 +600,12 @@ private fun InputBar(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        tonalElevation = 3.dp,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             pendingImage?.let {
@@ -609,25 +616,25 @@ private fun InputBar(
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedIconButton(
                     onClick = onPickImage,
                     enabled = !isLoading && !isPreparingImage,
-                    modifier = Modifier.semantics { contentDescription = "Pick image" },
+                    modifier = Modifier.semantics { contentDescription = "Attach image" },
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
+                        imageVector = Icons.Default.Image,
                         contentDescription = null,
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = onInputTextChanged,
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Enter message...") },
+                    placeholder = { Text("和奥拉说点什么") },
                     maxLines = 4,
-                    shape = MaterialTheme.shapes.large,
+                    shape = RoundedCornerShape(22.dp),
                 )
                 if (isLoading || isPreparingImage) {
                     CircularProgressIndicator(
@@ -635,7 +642,6 @@ private fun InputBar(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
                         onClick = onSendMessage,
                         enabled = (inputText.isNotBlank() || pendingImage != null) && isConfigReady,
