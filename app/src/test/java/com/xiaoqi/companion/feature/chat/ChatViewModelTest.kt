@@ -18,6 +18,7 @@ import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -49,7 +51,7 @@ class ChatViewModelTest {
     private lateinit var agentStateDao: AgentStateDao
     private val testDispatcher = UnconfinedTestDispatcher()
 
-    private val configRepo: ConfigRepository = mockk {
+    private val configRepo: ConfigRepository = mockk(relaxed = true) {
         every { getCurrentLlmConfig() } returns flowOf(
             LlmConfig(
                 provider = com.xiaoqi.companion.data.db.converter.LlmProvider.GLM,
@@ -212,6 +214,33 @@ class ChatViewModelTest {
 
         assertFalse(blockedRuntime.sendCalled)
         assertEquals("缺少 API Key", blockedViewModel.uiState.value.error)
+    }
+
+    @Test
+    fun saveSettings_persistsProviderModelAndApiKey() = runTest {
+        viewModel.openSettings()
+        viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.KIMI)
+        viewModel.updateSettingsModelName("kimi-latest")
+        viewModel.updateSettingsApiKey("new-key")
+
+        viewModel.saveSettings()
+        advanceUntilIdle()
+
+        coVerify { configRepo.setLlmProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.KIMI) }
+        coVerify { configRepo.setModelName("kimi-latest") }
+        coVerify { configRepo.setApiKey("new-key") }
+        assertFalse(viewModel.uiState.value.isSettingsOpen)
+    }
+
+    @Test
+    fun saveSettings_rejectsBlankModelName() = runTest {
+        viewModel.openSettings()
+        viewModel.updateSettingsModelName("   ")
+
+        viewModel.saveSettings()
+
+        assertEquals("模型名称不能为空", viewModel.uiState.value.settingsMessage)
+        assertTrue(viewModel.uiState.value.isSettingsOpen)
     }
 
     @Test

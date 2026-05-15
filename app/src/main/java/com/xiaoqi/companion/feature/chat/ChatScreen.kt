@@ -24,6 +24,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.Dialog
+import com.xiaoqi.companion.data.db.converter.LlmProvider
 
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
@@ -60,6 +62,12 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onClearError = { viewModel.clearError() },
         onOpenMemoryRoom = { viewModel.openMemoryRoom() },
         onCloseMemoryRoom = { viewModel.closeMemoryRoom() },
+        onOpenSettings = { viewModel.openSettings() },
+        onCloseSettings = { viewModel.closeSettings() },
+        onSettingsApiKeyChanged = { viewModel.updateSettingsApiKey(it) },
+        onSettingsProviderChanged = { viewModel.updateSettingsProvider(it) },
+        onSettingsModelNameChanged = { viewModel.updateSettingsModelName(it) },
+        onSaveSettings = { viewModel.saveSettings() },
     )
 }
 
@@ -71,6 +79,12 @@ fun ChatScreenContent(
     onClearError: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
     onCloseMemoryRoom: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onCloseSettings: () -> Unit,
+    onSettingsApiKeyChanged: (String) -> Unit,
+    onSettingsProviderChanged: (LlmProvider) -> Unit,
+    onSettingsModelNameChanged: (String) -> Unit,
+    onSaveSettings: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -96,6 +110,7 @@ fun ChatScreenContent(
                 configStatus = uiState.configStatus,
                 memories = uiState.memories,
                 onOpenMemoryRoom = onOpenMemoryRoom,
+                onOpenSettings = onOpenSettings,
             )
             if (messages.isEmpty()) {
                 Box(
@@ -148,6 +163,20 @@ fun ChatScreenContent(
             onDismiss = onCloseMemoryRoom,
         )
     }
+
+    if (uiState.isSettingsOpen) {
+        SettingsDialog(
+            apiKey = uiState.settingsApiKey,
+            provider = uiState.settingsProvider,
+            modelName = uiState.settingsModelName,
+            message = uiState.settingsMessage,
+            onApiKeyChanged = onSettingsApiKeyChanged,
+            onProviderChanged = onSettingsProviderChanged,
+            onModelNameChanged = onSettingsModelNameChanged,
+            onSave = onSaveSettings,
+            onDismiss = onCloseSettings,
+        )
+    }
 }
 
 @Composable
@@ -156,6 +185,7 @@ private fun CompanionHeader(
     configStatus: ChatConfigStatus,
     memories: List<ChatMemory>,
     onOpenMemoryRoom: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -196,7 +226,7 @@ private fun CompanionHeader(
             }
         }
 
-        ConfigStatusCard(status = configStatus)
+        ConfigStatusCard(status = configStatus, onOpenSettings = onOpenSettings)
 
         Row(
             modifier = Modifier
@@ -217,7 +247,10 @@ private fun CompanionHeader(
 }
 
 @Composable
-private fun ConfigStatusCard(status: ChatConfigStatus) {
+private fun ConfigStatusCard(
+    status: ChatConfigStatus,
+    onOpenSettings: () -> Unit,
+) {
     ElevatedCard(
         colors = CardDefaults.elevatedCardColors(
             containerColor = if (status.isReady) {
@@ -249,15 +282,123 @@ private fun ConfigStatusCard(status: ChatConfigStatus) {
                     maxLines = 1,
                 )
             }
-            Text(
-                text = if (status.isReady) "Ready" else status.detail,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (status.isReady) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (status.isReady) "Ready" else status.detail,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (status.isReady) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
+                Button(onClick = onOpenSettings) {
+                    Text("设置")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsDialog(
+    apiKey: String,
+    provider: LlmProvider,
+    modelName: String,
+    message: String?,
+    onApiKeyChanged: (String) -> Unit,
+    onProviderChanged: (LlmProvider) -> Unit,
+    onModelNameChanged: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "模型设置",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "配置真实模型调用；API Key 只会保存在本机。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = provider == LlmProvider.GLM,
+                        onClick = { onProviderChanged(LlmProvider.GLM) },
+                        label = { Text("GLM") },
+                    )
+                    FilterChip(
+                        selected = provider == LlmProvider.KIMI,
+                        onClick = { onProviderChanged(LlmProvider.KIMI) },
+                        label = { Text("Kimi") },
+                    )
+                }
+
+                OutlinedTextField(
+                    value = modelName,
+                    onValueChange = onModelNameChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("模型名称") },
+                    singleLine = true,
+                )
+
+                Text(
+                    text = when (provider) {
+                        LlmProvider.GLM -> "Base URL 来自 LLM_BASE_URL，默认模型 glm-5v-turbo。"
+                        LlmProvider.KIMI -> "Base URL 使用 https://api.moonshot.cn/v1。"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = onApiKeyChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("API Key") },
+                    placeholder = { Text("留空则保留当前 Key") },
+                    singleLine = true,
+                )
+
+                message?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    Button(onClick = onDismiss) {
+                        Text("取消")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = onSave) {
+                        Text("保存")
+                    }
+                }
+            }
         }
     }
 }

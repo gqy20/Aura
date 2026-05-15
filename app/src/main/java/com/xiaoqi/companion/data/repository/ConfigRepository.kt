@@ -42,6 +42,7 @@ interface ConfigRepository {
     fun getCurrentLlmConfig(): Flow<LlmConfig>
     fun observeLlmConfigStatus(): Flow<LlmConfigStatus>
     suspend fun setApiKey(key: String?)
+    suspend fun setLlmProvider(provider: LlmProvider)
     suspend fun setModelName(name: String)
 }
 
@@ -87,6 +88,10 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
 
     override suspend fun setApiKey(key: String?) {
         prefs.setApiKey(key)
+    }
+
+    override suspend fun setLlmProvider(provider: LlmProvider) {
+        prefs.setLlmProvider(provider)
     }
 
     override suspend fun setModelName(name: String) {

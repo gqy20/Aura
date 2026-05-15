@@ -13,6 +13,7 @@ import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.converter.MessageRole
+import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
@@ -281,6 +282,68 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(isMemoryRoomOpen = false) }
     }
 
+    fun openSettings() {
+        val state = _uiState.value
+        _uiState.update {
+            it.copy(
+                isSettingsOpen = true,
+                settingsProvider = state.configStatus.provider,
+                settingsModelName = state.configStatus.modelName,
+                settingsMessage = null,
+            )
+        }
+    }
+
+    fun closeSettings() {
+        _uiState.update { it.copy(isSettingsOpen = false, settingsMessage = null) }
+    }
+
+    fun updateSettingsApiKey(value: String) {
+        _uiState.update { it.copy(settingsApiKey = value, settingsMessage = null) }
+    }
+
+    fun updateSettingsProvider(value: LlmProvider) {
+        val defaultModel = when (value) {
+            LlmProvider.GLM -> "glm-5v-turbo"
+            LlmProvider.KIMI -> "kimi-latest"
+        }
+        _uiState.update {
+            it.copy(
+                settingsProvider = value,
+                settingsModelName = defaultModel,
+                settingsMessage = null,
+            )
+        }
+    }
+
+    fun updateSettingsModelName(value: String) {
+        _uiState.update { it.copy(settingsModelName = value, settingsMessage = null) }
+    }
+
+    fun saveSettings() {
+        val state = _uiState.value
+        val model = state.settingsModelName.trim()
+        if (model.isBlank()) {
+            _uiState.update { it.copy(settingsMessage = "模型名称不能为空") }
+            return
+        }
+        viewModelScope.launch {
+            configRepository.setLlmProvider(state.settingsProvider)
+            configRepository.setModelName(model)
+            state.settingsApiKey.trim().takeIf { it.isNotEmpty() }?.let { apiKey ->
+                configRepository.setApiKey(apiKey)
+            }
+            _uiState.update {
+                it.copy(
+                    isSettingsOpen = false,
+                    settingsApiKey = "",
+                    settingsModelName = model,
+                    settingsMessage = null,
+                )
+            }
+        }
+    }
+
     private fun updateAssistantMessage(
         assistantId: String,
         transform: (ChatMessage) -> ChatMessage,
@@ -355,12 +418,16 @@ class ChatViewModel @Inject constructor(
                 label = "${provider.name} · $modelName",
                 isReady = true,
                 detail = "模型已就绪",
+                provider = provider,
+                modelName = modelName,
             )
         } else {
             ChatConfigStatus(
                 label = "${provider.name} · ${modelName.ifBlank { "未选择模型" }}",
                 isReady = false,
                 detail = missingReason ?: "模型配置未完成",
+                provider = provider,
+                modelName = modelName,
             )
         }
 

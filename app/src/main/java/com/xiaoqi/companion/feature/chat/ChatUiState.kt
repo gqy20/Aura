@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.feature.chat
 
+import com.xiaoqi.companion.data.db.converter.LlmProvider
+
 data class ChatMessage(
     val id: String,
     val role: String, // "USER" or "ASSISTANT"
@@ -42,6 +44,8 @@ data class ChatConfigStatus(
     val label: String = "模型配置检查中",
     val isReady: Boolean = false,
     val detail: String = "",
+    val provider: LlmProvider = LlmProvider.GLM,
+    val modelName: String = "glm-5v-turbo",
 )
 
 data class ChatUiState(
@@ -51,6 +55,11 @@ data class ChatUiState(
     val status: CompanionStatus = CompanionStatus(),
     val configStatus: ChatConfigStatus = ChatConfigStatus(),
     val isMemoryRoomOpen: Boolean = false,
+    val isSettingsOpen: Boolean = false,
+    val settingsApiKey: String = "",
+    val settingsProvider: LlmProvider = LlmProvider.GLM,
+    val settingsModelName: String = "glm-5v-turbo",
+    val settingsMessage: String? = null,
     val isLoading: Boolean = false,
     val inputText: String = "",
     val error: String? = null,

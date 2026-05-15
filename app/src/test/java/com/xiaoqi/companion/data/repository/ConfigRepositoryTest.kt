@@ -73,4 +73,24 @@ class ConfigRepositoryTest {
         val repo = ConfigRepositoryImpl(prefs)
         repo.setApiKey("new-key")
     }
+
+    @Test
+    fun setLlmProvider_delegatesToPrefs() = runTest {
+        val prefs: AppPreferences = mockk(relaxed = true) {
+            coEvery { setLlmProvider(any()) } returns Unit
+        }
+
+        val repo = ConfigRepositoryImpl(prefs)
+        repo.setLlmProvider(LlmProvider.KIMI)
+    }
+
+    @Test
+    fun setModelName_delegatesToPrefs() = runTest {
+        val prefs: AppPreferences = mockk(relaxed = true) {
+            coEvery { setModelName(any()) } returns Unit
+        }
+
+        val repo = ConfigRepositoryImpl(prefs)
+        repo.setModelName("kimi-latest")
+    }
 }
