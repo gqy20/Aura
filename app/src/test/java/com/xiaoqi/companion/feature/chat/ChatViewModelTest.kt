@@ -9,6 +9,7 @@ import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
+import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
@@ -17,6 +18,7 @@ import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import io.mockk.every
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -43,6 +45,7 @@ class ChatViewModelTest {
     private lateinit var fakeRuntime: FakeCompanionRuntime
     private lateinit var toolCallRepository: FakeToolCallRepository
     private lateinit var memoryDao: MemoryDao
+    private lateinit var agentStateDao: AgentStateDao
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val configRepo: ConfigRepository = mockk {
@@ -109,12 +112,16 @@ class ChatViewModelTest {
         memoryDao = mockk(relaxed = true) {
             every { observeAll() } returns flowOf(emptyList())
         }
+        agentStateDao = mockk(relaxed = true) {
+            every { observeByCompanionId("default") } returns flowOf(null)
+        }
         viewModel = ChatViewModel(
             fakeRuntime,
             ToolDisplayRegistry(),
             toolCallRepository,
             messageRepo,
             memoryDao,
+            agentStateDao,
         )
     }
 
@@ -206,6 +213,22 @@ class ChatViewModelTest {
 
         val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
         assertEquals("Memory saved", assistant.toolStatus)
+    }
+
+    @Test
+    fun sendMessage_completeEvent_persistsCompanionStatus() = runTest {
+        fakeRuntime.rawResponse = "[mood:happy][intensity:0.7][affinity:+0.2] 你好呀！"
+
+        viewModel.sendMessage("hello")
+
+        coVerify {
+            agentStateDao.insert(match {
+                it.companionId == "default" &&
+                    it.mood == "happy" &&
+                    it.relationshipLevel == 0.2f &&
+                    it.emotionVector.contains("0.7")
+            })
+        }
     }
 
     @Test

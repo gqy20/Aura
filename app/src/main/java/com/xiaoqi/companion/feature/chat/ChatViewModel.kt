@@ -11,8 +11,10 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogFieldSanitizer
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
+import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -35,6 +37,7 @@ class ChatViewModel @Inject constructor(
     private val toolCallRepository: ToolCallRepository,
     private val messageRepository: MessageRepository,
     private val memoryDao: MemoryDao,
+    private val agentStateDao: AgentStateDao,
 ) : ViewModel() {
 
     companion object {
@@ -47,6 +50,22 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState
 
     init {
+        viewModelScope.launch {
+            agentStateDao.observeByCompanionId(DEFAULT_SESSION_ID).collect { savedState ->
+                if (savedState != null) {
+                    _uiState.update { state ->
+                        state.copy(
+                            status = state.status.copy(
+                                mood = savedState.mood.ifBlank { "neutral" },
+                                intensity = savedState.emotionVector.extractIntensity(),
+                                relationshipLevel = savedState.relationshipLevel,
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
         viewModelScope.launch {
             messageRepository.getMessagesBySession(DEFAULT_SESSION_ID).collect { messages ->
                 _uiState.update { state ->
@@ -192,13 +211,15 @@ class ChatViewModel @Inject constructor(
                                 )
                             }
                             _uiState.update {
+                                val nextStatus = it.status.after(
+                                    mood = event.parsed.emotionSignal.mood,
+                                    intensity = event.parsed.emotionSignal.intensity,
+                                    affinityDelta = event.parsed.interactionSignal.affinityDelta,
+                                )
+                                persistStatus(nextStatus)
                                 it.copy(
                                     isLoading = false,
-                                    status = it.status.after(
-                                        mood = event.parsed.emotionSignal.mood,
-                                        intensity = event.parsed.emotionSignal.intensity,
-                                        affinityDelta = event.parsed.interactionSignal.affinityDelta,
-                                    ),
+                                    status = nextStatus,
                                 )
                             }
                         }
@@ -232,6 +253,14 @@ class ChatViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun openMemoryRoom() {
+        _uiState.update { it.copy(isMemoryRoomOpen = true) }
+    }
+
+    fun closeMemoryRoom() {
+        _uiState.update { it.copy(isMemoryRoomOpen = false) }
     }
 
     private fun updateAssistantMessage(
@@ -301,4 +330,32 @@ class ChatViewModel @Inject constructor(
             intensity = intensity.coerceIn(0f, 1f),
             relationshipLevel = (relationshipLevel + affinityDelta).coerceIn(0f, 1f),
         )
+
+    private fun persistStatus(status: CompanionStatus) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val existing = agentStateDao.getByCompanionId(DEFAULT_SESSION_ID)
+            agentStateDao.insert(
+                AgentStateEntity(
+                    id = existing?.id ?: UUID.randomUUID().toString(),
+                    companionId = DEFAULT_SESSION_ID,
+                    mood = status.mood,
+                    emotionVector = """{"intensity":${status.intensity}}""",
+                    relationshipLevel = status.relationshipLevel,
+                    lastInteractionAt = now,
+                    createdAt = existing?.createdAt ?: now,
+                    updatedAt = now,
+                )
+            )
+        }
+    }
+
+    private fun String.extractIntensity(): Float {
+        val value = Regex("\"intensity\"\\s*:\\s*([\\d.]+)")
+            .find(this)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toFloatOrNull()
+        return value?.coerceIn(0f, 1f) ?: 0.5f
+    }
 }

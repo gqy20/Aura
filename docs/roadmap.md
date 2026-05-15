@@ -29,7 +29,9 @@
 - Agent tools：`save_memory`、`search_memory`、`update_mood`、`update_relationship`。
 - App 启动时恢复 Room 中的聊天历史。
 - 聊天页顶部展示当前情绪和关系状态。
+- 情绪/关系状态写入 `agent_state`，App 重启后可恢复。
 - 聊天页展示最近的长期记忆，只读可见。
+- 只读记忆房间弹层可查看全部当前记忆。
 - 单元测试覆盖 core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI 等。
 - Debug APK 构建链路。
 
@@ -37,8 +39,8 @@
 
 - **模型切换**：Repository/Config 基础能力已存在，但还没有设置页 UI。
 - **Vision**：`UserInput.Vision` 和 LLM client 图片 content 支持已存在，但 CameraX 拍照/选图 UI 尚未实现。
-- **情绪与关系**：核心状态更新和聊天页可视化已接入，但状态持久化恢复和头像/表情层尚未完成。
-- **记忆**：工具保存/搜索、prompt 注入和聊天页只读展示已实现，但还没有独立记忆房间或记忆管理界面。
+- **情绪与关系**：核心状态更新、持久化恢复和聊天页可视化已接入，但头像/表情层尚未完成。
+- **记忆**：工具保存/搜索、prompt 注入、聊天页只读展示和只读记忆房间弹层已实现，但还没有完整记忆管理能力。
 - **Release 构建**：ProGuard 与 debug 签名 fallback 已有，真实 release keystore 仍需验证。
 
 ## 尚未实现
@@ -91,7 +93,7 @@
 目标：让陪伴对象不只是回复文本，而是能表现状态。
 
 - 持久化情绪和关系快照，支持重启恢复。
-- 在聊天页或独立主页增加紧凑状态/头像展示。（聊天页状态条已完成，头像层待做）
+- 在聊天页或独立主页增加紧凑状态/头像展示。（状态持久化和聊天页状态条已完成，头像层待做）
 - 将 parsed mood/intensity 映射到可见 UI 状态。
 - App 回到前台时补算时间衰减。
 - 补充持久化、衰减、关系阈值变化测试。

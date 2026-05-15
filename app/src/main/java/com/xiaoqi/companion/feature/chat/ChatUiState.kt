@@ -43,6 +43,7 @@ data class ChatUiState(
     val toolCalls: List<ChatToolCall> = emptyList(),
     val memories: List<ChatMemory> = emptyList(),
     val status: CompanionStatus = CompanionStatus(),
+    val isMemoryRoomOpen: Boolean = false,
     val isLoading: Boolean = false,
     val inputText: String = "",
     val error: String? = null,

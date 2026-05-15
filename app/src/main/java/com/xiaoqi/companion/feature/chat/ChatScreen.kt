@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +20,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,8 +43,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.window.Dialog
 
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
@@ -50,6 +56,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onSendMessage = { viewModel.sendMessage(uiState.inputText) },
         onInputTextChanged = { viewModel.updateInputText(it) },
         onClearError = { viewModel.clearError() },
+        onOpenMemoryRoom = { viewModel.openMemoryRoom() },
+        onCloseMemoryRoom = { viewModel.closeMemoryRoom() },
     )
 }
 
@@ -59,6 +67,8 @@ fun ChatScreenContent(
     onSendMessage: () -> Unit,
     onInputTextChanged: (String) -> Unit,
     onClearError: () -> Unit,
+    onOpenMemoryRoom: () -> Unit,
+    onCloseMemoryRoom: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -82,6 +92,7 @@ fun ChatScreenContent(
             CompanionHeader(
                 status = uiState.status,
                 memories = uiState.memories,
+                onOpenMemoryRoom = onOpenMemoryRoom,
             )
             if (messages.isEmpty()) {
                 Box(
@@ -126,12 +137,20 @@ fun ChatScreenContent(
             onClearError()
         }
     }
+
+    if (uiState.isMemoryRoomOpen) {
+        MemoryRoomDialog(
+            memories = uiState.memories,
+            onDismiss = onCloseMemoryRoom,
+        )
+    }
 }
 
 @Composable
 private fun CompanionHeader(
     status: CompanionStatus,
     memories: List<ChatMemory>,
+    onOpenMemoryRoom: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -140,12 +159,12 @@ private fun CompanionHeader(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Surface(
-            tonalElevation = 2.dp,
-            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+            shape = MaterialTheme.shapes.medium,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(
@@ -156,6 +175,7 @@ private fun CompanionHeader(
                     Text(
                         text = "情绪：${status.mood}",
                         style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
@@ -171,16 +191,19 @@ private fun CompanionHeader(
             }
         }
 
-        if (memories.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                memories.forEach { memory ->
-                    MemoryChip(memory = memory)
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AssistChip(
+                onClick = onOpenMemoryRoom,
+                label = { Text("记忆房间 ${memories.size}") },
+            )
+            memories.take(3).forEach { memory ->
+                MemoryChip(memory = memory)
             }
         }
     }
@@ -189,7 +212,7 @@ private fun CompanionHeader(
 @Composable
 private fun MemoryChip(memory: ChatMemory) {
     Surface(
-        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.62f),
         shape = MaterialTheme.shapes.small,
         modifier = Modifier.widthIn(max = 260.dp),
     ) {
@@ -200,13 +223,105 @@ private fun MemoryChip(memory: ChatMemory) {
             Text(
                 text = "记忆 ${memory.type}",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.tertiary,
             )
             Text(
                 text = memory.content,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemoryRoomDialog(
+    memories: List<ChatMemory>,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.72f),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text(
+                            text = "记忆房间",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "奥拉目前记住的长期信息",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Button(onClick = onDismiss) {
+                        Text("关闭")
+                    }
+                }
+
+                if (memories.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "还没有长期记忆",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(memories, key = { it.id }) { memory ->
+                            MemoryRoomItem(memory = memory)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MemoryRoomItem(memory: ChatMemory) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = "${memory.type} · importance ${String.format("%.2f", memory.importance)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = memory.content,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
