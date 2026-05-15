@@ -8,16 +8,36 @@
 
 ---
 
+## 当前实现状态
+
+> Last verified: 2026-05-15. 详细里程碑见 [roadmap.md](./roadmap.md)。
+
+当前代码已经达到 **文本聊天技术闭环 / Phase 1 agent tools** 阶段：
+
+- 已实现 Compose 聊天页、`ChatViewModel`、`CompanionRuntime` 和 Koog `AIAgent` 流式调用链路。
+- 已实现 Room/DataStore/Hilt 基础设施，消息、记忆、情绪快照、工具调用记录可持久化。
+- 已实现 `save_memory`、`search_memory`、`update_mood`、`update_relationship` 四个 Agent tools。
+- 已通过 `testDebugUnitTest` 与 `assembleDebug` 验证。
+
+仍处于规划或部分实现状态的模块：
+
+- 设置页、导航、记忆房间 UI、角色主屏、Lottie 表情层。
+- CameraX 拍照/选图、多模态 UI、运行时权限 UX。
+- SpeechRecognizer/TextToSpeech 语音能力。
+- WorkManager pulse、通知、离线衰减、主动关怀。
+
 ## 一、基础技术栈
 
 | 层面 | 选型 | 说明 |
 |------|------|------|
-| JDK | **21**（Oracle LTS 21.0.6） | 与环境一致，AGP 8.x / Kotlin 2.0+ 原生支持 |
-| 语言 | Kotlin | 一等公民，与 Jetpack 生态完美配合 |
+| JDK | **21**（Oracle LTS 21.0.6） | 与当前本地环境一致 |
+| 语言 | **Kotlin 2.3.21** | 由 Gradle plugin 管理 |
+| Android Gradle Plugin | **9.2.0** | 以 `gradle/libs.versions.toml` 为准 |
+| SDK | compileSdk 36 / minSdk 26 / targetSdk 36 | 当前项目实际配置 |
 | UI | Jetpack Compose | 官方现代声明式 UI，状态驱动 |
 | 架构 | MVVM + Repository + UseCase | 标准分层，职责清晰 |
 | 并发 | Kotlin Coroutines + Flow | 异步事件流，天然适配 Agent 场景 |
-| Agent 框架 | **Koog 0.8+**（JetBrains） | Agent 运行时，内置 Anthropic 兼容 executor |
+| Agent 框架 | **Koog 0.8.0**（JetBrains） | Agent 运行时 |
 | LLM 默认模型 | **GLM-5v-turbo**（智谱 AI） | 多模态（Vision），兼容 Anthropic Messages API |
 | LLM 备选模型 | **Kimi 2.6**（Moonshot AI） | 可切换，同样兼容 Anthropic Messages API |
 | API 协议 | **Anthropic Messages API**（兼容格式） | 统一接口，切换模型只需改 base_url + model name |
@@ -26,9 +46,9 @@
 | 配置存储 | DataStore | 轻量键值对配置（API key、主题等） |
 | 后台任务 | WorkManager | 可延迟、可持久化的后台调度（Pulse） |
 | 序列化 | kotlinx.serialization | 结构化 JSON 输入输出 |
-| 动画 | Lottie / Rive | 角色表情和交互动画 |
-| 语音 | Android TTS + SpeechRecognizer | 系统级语音能力 |
-| 相机 | CameraX | 多模态视觉输入 → Vision 模型 |
+| 动画 | Lottie / Rive | 依赖已规划，角色表情层尚未实现 |
+| 语音 | Android TTS + SpeechRecognizer | 规划中 |
+| 相机 | CameraX | 依赖已接入，拍照/选图 UI 尚未实现 |
 | 图片加载 | Coil | Compose 原生图片加载 |
 | 日志 | Timber | 轻量日志库 |
 | 崩溃分析 | Firebase Crashlytics / Sentry | 生产级监控 |
@@ -40,20 +60,19 @@
 ```
 app/
 ├─ feature/                    # 功能模块（UI 层）
-│  ├─ chat/                    #   聊天对话
-│  ├─ avatar/                  #   角色主屏
-│  ├─ memory_room/             #   记忆房间
-│  ├─ settings/               #   设置页
-│  └─ onboarding/             #   新手引导
+│  ├─ chat/                    #   聊天对话（已实现）
+│  ├─ avatar/                  #   角色主屏（规划中）
+│  ├─ memory_room/             #   记忆房间（规划中）
+│  ├─ settings/                #   设置页（规划中）
+│  └─ onboarding/              #   新手引导（规划中）
 │
 ├─ core/                       # 核心业务逻辑（自研 + Koog）
 │  ├─ companion/               #   ★ CompanionRuntime 主循环（自研）
-│  ├─ emotion/                #   ★ 情绪状态机（自研）
-│  ├─ relationship/           #   ★ 关系系统（自研）
-│  ├─ pulse/                  #   ★ 生命脉冲策略（自研）
-│  ├─ prompt/                 #   ★ Prompt 组装引擎（自研）
-│  ├─ memory/                 #   记忆管理（Room）
-│  └─ actions/                #   动作分发器
+│  ├─ llm/                     #   Anthropic Messages 兼容 LLM client / executor
+│  ├─ prompt/                  #   ★ Prompt 组装引擎（自研）
+│  ├─ tools/                   #   Agent tools（已实现基础能力）
+│  ├─ logging/                 #   日志封装与字段脱敏
+│  └─ pulse/                   #   ★ 生命脉冲策略（规划中）
 │
 ├─ data/                       # 数据层
 │  ├─ db/                     #   Room DAO / Entity
@@ -68,6 +87,8 @@ app/
    ├─ widget/                 #   桌面小组件
    └─ permissions/            #   权限管理
 ```
+
+> 上面包含目标形态。当前源码中已经落地 `feature/chat`、`core/companion`、`core/llm`、`core/prompt`、`core/tools`、`core/logging`、`data`、`di`；`platform` 与多数非聊天 feature 仍在 roadmap 中。
 
 ### 自研范围（标 ★）
 
@@ -100,7 +121,7 @@ app/
 
 选择 GLM-5v-turbo 的原因：
 - **原生多模态**：Vision 能力是核心需求（CameraX → 图片理解）
-- **Anthropic 兼容**：直接用 Koog 的 `simpleAnthropicExecutor`，零手写代码
+- **Anthropic 兼容**：通过项目内 `AnthropicMessagesLLMClient` 适配 Koog executor，统一 GLM/Kimi 调用形态
 - **国内服务**：延迟低、稳定性好
 - **成本优势**：相比 Claude 有竞争力
 
@@ -131,7 +152,7 @@ GLM-5v-turbo 和 Kimi 2.6 都兼容 **Anthropic Messages API** 格式，这意�
 ```
 App 代码
   ↓
-Koog simpleAnthropicExecutor(baseUrl, apiKey, model)
+Koog PromptExecutor + AnthropicMessagesLLMClient(baseUrl, apiKey, model)
   ↓ （自动组装 Anthropic 格式请求）
 { "model": "glm-5v-turbo", "messages": [...], "stream": true }
   ↓
@@ -143,18 +164,17 @@ Koog 自动解析 → Flow<AgentEvent>
 ```
 
 **关键收益：**
-- 不手写任何 HTTP 客户端代码
-- 不手写任何 JSON 序列化/反序列化
-- 不手写 Streaming SSE 解析
-- 模型切换只需换配置，Koog 的 executor 接口不变
+- App 业务层只依赖 `CompanionRuntime` / `KoogAgentFactory`，不直接接触 HTTP 细节
+- Anthropic Messages 请求、SSE 解析和工具 schema 适配集中在 `core/llm`
+- 模型切换只需换配置，Runtime/Chat UI 接口不变
 
 ### 3.3 API 能力映射
 
 ```
 文本对话（Chat）          → Messages API          ✅ GLM/Kimi 均支持
-流式输出（Streaming）     → SSE stream             ✅ 通过 Koog 内置
+流式输出（Streaming）     → SSE stream             ✅ 通过项目内兼容层接入 Koog
 多模态视觉（Vision）      → image content block    ✅ GLM-5v-turbo 原生支持
-结构化输出（Tool Use）    → tool_use + JSON schema ✅ 通过 Koog 内置
+结构化输出（Tool Use）    → tool_use + JSON schema ✅ 通过项目内兼容层接入 Koog tools
 长上下文                 → 大窗口                 ✅ 两者均支持
 Prompt 缓存（Caching）   → cache_control          ⚠️ 取决于提供商实现
 ```
@@ -193,14 +213,15 @@ Room 负责持久化的核心数据：
 
 | 表名 | 存储内容 |
 |------|----------|
-| messages | 聊天消息记录 |
-| memories | 长期记忆条目 |
-| life_events | 生活事件时间线 |
-| agent_state | Agent 当前完整状态快照 |
-| agent_profile | 角色档案配置 |
-| memory_objects | 记忆物品（照片、地点等） |
-| scheduled_actions | 待执行的定时动作 |
-| mood_snapshots | 情绪历史快照 |
+| messages | 聊天消息记录（已实现） |
+| memories | 长期记忆条目（已实现） |
+| agent_state | Agent 当前状态快照（已实现基础表） |
+| mood_snapshots | 情绪历史快照（已实现） |
+| tool_calls | Agent 工具调用记录（已实现） |
+| life_events | 生活事件时间线（规划中） |
+| agent_profile | 角色档案配置（规划中） |
+| memory_objects | 记忆物品（照片、地点等，规划中） |
+| scheduled_actions | 待执行的定时动作（规划中） |
 
 ```kotlin
 implementation("androidx.room:room-runtime:<version>")
@@ -218,14 +239,14 @@ DataStore 存储轻量键值对配置：
 
 | 配置项 | 类型 |
 |--------|------|
-| API Key 是否已设置 | Boolean |
-| 当前角色 ID | String |
-| 主题模式 | Enum (Light/Dark/System) |
-| 语音开关 | Boolean |
-| 是否允许主动通知 | Boolean |
-| **LLM Provider** | **Enum (GLM / KIMI)** |
-| **当前模型名称** | **String (glm-5v-turbo / kimi-latest 等)** |
-| 用户隐私设置 | Preferences |
+| API Key | String?（已实现） |
+| 主题模式 | Enum (Light/Dark/System，已实现） |
+| **LLM Provider** | **Enum (GLM / KIMI，已实现）** |
+| **当前模型名称** | **String (glm-5v-turbo / kimi-latest 等，已实现）** |
+| 当前角色 ID | String（规划中） |
+| 语音开关 | Boolean（规划中） |
+| 是否允许主动通知 | Boolean（规划中） |
+| 用户隐私设置 | Preferences（规划中） |
 
 ```kotlin
 implementation("androidx.datastore:datastore-preferences:<version>")
@@ -254,9 +275,9 @@ ksp("androidx.hilt:hilt-compiler:<version>")
 
 ---
 
-### 4.5 网络：由 Koog 内部处理
+### 4.5 网络：Koog + Anthropic Messages 兼容层
 
-**不需要手写 LLM HTTP 客户端。** Koog 的 `simpleAnthropicExecutor` 内置处理所有网络通信：
+当前项目通过 `core/llm/AnthropicMessagesLLMClient.kt` 实现 Anthropic Messages 兼容请求，再接入 Koog 的 `PromptExecutor` / `AIAgent`：
 
 - HTTP 连接管理（基于内部 HttpClient）
 - 请求序列化（Anthropic Messages 格式）
@@ -264,7 +285,7 @@ ksp("androidx.hilt:hilt-compiler:<version>")
 - 错误处理与重试
 - 超时控制
 
-App 只需通过 DataStore 提供 `baseUrl`、`apiKey`、`modelName` 给 Koog 即可。
+App 业务层只需通过 DataStore / BuildConfig 提供 `baseUrl`、`apiKey`、`modelName`，由 `KoogPromptExecutorFactory` 和 `KoogAgentFactoryImpl` 负责创建执行器与 Agent。
 
 > **注意：** App 中仍可能需要 Ktor/Retrofit 用于非 LLM 的其他网络请求（如崩溃上报、 analytics 等）。如有需要再单独引入。
 
@@ -455,18 +476,19 @@ sealed class UserInput {
 ### 5.3 Koog Agent 工厂（模型切换）
 
 ```kotlin
-class KoogAgentFactory @Inject constructor() {
+class KoogAgentFactoryImpl @Inject constructor(
+    private val executorFactory: KoogPromptExecutorFactory,
+    private val toolRegistry: AgentToolRegistry,
+    private val toolCallRecorder: ToolCallRecorder,
+) : KoogAgentFactory {
 
-    fun create(config: LlmConfig): AIAgent {
-        return AIAgent(
-            promptExecutor = simpleAnthropicExecutor(
-                baseUrl = config.baseUrl,       // GLM 或 Kimi 的 endpoint
-                apiKey = config.apiKey,
-            ),
-            systemPrompt = "...",              // 由 promptBuilder 动态生成
-            llmModel = AnthropicModels.Chat.Custom(config.modelName),  // glm-5v-turbo / kimi-latest
+    override fun create(config: LlmConfig): KoogAgentWrapper =
+        KoogPromptExecutorWrapper(
+            config = config,
+            executor = executorFactory.create(config),
+            toolRegistry = toolRegistry,
+            toolCallRecorder = toolCallRecorder,
         )
-    }
 }
 ```
 
@@ -476,11 +498,11 @@ class KoogAgentFactory @Inject constructor() {
 
 | 能力 | 使用什么 |
 |------|----------|
-| LLM HTTP 客户端 | **Koog 内置**（simpleAnthropicExecutor） |
-| Streaming SSE 解析 | **Koog 内置** |
-| 对话历史管理 / Token 压缩 | **Koog 内置** |
-| 结构化 Tool Use | **Koog 内置** |
-| 错误重试 / 容错 | **Koog 内置** |
+| LLM HTTP 客户端 | **项目内 Anthropic Messages 兼容层** |
+| Streaming SSE 解析 | **项目内兼容层转换为 Koog streaming events** |
+| 对话历史管理 / Token 压缩 | **Koog 能力，当前未启用压缩** |
+| 结构化 Tool Use | **Koog tools + 项目内 tool schema 适配** |
+| 错误重试 / 容错 | **规划中，当前以错误事件和 UI 提示为主** |
 | JSON 解析 | kotlinx.serialization |
 | 数据库 ORM | Room |
 | 后台调度 | WorkManager |
@@ -540,26 +562,26 @@ project-root/
 
 [versions]
 # Kotlin & AGP
-kotlin = "2.0.21"
-agp = "8.6.1"
+kotlin = "2.3.21"
+agp = "9.2.0"
 
 # Core Android
-compileSdk = "35"
+compileSdk = "36"
 minSdk = "26"
-targetSdk = "35"
+targetSdk = "36"
 ndk = "27.0.12077973"
 
 # Jetpack Compose
-compose-bom = "2024.12.01"
+compose-bom = "2026.05.00"
 compose-activity = "1.9.3"
 navigation = "2.8.4"
 lifecycle = "2.8.7"
 
 # DI
-hilt = "2.53.1"
+hilt = "2.59.2"
 
 # Database
-room = "2.6.1"
+room = "2.8.4"
 
 # Background
 work = "2.10.0"
@@ -655,7 +677,7 @@ androidTest = ["androidx-test-ext-junit", "espresso-core"]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-ksp = { id = "com.google.devtools.ksp", version = "2.0.21-1.0.29" }
+ksp = { id = "com.google.devtools.ksp", version = "2.3.7" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
 ```
@@ -933,11 +955,11 @@ com.xiaoqi.companion
 
 ## 七、代码量估算
 
-### 技术闭环 Demo
+### 当前技术闭环 Demo
 
 **9k - 17k 行**
 
-包含：Compose UI、Koog Agent 调用（零手写 LLM 客户端）、Room 持久化、DataStore 配置、基本角色表情、结构化 Tool Use 输出、简单记忆系统、GLM-5v-turbo 多模态基础接入。
+当前已覆盖：Compose 聊天 UI、Koog Agent 调用、项目内 Anthropic Messages 兼容 LLM client、Room 持久化、DataStore 配置、结构化 Tool Use、简单记忆系统、GLM-5v-turbo Vision 底层接入预留。
 
 ### 可玩的情绪 MVP
 
@@ -955,10 +977,10 @@ com.xiaoqi.companion
 
 | 领域 | 节省来源 |
 |------|----------|
-| **LLM 客户端** | **Koog 内置（最大节省，~300 行 → 0 行）** |
-| Streaming / 历史压缩 | **Koog 内置** |
-| Tool Use / 结构化输出 | **Koog 内置** |
-| 错误重试 / 容错 | **Koog 内置** |
+| **LLM 客户端** | **通过项目内兼容层集中封装，业务层无需直接处理 HTTP/SSE** |
+| Streaming / 历史压缩 | Streaming 已接入；历史压缩当前配置为 NoCompression |
+| Tool Use / 结构化输出 | Koog tools + 项目内 Anthropic Messages 兼容层 |
+| 错误重试 / 容错 | 当前基础错误处理，重试策略待补 |
 | 数据库 | Room 替代手写 SQLite |
 | 后台任务 | WorkManager 替代 Service+AlarmManager |
 | DI | Hilt 替代手动工厂 |

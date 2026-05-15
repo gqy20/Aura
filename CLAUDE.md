@@ -2,8 +2,20 @@
 
 ## 项目文档
 
+- **[README](README.md)** — 项目概览、当前已实现能力、构建/测试命令。
+- **[Roadmap](docs/roadmap.md)** — 当前处于“文本聊天技术闭环 / Phase 1 agent tools”，列出已实现、部分实现、未实现和 M0-M6 里程碑。
+- **[技术架构文档](docs/architecture.md)** — 架构目标与当前实现状态，包含技术栈、数据层、Agent Core、Vision/Pulse 规划。
+- **[工程化规范](docs/engineering-standards.md)** — CI/CD、测试策略、代码规范、质量门禁。
 - **[Koog API 参考](docs/koog-api-reference.md)** — 从 Gradle 缓存 JAR (`javap -p -s`) 提取的 Koog v0.8.0 完整 API 签名，覆盖 Agent/Builder/Strategy/Service/Tool/Pipeline/Prompt&LLM 等 15 个模块，含架构图和类型签名表。
-- **[Koog ↔ Android 集成指南](docs/koog-android-integration.md)** — Koog 在 Android 上的集成方案：当前项目审计（Stub 工厂/MainActivity 反模式/URL 不一致）、两阶段实现策略（非流式验证 → 流式生产）、线程规则（禁止 runBlocking/KG-750 死锁）、生命周期模式、完整可运行代码。
+- **[Koog ↔ Android 集成指南](docs/koog-android-integration.md)** — Koog 在 Android 上的集成状态：当前已接入真实 `AIAgent`、流式文本和工具事件；保留线程规则（禁止 runBlocking/KG-750 死锁）、生命周期模式、后续待补项。
+
+## 当前项目状态
+
+- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**
+- 已实现：Compose 聊天页、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用、Room/DataStore/Hilt、Agent tools。
+- 部分实现：模型配置、Vision 底层输入结构、情绪与关系核心、记忆注入。
+- 尚未实现：设置页、CameraX UI、语音、WorkManager pulse、通知、角色主屏、记忆房间。
+- 已验证：`./gradlew.bat testDebugUnitTest` 和 `./gradlew.bat assembleDebug` 于 2026-05-15 通过。
 
 ## Compose UI: Window Insets 速查
 
@@ -130,10 +142,10 @@ Inset 值在 **composition 之后、layout 之前** 更新。内置 Modifier 已
 | 项目 | 版本/路径 |
 |------|-----------|
 | JDK | **21.0.6** (Oracle LTS) |
-| Kotlin | 由 Gradle plugin 管理（目标 2.0+） |
-| AGP | 8.6.1 |
+| Kotlin | **2.3.21**（由 Gradle plugin 管理） |
+| AGP | **9.2.0** |
 | SDK Root | `C:\Users\gqy17\AppData\Local\Android\Sdk` |
-| SDK Platform | android-36.1 |
+| SDK Platform | android-36 / android-36.1 |
 | Build Tools | 37.0.0 / 36.1.0 |
 | Git | 2.50.0 |
 | Node.js | v22.14.0 |

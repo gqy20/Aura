@@ -6,23 +6,27 @@
 
 ## 特性
 
-- **情绪系统** — 多维情绪状态机，支持实时衰减与触发
-- **关系模型** — 亲密度等级随交互自然演进
-- **多模态** — CameraX 视觉输入 + GLM-5v-turbo Vision 图片理解
-- **模型可切换** — GLM-5v-turbo（默认）/ Kimi 2.6，统一 Anthropic Messages API 协议
-- **流式对话** — Koog Agent 驱动的 SSE 流式输出，逐字渲染
-- **记忆持久化** — Room 存储消息、记忆、情绪快照等
-- **生命脉冲** — WorkManager 后台调度，离线期间状态衰减与主动关怀
+- **已实现：文本聊天闭环** — Compose 聊天页 + ChatViewModel + CompanionRuntime + Koog Agent
+- **已实现：流式对话** — Anthropic Messages 兼容 SSE 流式输出，聊天气泡逐字渲染
+- **已实现：长期记忆基础能力** — Room 存储消息、记忆、情绪快照、工具调用记录
+- **已实现：Agent 工具调用** — `save_memory`、`search_memory`、`update_mood`、`update_relationship`
+- **已实现：情绪与关系核心** — 情绪状态机和关系模型已接入 Agent 主循环
+- **部分实现：模型配置** — DataStore/BuildConfig 已支持 API Key 与模型名，设置页尚未实现
+- **规划中：多模态** — 底层 Vision prompt/client 支持已预留，CameraX 拍照/选图 UI 尚未实现
+- **规划中：生命脉冲** — WorkManager 依赖已接入，后台 pulse/通知/主动关怀尚未实现
 
 ## 技术栈
 
 | 层面 | 选型 |
 |------|------|
-| 语言 | Kotlin |
+| JDK | 21 |
+| 语言 | Kotlin 2.3.21 |
+| Android Gradle Plugin | 9.2.0 |
+| SDK | compileSdk 36 / minSdk 26 / targetSdk 36 |
 | UI | Jetpack Compose + Material 3 |
 | 架构 | MVVM + Repository |
 | 并发 | Coroutines + Flow |
-| Agent 框架 | [Koog](https://github.com/JetBrains/koog) (JetBrains) |
+| Agent 框架 | [Koog](https://github.com/JetBrains/koog) 0.8.0 |
 | LLM | GLM-5v-turbo (智谱) / Kimi 2.6 (月之暗面) |
 | DI | Hilt |
 | 数据库 | Room |
@@ -35,26 +39,28 @@
 
 ```
 app/src/main/java/com/xiaoqi/companion/
-├── feature/                  # UI 层 — 聊天、设置等功能模块
+├── feature/                  # UI 层 — 当前已实现 chat
 ├── core/                     # 核心逻辑 — Agent 运行时、情绪、关系、Prompt
 │   ├── companion/            #   CompanionRuntime 主循环 + Koog 集成
+│   ├── llm/                  #   Anthropic Messages 兼容 LLM client / executor
 │   ├── prompt/               #   Prompt 组装引擎 + 模板
-│   ├── emotion/              #   情绪状态机
-│   └── relationship/         #   关系亲密度模型
+│   ├── tools/                #   Agent tools + 工具调用记录
+│   └── logging/              #   Timber 日志封装与字段脱敏
 ├── data/                     # 数据层 — Room DAO/Entity、DataStore、Repository
 │   ├── db/
 │   ├── datastore/
 │   └── repository/
-├── platform/                 # 平台能力 — 语音、相机、通知、权限
 └── di/                       # Hilt 依赖注入模块
 ```
+
+> `platform/`、`feature/settings`、`feature/memory_room`、`core/pulse` 仍属于 roadmap 中的计划模块，当前源码目录尚未落地。
 
 ## 快速开始
 
 ### 环境要求
 
 - JDK 21+
-- Android SDK（compileSdk 36.1, minSdk 26）
+- Android SDK（compileSdk 36, minSdk 26）
 - Android Studio (推荐) 或 Gradle 命令行
 
 ### 构建
@@ -102,9 +108,11 @@ make help        # 查看所有命令
         → UI 响应（表情 / 气泡 / 动作）
 ```
 
+当前已跑通的是文本输入链路；图片和语音输入的数据结构/底层能力在设计中预留，UI 与平台实现仍在 roadmap 中。
+
 ## 配置
 
-LLM 模型配置通过 DataStore 管理，在设置页切换：
+LLM 模型配置通过 DataStore 与 BuildConfig 管理。当前可以从 `.env` / 环境变量读取默认值，设置页切换尚未实现：
 
 ```kotlin
 data class LlmConfig(
@@ -119,6 +127,7 @@ data class LlmConfig(
 
 - [技术架构文档](docs/architecture.md) — 完整的分层设计、LLM 选型、Agent Core 流程
 - [工程化规范](docs/engineering-standards.md) — CI/CD、测试策略、代码规范、质量门禁
+- [Roadmap](docs/roadmap.md) — 当前进度、下一阶段任务和里程碑
 
 ## License
 

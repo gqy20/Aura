@@ -1,6 +1,6 @@
 # Koog v0.8.0 <-> Android 集成指南
 
-> **版本**: Koog 0.8.0 | 项目: Aura Companion App | 最后更新: 2025-05-12
+> **版本**: Koog 0.8.0 | 项目: Aura Companion App | 最后更新: 2026-05-15
 >
 > 本文档基于以下材料交叉验证：
 > - [Koog GitHub README](https://github.com/koog-ai/koog)（官方源码仓库）
@@ -14,11 +14,11 @@
 
 1. [Koog 对 Android 的官方立场](#1-koog-对-android-的官方立场)
 2. [当前项目集成状态审计](#2-当前项目集成状态审计)
-3. [核心问题：Stub → 真实 Agent 的替换方案](#3-核心问题stub--真实-agent-的替换方案)
+3. [真实 Agent 实现要点](#3-真实-agent-实现要点)
 4. [线程与调度器规则](#4-线程与调度器规则)
 5. [Android 生命周期集成模式](#5-android-生命周期集成模式)
 6. [流式输出在 Chat UI 中的集成](#6-流式输出在-chat-ui-中的集成)
-7. [完整实现：KoogAgentFactoryImpl 重写](#7-完整实现koogagentfactoryimpl-重写)
+7. [当前实现参考](#7-当前实现参考)
 8. [已知问题与规避策略](#8-已知问题与规避策略)
 9. [检查清单](#9-检查清单)
 
@@ -83,9 +83,7 @@ Koog 的 `AnthropicLLMClient` 实现了 Anthropic Messages API 协议。本项�
 | 智谱 GLM | `https://open.bigmodel.cn/api/paas/v1` | Anthropic Messages API |
 | Moonshot Kimi | `https://api.moonshot.cn/v1` | Anthropic Messages API |
 
-> **注意**: `build.gradle.kts` 中当前默认 URL 为 `https://open.bigmodel.cn/api/anthropic`，
-> 但 `ConfigRepository` 中 GLM 的 URL 是 `https://open.bigmodel.cn/api/paas/v1`。
-> **两处不一致，需统一**（见第 2 节审计）。
+> 当前项目通过自定义 `AnthropicMessagesLLMClient` 适配 Koog `PromptExecutor`，GLM 默认 base URL 由 `.env` / `BuildConfig.LLM_BASE_URL` 提供，Kimi base URL 在 `ConfigRepository` 中固定为 `https://api.moonshot.cn/v1`。
 
 ---
 
@@ -95,77 +93,36 @@ Koog 的 `AnthropicLLMClient` 实现了 Anthropic Messages API 协议。本项�
 
 | 层 | 文件 | 状态 | 说明 |
 |----|------|------|------|
-| UI 层 | `MainActivity.kt` | ⚠️ 反模式 | 直接创建 LLM Client，绕过 ViewModel |
-| UI 层 | `ChatScreenContent.kt` | ✅ 正常 | 纯 Compose UI，无业务逻辑 |
+| UI 层 | `MainActivity.kt` | ✅ 正常 | 只负责 `setContent`，通过 Hilt 获取 `ChatViewModel` |
+| UI 层 | `ChatScreen.kt` / `MessageBubble.kt` | ✅ 正常 | Compose UI，展示消息、输入框、工具状态 |
 | ViewModel | `ChatViewModel.kt` | ✅ 正常 | 正确使用 viewModelScope + CompanionRuntime |
-| Runtime | `CompanionRuntime.kt` | ⚠️ 半成品 | 流程正确但调用的 agent.run() 是 stub |
-| Agent 工厂 | `KoogAgentFactoryImpl.kt` | ❌ Stub | 返回空字符串，未接入真实 Koog |
+| Runtime | `CompanionRuntime.kt` | ✅ 已接入 | 构建 prompt、注入记忆、调用 Agent、解析输出、更新情绪/关系 |
+| Agent 工厂 | `KoogAgentFactoryImpl.kt` | ✅ 已接入 | 使用 Koog `AIAgent`，支持流式文本与工具事件 |
+| LLM client | `AnthropicMessagesLLMClient.kt` | ✅ 已实现 | Anthropic Messages 兼容请求、SSE streaming、tool schema、Vision content |
 | Agent 接口 | `KoogAgentFactory.kt` | ✅ 设计合理 | 抽象层设计良好 |
-| 配置 | `ConfigRepository.kt` | ⚠️ URL 不一致 | 与 build.gradle.kts 中默认值冲突 |
+| 配置 | `ConfigRepository.kt` | ✅ 可用 | DataStore + BuildConfig 组合读取 provider/key/model |
 | Prompt | `PromptBuilder.kt` | ✅ 正常 | 正确构建 BuiltPrompt |
 | DI | `AppModule.kt` | ✅ 正常 | Hilt 绑定完整 |
 
-### 2.2 问题 #1：MainActivity 反模式
+### 2.2 当前已验证事项
 
-**文件**: `app/src/main/java/com/xiaoqi/companion/MainActivity.kt`
+- `MainActivity` 已清理为 ViewModel 驱动，不再直接创建 LLM client。
+- `KoogAgentFactoryImpl` 已不再是 stub，当前通过 `AIAgent.builder()` 构建真实 Agent。
+- `CompanionRuntime.send()` 已返回 `Flow<AgentEvent>`，支持 `Streaming`、`Complete`、`Error` 与工具事件。
+- `testDebugUnitTest` 和 `assembleDebug` 已在 2026-05-15 验证通过。
 
-```kotlin
-// ❌ 当前代码 — 反模式
-@AndroidEntryPoint
-class MainActivity : ComponentActivity() {
-    private val uiState = MutableStateFlow<ChatUiState>()  // 手动管理状态
-    private val scope = CoroutineScope(Dispatchers.Main)    // 自建 Scope，泄漏风险
-    private val client by lazy { AnthropicLLMClient(...) }  // Activity 级别创建 Client
-    // ...
-    private fun sendMessage(text: String) {
-        scope.launch {
-            client.executeStreaming(chatPrompt, glmModel).collect { frame -> ... }
-        }
-    }
-}
-```
+### 2.3 仍待完善
 
-**问题清单**:
-
-| 问题 | 风险 | 严重度 |
-|------|------|--------|
-| `CoroutineScope(Dispatchers.Main)` 无 lifecycle 边界 | Activity 销毁后协程继续运行，可能导致内存泄漏或崩溃 | 🔴 高 |
-| Activity 内直接持有 `AnthropicLLMClient` | 无法测试、无法切换实现、违反单一职责 | 🟡 中 |
-| 手动管理 `MutableStateFlow` | 与 Compose StateHoisting 模式矛盾，ViewModel 已有正确实现 | 🟡 中 |
-| 绕过 `CompanionRuntime` | 情感机、关系模型、消息持久化全部失效 | 🔴 高 |
-
-**修复方向**: MainActivity 应只负责 setContent + 收集状态，所有逻辑委托给 ChatViewModel。
-
-### 2.3 问题 #2：KoogAgentFactoryImpl 是 Stub
-
-**文件**: `core/companion/KoogAgentFactoryImpl.kt`
-
-```kotlin
-// ❌ 当前代码 — Stub
-class StubKoogAgentWrapper(private val config: LlmConfig) : KoogAgentWrapper {
-    override suspend fun run(prompt: BuiltPrompt): String {
-        // TODO: integrate with real Koog AIAgent
-        return ""
-    }
-}
-```
-
-这是当前**最大的阻塞点**。ChatViewModel → CompanionRuntime → KoogAgentFactory 这条链路已经打通，
-但最后一环返回空字符串。
-
-### 2.4 问题 #3：Base URL 不一致
-
-| 位置 | GLM Base URL | Kimi Base URL |
-|------|-------------|---------------|
-| `build.gradle.kts` 默认值 | `https://open.bigmodel.cn/api/anthropic` | — |
-| `ConfigRepositoryImpl` | `https://open.bigmodel.cn/api/paas/v1` | `https://api.moonshot.cn/v1` |
-
-两个 URL 可能都有效（智谱可能做了路径兼容），但应统一为一个确定值。
-建议以 `ConfigRepository` 中的值为准（更具体、更明确），修改 `build.gradle.kts` 默认值。
+- 设置页尚未实现，用户不能在 UI 中修改 API Key / Provider / Model。
+- CameraX 依赖和 Vision 数据结构已预留，但拍照/选图 UI 尚未实现。
+- WorkManager pulse、语音、通知、角色表情层尚未实现。
+- 进程死亡后的输入框草稿、情绪/关系状态恢复仍需补齐。
 
 ---
 
-## 3. 核心问题：Stub → 真实 Agent 的替换方案
+## 3. 真实 Agent 实现要点
+
+> 当前项目已经采用真实 Koog `AIAgent` 集成；本节记录实现要点，历史上的 stub 替换任务已完成。
 
 ### 3.1 接口适配分析
 
@@ -484,7 +441,17 @@ runtime.send(UserInput.Text(trimmed)).collect { event ->
 
 ---
 
-## 7. 完整实现：KoogAgentFactoryImpl 重写
+## 7. 当前实现参考
+
+当前实现位于 `app/src/main/java/com/xiaoqi/companion/core/companion/KoogAgentFactoryImpl.kt`：
+
+- `KoogAgentFactoryImpl.create(config)` 创建 `KoogPromptExecutorWrapper`。
+- `KoogPromptExecutorWrapper` 使用 `AIAgent.builder()` 配置 prompt executor、LLM model、tool registry 和 event handler。
+- `runEvents(prompt)` 通过 `callbackFlow` 将 Koog streaming frame 和 tool call 生命周期转换为项目内 `KoogAgentEvent`。
+- `BuiltPrompt.toKoogAgentPrompt()` 将 system prompt、user text 和可选 base64 image 转为 Koog prompt DSL。
+- 工具调用通过 `ToolCallRecorder` 写入 Room，并同步推送给聊天 UI。
+
+下面的代码片段属于历史实现参考，实际代码请以当前源码为准。
 
 ### 7.1 新增依赖导入
 
@@ -684,9 +651,9 @@ public kotlinx.coroutines.flow.Flow<ai.koog.prompt.streaming.StreamFrame>
 
 | ID | 问题 | 影响 | 规避/解决方案 | 状态 |
 |----|------|------|--------------|------|
-| P1 | `build.gradle.kts` 与 `ConfigRepository` 的 GLM URL 不一致 | Debug 模式下可能连接错误的端点 | 统一为 `api/paas/v1` | 待修复 |
-| P2 | MainActivity 包含反模式代码（直接 LLM 调用） | 绕过整个架构，情感/关系模块失效 | 删除 MainActivity 中的 LLM 代码，委托给 ViewModel | 待修复 |
-| P3 | KoogAgentFactoryImpl 是 Stub | 所有 AI 回复为空 | 用第 7 节代码替换 | **本文档目标** |
+| P1 | GLM base URL 依赖 `.env` / `BuildConfig.LLM_BASE_URL` | 未配置时会报 `LLM_BASE_URL is not configured` | 在 `.env` 中配置 `LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v1` | 需运行环境配置 |
+| P2 | MainActivity 直接 LLM 调用反模式 | 绕过架构 | 已改为 `ChatViewModel` 驱动 | 已修复 |
+| P3 | 历史上的 KoogAgentFactoryImpl stub | 所有 AI 回复为空 | 已替换为真实 Koog `AIAgent` | 已修复 |
 | P4 | 进程死亡时 EmotionMachine/RelationshipModel 状态丢失 | 重启后情感和关系上下文归零 | 序列化到 DataStore | 低优先级 |
 | P5 | SavedStateHandle 未接入 | 旋转屏幕/进程死亡后输入框内容丢失 | 在 ViewModel 中添加 | 低优先级 |
 | KG-750 | runBlocking + ExecutorService 死锁 | ANR | 全项目禁用 runBlocking | 已规避（设计中未使用） |
@@ -710,37 +677,27 @@ public kotlinx.coroutines.flow.Flow<ai.koog.prompt.streaming.StreamFrame>
 
 ## 9. 检查清单
 
-### 实现前
+### 本地运行前
 
-- [ ] 确认 `.env` 文件中 `ANTHROPIC_AUTH_TOKEN` 已配置有效 API Key
-- [ ] 统一 `build.gradle.kts` 和 `ConfigRepository` 中的 GLM base URL
+- [ ] 确认 `.env` 文件中 `LLM_API_KEY` 已配置有效 API Key
+- [ ] 确认 `.env` 文件中 `LLM_BASE_URL` 已配置有效 Anthropic Messages 兼容端点
 - [ ] 确认网络权限 `<uses-permission android:name="android.permission.INTERNET" />` 已在 AndroidManifest.xml 中声明
 - [ ] 确认明文流量允许（如果使用 HTTP 而非 HTTPS）：`android:usesCleartextTraffic="true"` （仅 debug）
 
-### 实现策略 A（非流式）
+### 已完成的 Koog 集成检查
 
-- [ ] 替换 `KoogAgentFactoryImpl` 中的 `StubKoogAgentWrapper` 为 `RealKoogAgentWrapper`
-- [ ] 添加 `BuiltPrompt.toKoogPrompt()` 扩展函数
-- [ ] 在 `RealKoogAgentWrapper` 中用 `config` 参数初始化 `AnthropicLLMClient`
-- [ ] 调用 `client.execute(prompt, model)` 并返回结果字符串
-- [ ] 在真机/模拟器上发送一条消息验证端到端通路
+- [x] `MainActivity` 只负责 `setContent`
+- [x] `ChatViewModel` 通过 `CompanionRuntime` 发送消息
+- [x] `KoogAgentFactoryImpl` 创建真实 `AIAgent`
+- [x] `CompanionRuntime` 支持 streaming / complete / error / tool events
+- [x] 工具调用状态写入 Room 并显示在聊天 UI
 
-### 实现策略 B（流式）
+### 后续待补
 
-- [ ] 完成策略 A 的所有步骤并验证通过
-- [ ] 在 `KoogAgentWrapper` 接口中添加 `runStreaming()` 方法
-- [ ] 实现 `StreamingKoogAgentWrapper.runStreaming()` 使用 `callbackFlow` + `flowOn(IO)`
-- [ ] 改造 `CompanionRuntime.send()` 使用 `callbackFlow` + `agent.runStreaming()`
-- [ ] 处理 `StreamFrame.TextDelta` → `AgentEvent.Streaming` 的转换
-- [ ] 处理 `StreamFrame.End` → 解析 + 情感更新 + `AgentEvent.Complete`
-- [ ] 验证聊天界面逐字显示效果
-
-### 清理
-
-- [ ] 删除 `MainActivity.kt` 中的 `AnthropicLLMClient`、`glmModel`、`client`、`sendMessage()` 等字段和方法
-- [ ] 删除 `MainActivity.kt` 中不再需要的 import（`ai.koog.*`, `kotlinx.coroutines.*` 除 lifecycle 外）
-- [ ] 确保 `ChatViewModel` 的 `sendMessage` 被 `ChatScreenContent` 的 `onSendMessage` 正确回调
-- [ ] 运行全部单元测试确认无回归
+- [ ] 设置页配置 API key/provider/model
+- [ ] 真机/模拟器手动验证 GLM/Kimi 端到端回复
+- [ ] CameraX Vision 输入接入 `UserInput.Vision`
+- [ ] 进程死亡后的状态恢复
 
 ---
 
@@ -755,7 +712,7 @@ public kotlinx.coroutines.flow.Flow<ai.koog.prompt.streaming.StreamFrame>
 | Prompt 构建 | `core/prompt/PromptBuilder.kt` | BuiltPrompt 构建 |
 | 配置仓库 | `data/repository/ConfigRepository.kt` | LlmConfig (provider/url/key/model) |
 | Chat ViewModel | `feature/chat/ChatViewModel.kt` | UI 层状态管理 |
-| MainActivity | `MainActivity.kt` | **需清理反模式代码** |
+| MainActivity | `MainActivity.kt` | Activity 入口，委托给 `ChatViewModel` |
 | Build Config | `app/build.gradle.kts` | BuildConfig 字段定义 |
 | 版本目录 | `gradle/libs.versions.toml` | `koog = "0.8.0"` |
 | API 参考 | `docs/koog-api-reference.md` | JAR 提取的完整 API 签名 |

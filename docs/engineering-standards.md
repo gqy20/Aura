@@ -2,6 +2,8 @@
 
 > 本文档定义项目的 CI/CD 流水线、测试策略、代码规范和质量门禁。
 > 与 [architecture.md](./architecture.md) 配合使用：架构文档管"用什么"，本文档管"怎么写/怎么测/怎么发"。
+>
+> 当前状态（2026-05-15）：本地已验证 `testDebugUnitTest` 与 `assembleDebug` 通过；CI、ktlint、完整 instrumented tests 仍按本文档作为目标规范推进。
 
 ---
 
@@ -51,8 +53,11 @@ jobs:
           java-version: '21'
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-      - name: Run Kotlin Lint + Android Lint
-        run: ./gradlew :app:lint :app:ktlintCheck
+      - name: Run Android Lint
+        run: ./gradlew :app:lint
+      # If ktlint is added later:
+      # - name: Run Kotlin Lint
+      #   run: ./gradlew :app:ktlintCheck
 
   # === 阶段 2：Unit Tests ===
   test:
@@ -171,13 +176,13 @@ jobs:
 
 | 模块 | 测试重点 | 工具 |
 |------|----------|------|
-| `core/emotion` | 状态转换、情绪衰减曲线、边界值 | JUnit5 + MockK |
-| `core/relationship` | 亲密度计算、等级阈值、时间衰减 | JUnit5 |
-| `core/pulse` | 调度策略、条件触发、离线推演 | JUnit5 + Turbine(Flow) |
-| `core/prompt` | 模板渲染、变量替换、系统提示组装 | JUnit5 |
-| `core/companion` | 主循环编排（Mock Koog Agent） | JUnit5 + MockK + Turbine |
-| `data/repository` | 数据 CRUD、缓存逻辑 | JUnit5 + Room in-memory |
-| `platform/speech` | 接口契约、事件流格式 | JUnit5 + Turbine |
+| `core/companion` | 主循环编排、Koog wrapper、parser、model | JUnit4 + MockK + Turbine |
+| `core/prompt` | 模板渲染、变量替换、系统提示组装 | JUnit4 |
+| `core/tools` | 工具参数、Room 记录、结果展示语义 | JUnit4 + MockK |
+| `data/db` | DAO 查询、迁移、Room in-memory 行为 | JUnit4 + Room in-memory |
+| `data/repository` | 数据 CRUD、缓存逻辑 | JUnit4 + Room in-memory |
+| `feature/chat` | ViewModel 状态流、错误处理、消息展示 | JUnit4 + Turbine / Compose Test |
+| `platform/speech` | 接口契约、事件流格式（规划中） | JUnit4 + Turbine |
 
 ```kotlin
 // 示例：情绪状态机测试
@@ -304,7 +309,7 @@ class CompanionRuntimeTest {
 
 | 工具 | 用途 |
 |------|------|
-| **JUnit 5** | 单元测试框架 |
+| **JUnit 4** | 当前项目使用的单元测试框架 |
 | **MockK** | Kotlin 原生 Mock 框架（比 Mockito 更适合 Kotlin） |
 | **Turbine** | Kotlin Flow 测试（收集 Flow emit 事件并断言） |
 | **Espresso / Compose Test Rule** | Android UI 测试 |
@@ -570,5 +575,5 @@ kotlin.code.style=official
 
 ```bash
 # local.properties（不提交到 Git）
-sdk.dir=D:\\tools\\Android_Studio_Cli\\sdk
+sdk.dir=C:\\Users\\gqy17\\AppData\\Local\\Android\\Sdk
 ```
