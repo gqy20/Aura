@@ -32,12 +32,13 @@
 - 情绪/关系状态写入 `agent_state`，App 重启后可恢复。
 - 聊天页展示最近的长期记忆，只读可见。
 - 只读记忆房间弹层可查看全部当前记忆。
+- 聊天页显示模型配置状态；缺少 API Key/Base URL/model 时会禁用发送并给出明确提示。
 - 单元测试覆盖 core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI 等。
 - Debug APK 构建链路。
 
 ## 部分实现
 
-- **模型切换**：Repository/Config 基础能力已存在，但还没有设置页 UI。
+- **模型切换**：Repository/Config 基础能力和聊天页配置状态提示已存在，但还没有设置页 UI。
 - **Vision**：`UserInput.Vision` 和 LLM client 图片 content 支持已存在，但 CameraX 拍照/选图 UI 尚未实现。
 - **情绪与关系**：核心状态更新、持久化恢复和聊天页可视化已接入，但头像/表情层尚未完成。
 - **记忆**：工具保存/搜索、prompt 注入、聊天页只读展示和只读记忆房间弹层已实现，但还没有完整记忆管理能力。
@@ -76,6 +77,7 @@
 - 添加 API key 输入与本地持久化。
 - 添加 GLM/Kimi provider 与 model selector。
 - 添加模型连通性检查动作。
+- 聊天页配置状态提示。（已完成）
 - 补充配置写入与 ViewModel 行为测试。
 
 ### M2：记忆 MVP

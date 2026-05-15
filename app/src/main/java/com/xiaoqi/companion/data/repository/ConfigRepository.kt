@@ -8,6 +8,7 @@ import com.xiaoqi.companion.data.db.converter.LlmProvider
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 data class LlmConfig(
     val provider: LlmProvider,
@@ -16,6 +17,22 @@ data class LlmConfig(
     val modelName: String,
 )
 
+data class LlmConfigStatus(
+    val provider: LlmProvider,
+    val modelName: String,
+    val baseUrl: String,
+    val hasApiKey: Boolean,
+) {
+    val isReady: Boolean = hasApiKey && baseUrl.isNotBlank() && modelName.isNotBlank()
+    val missingReason: String?
+        get() = when {
+            !hasApiKey -> "缺少 API Key"
+            baseUrl.isBlank() -> "缺少 Base URL"
+            modelName.isBlank() -> "缺少模型名称"
+            else -> null
+        }
+}
+
 interface ConfigRepository {
     val apiKey: Flow<String?>
     val llmProvider: Flow<LlmProvider>
@@ -23,6 +40,7 @@ interface ConfigRepository {
     val themeMode: Flow<com.xiaoqi.companion.data.db.converter.ThemeMode>
 
     fun getCurrentLlmConfig(): Flow<LlmConfig>
+    fun observeLlmConfigStatus(): Flow<LlmConfigStatus>
     suspend fun setApiKey(key: String?)
     suspend fun setModelName(name: String)
 }
@@ -54,6 +72,16 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
                 },
                 apiKey = resolvedKey,
                 modelName = resolvedModel,
+            )
+        }
+
+    override fun observeLlmConfigStatus(): Flow<LlmConfigStatus> =
+        getCurrentLlmConfig().map { config ->
+            LlmConfigStatus(
+                provider = config.provider,
+                baseUrl = config.baseUrl,
+                hasApiKey = config.apiKey.isNotBlank(),
+                modelName = config.modelName,
             )
         }
 

@@ -14,6 +14,7 @@ import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
+import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
@@ -54,6 +55,14 @@ class ChatViewModelTest {
                 provider = com.xiaoqi.companion.data.db.converter.LlmProvider.GLM,
                 baseUrl = "https://open.bigmodel.cn/api/paas/v1",
                 apiKey = "test-key",
+                modelName = "glm-5v-turbo",
+            )
+        )
+        every { observeLlmConfigStatus() } returns flowOf(
+            LlmConfigStatus(
+                provider = com.xiaoqi.companion.data.db.converter.LlmProvider.GLM,
+                baseUrl = "https://open.bigmodel.cn/api/paas/v1",
+                hasApiKey = true,
                 modelName = "glm-5v-turbo",
             )
         )
@@ -119,6 +128,7 @@ class ChatViewModelTest {
             fakeRuntime,
             ToolDisplayRegistry(),
             toolCallRepository,
+            configRepo,
             messageRepo,
             memoryDao,
             agentStateDao,
@@ -165,6 +175,43 @@ class ChatViewModelTest {
         viewModel.sendMessage("")
         viewModel.sendMessage("   ")
         assertFalse(fakeRuntime.sendCalled)
+    }
+
+    @Test
+    fun sendMessage_blocksWhenConfigIsNotReady() = runTest {
+        val blockedConfigRepo: ConfigRepository = mockk {
+            every { observeLlmConfigStatus() } returns flowOf(
+                LlmConfigStatus(
+                    provider = com.xiaoqi.companion.data.db.converter.LlmProvider.GLM,
+                    baseUrl = "https://open.bigmodel.cn/api/paas/v1",
+                    hasApiKey = false,
+                    modelName = "glm-5v-turbo",
+                )
+            )
+            every { getCurrentLlmConfig() } returns flowOf(
+                LlmConfig(
+                    provider = com.xiaoqi.companion.data.db.converter.LlmProvider.GLM,
+                    baseUrl = "https://open.bigmodel.cn/api/paas/v1",
+                    apiKey = "",
+                    modelName = "glm-5v-turbo",
+                )
+            )
+        }
+        val blockedRuntime = FakeCompanionRuntime(blockedConfigRepo, messageRepo)
+        val blockedViewModel = ChatViewModel(
+            blockedRuntime,
+            ToolDisplayRegistry(),
+            toolCallRepository,
+            blockedConfigRepo,
+            messageRepo,
+            memoryDao,
+            agentStateDao,
+        )
+
+        blockedViewModel.sendMessage("hello")
+
+        assertFalse(blockedRuntime.sendCalled)
+        assertEquals("缺少 API Key", blockedViewModel.uiState.value.error)
     }
 
     @Test

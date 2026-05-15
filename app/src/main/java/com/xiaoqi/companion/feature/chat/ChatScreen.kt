@@ -22,6 +22,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -91,6 +93,7 @@ fun ChatScreenContent(
         ) {
             CompanionHeader(
                 status = uiState.status,
+                configStatus = uiState.configStatus,
                 memories = uiState.memories,
                 onOpenMemoryRoom = onOpenMemoryRoom,
             )
@@ -126,6 +129,7 @@ fun ChatScreenContent(
                 onInputTextChanged = onInputTextChanged,
                 onSendMessage = onSendMessage,
                 isLoading = uiState.isLoading && uiState.messages.none { it.role == "ASSISTANT" && it.isStreaming },
+                isConfigReady = uiState.configStatus.isReady,
                 modifier = Modifier.imePadding(),
             )
         }
@@ -149,6 +153,7 @@ fun ChatScreenContent(
 @Composable
 private fun CompanionHeader(
     status: CompanionStatus,
+    configStatus: ChatConfigStatus,
     memories: List<ChatMemory>,
     onOpenMemoryRoom: () -> Unit,
 ) {
@@ -191,6 +196,8 @@ private fun CompanionHeader(
             }
         }
 
+        ConfigStatusCard(status = configStatus)
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -205,6 +212,52 @@ private fun CompanionHeader(
             memories.take(3).forEach { memory ->
                 MemoryChip(memory = memory)
             }
+        }
+    }
+}
+
+@Composable
+private fun ConfigStatusCard(status: ChatConfigStatus) {
+    ElevatedCard(
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (status.isReady) {
+                MaterialTheme.colorScheme.surface
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.68f)
+            },
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (status.isReady) "模型已就绪" else "需要配置模型",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = status.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            Text(
+                text = if (status.isReady) "Ready" else status.detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (status.isReady) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
         }
     }
 }
@@ -363,6 +416,7 @@ private fun InputBar(
     onInputTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
     isLoading: Boolean = false,
+    isConfigReady: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -390,7 +444,7 @@ private fun InputBar(
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = onSendMessage,
-                    enabled = inputText.isNotBlank(),
+                    enabled = inputText.isNotBlank() && isConfigReady,
                     modifier = Modifier.semantics { contentDescription = "Send" },
                 ) {
                     Icon(

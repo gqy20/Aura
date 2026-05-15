@@ -17,6 +17,8 @@ import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
+import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
@@ -35,6 +37,7 @@ class ChatViewModel @Inject constructor(
     private val runtime: CompanionRuntime,
     private val toolDisplayRegistry: ToolDisplayRegistry,
     private val toolCallRepository: ToolCallRepository,
+    private val configRepository: ConfigRepository,
     private val messageRepository: MessageRepository,
     private val memoryDao: MemoryDao,
     private val agentStateDao: AgentStateDao,
@@ -50,6 +53,14 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState
 
     init {
+        viewModelScope.launch {
+            configRepository.observeLlmConfigStatus().collect { status ->
+                _uiState.update { state ->
+                    state.copy(configStatus = status.toChatConfigStatus())
+                }
+            }
+        }
+
         viewModelScope.launch {
             agentStateDao.observeByCompanionId(DEFAULT_SESSION_ID).collect { savedState ->
                 if (savedState != null) {
@@ -102,6 +113,13 @@ class ChatViewModel @Inject constructor(
     fun sendMessage(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
+        val configStatus = _uiState.value.configStatus
+        if (!configStatus.isReady) {
+            _uiState.update {
+                it.copy(error = configStatus.detail.ifBlank { "模型配置未完成" })
+            }
+            return
+        }
 
         val requestId = UUID.randomUUID().toString()
         AppLogger.info(
@@ -330,6 +348,21 @@ class ChatViewModel @Inject constructor(
             intensity = intensity.coerceIn(0f, 1f),
             relationshipLevel = (relationshipLevel + affinityDelta).coerceIn(0f, 1f),
         )
+
+    private fun LlmConfigStatus.toChatConfigStatus(): ChatConfigStatus =
+        if (isReady) {
+            ChatConfigStatus(
+                label = "${provider.name} · $modelName",
+                isReady = true,
+                detail = "模型已就绪",
+            )
+        } else {
+            ChatConfigStatus(
+                label = "${provider.name} · ${modelName.ifBlank { "未选择模型" }}",
+                isReady = false,
+                detail = missingReason ?: "模型配置未完成",
+            )
+        }
 
     private fun persistStatus(status: CompanionStatus) {
         viewModelScope.launch {

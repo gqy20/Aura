@@ -38,11 +38,18 @@ data class ChatMemory(
     val importance: Float,
 )
 
+data class ChatConfigStatus(
+    val label: String = "模型配置检查中",
+    val isReady: Boolean = false,
+    val detail: String = "",
+)
+
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val toolCalls: List<ChatToolCall> = emptyList(),
     val memories: List<ChatMemory> = emptyList(),
     val status: CompanionStatus = CompanionStatus(),
+    val configStatus: ChatConfigStatus = ChatConfigStatus(),
     val isMemoryRoomOpen: Boolean = false,
     val isLoading: Boolean = false,
     val inputText: String = "",
