@@ -14,6 +14,7 @@ import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
@@ -54,6 +55,7 @@ class ChatViewModelTest {
     private lateinit var imageProcessor: FakeChatImageProcessor
     private lateinit var memoryDao: MemoryDao
     private lateinit var agentStateDao: AgentStateDao
+    private lateinit var appPreferences: AppPreferences
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val configRepo: ConfigRepository = mockk(relaxed = true) {
@@ -78,6 +80,15 @@ class ChatViewModelTest {
     private val messageRepo: MessageRepository = mockk(relaxed = true) {
         every { getMessagesBySession("default") } returns flowOf(emptyList())
     }
+
+    private fun mockAppPreferences(): AppPreferences =
+        mockk(relaxed = true) {
+            every { deviceStatusContextEnabled } returns flowOf(true)
+            every { locationContextEnabled } returns flowOf(true)
+            every { weatherContextEnabled } returns flowOf(true)
+            every { reminderToolEnabled } returns flowOf(true)
+            every { notificationEnabled } returns flowOf(true)
+        }
 
     private class FakeToolCallRepository : ToolCallRepository {
         val calls = MutableStateFlow<List<ToolCallSnapshot>>(emptyList())
@@ -157,6 +168,7 @@ class ChatViewModelTest {
         agentStateDao = mockk(relaxed = true) {
             every { observeByCompanionId("default") } returns flowOf(null)
         }
+        appPreferences = mockAppPreferences()
         viewModel = ChatViewModel(
             fakeRuntime,
             ToolDisplayRegistry(),
@@ -167,6 +179,7 @@ class ChatViewModelTest {
             memoryDao,
             agentStateDao,
             PresenceController(),
+            appPreferences,
         )
     }
 
@@ -285,6 +298,7 @@ class ChatViewModelTest {
             memoryDao,
             agentStateDao,
             PresenceController(),
+            appPreferences,
         )
 
         blockedViewModel.sendMessage("hello")

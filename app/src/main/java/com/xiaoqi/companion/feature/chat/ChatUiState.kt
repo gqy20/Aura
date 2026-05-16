@@ -57,6 +57,14 @@ data class ChatConfigStatus(
     val modelName: String = "glm-5v-turbo",
 )
 
+data class ChatToolCapabilitySettings(
+    val deviceStatusEnabled: Boolean = true,
+    val locationContextEnabled: Boolean = true,
+    val weatherContextEnabled: Boolean = true,
+    val reminderToolEnabled: Boolean = true,
+    val notificationEnabled: Boolean = true,
+)
+
 data class ChatImageAttachment(
     val uriString: String,
     val imageBase64: String,
@@ -77,6 +85,7 @@ data class ChatUiState(
     val settingsProvider: LlmProvider = LlmProvider.GLM,
     val settingsModelName: String = "glm-5v-turbo",
     val settingsMessage: String? = null,
+    val toolCapabilitySettings: ChatToolCapabilitySettings = ChatToolCapabilitySettings(),
     val pendingImage: ChatImageAttachment? = null,
     val isPreparingImage: Boolean = false,
     val isLoading: Boolean = false,

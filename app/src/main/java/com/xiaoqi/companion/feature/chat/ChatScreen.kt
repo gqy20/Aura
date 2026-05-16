@@ -24,8 +24,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
@@ -45,6 +47,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -87,6 +90,11 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onSettingsProviderChanged = { viewModel.updateSettingsProvider(it) },
         onSettingsModelNameChanged = { viewModel.updateSettingsModelName(it) },
         onSaveSettings = { viewModel.saveSettings() },
+        onDeviceStatusEnabledChanged = { viewModel.setDeviceStatusContextEnabled(it) },
+        onLocationContextEnabledChanged = { viewModel.setLocationContextEnabled(it) },
+        onWeatherContextEnabledChanged = { viewModel.setWeatherContextEnabled(it) },
+        onReminderToolEnabledChanged = { viewModel.setReminderToolEnabled(it) },
+        onNotificationEnabledChanged = { viewModel.setNotificationEnabled(it) },
         onAttachImage = { viewModel.attachImage(it.toString()) },
         onRemoveImage = { viewModel.removePendingImage() },
         onPresenceTapped = { viewModel.onPresenceTapped() },
@@ -107,6 +115,11 @@ fun ChatScreenContent(
     onSettingsProviderChanged: (LlmProvider) -> Unit,
     onSettingsModelNameChanged: (String) -> Unit,
     onSaveSettings: () -> Unit,
+    onDeviceStatusEnabledChanged: (Boolean) -> Unit,
+    onLocationContextEnabledChanged: (Boolean) -> Unit,
+    onWeatherContextEnabledChanged: (Boolean) -> Unit,
+    onReminderToolEnabledChanged: (Boolean) -> Unit,
+    onNotificationEnabledChanged: (Boolean) -> Unit,
     onAttachImage: (Uri) -> Unit,
     onRemoveImage: () -> Unit,
     onPresenceTapped: () -> Unit,
@@ -215,10 +228,19 @@ fun ChatScreenContent(
             provider = uiState.settingsProvider,
             modelName = uiState.settingsModelName,
             message = uiState.settingsMessage,
+            toolSettings = uiState.toolCapabilitySettings,
             onApiKeyChanged = onSettingsApiKeyChanged,
             onProviderChanged = onSettingsProviderChanged,
             onModelNameChanged = onSettingsModelNameChanged,
             onSave = onSaveSettings,
+            onDeviceStatusEnabledChanged = onDeviceStatusEnabledChanged,
+            onLocationContextEnabledChanged = onLocationContextEnabledChanged,
+            onWeatherContextEnabledChanged = onWeatherContextEnabledChanged,
+            onReminderToolEnabledChanged = onReminderToolEnabledChanged,
+            onNotificationEnabledChanged = onNotificationEnabledChanged,
+            onRequestContextPermissions = {
+                contextPermissionLauncher.launch(contextPermissions())
+            },
             onDismiss = onCloseSettings,
         )
     }
@@ -407,10 +429,17 @@ private fun SettingsDialog(
     provider: LlmProvider,
     modelName: String,
     message: String?,
+    toolSettings: ChatToolCapabilitySettings,
     onApiKeyChanged: (String) -> Unit,
     onProviderChanged: (LlmProvider) -> Unit,
     onModelNameChanged: (String) -> Unit,
     onSave: () -> Unit,
+    onDeviceStatusEnabledChanged: (Boolean) -> Unit,
+    onLocationContextEnabledChanged: (Boolean) -> Unit,
+    onWeatherContextEnabledChanged: (Boolean) -> Unit,
+    onReminderToolEnabledChanged: (Boolean) -> Unit,
+    onNotificationEnabledChanged: (Boolean) -> Unit,
+    onRequestContextPermissions: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -418,10 +447,14 @@ private fun SettingsDialog(
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.88f),
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
+                modifier = Modifier
+                    .padding(18.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -476,6 +509,16 @@ private fun SettingsDialog(
                     singleLine = true,
                 )
 
+                ToolCapabilitiesSection(
+                    settings = toolSettings,
+                    onDeviceStatusEnabledChanged = onDeviceStatusEnabledChanged,
+                    onLocationContextEnabledChanged = onLocationContextEnabledChanged,
+                    onWeatherContextEnabledChanged = onWeatherContextEnabledChanged,
+                    onReminderToolEnabledChanged = onReminderToolEnabledChanged,
+                    onNotificationEnabledChanged = onNotificationEnabledChanged,
+                    onRequestContextPermissions = onRequestContextPermissions,
+                )
+
                 message?.let {
                     Text(
                         text = it,
@@ -496,6 +539,146 @@ private fun SettingsDialog(
                         Text("保存")
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolCapabilitiesSection(
+    settings: ChatToolCapabilitySettings,
+    onDeviceStatusEnabledChanged: (Boolean) -> Unit,
+    onLocationContextEnabledChanged: (Boolean) -> Unit,
+    onWeatherContextEnabledChanged: (Boolean) -> Unit,
+    onReminderToolEnabledChanged: (Boolean) -> Unit,
+    onNotificationEnabledChanged: (Boolean) -> Unit,
+    onRequestContextPermissions: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Context & Tools",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Local abilities Aura can use during chat",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onRequestContextPermissions) {
+                Text("Permissions")
+            }
+        }
+
+        ToolCapabilityRow(
+            title = "Time and recent activity",
+            detail = "Current time, date, and recent chat activity",
+            toolNames = "get_current_time · get_recent_interaction_context",
+            enabled = true,
+            locked = true,
+            onEnabledChanged = {},
+        )
+        ToolCapabilityRow(
+            title = "Device status",
+            detail = "Battery, charging, network, and power saver",
+            toolNames = "get_device_status",
+            enabled = settings.deviceStatusEnabled,
+            onEnabledChanged = onDeviceStatusEnabledChanged,
+        )
+        ToolCapabilityRow(
+            title = "Location",
+            detail = "Last known location for local context",
+            toolNames = "get_user_context_settings",
+            enabled = settings.locationContextEnabled,
+            onEnabledChanged = onLocationContextEnabledChanged,
+        )
+        ToolCapabilityRow(
+            title = "Weather",
+            detail = "Weather by city or allowed current location",
+            toolNames = "get_weather",
+            enabled = settings.weatherContextEnabled,
+            onEnabledChanged = onWeatherContextEnabledChanged,
+        )
+        ToolCapabilityRow(
+            title = "Reminders",
+            detail = "Schedule local reminder notifications",
+            toolNames = "create_local_reminder",
+            enabled = settings.reminderToolEnabled,
+            onEnabledChanged = onReminderToolEnabledChanged,
+        )
+        ToolCapabilityRow(
+            title = "Notifications",
+            detail = "Allow Aura to post local reminders",
+            toolNames = "Android notification permission",
+            enabled = settings.notificationEnabled,
+            onEnabledChanged = onNotificationEnabledChanged,
+        )
+        ToolCapabilityRow(
+            title = "Memory, mood, relationship",
+            detail = "Local memory and companion state updates",
+            toolNames = "save_memory · search_memory · update_mood · update_relationship",
+            enabled = true,
+            locked = true,
+            onEnabledChanged = {},
+        )
+    }
+}
+
+@Composable
+private fun ToolCapabilityRow(
+    title: String,
+    detail: String,
+    toolNames: String,
+    enabled: Boolean,
+    locked: Boolean = false,
+    onEnabledChanged: (Boolean) -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = toolNames,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (locked) {
+                Text(
+                    text = "Always on",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChanged,
+                )
             }
         }
     }

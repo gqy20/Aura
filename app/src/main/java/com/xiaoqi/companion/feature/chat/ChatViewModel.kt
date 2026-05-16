@@ -22,6 +22,7 @@ import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -35,6 +36,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -51,6 +53,7 @@ class ChatViewModel @Inject constructor(
     private val memoryDao: MemoryDao,
     private val agentStateDao: AgentStateDao,
     private val presenceController: PresenceController,
+    private val appPreferences: AppPreferences,
 ) : ViewModel() {
 
     companion object {
@@ -95,6 +98,26 @@ class ChatViewModel @Inject constructor(
                         ).withPresence()
                     }
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            combine(
+                appPreferences.deviceStatusContextEnabled,
+                appPreferences.locationContextEnabled,
+                appPreferences.weatherContextEnabled,
+                appPreferences.reminderToolEnabled,
+                appPreferences.notificationEnabled,
+            ) { deviceStatus, location, weather, reminder, notification ->
+                ChatToolCapabilitySettings(
+                    deviceStatusEnabled = deviceStatus,
+                    locationContextEnabled = location,
+                    weatherContextEnabled = weather,
+                    reminderToolEnabled = reminder,
+                    notificationEnabled = notification,
+                )
+            }.collect { settings ->
+                _uiState.update { state -> state.copy(toolCapabilitySettings = settings) }
             }
         }
 
@@ -459,6 +482,26 @@ class ChatViewModel @Inject constructor(
 
     fun updateSettingsModelName(value: String) {
         _uiState.update { it.copy(settingsModelName = value, settingsMessage = null) }
+    }
+
+    fun setDeviceStatusContextEnabled(value: Boolean) {
+        viewModelScope.launch { appPreferences.setDeviceStatusContextEnabled(value) }
+    }
+
+    fun setLocationContextEnabled(value: Boolean) {
+        viewModelScope.launch { appPreferences.setLocationContextEnabled(value) }
+    }
+
+    fun setWeatherContextEnabled(value: Boolean) {
+        viewModelScope.launch { appPreferences.setWeatherContextEnabled(value) }
+    }
+
+    fun setReminderToolEnabled(value: Boolean) {
+        viewModelScope.launch { appPreferences.setReminderToolEnabled(value) }
+    }
+
+    fun setNotificationEnabled(value: Boolean) {
+        viewModelScope.launch { appPreferences.setNotificationEnabled(value) }
     }
 
     fun saveSettings() {
