@@ -65,13 +65,60 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release
+          apk_name="aura-v${{ steps.version.outputs.VERSION }}-android-release.apk"
+          cp app/build/outputs/apk/release/app-release.apk "release/${apk_name}"
+          (cd release && sha256sum "${apk_name}" > checksums.txt)
+
+      - name: Build release notes
+        run: |
+          version="${{ steps.version.outputs.VERSION }}"
+          tag="${{ github.ref_name }}"
+          notes_file="release-notes.md"
+          changelog_body="$(awk -v version="$version" '
+            $0 ~ "^## \\[" version "\\]" { capture=1; next }
+            capture && $0 ~ "^## \\[" { exit }
+            capture { print }
+          ' CHANGLOG.md | sed '/^[[:space:]]*$/N;/^\n$/D')"
+
+          if [ -z "$changelog_body" ]; then
+            changelog_body="本次发布。"
+          fi
+
+          cat > "$notes_file" << EOF
+          ## Aura ${tag}
+
+          Android AI 陪伴应用 · 文本聊天技术闭环 / Phase 1 agent tools
+
+          ### 下载
+
+          | 类型 | 文件 | 说明 |
+          |------|------|------|
+          | Android Release APK | \`aura-${tag}-android-release.apk\` | 已签名 release APK，适合真机安装测试 |
+          | 校验和 | \`checksums.txt\` | SHA-256 |
+
+          > 下载后可用 \`certutil -hashfile <文件> SHA256\`（Windows）或 \`sha256sum <文件>\`（Linux/macOS）与 \`checksums.txt\` 对比验证完整性。
+
+          ### 更新内容
+
+          ${changelog_body}
+
+          ---
+
+          安装与项目说明见 [README](https://github.com/${{ github.repository }}/blob/master/README.md) · [完整 CHANGLOG](https://github.com/${{ github.repository }}/blob/master/CHANGLOG.md)
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Aura ${{ steps.version.outputs.VERSION }}
+          name: Aura ${{ github.ref_name }}
           draft: true
-          generate_release_notes: true
-          files: app/build/outputs/apk/release/*.apk
+          body_path: release-notes.md
+          files: |
+            release/aura-v${{ steps.version.outputs.VERSION }}-android-release.apk
+            release/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
