@@ -1,0 +1,29 @@
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+  - commit-msg
+
+repos:
+  - repo: local
+    hooks:
+      - id: aura-file-sanity
+        name: Aura file sanity checks
+        entry: python scripts/hooks/check_files.py
+        language: system
+        stages: [pre-commit]
+        pass_filenames: true
+
+      - id: aura-commit-message
+        name: Aura conventional commit message
+        entry: python scripts/hooks/check_commit_msg.py
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true
+
+      - id: aura-unit-tests
+        name: Aura debug unit tests
+        entry: python scripts/hooks/run_gradle.py cleanTestDebugUnitTest testDebugUnitTest --stacktrace
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
