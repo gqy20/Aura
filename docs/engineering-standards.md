@@ -473,7 +473,7 @@ main (受保护)
   │     │
   │     └── fix/pulse-decay-bug
   │
-  └── release/1.0.0 (发布分支)
+  └── release/x.y.z (发布分支)
 ```
 
 | 分支 | 用途 | 保护规则 |
