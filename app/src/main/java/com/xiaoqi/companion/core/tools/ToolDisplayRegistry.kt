@@ -18,6 +18,12 @@ class ToolDisplayRegistry @Inject constructor() {
         when (toolName) {
             "save_memory" -> ToolDisplayLabels("Saving memory", "Memory saved", "Memory save failed")
             "search_memory" -> ToolDisplayLabels("Searching memory", "Memory searched", "Memory search failed")
+            "get_current_time" -> ToolDisplayLabels("Checking time", "Time checked", "Time check failed")
+            "get_recent_interaction_context" -> ToolDisplayLabels(
+                "Checking recent activity",
+                "Recent activity checked",
+                "Recent activity check failed",
+            )
             "update_mood" -> ToolDisplayLabels("Updating mood", "Mood updated", "Mood update failed")
             "update_relationship" -> ToolDisplayLabels(
                 "Updating relationship",

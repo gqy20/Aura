@@ -13,6 +13,11 @@ class ToolDisplayRegistryTest {
         assertEquals("Saving memory", registry.label("save_memory", ToolCallStatus.STARTED))
         assertEquals("Memory saved", registry.label("save_memory", ToolCallStatus.SUCCEEDED))
         assertEquals("Searching memory", registry.label("search_memory", ToolCallStatus.STARTED))
+        assertEquals("Time checked", registry.label("get_current_time", ToolCallStatus.SUCCEEDED))
+        assertEquals(
+            "Recent activity check failed",
+            registry.label("get_recent_interaction_context", ToolCallStatus.FAILED),
+        )
         assertEquals("Mood updated", registry.label("update_mood", ToolCallStatus.SUCCEEDED))
         assertEquals("Relationship update failed", registry.label("update_relationship", ToolCallStatus.FAILED))
     }
