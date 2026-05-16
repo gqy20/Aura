@@ -11,7 +11,9 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogFieldSanitizer
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.PresenceController
+import com.xiaoqi.companion.core.presence.PresenceEvent
 import com.xiaoqi.companion.core.presence.PresenceInputs
+import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.converter.MessageRole
@@ -54,10 +56,13 @@ class ChatViewModel @Inject constructor(
     companion object {
         private const val DEFAULT_SESSION_ID = "default"
         private const val RECENT_TOOL_CALL_LIMIT = 3
+        private const val PRESENCE_REACTION_DURATION_MS = 1_300L
         private const val STREAMING_IDLE_TIMEOUT_MS = 30_000L
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())
+    private var presenceReactionJob: Job? = null
+
     val uiState: StateFlow<ChatUiState> = _uiState
         .map { it.withPresence() }
         .stateIn(
@@ -113,8 +118,29 @@ class ChatViewModel @Inject constructor(
 
         viewModelScope.launch {
             toolCallRepository.observeBySession(DEFAULT_SESSION_ID).collect { calls ->
+                var shouldClearReaction = false
                 _uiState.update { state ->
-                    state.copy(toolCalls = calls.take(RECENT_TOOL_CALL_LIMIT).map { it.toChatToolCall() }).withPresence()
+                    val visibleCalls = calls.take(RECENT_TOOL_CALL_LIMIT).map { it.toChatToolCall() }
+                    val previousLatest = state.toolCalls.firstOrNull()
+                    val nextLatest = visibleCalls.firstOrNull()
+                    val reaction = nextLatest
+                        ?.takeIf { previousLatest?.id != it.id || previousLatest.toolStatus != it.toolStatus }
+                        ?.let {
+                            presenceController.reactionFor(
+                                PresenceEvent.ToolChanged(
+                                    name = it.toolName,
+                                    status = it.toolStatus,
+                                )
+                            )
+                        }
+                    shouldClearReaction = reaction != null
+                    state.copy(
+                        toolCalls = visibleCalls,
+                        presenceReaction = reaction ?: state.presenceReaction,
+                    ).withPresence()
+                }
+                if (shouldClearReaction) {
+                    clearPresenceReactionLater()
                 }
             }
         }
@@ -344,6 +370,10 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
 
+    fun onPresenceTapped() {
+        triggerPresenceReaction(presenceController.reactionFor(PresenceEvent.UserTapped))
+    }
+
     fun openMemoryRoom() {
         _uiState.update { it.copy(isMemoryRoomOpen = true) }
     }
@@ -546,11 +576,25 @@ class ChatViewModel @Inject constructor(
                     isStreaming = hasStreamingAssistant,
                     latestToolName = latestTool?.toolName,
                     latestToolStatus = latestTool?.toolStatus,
+                    reaction = presenceReaction,
                     hasError = error != null,
                     hasInputText = inputText.isNotBlank(),
                     hasPendingImage = pendingImage != null,
                 )
             )
         )
+    }
+
+    private fun triggerPresenceReaction(reaction: PresenceReaction) {
+        _uiState.update { it.copy(presenceReaction = reaction).withPresence() }
+        clearPresenceReactionLater()
+    }
+
+    private fun clearPresenceReactionLater() {
+        presenceReactionJob?.cancel()
+        presenceReactionJob = viewModelScope.launch {
+            delay(PRESENCE_REACTION_DURATION_MS)
+            _uiState.update { it.copy(presenceReaction = null).withPresence() }
+        }
     }
 }

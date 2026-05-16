@@ -16,8 +16,27 @@ enum class PresenceMode {
     ERROR,
 }
 
+enum class PresenceReaction {
+    TOUCH_NUZZLE,
+    MEMORY_SPARK,
+    SEARCH_SWEEP,
+    RETURN_BLINK,
+    ERROR_RECOVER,
+}
+
+sealed class PresenceEvent {
+    data object UserTapped : PresenceEvent()
+    data object AppReturned : PresenceEvent()
+    data class ToolChanged(
+        val name: String,
+        val status: ToolCallStatus,
+    ) : PresenceEvent()
+    data object ErrorShown : PresenceEvent()
+}
+
 data class PresenceUiState(
     val mode: PresenceMode = PresenceMode.IDLE,
+    val reaction: PresenceReaction? = null,
     val mood: String = "neutral",
     val intensity: Float = 0.5f,
     val relationshipLevel: Float = 0f,
@@ -32,6 +51,7 @@ data class PresenceInputs(
     val isStreaming: Boolean,
     val latestToolName: String? = null,
     val latestToolStatus: ToolCallStatus? = null,
+    val reaction: PresenceReaction? = null,
     val hasError: Boolean = false,
     val hasInputText: Boolean = false,
     val hasPendingImage: Boolean = false,

@@ -65,12 +65,34 @@ class PresenceControllerTest {
         assertEquals(PresenceMode.SAD, state.mode)
     }
 
+    @Test
+    fun derive_whenReactionProvided_keepsReaction() {
+        val state = controller.derive(inputs(reaction = PresenceReaction.TOUCH_NUZZLE))
+
+        assertEquals(PresenceReaction.TOUCH_NUZZLE, state.reaction)
+    }
+
+    @Test
+    fun reactionFor_whenUserTapped_returnsTouchNuzzle() {
+        assertEquals(PresenceReaction.TOUCH_NUZZLE, controller.reactionFor(PresenceEvent.UserTapped))
+    }
+
+    @Test
+    fun reactionFor_whenMemorySaved_returnsMemorySpark() {
+        val reaction = controller.reactionFor(
+            PresenceEvent.ToolChanged("save_memory", ToolCallStatus.SUCCEEDED)
+        )
+
+        assertEquals(PresenceReaction.MEMORY_SPARK, reaction)
+    }
+
     private fun inputs(
         mood: String = "neutral",
         isLoading: Boolean = false,
         isStreaming: Boolean = false,
         latestToolName: String? = null,
         latestToolStatus: ToolCallStatus? = null,
+        reaction: PresenceReaction? = null,
         hasError: Boolean = false,
         hasInputText: Boolean = false,
         hasPendingImage: Boolean = false,
@@ -82,6 +104,7 @@ class PresenceControllerTest {
         isStreaming = isStreaming,
         latestToolName = latestToolName,
         latestToolStatus = latestToolStatus,
+        reaction = reaction,
         hasError = hasError,
         hasInputText = hasInputText,
         hasPendingImage = hasPendingImage,

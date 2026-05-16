@@ -82,6 +82,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onSaveSettings = { viewModel.saveSettings() },
         onAttachImage = { viewModel.attachImage(it.toString()) },
         onRemoveImage = { viewModel.removePendingImage() },
+        onPresenceTapped = { viewModel.onPresenceTapped() },
     )
 }
 
@@ -101,6 +102,7 @@ fun ChatScreenContent(
     onSaveSettings: () -> Unit,
     onAttachImage: (Uri) -> Unit,
     onRemoveImage: () -> Unit,
+    onPresenceTapped: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -134,6 +136,7 @@ fun ChatScreenContent(
                 memories = uiState.memories,
                 onOpenMemoryRoom = onOpenMemoryRoom,
                 onOpenSettings = onOpenSettings,
+                onPresenceTapped = onPresenceTapped,
             )
             if (messages.isEmpty()) {
                 Box(
@@ -249,6 +252,7 @@ private fun CompanionHeader(
     memories: List<ChatMemory>,
     onOpenMemoryRoom: () -> Unit,
     onOpenSettings: () -> Unit,
+    onPresenceTapped: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -267,7 +271,10 @@ private fun CompanionHeader(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PresenceAvatar(presence = presence)
+                PresenceAvatar(
+                    presence = presence,
+                    onClick = onPresenceTapped,
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Aura",

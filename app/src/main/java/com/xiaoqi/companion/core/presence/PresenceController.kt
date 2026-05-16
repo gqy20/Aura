@@ -25,12 +25,26 @@ class PresenceController @Inject constructor() {
 
         return PresenceUiState(
             mode = mode,
+            reaction = inputs.reaction,
             mood = normalizedMood,
             intensity = inputs.intensity.coerceIn(0f, 1f),
             relationshipLevel = inputs.relationshipLevel.coerceIn(0f, 1f),
             label = mode.labelFor(normalizedMood),
         )
     }
+
+    fun reactionFor(event: PresenceEvent): PresenceReaction =
+        when (event) {
+            PresenceEvent.UserTapped -> PresenceReaction.TOUCH_NUZZLE
+            PresenceEvent.AppReturned -> PresenceReaction.RETURN_BLINK
+            PresenceEvent.ErrorShown -> PresenceReaction.ERROR_RECOVER
+            is PresenceEvent.ToolChanged -> when {
+                event.status == ToolCallStatus.SUCCEEDED && event.name.isMemoryWrite() -> PresenceReaction.MEMORY_SPARK
+                event.status == ToolCallStatus.STARTED && event.name.isMemorySearch() -> PresenceReaction.SEARCH_SWEEP
+                event.status == ToolCallStatus.FAILED -> PresenceReaction.ERROR_RECOVER
+                else -> PresenceReaction.RETURN_BLINK
+            }
+        }
 
     private fun String?.isMemorySearch(): Boolean =
         this == "search_memory"

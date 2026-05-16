@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.resetMain
@@ -382,6 +383,21 @@ class ChatViewModelTest {
         )
 
         assertEquals(PresenceMode.SEARCHING, viewModel.uiState.value.presence.mode)
+    }
+
+    @Test
+    fun onPresenceTapped_setsTemporaryTouchReaction() = runTest {
+        viewModel.onPresenceTapped()
+
+        assertEquals(
+            com.xiaoqi.companion.core.presence.PresenceReaction.TOUCH_NUZZLE,
+            viewModel.uiState.value.presence.reaction,
+        )
+
+        advanceTimeBy(1_301L)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.presence.reaction)
     }
 
     @Test

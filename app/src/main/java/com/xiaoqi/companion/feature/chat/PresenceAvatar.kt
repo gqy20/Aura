@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.xiaoqi.companion.core.presence.PresenceMode
+import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import kotlin.math.sin
 
@@ -32,6 +34,7 @@ import kotlin.math.sin
 fun PresenceAvatar(
     presence: PresenceUiState,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
 ) {
     val transition = rememberInfiniteTransition(label = "presence")
     val breath by transition.animateFloat(
@@ -54,17 +57,26 @@ fun PresenceAvatar(
     )
 
     val palette = presence.palette()
+    val reactionScale = when (presence.reaction) {
+        PresenceReaction.TOUCH_NUZZLE -> 1.08f + sin(pulse * 6.28f) * 0.018f
+        PresenceReaction.RETURN_BLINK -> 1.03f
+        PresenceReaction.MEMORY_SPARK -> 1.05f
+        PresenceReaction.SEARCH_SWEEP -> 1.02f
+        PresenceReaction.ERROR_RECOVER -> 0.98f + sin(pulse * 6.28f) * 0.012f
+        null -> 1f
+    }
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(54.dp)
+            .clickable(onClick = onClick)
             .semantics { contentDescription = presence.label },
     ) {
         Canvas(
             modifier = Modifier
                 .size(54.dp)
-                .scale(if (presence.mode == PresenceMode.SPEAKING) 1f + sin(pulse * 6.28f) * 0.025f else breath),
+                .scale((if (presence.mode == PresenceMode.SPEAKING) 1f + sin(pulse * 6.28f) * 0.025f else breath) * reactionScale),
         ) {
             val w = size.width
             val h = size.height
@@ -98,6 +110,7 @@ fun PresenceAvatar(
 
             drawPresenceEyes(
                 mode = presence.mode,
+                reaction = presence.reaction,
                 color = palette.feature,
                 pulse = pulse,
                 width = w,
@@ -116,6 +129,13 @@ fun PresenceAvatar(
                 drawCircle(dotColor.copy(alpha = 0.72f), w * 0.045f, Offset(w * (0.23f + pulse * 0.08f), h * 0.24f))
                 drawCircle(dotColor.copy(alpha = 0.52f), w * 0.032f, Offset(w * (0.78f - pulse * 0.06f), h * 0.74f))
             }
+            drawPresenceReaction(
+                reaction = presence.reaction,
+                palette = palette,
+                pulse = pulse,
+                width = w,
+                height = h,
+            )
         }
     }
 }
@@ -186,6 +206,7 @@ private fun PresenceUiState.palette(): PresencePalette {
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPresenceEyes(
     mode: PresenceMode,
+    reaction: PresenceReaction?,
     color: Color,
     pulse: Float,
     width: Float,
@@ -194,12 +215,17 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPresenceEyes(
     val eyeY = height * 0.43f
     val leftX = width * 0.38f
     val rightX = width * 0.62f
-    when (mode) {
-        PresenceMode.SLEEPING, PresenceMode.TIRED -> {
+    when {
+        reaction == PresenceReaction.RETURN_BLINK || reaction == PresenceReaction.TOUCH_NUZZLE -> {
+            val openness = if (pulse < 0.45f) 0.02f else 0.09f
+            drawOval(color, Offset(leftX - width * 0.04f, eyeY - height * openness / 2f), Size(width * 0.08f, height * openness))
+            drawOval(color, Offset(rightX - width * 0.04f, eyeY - height * openness / 2f), Size(width * 0.08f, height * openness))
+        }
+        mode == PresenceMode.SLEEPING || mode == PresenceMode.TIRED -> {
             drawLine(color, Offset(width * 0.31f, eyeY), Offset(width * 0.45f, eyeY + height * 0.025f), strokeWidth = width * 0.035f, cap = StrokeCap.Round)
             drawLine(color, Offset(width * 0.55f, eyeY + height * 0.025f), Offset(width * 0.69f, eyeY), strokeWidth = width * 0.035f, cap = StrokeCap.Round)
         }
-        PresenceMode.HAPPY -> {
+        mode == PresenceMode.HAPPY -> {
             drawArc(
                 color = color,
                 startAngle = 195f,
@@ -219,7 +245,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPresenceEyes(
                 style = Stroke(width * 0.035f, cap = StrokeCap.Round),
             )
         }
-        PresenceMode.THINKING, PresenceMode.SEARCHING -> {
+        mode == PresenceMode.THINKING || mode == PresenceMode.SEARCHING || reaction == PresenceReaction.SEARCH_SWEEP -> {
             val offset = (pulse - 0.5f) * width * 0.045f
             drawCircle(color, width * 0.035f, Offset(leftX + offset, eyeY))
             drawCircle(color, width * 0.035f, Offset(rightX + offset, eyeY))
@@ -228,6 +254,47 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPresenceEyes(
             drawOval(color, Offset(leftX - width * 0.035f, eyeY - height * 0.045f), Size(width * 0.07f, height * 0.09f))
             drawOval(color, Offset(rightX - width * 0.035f, eyeY - height * 0.045f), Size(width * 0.07f, height * 0.09f))
         }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPresenceReaction(
+    reaction: PresenceReaction?,
+    palette: PresencePalette,
+    pulse: Float,
+    width: Float,
+    height: Float,
+) {
+    when (reaction) {
+        PresenceReaction.MEMORY_SPARK -> {
+            val radius = width * (0.04f + pulse * 0.04f)
+            drawCircle(palette.glow.copy(alpha = 0.82f - pulse * 0.35f), radius, Offset(width * 0.74f, height * 0.24f))
+            drawCircle(palette.accent.copy(alpha = 0.62f), width * 0.026f, Offset(width * (0.68f - pulse * 0.18f), height * (0.3f + pulse * 0.28f)))
+        }
+        PresenceReaction.SEARCH_SWEEP -> {
+            val x = width * (0.22f + pulse * 0.56f)
+            drawLine(
+                color = palette.accent.copy(alpha = 0.34f),
+                start = Offset(x, height * 0.22f),
+                end = Offset(x + width * 0.08f, height * 0.78f),
+                strokeWidth = width * 0.025f,
+                cap = StrokeCap.Round,
+            )
+        }
+        PresenceReaction.TOUCH_NUZZLE -> {
+            drawCircle(palette.glow.copy(alpha = 0.28f), width * 0.08f, Offset(width * 0.82f, height * 0.34f))
+        }
+        PresenceReaction.ERROR_RECOVER -> {
+            drawArc(
+                color = palette.accent.copy(alpha = 0.5f),
+                startAngle = -20f,
+                sweepAngle = 220f * pulse,
+                useCenter = false,
+                topLeft = Offset(width * 0.2f, height * 0.17f),
+                size = Size(width * 0.6f, height * 0.66f),
+                style = Stroke(width * 0.024f, cap = StrokeCap.Round),
+            )
+        }
+        PresenceReaction.RETURN_BLINK, null -> Unit
     }
 }
 
