@@ -100,14 +100,18 @@ private class KoogPromptExecutorWrapper(
                 hasStreamingText = true
                 trySend(KoogAgentEvent.TextDelta(text))
             }
+
+            override fun onTextComplete(text: String) {
+                if (!hasStreamingText && text.isNotBlank()) {
+                    hasStreamingText = true
+                    trySend(KoogAgentEvent.TextDelta(text))
+                }
+            }
         }
 
         val job = launch {
             try {
-                val response = createAgent(prompt, observer).run(prompt.userMessage)
-                if (!hasStreamingText) {
-                    trySend(KoogAgentEvent.TextDelta(response))
-                }
+                createAgent(prompt, observer).run(prompt.userMessage)
                 close()
             } catch (e: Throwable) {
                 close(e)
@@ -192,6 +196,7 @@ private class KoogPromptExecutorWrapper(
                     onLLMStreamingFrameReceived { context ->
                         when (val frame = context.streamFrame) {
                             is StreamFrame.TextDelta -> observer?.onTextDelta(frame.text)
+                            is StreamFrame.TextComplete -> observer?.onTextComplete(frame.text)
                             else -> Unit
                         }
                     }
@@ -243,6 +248,7 @@ private class KoogPromptExecutorWrapper(
 private interface KoogAgentObserver {
     fun onToolUpdated(call: AgentToolCall)
     fun onTextDelta(text: String)
+    fun onTextComplete(text: String)
 }
 
 private fun BuiltPrompt.toKoogAgentPrompt() = prompt("companion-chat") {

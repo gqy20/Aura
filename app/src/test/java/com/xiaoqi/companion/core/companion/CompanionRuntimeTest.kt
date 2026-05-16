@@ -65,11 +65,15 @@ class CompanionRuntimeTest {
         var responseText = "[mood:happy][intensity:0.7] 你好呀！"
         var shouldFail = false
         var emitToolEvents = false
+        var emitTextEvents = true
+        var runCallCount = 0
+        var runEventsCallCount = 0
 
         override fun create(config: com.xiaoqi.companion.data.repository.LlmConfig): KoogAgentWrapper {
             lastConfig = config
             return object : KoogAgentWrapper {
                 override suspend fun run(prompt: BuiltPrompt): String {
+                    runCallCount++
                     if (shouldFail) throw RuntimeException("API error")
                     return responseText
                 }
@@ -80,12 +84,15 @@ class CompanionRuntimeTest {
                 }
 
                 override fun runEvents(prompt: BuiltPrompt) = flow {
+                    runEventsCallCount++
                     if (shouldFail) throw RuntimeException("API error")
                     if (emitToolEvents) {
                         emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)))
                         emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
                     }
-                    emit(KoogAgentEvent.TextDelta(responseText))
+                    if (emitTextEvents) {
+                        emit(KoogAgentEvent.TextDelta(responseText))
+                    }
                 }
             }
         }
@@ -181,6 +188,21 @@ class CompanionRuntimeTest {
             assertTrue(event is AgentEvent.Error)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun send_whenRunEventsHasNoText_doesNotFallbackToSecondRun() = runTest {
+        val factory = FakeKoogAgentFactory().apply { emitTextEvents = false }
+
+        makeRuntime(factory).send(UserInput.Text("hi")).test {
+            val event = awaitItem()
+            assertTrue(event is AgentEvent.Error)
+            assertTrue((event as AgentEvent.Error).error is AgentError.ParseError)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        assertEquals(1, factory.runEventsCallCount)
+        assertEquals(0, factory.runCallCount)
     }
 
     @Test

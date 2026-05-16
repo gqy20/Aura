@@ -85,9 +85,6 @@ open class CompanionRuntime @Inject constructor(
                         is KoogAgentEvent.ToolFinished -> trySend(AgentEvent.ToolFinished(event.name))
                     }
                 }
-                if (rawResponse.isEmpty()) {
-                    rawResponse = agent.run(prompt)
-                }
             }
             job.join()
 
@@ -97,29 +94,38 @@ open class CompanionRuntime @Inject constructor(
                 "responseLength" to rawResponse.length,
             )
 
-            val parsed = outputParser.parse(rawResponse)
-            messageRepository.saveAssistantMessage(
-                sessionId = DEFAULT_SESSION_ID,
-                content = parsed.textReply,
-            )
-            AppLogger.debug(
-                LogTags.Runtime,
-                "response_parsed",
-                "mood" to parsed.emotionSignal.mood,
-                "replyLength" to parsed.textReply.length,
-                "actionCount" to parsed.actions.size,
-            )
+            if (rawResponse.isBlank()) {
+                AppLogger.warn(
+                    LogTags.Runtime,
+                    "empty_model_response",
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+                trySend(AgentEvent.Error(AgentError.ParseError("Empty model response")))
+            } else {
+                val parsed = outputParser.parse(rawResponse)
+                messageRepository.saveAssistantMessage(
+                    sessionId = DEFAULT_SESSION_ID,
+                    content = parsed.textReply,
+                )
+                AppLogger.debug(
+                    LogTags.Runtime,
+                    "response_parsed",
+                    "mood" to parsed.emotionSignal.mood,
+                    "replyLength" to parsed.textReply.length,
+                    "actionCount" to parsed.actions.size,
+                )
 
-            emotionMachine.feed(parsed.emotionSignal)
-            relationshipModel.update(parsed.interactionSignal)
+                emotionMachine.feed(parsed.emotionSignal)
+                relationshipModel.update(parsed.interactionSignal)
 
-            AppLogger.info(
-                LogTags.Runtime,
-                "pipeline_completed",
-                "durationMs" to (System.currentTimeMillis() - startedAt),
-                "replyLength" to parsed.textReply.length,
-            )
-            trySend(AgentEvent.Complete(parsed))
+                AppLogger.info(
+                    LogTags.Runtime,
+                    "pipeline_completed",
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                    "replyLength" to parsed.textReply.length,
+                )
+                trySend(AgentEvent.Complete(parsed))
+            }
         } catch (e: Exception) {
             AppLogger.error(
                 LogTags.Runtime,

@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -101,6 +102,8 @@ class ChatViewModelTest {
         var shouldFail = false
         var emitToolEvents = false
         var emitStreaming = false
+        var streamingDeltas: List<String> = emptyList()
+        var completeDelayMs = 0L
         var sendCalled = false
         var lastInput: UserInput? = null
 
@@ -116,6 +119,12 @@ class ChatViewModelTest {
                 }
                 if (emitStreaming) {
                     emit(AgentEvent.Streaming("hello"))
+                }
+                streamingDeltas.forEach { delta ->
+                    emit(AgentEvent.Streaming(delta))
+                }
+                if (completeDelayMs > 0L) {
+                    delay(completeDelayMs)
                 }
                 val parsed = OutputParser().parse(rawResponse)
                 emit(AgentEvent.Complete(parsed))
@@ -374,6 +383,23 @@ class ChatViewModelTest {
 
         assertEquals(PresenceMode.HAPPY, viewModel.uiState.value.presence.mode)
         assertTrue(viewModel.uiState.value.messages.any { it.role == "ASSISTANT" })
+    }
+
+    @Test
+    fun sendMessage_batchesSmallStreamingDeltas() = runTest {
+        fakeRuntime.rawResponse = "abc"
+        fakeRuntime.streamingDeltas = listOf("a", "b", "c")
+        fakeRuntime.completeDelayMs = 200L
+
+        viewModel.sendMessage("hello")
+
+        assertEquals("a", viewModel.uiState.value.messages.last { it.role == "ASSISTANT" }.content)
+
+        advanceTimeBy(49L)
+
+        assertEquals("abc", viewModel.uiState.value.messages.last { it.role == "ASSISTANT" }.content)
+
+        advanceUntilIdle()
     }
 
     @Test

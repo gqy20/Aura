@@ -146,6 +146,26 @@ class KoogAgentFactoryImplTest {
     }
 
     @Test
+    fun runEvents_whenStreamOnlyCompletes_emitsCompleteTextOnce() = runTest {
+        val executor = CompleteOnlyPromptExecutor()
+        val factory = KoogAgentFactoryImpl(
+            executorFactory = object : KoogPromptExecutorFactory {
+                override fun create(config: LlmConfig): PromptExecutor = executor
+            },
+            toolCallRecorder = toolCallRecorder,
+            toolRegistry = object : AgentToolRegistry {
+                override fun create(): ToolRegistry = ToolRegistry.EMPTY
+            },
+        )
+
+        val events = factory.create(testConfig).runEvents(
+            BuiltPrompt(systemPrompt = "system", userMessage = "hello")
+        ).toList()
+
+        assertEquals(listOf(KoogAgentEvent.TextDelta("complete only")), events)
+    }
+
+    @Test
     fun run_withVisionPromptDisablesTools() = runTest {
         val executor = VisionPromptExecutor()
         val factory = KoogAgentFactoryImpl(
@@ -219,6 +239,30 @@ class KoogAgentFactoryImplTest {
                     .asFlow()
             }
         }
+
+        override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
+            ModerationResult(isHarmful = false, categories = emptyMap())
+
+        override fun close() = Unit
+    }
+
+    private class CompleteOnlyPromptExecutor : PromptExecutor() {
+        override suspend fun execute(
+            prompt: Prompt,
+            model: LLModel,
+            tools: List<ToolDescriptor>,
+        ): List<Message.Response> =
+            listOf(Message.Assistant("complete only", ResponseMetaInfo(Clock.System.now())))
+
+        override fun executeStreaming(
+            prompt: Prompt,
+            model: LLModel,
+            tools: List<ToolDescriptor>,
+        ): Flow<StreamFrame> =
+            listOf(
+                StreamFrame.TextComplete("complete only", null),
+                StreamFrame.End(null, ResponseMetaInfo(Clock.System.now())),
+            ).asFlow()
 
         override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
             ModerationResult(isHarmful = false, categories = emptyMap())

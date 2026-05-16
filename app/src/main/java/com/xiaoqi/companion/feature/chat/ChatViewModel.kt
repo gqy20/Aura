@@ -58,6 +58,8 @@ class ChatViewModel @Inject constructor(
         private const val RECENT_TOOL_CALL_LIMIT = 3
         private const val PRESENCE_REACTION_DURATION_MS = 1_300L
         private const val STREAMING_IDLE_TIMEOUT_MS = 30_000L
+        private const val STREAMING_RENDER_BATCH_MS = 48L
+        private const val STREAMING_RENDER_BATCH_CHARS = 24
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -233,6 +235,9 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val assistantId = UUID.randomUUID().toString()
             var assistantContent = ""
+            var visibleAssistantContent = ""
+            val pendingStreamingContent = StringBuilder()
+            var streamingRenderJob: Job? = null
             var idleTimeoutJob: Job? = null
             var timedOut = false
 
@@ -251,8 +256,33 @@ class ChatViewModel @Inject constructor(
                 }
             }
 
+            fun flushStreamingContent() {
+                if (pendingStreamingContent.isEmpty()) return
+                visibleAssistantContent += pendingStreamingContent.toString()
+                pendingStreamingContent.clear()
+                updateAssistantMessage(assistantId) {
+                    it.copy(content = visibleAssistantContent)
+                }
+            }
+
+            fun scheduleStreamingRender() {
+                if (visibleAssistantContent.isBlank() || pendingStreamingContent.length >= STREAMING_RENDER_BATCH_CHARS) {
+                    streamingRenderJob?.cancel()
+                    streamingRenderJob = null
+                    flushStreamingContent()
+                    return
+                }
+                if (streamingRenderJob?.isActive == true) return
+                streamingRenderJob = launch {
+                    delay(STREAMING_RENDER_BATCH_MS)
+                    flushStreamingContent()
+                    streamingRenderJob = null
+                }
+            }
+
             fun finishWithError(message: String) {
                 idleTimeoutJob?.cancel()
+                streamingRenderJob?.cancel()
                 _uiState.update { state ->
                     state.copy(
                         messages = state.messages.filter { it.id != assistantId },
@@ -289,9 +319,8 @@ class ChatViewModel @Inject constructor(
                         is AgentEvent.Streaming -> {
                             resetIdleTimer()
                             assistantContent += event.delta
-                            updateAssistantMessage(assistantId) {
-                                it.copy(content = assistantContent)
-                            }
+                            pendingStreamingContent.append(event.delta)
+                            scheduleStreamingRender()
                         }
                         is AgentEvent.ToolCallUpdated -> {
                             updateAssistantToolStatus(
@@ -313,6 +342,8 @@ class ChatViewModel @Inject constructor(
                         }
                         is AgentEvent.Complete -> {
                             idleTimeoutJob?.cancel()
+                            streamingRenderJob?.cancel()
+                            flushStreamingContent()
                             AppLogger.info(
                                 LogTags.Chat,
                                 "message_send_completed",
