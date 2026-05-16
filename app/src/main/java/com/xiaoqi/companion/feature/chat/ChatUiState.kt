@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.feature.chat
 
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
+import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 
 data class ChatMessage(
@@ -14,6 +16,8 @@ data class ChatMessage(
 
 data class ChatToolCall(
     val id: String,
+    val toolName: String,
+    val toolStatus: ToolCallStatus,
     val label: String,
     val status: String,
     val durationMs: Long? = null,
@@ -60,6 +64,7 @@ data class ChatUiState(
     val toolCalls: List<ChatToolCall> = emptyList(),
     val memories: List<ChatMemory> = emptyList(),
     val status: CompanionStatus = CompanionStatus(),
+    val presence: PresenceUiState = PresenceUiState(),
     val configStatus: ChatConfigStatus = ChatConfigStatus(),
     val isMemoryRoomOpen: Boolean = false,
     val isSettingsOpen: Boolean = false,

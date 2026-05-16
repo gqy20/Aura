@@ -10,6 +10,8 @@ import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogFieldSanitizer
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.core.presence.PresenceController
+import com.xiaoqi.companion.core.presence.PresenceInputs
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.converter.MessageRole
@@ -29,7 +31,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -43,6 +48,7 @@ class ChatViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val memoryDao: MemoryDao,
     private val agentStateDao: AgentStateDao,
+    private val presenceController: PresenceController,
 ) : ViewModel() {
 
     companion object {
@@ -53,12 +59,18 @@ class ChatViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
+        .map { it.withPresence() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = _uiState.value.withPresence(),
+        )
 
     init {
         viewModelScope.launch {
             configRepository.observeLlmConfigStatus().collect { status ->
                 _uiState.update { state ->
-                    state.copy(configStatus = status.toChatConfigStatus())
+                    state.copy(configStatus = status.toChatConfigStatus()).withPresence()
                 }
             }
         }
@@ -73,7 +85,7 @@ class ChatViewModel @Inject constructor(
                                 intensity = savedState.emotionVector.extractIntensity(),
                                 relationshipLevel = savedState.relationshipLevel,
                             )
-                        )
+                        ).withPresence()
                     }
                 }
             }
@@ -85,7 +97,7 @@ class ChatViewModel @Inject constructor(
                     if (state.isLoading || state.messages.any { it.isStreaming }) {
                         state
                     } else {
-                        state.copy(messages = messages.map { it.toChatMessage() })
+                        state.copy(messages = messages.map { it.toChatMessage() }).withPresence()
                     }
                 }
             }
@@ -94,7 +106,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             memoryDao.observeAll().collect { memories ->
                 _uiState.update { state ->
-                    state.copy(memories = memories.take(5).map { it.toChatMemory() })
+                    state.copy(memories = memories.take(5).map { it.toChatMemory() }).withPresence()
                 }
             }
         }
@@ -102,14 +114,14 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             toolCallRepository.observeBySession(DEFAULT_SESSION_ID).collect { calls ->
                 _uiState.update { state ->
-                    state.copy(toolCalls = calls.take(RECENT_TOOL_CALL_LIMIT).map { it.toChatToolCall() })
+                    state.copy(toolCalls = calls.take(RECENT_TOOL_CALL_LIMIT).map { it.toChatToolCall() }).withPresence()
                 }
             }
         }
     }
 
     fun updateInputText(text: String) {
-        _uiState.update { it.copy(inputText = text) }
+        _uiState.update { it.copy(inputText = text).withPresence() }
     }
 
     fun attachImage(uriString: String?) {
@@ -118,7 +130,7 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 isPreparingImage = true,
                 error = null,
-            )
+            ).withPresence()
         }
         viewModelScope.launch {
             try {
@@ -131,7 +143,7 @@ class ChatViewModel @Inject constructor(
                             mediaType = prepared.mediaType,
                         ),
                         isPreparingImage = false,
-                    )
+                    ).withPresence()
                 }
             } catch (e: Exception) {
                 AppLogger.warn(
@@ -151,7 +163,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun removePendingImage() {
-        _uiState.update { it.copy(pendingImage = null, isPreparingImage = false) }
+        _uiState.update { it.copy(pendingImage = null, isPreparingImage = false).withPresence() }
     }
 
     fun sendMessage(text: String) {
@@ -421,6 +433,8 @@ class ChatViewModel @Inject constructor(
     private fun ToolCallSnapshot.toChatToolCall(): ChatToolCall =
         ChatToolCall(
             id = id,
+            toolName = toolName,
+            toolStatus = status,
             label = toolDisplayRegistry.label(toolName, status),
             status = when (status) {
                 ToolCallStatus.STARTED -> "Running"
@@ -515,5 +529,28 @@ class ChatViewModel @Inject constructor(
             ?.getOrNull(1)
             ?.toFloatOrNull()
         return value?.coerceIn(0f, 1f) ?: 0.5f
+    }
+
+    private fun ChatUiState.withPresence(): ChatUiState {
+        val latestTool = toolCalls.firstOrNull()
+        val hasStreamingAssistant = messages.any {
+            it.role == "ASSISTANT" && it.isStreaming && it.content.isNotBlank()
+        }
+        return copy(
+            presence = presenceController.derive(
+                PresenceInputs(
+                    mood = status.mood,
+                    intensity = status.intensity,
+                    relationshipLevel = status.relationshipLevel,
+                    isLoading = isLoading || isPreparingImage,
+                    isStreaming = hasStreamingAssistant,
+                    latestToolName = latestTool?.toolName,
+                    latestToolStatus = latestTool?.toolStatus,
+                    hasError = error != null,
+                    hasInputText = inputText.isNotBlank(),
+                    hasPendingImage = pendingImage != null,
+                )
+            )
+        )
     }
 }

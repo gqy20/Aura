@@ -61,6 +61,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 
 @Composable
@@ -128,6 +129,7 @@ fun ChatScreenContent(
         ) {
             CompanionHeader(
                 status = uiState.status,
+                presence = uiState.presence,
                 configStatus = uiState.configStatus,
                 memories = uiState.memories,
                 onOpenMemoryRoom = onOpenMemoryRoom,
@@ -226,13 +228,13 @@ private fun EmptyChatState() {
             }
         }
         Text(
-            text = "奥拉在这里",
+            text = "Aura is here",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            text = "说一句今天的事，或者发张图给她看看。",
+            text = "Tell her what happened today, or send a picture.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -242,6 +244,7 @@ private fun EmptyChatState() {
 @Composable
 private fun CompanionHeader(
     status: CompanionStatus,
+    presence: PresenceUiState,
     configStatus: ChatConfigStatus,
     memories: List<ChatMemory>,
     onOpenMemoryRoom: () -> Unit,
@@ -264,29 +267,16 @@ private fun CompanionHeader(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = CircleShape,
-                    modifier = Modifier.size(38.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "A",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                }
+                PresenceAvatar(presence = presence)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "奥拉",
+                        text = "Aura",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "${status.mood} · ${status.relationshipLabel}",
+                        text = "${presence.label} · ${status.mood} · ${status.relationshipLabel}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -340,7 +330,7 @@ private fun ConfigStatusCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "需要配置模型",
+                    text = "Model setup needed",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -399,7 +389,7 @@ private fun SettingsDialog(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "API Key 只保存在本机。",
+                        text = "API keys stay on this device.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -428,8 +418,8 @@ private fun SettingsDialog(
 
                 Text(
                     text = when (provider) {
-                        LlmProvider.GLM -> "默认模型 glm-5v-turbo。"
-                        LlmProvider.KIMI -> "使用 Moonshot 兼容接口。"
+                        LlmProvider.GLM -> "Default model: glm-5v-turbo."
+                        LlmProvider.KIMI -> "Uses the Moonshot-compatible endpoint."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -499,7 +489,7 @@ private fun MemoryRoomDialog(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "奥拉记住的长期信息",
+                            text = "Long-term things Aura remembers",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -515,7 +505,7 @@ private fun MemoryRoomDialog(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = "还没有长期记忆",
+                            text = "No long-term memories yet",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -632,7 +622,7 @@ private fun InputBar(
                     value = inputText,
                     onValueChange = onInputTextChanged,
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("和奥拉说点什么") },
+                    placeholder = { Text("Talk to Aura") },
                     maxLines = 4,
                     shape = RoundedCornerShape(22.dp),
                 )

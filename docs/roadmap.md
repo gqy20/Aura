@@ -8,6 +8,8 @@
 
 项目当前处于 **文本聊天技术闭环 / Phase 1 agent tools** 阶段。
 
+同时已经开始规划 Phase 2+ 的端云协同智能体能力：Android 端继续承担亲密交互、本地状态和用户授权边界；远程 Agent Server 承担 MCP、浏览器工具、长期任务、云端记忆和 Skills 编排。详细方案见 `docs/plan/agent-capability-server-plan.md`，Vision 与 Agent tools 协同策略见 `docs/plan/vision-tools-plan.md`。产品表现层也开始转向 Presence Layer 思路：借鉴 Looi 一类陪伴设备的状态动画，但目标不是玩具化机器人，而是把 Aura 的情绪、关系、思考、工具调用和主动关怀变成可感知的细腻行为。
+
 已验证命令：
 
 ```bash
@@ -36,6 +38,7 @@
 - 聊天页提供模型设置弹层，可编辑 Provider、模型名称和本机 API Key。
 - 单元测试覆盖 core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI 等。
 - Debug APK 构建链路。
+- `docs/plan` 规划文档：已新增端云智能体能力整体方案与 Vision/tools 协同计划。
 
 ## 部分实现
 
@@ -44,6 +47,8 @@
 - **情绪与关系**：核心状态更新、持久化恢复和聊天页可视化已接入，但头像/表情层尚未完成。
 - **记忆**：工具保存/搜索、prompt 注入、聊天页只读展示和只读记忆房间弹层已实现，但还没有完整记忆管理能力。
 - **Release 构建**：ProGuard 与 debug 签名 fallback 已有，真实 release keystore 仍需验证。
+- **端云智能体能力**：总体方案已整理到 `docs/plan/agent-capability-server-plan.md`，但 Android 远程 runtime、Agent Server、MCP Gateway、Browser Worker、云端记忆、长期任务和 Skills 系统尚未实现。
+- **Presence Layer**：已明确产品方向，优先考虑 Rive 状态机 + Compose，把 idle/listening/thinking/speaking/searching/remembering/sleeping/return reaction 等状态接入现有情绪、关系、工具事件和 pulse；尚未实现动画资源、状态控制器和交互层。
 
 ## 尚未实现
 
@@ -54,8 +59,11 @@
 - `SpeechRecognizer` / `TextToSpeech` 语音输入输出。
 - WorkManager pulse、离线衰减、回归反应、主动通知。
 - 角色主屏、Lottie 表情层或更完整的陪伴感 UI。
+- Rive/Presence Layer 角色状态机、思考/说话/记忆/搜索等状态动画、触摸互动和回归反应动画。
 - 隐私、导出、删除数据等用户控制能力。
 - Instrumented UI 测试套件和 CI 工作流验证。
+- 远程 Agent Server 与 Android `RemoteAgentRuntime`。
+- MCP Gateway、Browser Worker、云端长期记忆、长期任务调度和 Skill Registry。
 
 ## 里程碑
 
@@ -99,6 +107,8 @@
 - 持久化情绪和关系快照，支持重启恢复。
 - 在聊天页或独立主页增加紧凑状态/头像展示。（状态持久化和聊天页状态条已完成，头像层待做）
 - 将 parsed mood/intensity 映射到可见 UI 状态。
+- 新增 `PresenceController` 雏形，把 mood、relationshipLevel、streaming/tool 状态映射为统一的角色表现状态。
+- 优先用 Rive 状态机验证 idle、listening、thinking、speaking、happy、sad、tired 等基础状态。
 - App 回到前台时补算时间衰减。
 - 补充持久化、衰减、关系阈值变化测试。
 
@@ -121,6 +131,8 @@
 - 实现离线情绪衰减和回归反应。
 - 添加通知权限流程。
 - 添加用户可选择的主动通知。
+- 将 idle、sleeping、return reaction、remembering、searching 等 Presence 状态接入 pulse、工具调用和用户回归事件。
+- 将工具调用从普通 loading 文案升级为角色行为反馈，例如搜索时观察、保存记忆时收纳、失败时困惑但可恢复。
 - 补充 worker 调度与状态更新测试。
 
 ### M6：产品化加固
@@ -133,6 +145,21 @@
 - 验证 release signing 和 shrinker 行为。
 - 在隐私预期清晰后再接入崩溃分析。
 
+### M7：端云 Agent 能力
+
+目标：让 Aura 从本地聊天 Agent 演进为可使用外部工具、浏览网页、执行长期任务的端云协同智能体。
+
+- 抽象 `AgentRuntime`，为本地 `CompanionRuntime` 和远程 `RemoteAgentRuntime` 留出切换入口。
+- 新增 `RemoteAgentService`，支持 HTTPS + SSE/WebSocket 的远程流式事件。
+- 搭建最小 Aura Agent Server，先支持文本输入、流式输出和只读远程工具。
+- 接入 MCP Gateway，按用户、场景和风险等级筛选工具。
+- 接入 Browser Worker，支持网页打开、搜索、正文提取、截图和总结。
+- 在 Android UI 中展示远程工具调用、浏览器结果和确认请求。
+- 建立云端 Memory Service，并设计本地/云端记忆同步策略。
+- 建立 Task Scheduler，支持提醒、网页监控、pulse、等待用户确认后恢复。
+- 增加 Skill Registry，把 prompt 片段、工具白名单、风险策略和场景触发组合为可管理能力。
+- 补充远程事件映射、确认流程、任务状态和安全策略测试。
+
 ## 近期建议顺序
 
 1. 设置页与 API key/model 配置。
@@ -141,6 +168,8 @@
 4. 情绪/关系持久化。
 5. CameraX 单张图片发送。
 6. WorkManager pulse。
+7. Presence Layer 雏形：`PresenceController` + Rive 状态机基础动画。
+8. 抽象 `AgentRuntime`，为后续远程 Agent/MCP/浏览器能力预留接入点。
 
 ## 维护规则
 

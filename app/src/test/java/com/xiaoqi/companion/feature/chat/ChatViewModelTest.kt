@@ -8,6 +8,8 @@ import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
+import com.xiaoqi.companion.core.presence.PresenceController
+import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
@@ -97,6 +99,7 @@ class ChatViewModelTest {
         var rawResponse = "[mood:happy][intensity:0.7] 你好呀！"
         var shouldFail = false
         var emitToolEvents = false
+        var emitStreaming = false
         var sendCalled = false
         var lastInput: UserInput? = null
 
@@ -109,6 +112,9 @@ class ChatViewModelTest {
                 if (emitToolEvents) {
                     emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)))
                     emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
+                }
+                if (emitStreaming) {
+                    emit(AgentEvent.Streaming("hello"))
                 }
                 val parsed = OutputParser().parse(rawResponse)
                 emit(AgentEvent.Complete(parsed))
@@ -150,6 +156,7 @@ class ChatViewModelTest {
             messageRepo,
             memoryDao,
             agentStateDao,
+            PresenceController(),
         )
     }
 
@@ -267,6 +274,7 @@ class ChatViewModelTest {
             messageRepo,
             memoryDao,
             agentStateDao,
+            PresenceController(),
         )
 
         blockedViewModel.sendMessage("hello")
@@ -348,6 +356,32 @@ class ChatViewModelTest {
 
         val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
         assertEquals("Memory saved", assistant.toolStatus)
+    }
+
+    @Test
+    fun updateInputText_setsPresenceToListening() = runTest {
+        viewModel.updateInputText("hello")
+
+        assertEquals(PresenceMode.LISTENING, viewModel.uiState.value.presence.mode)
+    }
+
+    @Test
+    fun sendMessage_streamingDelta_setsPresenceToSpeaking() = runTest {
+        fakeRuntime.emitStreaming = true
+
+        viewModel.sendMessage("hello")
+
+        assertEquals(PresenceMode.HAPPY, viewModel.uiState.value.presence.mode)
+        assertTrue(viewModel.uiState.value.messages.any { it.role == "ASSISTANT" })
+    }
+
+    @Test
+    fun toolRepositoryRunningSearch_setsPresenceToSearching() = runTest {
+        toolCallRepository.calls.value = listOf(
+            toolCallSnapshot("search", "search_memory", ToolCallStatus.STARTED),
+        )
+
+        assertEquals(PresenceMode.SEARCHING, viewModel.uiState.value.presence.mode)
     }
 
     @Test
