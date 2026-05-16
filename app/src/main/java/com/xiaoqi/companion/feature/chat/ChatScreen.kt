@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
@@ -59,6 +61,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.xiaoqi.companion.core.presence.PresenceUiState
@@ -596,6 +600,11 @@ private fun InputBar(
     isConfigReady: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
+    val canSend = (inputText.isNotBlank() || pendingImage != null) &&
+        isConfigReady &&
+        !isLoading &&
+        !isPreparingImage
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
@@ -631,6 +640,15 @@ private fun InputBar(
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Talk to Aura") },
                     maxLines = 4,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Send,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSend = {
+                            if (canSend) onSendMessage()
+                        },
+                    ),
                     shape = RoundedCornerShape(22.dp),
                 )
                 if (isLoading || isPreparingImage) {
@@ -641,7 +659,7 @@ private fun InputBar(
                 } else {
                     IconButton(
                         onClick = onSendMessage,
-                        enabled = (inputText.isNotBlank() || pendingImage != null) && isConfigReady,
+                        enabled = canSend,
                         modifier = Modifier.semantics { contentDescription = "Send" },
                     ) {
                         Icon(
