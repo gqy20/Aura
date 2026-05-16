@@ -235,7 +235,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val assistantId = UUID.randomUUID().toString()
             var assistantContent = ""
-            var visibleAssistantContent = ""
+            val streamingChunker = StreamingMarkdownChunker()
             val pendingStreamingContent = StringBuilder()
             var streamingRenderJob: Job? = null
             var idleTimeoutJob: Job? = null
@@ -258,15 +258,22 @@ class ChatViewModel @Inject constructor(
 
             fun flushStreamingContent() {
                 if (pendingStreamingContent.isEmpty()) return
-                visibleAssistantContent += pendingStreamingContent.toString()
+                val renderState = streamingChunker.append(pendingStreamingContent.toString())
                 pendingStreamingContent.clear()
                 updateAssistantMessage(assistantId) {
-                    it.copy(content = visibleAssistantContent)
+                    it.copy(
+                        content = renderState.rawText,
+                        renderBlocks = renderState.committedBlocks,
+                        renderDraft = renderState.draftText,
+                        isRenderDraftCode = renderState.isDraftCode,
+                    )
                 }
             }
 
             fun scheduleStreamingRender() {
-                if (visibleAssistantContent.isBlank() || pendingStreamingContent.length >= STREAMING_RENDER_BATCH_CHARS) {
+                if (assistantContent == pendingStreamingContent.toString() ||
+                    pendingStreamingContent.length >= STREAMING_RENDER_BATCH_CHARS
+                ) {
                     streamingRenderJob?.cancel()
                     streamingRenderJob = null
                     flushStreamingContent()
@@ -354,6 +361,9 @@ class ChatViewModel @Inject constructor(
                                 it.copy(
                                     content = event.parsed.textReply,
                                     isStreaming = false,
+                                    renderBlocks = emptyList(),
+                                    renderDraft = "",
+                                    isRenderDraftCode = false,
                                 )
                             }
                             _uiState.update {

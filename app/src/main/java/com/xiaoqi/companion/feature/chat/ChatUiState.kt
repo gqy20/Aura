@@ -13,6 +13,9 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis(),
     val isStreaming: Boolean = false,
     val toolStatus: String? = null,
+    val renderBlocks: List<MessageRenderBlock> = emptyList(),
+    val renderDraft: String = "",
+    val isRenderDraftCode: Boolean = false,
 )
 
 data class ChatToolCall(

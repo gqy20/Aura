@@ -34,7 +34,7 @@ fun MarkdownMessageText(
     ) {
         blocks.forEach { block ->
             when (block) {
-                is MarkdownBlock.Code -> CodeBlock(text = block.text)
+                is MarkdownBlock.Code -> MarkdownCodeBlock(text = block.text)
                 is MarkdownBlock.Text -> Text(
                     text = remember(block.text) { parseInlineMarkdown(block.text) },
                     color = color,
@@ -46,12 +46,33 @@ fun MarkdownMessageText(
 }
 
 @Composable
-private fun CodeBlock(text: String) {
+fun MessageRenderBlockText(
+    block: MessageRenderBlock,
+    color: Color,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.bodyLarge,
+) {
+    when (block) {
+        is MessageRenderBlock.Code -> MarkdownCodeBlock(text = block.text, modifier = modifier)
+        is MessageRenderBlock.Text -> MarkdownMessageText(
+            text = block.text,
+            color = color,
+            modifier = modifier,
+            style = style,
+        )
+    }
+}
+
+@Composable
+fun MarkdownCodeBlock(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         text = text,
         color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-        modifier = Modifier
+        modifier = modifier
             .background(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.74f),
                 shape = RoundedCornerShape(10.dp),
