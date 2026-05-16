@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.map
 class AppPreferences @Inject constructor(private val dataStore: DataStore<Preferences>) {
 
     val apiKey: Flow<String?> = dataStore.data.map { it[Keys.apiKey] }
+    val baseUrl: Flow<String> = dataStore.data.map { it[Keys.baseUrl] ?: "" }
     val currentCompanionId: Flow<String> = dataStore.data.map { it[Keys.currentCompanionId] ?: "" }
     val themeMode: Flow<ThemeMode> = dataStore.data.map {
         ThemeMode.valueOf(it[Keys.themeMode] ?: defaultThemeMode.name)
@@ -30,6 +31,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val modelName: Flow<String> = dataStore.data.map { it[Keys.modelName] ?: "glm-5v-turbo" }
 
     suspend fun setApiKey(value: String?) { dataStore.edit { if (value != null) it[Keys.apiKey] = value else it.remove(Keys.apiKey) } }
+    suspend fun setBaseUrl(value: String) { dataStore.edit { it[Keys.baseUrl] = value } }
     suspend fun setCurrentCompanionId(value: String) { dataStore.edit { it[Keys.currentCompanionId] = value } }
     suspend fun setThemeMode(value: ThemeMode) { dataStore.edit { it[Keys.themeMode] = value.name } }
     suspend fun setVoiceEnabled(value: Boolean) { dataStore.edit { it[Keys.voiceEnabled] = value } }
@@ -43,6 +45,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
 
     object Keys {
         val apiKey = stringPreferencesKey("api_key")
+        val baseUrl = stringPreferencesKey("base_url")
         val currentCompanionId = stringPreferencesKey("current_companion_id")
         val themeMode = stringPreferencesKey("theme_mode")
         val voiceEnabled = booleanPreferencesKey("voice_enabled")

@@ -69,12 +69,12 @@ class MessageBubbleTest {
                     id = "1",
                     role = "ASSISTANT",
                     content = "I will remember that.",
-                    toolStatus = "Memory saved",
+                    toolStatus = "已保存记忆",
                 )
             )
         }
 
-        composeTestRule.onNodeWithText("Memory saved").assertIsDisplayed()
+        composeTestRule.onNodeWithText("已保存记忆").assertIsDisplayed()
     }
 
     @Test

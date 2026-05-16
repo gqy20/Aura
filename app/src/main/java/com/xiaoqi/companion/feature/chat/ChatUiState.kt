@@ -55,6 +55,7 @@ data class ChatConfigStatus(
     val detail: String = "",
     val provider: LlmProvider = LlmProvider.GLM,
     val modelName: String = "glm-5v-turbo",
+    val baseUrl: String = "",
 )
 
 data class ChatToolCapabilitySettings(
@@ -82,6 +83,7 @@ data class ChatUiState(
     val isMemoryRoomOpen: Boolean = false,
     val isSettingsOpen: Boolean = false,
     val settingsApiKey: String = "",
+    val settingsBaseUrl: String = "",
     val settingsProvider: LlmProvider = LlmProvider.GLM,
     val settingsModelName: String = "glm-5v-turbo",
     val settingsMessage: String? = null,

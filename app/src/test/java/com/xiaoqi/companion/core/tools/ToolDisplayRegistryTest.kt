@@ -10,26 +10,26 @@ class ToolDisplayRegistryTest {
 
     @Test
     fun label_returnsSpecificLabelsForRegisteredTools() {
-        assertEquals("Saving memory", registry.label("save_memory", ToolCallStatus.STARTED))
-        assertEquals("Memory saved", registry.label("save_memory", ToolCallStatus.SUCCEEDED))
-        assertEquals("Searching memory", registry.label("search_memory", ToolCallStatus.STARTED))
-        assertEquals("Time checked", registry.label("get_current_time", ToolCallStatus.SUCCEEDED))
+        assertEquals("保存记忆中", registry.label("save_memory", ToolCallStatus.STARTED))
+        assertEquals("已保存记忆", registry.label("save_memory", ToolCallStatus.SUCCEEDED))
+        assertEquals("搜索记忆中", registry.label("search_memory", ToolCallStatus.STARTED))
+        assertEquals("已读取时间", registry.label("get_current_time", ToolCallStatus.SUCCEEDED))
         assertEquals(
-            "Recent activity check failed",
+            "最近互动读取失败",
             registry.label("get_recent_interaction_context", ToolCallStatus.FAILED),
         )
-        assertEquals("Settings checked", registry.label("get_user_context_settings", ToolCallStatus.SUCCEEDED))
-        assertEquals("Device checked", registry.label("get_device_status", ToolCallStatus.SUCCEEDED))
-        assertEquals("Weather checked", registry.label("get_weather", ToolCallStatus.SUCCEEDED))
-        assertEquals("Reminder created", registry.label("create_local_reminder", ToolCallStatus.SUCCEEDED))
-        assertEquals("Mood updated", registry.label("update_mood", ToolCallStatus.SUCCEEDED))
-        assertEquals("Relationship update failed", registry.label("update_relationship", ToolCallStatus.FAILED))
+        assertEquals("已检查设置", registry.label("get_user_context_settings", ToolCallStatus.SUCCEEDED))
+        assertEquals("已读取设备状态", registry.label("get_device_status", ToolCallStatus.SUCCEEDED))
+        assertEquals("已查询天气", registry.label("get_weather", ToolCallStatus.SUCCEEDED))
+        assertEquals("已创建提醒", registry.label("create_local_reminder", ToolCallStatus.SUCCEEDED))
+        assertEquals("已更新情绪", registry.label("update_mood", ToolCallStatus.SUCCEEDED))
+        assertEquals("关系更新失败", registry.label("update_relationship", ToolCallStatus.FAILED))
     }
 
     @Test
     fun label_returnsGenericLabelsForUnknownTool() {
-        assertEquals("Using tool", registry.label("unknown", ToolCallStatus.STARTED))
-        assertEquals("Tool finished", registry.label("unknown", ToolCallStatus.SUCCEEDED))
-        assertEquals("Tool failed", registry.label("unknown", ToolCallStatus.FAILED))
+        assertEquals("使用工具中", registry.label("unknown", ToolCallStatus.STARTED))
+        assertEquals("工具已完成", registry.label("unknown", ToolCallStatus.SUCCEEDED))
+        assertEquals("工具失败", registry.label("unknown", ToolCallStatus.FAILED))
     }
 }

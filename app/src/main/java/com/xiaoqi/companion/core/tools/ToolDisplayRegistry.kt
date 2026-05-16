@@ -16,25 +16,25 @@ class ToolDisplayRegistry @Inject constructor() {
 
     private fun labels(toolName: String): ToolDisplayLabels =
         when (toolName) {
-            "save_memory" -> ToolDisplayLabels("Saving memory", "Memory saved", "Memory save failed")
-            "search_memory" -> ToolDisplayLabels("Searching memory", "Memory searched", "Memory search failed")
-            "get_current_time" -> ToolDisplayLabels("Checking time", "Time checked", "Time check failed")
+            "save_memory" -> ToolDisplayLabels("保存记忆中", "已保存记忆", "记忆保存失败")
+            "search_memory" -> ToolDisplayLabels("搜索记忆中", "已搜索记忆", "记忆搜索失败")
+            "get_current_time" -> ToolDisplayLabels("读取时间中", "已读取时间", "时间读取失败")
             "get_recent_interaction_context" -> ToolDisplayLabels(
-                "Checking recent activity",
-                "Recent activity checked",
-                "Recent activity check failed",
+                "读取最近互动中",
+                "已读取最近互动",
+                "最近互动读取失败",
             )
-            "get_user_context_settings" -> ToolDisplayLabels("Checking settings", "Settings checked", "Settings check failed")
-            "get_device_status" -> ToolDisplayLabels("Checking device", "Device checked", "Device check failed")
-            "get_weather" -> ToolDisplayLabels("Checking weather", "Weather checked", "Weather check failed")
-            "create_local_reminder" -> ToolDisplayLabels("Creating reminder", "Reminder created", "Reminder failed")
-            "update_mood" -> ToolDisplayLabels("Updating mood", "Mood updated", "Mood update failed")
+            "get_user_context_settings" -> ToolDisplayLabels("检查设置中", "已检查设置", "设置检查失败")
+            "get_device_status" -> ToolDisplayLabels("读取设备状态中", "已读取设备状态", "设备状态读取失败")
+            "get_weather" -> ToolDisplayLabels("查询天气中", "已查询天气", "天气查询失败")
+            "create_local_reminder" -> ToolDisplayLabels("创建提醒中", "已创建提醒", "提醒创建失败")
+            "update_mood" -> ToolDisplayLabels("更新情绪中", "已更新情绪", "情绪更新失败")
             "update_relationship" -> ToolDisplayLabels(
-                "Updating relationship",
-                "Relationship updated",
-                "Relationship update failed",
+                "更新关系中",
+                "已更新关系",
+                "关系更新失败",
             )
-            else -> ToolDisplayLabels("Using tool", "Tool finished", "Tool failed")
+            else -> ToolDisplayLabels("使用工具中", "工具已完成", "工具失败")
         }
 
     private data class ToolDisplayLabels(

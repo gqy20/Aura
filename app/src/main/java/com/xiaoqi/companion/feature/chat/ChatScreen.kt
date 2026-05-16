@@ -32,7 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
@@ -89,6 +88,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onSettingsApiKeyChanged = { viewModel.updateSettingsApiKey(it) },
         onSettingsProviderChanged = { viewModel.updateSettingsProvider(it) },
         onSettingsModelNameChanged = { viewModel.updateSettingsModelName(it) },
+        onSettingsBaseUrlChanged = { viewModel.updateSettingsBaseUrl(it) },
         onSaveSettings = { viewModel.saveSettings() },
         onDeviceStatusEnabledChanged = { viewModel.setDeviceStatusContextEnabled(it) },
         onLocationContextEnabledChanged = { viewModel.setLocationContextEnabled(it) },
@@ -114,6 +114,7 @@ fun ChatScreenContent(
     onSettingsApiKeyChanged: (String) -> Unit,
     onSettingsProviderChanged: (LlmProvider) -> Unit,
     onSettingsModelNameChanged: (String) -> Unit,
+    onSettingsBaseUrlChanged: (String) -> Unit,
     onSaveSettings: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
@@ -159,9 +160,6 @@ fun ChatScreenContent(
                 memories = uiState.memories,
                 onOpenMemoryRoom = onOpenMemoryRoom,
                 onOpenSettings = onOpenSettings,
-                onRequestContextPermissions = {
-                    contextPermissionLauncher.launch(contextPermissions())
-                },
                 onPresenceTapped = onPresenceTapped,
             )
             if (messages.isEmpty()) {
@@ -186,7 +184,6 @@ fun ChatScreenContent(
                 }
             }
 
-            ToolActivityLine(toolCalls = uiState.toolCalls)
             InputBar(
                 inputText = uiState.inputText,
                 onInputTextChanged = onInputTextChanged,
@@ -227,11 +224,13 @@ fun ChatScreenContent(
             apiKey = uiState.settingsApiKey,
             provider = uiState.settingsProvider,
             modelName = uiState.settingsModelName,
+            baseUrl = uiState.settingsBaseUrl,
             message = uiState.settingsMessage,
             toolSettings = uiState.toolCapabilitySettings,
             onApiKeyChanged = onSettingsApiKeyChanged,
             onProviderChanged = onSettingsProviderChanged,
             onModelNameChanged = onSettingsModelNameChanged,
+            onBaseUrlChanged = onSettingsBaseUrlChanged,
             onSave = onSaveSettings,
             onDeviceStatusEnabledChanged = onDeviceStatusEnabledChanged,
             onLocationContextEnabledChanged = onLocationContextEnabledChanged,
@@ -289,7 +288,6 @@ private fun CompanionHeader(
     memories: List<ChatMemory>,
     onOpenMemoryRoom: () -> Unit,
     onOpenSettings: () -> Unit,
-    onRequestContextPermissions: () -> Unit,
     onPresenceTapped: () -> Unit,
 ) {
     Column(
@@ -301,19 +299,22 @@ private fun CompanionHeader(
         Surface(
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
             tonalElevation = 1.dp,
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 PresenceAvatar(
                     presence = presence,
                     onClick = onPresenceTapped,
                 )
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
                     Text(
                         text = "Aura",
                         style = MaterialTheme.typography.titleMedium,
@@ -321,34 +322,25 @@ private fun CompanionHeader(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "${presence.label} · ${status.mood} · ${status.relationshipLabel}",
+                        text = "在线 · ${status.moodLabel()} · ${status.relationshipLabel}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
                 }
-                IconButton(
+                TextButton(
                     onClick = onOpenMemoryRoom,
-                    modifier = Modifier.semantics { contentDescription = "Open memories" },
+                    modifier = Modifier.semantics { contentDescription = "打开记忆房间" },
                 ) {
                     Text(
-                        text = memories.size.toString(),
-                        style = MaterialTheme.typography.labelLarge,
+                        text = "记忆 ${memories.size}",
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 IconButton(
-                    onClick = onRequestContextPermissions,
-                    modifier = Modifier.semantics { contentDescription = "Enable context permissions" },
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(
                     onClick = onOpenSettings,
-                    modifier = Modifier.semantics { contentDescription = "Open settings" },
+                    modifier = Modifier.semantics { contentDescription = "打开设置" },
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
@@ -364,6 +356,18 @@ private fun CompanionHeader(
         }
     }
 }
+
+private fun CompanionStatus.moodLabel(): String =
+    when (mood.lowercase()) {
+        "happy" -> "开心"
+        "sad" -> "低落"
+        "angry" -> "生气"
+        "excited", "exited" -> "兴奋"
+        "calm" -> "平静"
+        "tired" -> "疲惫"
+        "neutral" -> "平常"
+        else -> mood
+    }
 
 private fun contextPermissions(): Array<String> =
     buildList {
@@ -394,7 +398,7 @@ private fun ConfigStatusCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Model setup needed",
+                    text = "需要配置模型",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -428,11 +432,13 @@ private fun SettingsDialog(
     apiKey: String,
     provider: LlmProvider,
     modelName: String,
+    baseUrl: String,
     message: String?,
     toolSettings: ChatToolCapabilitySettings,
     onApiKeyChanged: (String) -> Unit,
     onProviderChanged: (LlmProvider) -> Unit,
     onModelNameChanged: (String) -> Unit,
+    onBaseUrlChanged: (String) -> Unit,
     onSave: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
@@ -464,7 +470,7 @@ private fun SettingsDialog(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "API keys stay on this device.",
+                        text = "API Key 只保存在本机。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -493,11 +499,20 @@ private fun SettingsDialog(
 
                 Text(
                     text = when (provider) {
-                        LlmProvider.GLM -> "Default model: glm-5v-turbo."
-                        LlmProvider.KIMI -> "Uses the Moonshot-compatible endpoint."
+                        LlmProvider.GLM -> "默认模型：glm-5v-turbo。Base URL 可使用 GLM 兼容接口。"
+                        LlmProvider.KIMI -> "默认 Base URL：https://api.moonshot.cn/v1"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = onBaseUrlChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Base URL") },
+                    placeholder = { Text("例如：https://api.moonshot.cn/v1") },
+                    singleLine = true,
                 )
 
                 OutlinedTextField(
@@ -554,7 +569,7 @@ private fun ToolCapabilitiesSection(
     onNotificationEnabledChanged: (Boolean) -> Unit,
     onRequestContextPermissions: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -562,68 +577,75 @@ private fun ToolCapabilitiesSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Context & Tools",
+                    text = "上下文与工具",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Local abilities Aura can use during chat",
+                    text = "控制 Aura 能感知和执行什么",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             TextButton(onClick = onRequestContextPermissions) {
-                Text("Permissions")
+                Text("授权定位/通知")
             }
         }
 
         ToolCapabilityRow(
-            title = "Time and recent activity",
-            detail = "Current time, date, and recent chat activity",
-            toolNames = "get_current_time · get_recent_interaction_context",
+            title = "时间与最近互动",
+            detail = "当前时间、日期，以及最近聊天概况",
+            meta = "本地 · 始终可用",
+            tools = "get_current_time · get_recent_interaction_context",
             enabled = true,
             locked = true,
             onEnabledChanged = {},
         )
         ToolCapabilityRow(
-            title = "Device status",
-            detail = "Battery, charging, network, and power saver",
-            toolNames = "get_device_status",
+            title = "设备状态",
+            detail = "电量、充电状态、网络状态和省电模式",
+            meta = "本地读取",
+            tools = "get_device_status",
             enabled = settings.deviceStatusEnabled,
             onEnabledChanged = onDeviceStatusEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Location",
-            detail = "Last known location for local context",
-            toolNames = "get_user_context_settings",
+            title = "位置",
+            detail = "使用最近一次定位作为本地上下文",
+            meta = "需要系统定位权限",
+            tools = "get_user_context_settings",
             enabled = settings.locationContextEnabled,
             onEnabledChanged = onLocationContextEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Weather",
-            detail = "Weather by city or allowed current location",
-            toolNames = "get_weather",
+            title = "天气",
+            detail = "按城市或已授权的当前位置查询天气",
+            meta = "网络查询 · 可关闭",
+            tools = "get_weather",
             enabled = settings.weatherContextEnabled,
             onEnabledChanged = onWeatherContextEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Reminders",
-            detail = "Schedule local reminder notifications",
-            toolNames = "create_local_reminder",
+            title = "提醒",
+            detail = "创建本地提醒通知",
+            meta = "依赖通知权限",
+            tools = "create_local_reminder",
             enabled = settings.reminderToolEnabled,
             onEnabledChanged = onReminderToolEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Notifications",
-            detail = "Allow Aura to post local reminders",
-            toolNames = "Android notification permission",
+            title = "通知开关",
+            detail = "允许 Aura 发送本地提醒通知",
+            meta = "系统权限 + 应用开关",
+            tools = "Android 通知权限",
             enabled = settings.notificationEnabled,
             onEnabledChanged = onNotificationEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Memory, mood, relationship",
-            detail = "Local memory and companion state updates",
-            toolNames = "save_memory · search_memory · update_mood · update_relationship",
+            title = "记忆、情绪与关系",
+            detail = "本地记忆与陪伴状态更新",
+            meta = "本地 · 始终可用",
+            tools = "save_memory · search_memory · update_mood · update_relationship",
             enabled = true,
             locked = true,
             onEnabledChanged = {},
@@ -635,7 +657,8 @@ private fun ToolCapabilitiesSection(
 private fun ToolCapabilityRow(
     title: String,
     detail: String,
-    toolNames: String,
+    meta: String,
+    tools: String,
     enabled: Boolean,
     locked: Boolean = false,
     onEnabledChanged: (Boolean) -> Unit,
@@ -647,33 +670,37 @@ private fun ToolCapabilityRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    CapabilityMetaPill(text = meta)
+                }
                 Text(
                     text = detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
                 Text(
-                    text = toolNames,
+                    text = "工具：$tools",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    maxLines = 1,
                 )
             }
             if (locked) {
-                Text(
-                    text = "Always on",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                CapabilityMetaPill(text = "开启")
             } else {
                 Switch(
                     checked = enabled,
@@ -681,6 +708,22 @@ private fun ToolCapabilityRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CapabilityMetaPill(text: String) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.09f),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+            maxLines = 1,
+        )
     }
 }
 
@@ -771,31 +814,6 @@ private fun MemoryRoomItem(memory: ChatMemory) {
                 text = memory.content,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ToolActivityLine(toolCalls: List<ChatToolCall>) {
-    if (toolCalls.isEmpty()) return
-    val latestCall = toolCalls.last()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.Start,
-    ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
-            shape = RoundedCornerShape(999.dp),
-        ) {
-            Text(
-                text = latestCall.label,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

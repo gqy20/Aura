@@ -15,6 +15,11 @@ class AppPreferencesTest {
     }
 
     @Test
+    fun baseUrl_keyIsCorrect() {
+        assertEquals("base_url", AppPreferences.Keys.baseUrl.name)
+    }
+
+    @Test
     fun currentCompanionId_keyIsCorrect() {
         val key = stringPreferencesKey("current_companion_id")
         assertEquals("current_companion_id", key.name)

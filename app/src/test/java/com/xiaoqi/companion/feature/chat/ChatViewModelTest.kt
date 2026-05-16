@@ -319,6 +319,7 @@ class ChatViewModelTest {
 
         coVerify { configRepo.setLlmProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.KIMI) }
         coVerify { configRepo.setModelName("kimi-latest") }
+        coVerify { configRepo.setBaseUrl("https://api.moonshot.cn/v1") }
         coVerify { configRepo.setApiKey("new-key") }
         assertFalse(viewModel.uiState.value.isSettingsOpen)
     }
@@ -379,7 +380,7 @@ class ChatViewModelTest {
         viewModel.sendMessage("remember tea")
 
         val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
-        assertEquals("Memory saved", assistant.toolStatus)
+        assertEquals("已保存记忆", assistant.toolStatus)
     }
 
     @Test
@@ -467,10 +468,10 @@ class ChatViewModelTest {
 
         val calls = viewModel.uiState.value.toolCalls
         assertEquals(3, calls.size)
-        assertEquals("Memory saved", calls[0].label)
+        assertEquals("已保存记忆", calls[0].label)
         assertEquals("Done", calls[0].status)
         assertEquals(100L, calls[0].durationMs)
-        assertEquals("Searching memory", calls[1].label)
+        assertEquals("搜索记忆中", calls[1].label)
         assertEquals("Failed", calls[2].status)
         assertEquals("bad args", calls[2].errorMessage)
     }

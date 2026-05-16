@@ -35,6 +35,7 @@ data class LlmConfigStatus(
 
 interface ConfigRepository {
     val apiKey: Flow<String?>
+    val baseUrl: Flow<String>
     val llmProvider: Flow<LlmProvider>
     val modelName: Flow<String>
     val themeMode: Flow<com.xiaoqi.companion.data.db.converter.ThemeMode>
@@ -42,6 +43,7 @@ interface ConfigRepository {
     fun getCurrentLlmConfig(): Flow<LlmConfig>
     fun observeLlmConfigStatus(): Flow<LlmConfigStatus>
     suspend fun setApiKey(key: String?)
+    suspend fun setBaseUrl(url: String)
     suspend fun setLlmProvider(provider: LlmProvider)
     suspend fun setModelName(name: String)
 }
@@ -49,14 +51,16 @@ interface ConfigRepository {
 class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences) : ConfigRepository {
 
     override val apiKey get() = prefs.apiKey
+    override val baseUrl get() = prefs.baseUrl
     override val llmProvider get() = prefs.llmProvider
     override val modelName get() = prefs.modelName
     override val themeMode get() = prefs.themeMode
 
     override fun getCurrentLlmConfig(): Flow<LlmConfig> =
-        combine(prefs.llmProvider, prefs.apiKey, prefs.modelName) { provider, key, model ->
+        combine(prefs.llmProvider, prefs.apiKey, prefs.modelName, prefs.baseUrl) { provider, key, model, baseUrl ->
             val resolvedModel = model.ifBlank { BuildConfig.LLM_MODEL }
             val resolvedKey = key?.takeIf { it.isNotBlank() } ?: BuildConfig.LLM_API_KEY
+            val resolvedBaseUrl = baseUrl.ifBlank { provider.defaultBaseUrl() }
             if (resolvedKey.isEmpty()) {
                 AppLogger.warn(
                     LogTags.Config,
@@ -67,10 +71,7 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
             }
             LlmConfig(
                 provider = provider,
-                baseUrl = when (provider) {
-                    LlmProvider.GLM -> BuildConfig.LLM_BASE_URL
-                    LlmProvider.KIMI -> "https://api.moonshot.cn/v1"
-                },
+                baseUrl = resolvedBaseUrl,
                 apiKey = resolvedKey,
                 modelName = resolvedModel,
             )
@@ -90,6 +91,10 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
         prefs.setApiKey(key)
     }
 
+    override suspend fun setBaseUrl(url: String) {
+        prefs.setBaseUrl(url)
+    }
+
     override suspend fun setLlmProvider(provider: LlmProvider) {
         prefs.setLlmProvider(provider)
     }
@@ -97,4 +102,10 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
     override suspend fun setModelName(name: String) {
         prefs.setModelName(name)
     }
+
+    private fun LlmProvider.defaultBaseUrl(): String =
+        when (this) {
+            LlmProvider.GLM -> BuildConfig.LLM_BASE_URL
+            LlmProvider.KIMI -> "https://api.moonshot.cn/v1"
+        }
 }

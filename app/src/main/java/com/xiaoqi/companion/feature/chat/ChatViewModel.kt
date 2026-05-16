@@ -2,6 +2,7 @@ package com.xiaoqi.companion.feature.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
@@ -453,6 +454,7 @@ class ChatViewModel @Inject constructor(
                 isSettingsOpen = true,
                 settingsProvider = state.configStatus.provider,
                 settingsModelName = state.configStatus.modelName,
+                settingsBaseUrl = state.configStatus.baseUrl,
                 settingsMessage = null,
             )
         }
@@ -475,6 +477,7 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 settingsProvider = value,
                 settingsModelName = defaultModel,
+                settingsBaseUrl = defaultBaseUrl(value),
                 settingsMessage = null,
             )
         }
@@ -482,6 +485,10 @@ class ChatViewModel @Inject constructor(
 
     fun updateSettingsModelName(value: String) {
         _uiState.update { it.copy(settingsModelName = value, settingsMessage = null) }
+    }
+
+    fun updateSettingsBaseUrl(value: String) {
+        _uiState.update { it.copy(settingsBaseUrl = value, settingsMessage = null) }
     }
 
     fun setDeviceStatusContextEnabled(value: Boolean) {
@@ -507,13 +514,19 @@ class ChatViewModel @Inject constructor(
     fun saveSettings() {
         val state = _uiState.value
         val model = state.settingsModelName.trim()
+        val baseUrl = state.settingsBaseUrl.trim()
         if (model.isBlank()) {
             _uiState.update { it.copy(settingsMessage = "模型名称不能为空") }
+            return
+        }
+        if (baseUrl.isBlank()) {
+            _uiState.update { it.copy(settingsMessage = "Base URL 不能为空") }
             return
         }
         viewModelScope.launch {
             configRepository.setLlmProvider(state.settingsProvider)
             configRepository.setModelName(model)
+            configRepository.setBaseUrl(baseUrl)
             state.settingsApiKey.trim().takeIf { it.isNotEmpty() }?.let { apiKey ->
                 configRepository.setApiKey(apiKey)
             }
@@ -522,6 +535,7 @@ class ChatViewModel @Inject constructor(
                     isSettingsOpen = false,
                     settingsApiKey = "",
                     settingsModelName = model,
+                    settingsBaseUrl = baseUrl,
                     settingsMessage = null,
                 )
             }
@@ -606,6 +620,7 @@ class ChatViewModel @Inject constructor(
                 detail = "模型已就绪",
                 provider = provider,
                 modelName = modelName,
+                baseUrl = baseUrl,
             )
         } else {
             ChatConfigStatus(
@@ -614,7 +629,14 @@ class ChatViewModel @Inject constructor(
                 detail = missingReason ?: "模型配置未完成",
                 provider = provider,
                 modelName = modelName,
+                baseUrl = baseUrl,
             )
+        }
+
+    private fun defaultBaseUrl(provider: LlmProvider): String =
+        when (provider) {
+            LlmProvider.GLM -> BuildConfig.LLM_BASE_URL
+            LlmProvider.KIMI -> "https://api.moonshot.cn/v1"
         }
 
     private fun persistStatus(status: CompanionStatus) {
