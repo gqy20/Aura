@@ -11,12 +11,31 @@
 
 ## 常用验证命令
 
+优先使用 Makefile 作为日常入口；Windows 下建议在 Git Bash / WSL 中运行：
+
+```bash
+make test
+make build
+make release
+make check
+```
+
+其中：
+
+- `make test`：运行 debug 单元测试。
+- `make build`：构建 debug APK。
+- `make release`：构建 release APK。
+- `make check`：运行 lint + test + debug build 级别检查。
+
+如果当前 shell 是 PowerShell，或 `make` 不可用，再直接使用 Gradle Wrapper：
+
 ```bash
 ./gradlew.bat testDebugUnitTest
 ./gradlew.bat assembleDebug
+./gradlew.bat build
 ```
 
-以上命令已在 2026-05-15 验证通过。
+以上 Gradle 命令已在 2026-05-16 验证通过。
 
 ## 工具路径
 

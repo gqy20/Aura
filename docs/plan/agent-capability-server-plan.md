@@ -1,6 +1,6 @@
 # Aura 智能体能力整体方案
 
-> Last updated: 2026-05-15  
+> Last updated: 2026-05-15
 > Scope: Aura Android app, Koog, MCP, remote agent server, browser tools, skills, long-running tasks
 
 ## 1. 目标

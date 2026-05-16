@@ -1,6 +1,6 @@
 # Vision 与 Agent Tools 协同计划
 
-> Last updated: 2026-05-15  
+> Last updated: 2026-05-15
 > Scope: Aura Android app, Koog 0.8.0, GLM-5v-turbo Vision, Agent tools
 
 ## 1. 背景

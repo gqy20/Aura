@@ -49,7 +49,7 @@ release:
 clean:
 	./gradlew clean
 
-check: lint test
+check: lint test build
 	@echo "=== All checks passed ==="
 
 # --- 安装运行 ---
