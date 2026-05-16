@@ -1,6 +1,8 @@
 package com.xiaoqi.companion.feature.chat
 
+import android.Manifest
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
@@ -115,6 +118,9 @@ fun ChatScreenContent(
     ) { uri ->
         uri?.let(onAttachImage)
     }
+    val contextPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { }
     val messages = uiState.messages
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
 
@@ -140,6 +146,9 @@ fun ChatScreenContent(
                 memories = uiState.memories,
                 onOpenMemoryRoom = onOpenMemoryRoom,
                 onOpenSettings = onOpenSettings,
+                onRequestContextPermissions = {
+                    contextPermissionLauncher.launch(contextPermissions())
+                },
                 onPresenceTapped = onPresenceTapped,
             )
             if (messages.isEmpty()) {
@@ -258,6 +267,7 @@ private fun CompanionHeader(
     memories: List<ChatMemory>,
     onOpenMemoryRoom: () -> Unit,
     onOpenSettings: () -> Unit,
+    onRequestContextPermissions: () -> Unit,
     onPresenceTapped: () -> Unit,
 ) {
     Column(
@@ -305,6 +315,16 @@ private fun CompanionHeader(
                     )
                 }
                 IconButton(
+                    onClick = onRequestContextPermissions,
+                    modifier = Modifier.semantics { contentDescription = "Enable context permissions" },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(
                     onClick = onOpenSettings,
                     modifier = Modifier.semantics { contentDescription = "Open settings" },
                 ) {
@@ -322,6 +342,15 @@ private fun CompanionHeader(
         }
     }
 }
+
+private fun contextPermissions(): Array<String> =
+    buildList {
+        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }.toTypedArray()
 
 @Composable
 private fun ConfigStatusCard(

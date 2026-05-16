@@ -39,6 +39,14 @@ class AppPreferencesTest {
     }
 
     @Test
+    fun contextCapabilityKeys_areCorrect() {
+        assertEquals("device_status_context_enabled", AppPreferences.Keys.deviceStatusContextEnabled.name)
+        assertEquals("location_context_enabled", AppPreferences.Keys.locationContextEnabled.name)
+        assertEquals("weather_context_enabled", AppPreferences.Keys.weatherContextEnabled.name)
+        assertEquals("reminder_tool_enabled", AppPreferences.Keys.reminderToolEnabled.name)
+    }
+
+    @Test
     fun llmProvider_keyIsCorrect() {
         val key = stringPreferencesKey("llm_provider")
         assertEquals("llm_provider", key.name)

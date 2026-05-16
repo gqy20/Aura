@@ -395,7 +395,7 @@ class ChatViewModelTest {
 
         assertEquals("a", viewModel.uiState.value.messages.last { it.role == "ASSISTANT" }.content)
 
-        advanceTimeBy(49L)
+        advanceTimeBy(91L)
 
         assertEquals("abc", viewModel.uiState.value.messages.last { it.role == "ASSISTANT" }.content)
 

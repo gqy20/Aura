@@ -6,10 +6,20 @@ import com.xiaoqi.companion.core.companion.KoogAgentFactory
 import com.xiaoqi.companion.core.companion.KoogAgentFactoryImpl
 import com.xiaoqi.companion.core.companion.RelationshipModel
 import com.xiaoqi.companion.core.companion.RelationshipModelImpl
+import com.xiaoqi.companion.core.context.AndroidContextPermissionReader
+import com.xiaoqi.companion.core.context.AndroidCurrentLocationProvider
+import com.xiaoqi.companion.core.context.AndroidDeviceStatusProvider
+import com.xiaoqi.companion.core.context.ContextPermissionReader
+import com.xiaoqi.companion.core.context.CurrentLocationProvider
+import com.xiaoqi.companion.core.context.DeviceStatusProvider
 import com.xiaoqi.companion.core.llm.DefaultKoogPromptExecutorFactory
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
+import com.xiaoqi.companion.core.reminder.AndroidReminderScheduler
+import com.xiaoqi.companion.core.reminder.ReminderScheduler
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.core.tools.CompanionToolRegistry
+import com.xiaoqi.companion.core.weather.OpenMeteoWeatherProvider
+import com.xiaoqi.companion.core.weather.WeatherProvider
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.ConfigRepositoryImpl
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -63,4 +73,24 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindChatImageProcessor(processor: AndroidChatImageProcessor): ChatImageProcessor
+
+    @Binds
+    @Singleton
+    abstract fun bindContextPermissionReader(reader: AndroidContextPermissionReader): ContextPermissionReader
+
+    @Binds
+    @Singleton
+    abstract fun bindDeviceStatusProvider(provider: AndroidDeviceStatusProvider): DeviceStatusProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindCurrentLocationProvider(provider: AndroidCurrentLocationProvider): CurrentLocationProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindWeatherProvider(provider: OpenMeteoWeatherProvider): WeatherProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindReminderScheduler(scheduler: AndroidReminderScheduler): ReminderScheduler
 }

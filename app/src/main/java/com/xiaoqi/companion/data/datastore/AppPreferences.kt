@@ -20,6 +20,10 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     }
     val voiceEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.voiceEnabled] ?: true }
     val notificationEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.notificationEnabled] ?: true }
+    val deviceStatusContextEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.deviceStatusContextEnabled] ?: true }
+    val locationContextEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.locationContextEnabled] ?: true }
+    val weatherContextEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.weatherContextEnabled] ?: true }
+    val reminderToolEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.reminderToolEnabled] ?: true }
     val llmProvider: Flow<LlmProvider> = dataStore.data.map {
         LlmProvider.valueOf(it[Keys.llmProvider] ?: defaultLlmProvider.name)
     }
@@ -30,6 +34,10 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     suspend fun setThemeMode(value: ThemeMode) { dataStore.edit { it[Keys.themeMode] = value.name } }
     suspend fun setVoiceEnabled(value: Boolean) { dataStore.edit { it[Keys.voiceEnabled] = value } }
     suspend fun setNotificationEnabled(value: Boolean) { dataStore.edit { it[Keys.notificationEnabled] = value } }
+    suspend fun setDeviceStatusContextEnabled(value: Boolean) { dataStore.edit { it[Keys.deviceStatusContextEnabled] = value } }
+    suspend fun setLocationContextEnabled(value: Boolean) { dataStore.edit { it[Keys.locationContextEnabled] = value } }
+    suspend fun setWeatherContextEnabled(value: Boolean) { dataStore.edit { it[Keys.weatherContextEnabled] = value } }
+    suspend fun setReminderToolEnabled(value: Boolean) { dataStore.edit { it[Keys.reminderToolEnabled] = value } }
     suspend fun setLlmProvider(value: LlmProvider) { dataStore.edit { it[Keys.llmProvider] = value.name } }
     suspend fun setModelName(value: String) { dataStore.edit { it[Keys.modelName] = value } }
 
@@ -39,6 +47,10 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val themeMode = stringPreferencesKey("theme_mode")
         val voiceEnabled = booleanPreferencesKey("voice_enabled")
         val notificationEnabled = booleanPreferencesKey("notification_enabled")
+        val deviceStatusContextEnabled = booleanPreferencesKey("device_status_context_enabled")
+        val locationContextEnabled = booleanPreferencesKey("location_context_enabled")
+        val weatherContextEnabled = booleanPreferencesKey("weather_context_enabled")
+        val reminderToolEnabled = booleanPreferencesKey("reminder_tool_enabled")
         val llmProvider = stringPreferencesKey("llm_provider")
         val modelName = stringPreferencesKey("model_name")
     }

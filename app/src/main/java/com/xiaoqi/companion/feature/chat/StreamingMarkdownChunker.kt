@@ -1,6 +1,6 @@
 package com.xiaoqi.companion.feature.chat
 
-private const val SOFT_TEXT_BLOCK_LIMIT = 420
+private const val SOFT_TEXT_BLOCK_LIMIT = 640
 
 data class StreamingMessageRenderState(
     val committedBlocks: List<MessageRenderBlock> = emptyList(),

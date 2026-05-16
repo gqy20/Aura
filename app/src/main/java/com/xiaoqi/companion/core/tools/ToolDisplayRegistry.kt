@@ -24,6 +24,10 @@ class ToolDisplayRegistry @Inject constructor() {
                 "Recent activity checked",
                 "Recent activity check failed",
             )
+            "get_user_context_settings" -> ToolDisplayLabels("Checking settings", "Settings checked", "Settings check failed")
+            "get_device_status" -> ToolDisplayLabels("Checking device", "Device checked", "Device check failed")
+            "get_weather" -> ToolDisplayLabels("Checking weather", "Weather checked", "Weather check failed")
+            "create_local_reminder" -> ToolDisplayLabels("Creating reminder", "Reminder created", "Reminder failed")
             "update_mood" -> ToolDisplayLabels("Updating mood", "Mood updated", "Mood update failed")
             "update_relationship" -> ToolDisplayLabels(
                 "Updating relationship",

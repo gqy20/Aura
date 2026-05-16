@@ -58,8 +58,8 @@ class ChatViewModel @Inject constructor(
         private const val RECENT_TOOL_CALL_LIMIT = 3
         private const val PRESENCE_REACTION_DURATION_MS = 1_300L
         private const val STREAMING_IDLE_TIMEOUT_MS = 30_000L
-        private const val STREAMING_RENDER_BATCH_MS = 48L
-        private const val STREAMING_RENDER_BATCH_CHARS = 24
+        private const val STREAMING_RENDER_BATCH_MS = 90L
+        private const val STREAMING_RENDER_BATCH_CHARS = 48
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())

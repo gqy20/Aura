@@ -18,6 +18,10 @@ class ToolDisplayRegistryTest {
             "Recent activity check failed",
             registry.label("get_recent_interaction_context", ToolCallStatus.FAILED),
         )
+        assertEquals("Settings checked", registry.label("get_user_context_settings", ToolCallStatus.SUCCEEDED))
+        assertEquals("Device checked", registry.label("get_device_status", ToolCallStatus.SUCCEEDED))
+        assertEquals("Weather checked", registry.label("get_weather", ToolCallStatus.SUCCEEDED))
+        assertEquals("Reminder created", registry.label("create_local_reminder", ToolCallStatus.SUCCEEDED))
         assertEquals("Mood updated", registry.label("update_mood", ToolCallStatus.SUCCEEDED))
         assertEquals("Relationship update failed", registry.label("update_relationship", ToolCallStatus.FAILED))
     }
