@@ -1,11 +1,16 @@
 package com.xiaoqi.companion.core.companion
 
 import ai.koog.agents.core.agent.AIAgent
-import ai.koog.agents.core.agent.ToolCalls
+import ai.koog.agents.core.dsl.builder.forwardTo
+import ai.koog.agents.core.dsl.builder.node
+import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.core.dsl.extension.HistoryCompressionStrategy
-import ai.koog.agents.ext.agent.HistoryCompressionConfig
-import ai.koog.agents.ext.agent.singleRunStrategyWithHistoryCompression
+import ai.koog.agents.core.dsl.extension.nodeExecuteMultipleTools
+import ai.koog.agents.core.dsl.extension.nodeLLMRequestStreamingAndSendResults
+import ai.koog.agents.core.dsl.extension.onMultipleAssistantMessages
+import ai.koog.agents.core.dsl.extension.onMultipleToolCalls
+import ai.koog.agents.core.environment.ReceivedToolResult
+import ai.koog.agents.core.environment.result
 import ai.koog.agents.features.eventHandler.feature.EventHandler
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.model.PromptExecutor
@@ -14,7 +19,9 @@ import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.AttachmentContent
 import ai.koog.prompt.message.ContentPart
+import ai.koog.prompt.message.Message
 import ai.koog.prompt.streaming.StreamFrame
+import ai.koog.prompt.streaming.toMessageResponses
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
@@ -29,6 +36,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.awaitClose
 
@@ -117,16 +125,7 @@ private class KoogPromptExecutorWrapper(
             .toolRegistry(if (prompt.hasImage) ToolRegistry.EMPTY else toolRegistry.create())
             .maxIterations(MAX_AGENT_ITERATIONS)
             .id("companion-agent-${config.provider.name.lowercase()}")
-            .graphStrategy(
-                singleRunStrategyWithHistoryCompression(
-                    HistoryCompressionConfig(
-                        isHistoryTooBig = { false },
-                        compressionStrategy = HistoryCompressionStrategy.NoCompression,
-                        retrievalModel = model,
-                    ),
-                    ToolCalls.SEQUENTIAL,
-                )
-            )
+            .graphStrategy(streamingSingleRunStrategy())
             .install {
                 install(EventHandler.Feature) {
                     onToolCallStarting { context ->
@@ -199,6 +198,41 @@ private class KoogPromptExecutorWrapper(
                 }
             }
             .build()
+
+    private fun streamingSingleRunStrategy() = strategy<String, String>("single_run_streaming_tools") {
+        val nodeCallLLM by nodeLLMRequestStreamingAndSendResults<String>()
+        val nodeExecuteTool by nodeExecuteMultipleTools(parallelTools = false)
+        val nodeSendToolResult by node<List<ReceivedToolResult>, List<Message.Response>> { results ->
+            llm.writeSession {
+                appendPrompt {
+                    tool {
+                        results.forEach { result(it) }
+                    }
+                }
+
+                requestLLMStreaming()
+                    .toList()
+                    .toMessageResponses()
+                    .also { appendPrompt { messages(it) } }
+            }
+        }
+
+        edge(nodeStart forwardTo nodeCallLLM)
+        edge(nodeCallLLM forwardTo nodeExecuteTool onMultipleToolCalls { true })
+        edge(
+            nodeCallLLM forwardTo nodeFinish
+                onMultipleAssistantMessages { true }
+                transformed { it.joinToString("\n") { message -> message.content } }
+        )
+
+        edge(nodeExecuteTool forwardTo nodeSendToolResult)
+        edge(nodeSendToolResult forwardTo nodeExecuteTool onMultipleToolCalls { true })
+        edge(
+            nodeSendToolResult forwardTo nodeFinish
+                onMultipleAssistantMessages { true }
+                transformed { it.joinToString("\n") { message -> message.content } }
+        )
+    }
 
     private companion object {
         const val MAX_AGENT_ITERATIONS = 12

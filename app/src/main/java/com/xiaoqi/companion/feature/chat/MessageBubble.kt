@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
@@ -70,16 +73,29 @@ fun MessageBubble(message: ChatMessage) {
                     )
                     Spacer(modifier = Modifier.size(8.dp))
                 }
-                val displayText = if (message.isStreaming && message.content.isNotEmpty()) {
-                    "${message.content}..."
+                if (!isUser && message.isStreaming && message.content.isBlank()) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .semantics { contentDescription = "Assistant response loading" },
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 } else {
-                    message.content
+                    if (message.isStreaming) {
+                        Text(
+                            text = "${message.content}...",
+                            color = contentColor,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    } else {
+                        MarkdownMessageText(
+                            text = message.content,
+                            color = contentColor,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
                 }
-                MarkdownMessageText(
-                    text = displayText,
-                    color = contentColor,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
                 if (!isUser && message.toolStatus != null) {
                     Spacer(modifier = Modifier.size(6.dp))
                     ToolStatusPill(text = message.toolStatus)

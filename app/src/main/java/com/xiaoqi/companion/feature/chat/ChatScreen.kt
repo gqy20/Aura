@@ -177,7 +177,9 @@ fun ChatScreenContent(
                     )
                 },
                 onRemoveImage = onRemoveImage,
-                isLoading = uiState.isLoading && uiState.messages.none { it.role == "ASSISTANT" && it.isStreaming },
+                isLoading = uiState.isLoading && uiState.messages.none {
+                    it.role == "ASSISTANT" && it.isStreaming && it.content.isNotBlank()
+                },
                 isConfigReady = uiState.configStatus.isReady,
                 modifier = Modifier.imePadding(),
             )

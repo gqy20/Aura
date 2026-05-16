@@ -114,6 +114,7 @@ class AnthropicMessagesLLMClient(
         val request = buildRequest(prompt, model, stream = true, tools = tools)
         var fullText = ""
         var finishReason: String? = null
+        var currentToolId: String? = null
         var currentToolName: String? = null
         var currentToolInput = StringBuilder()
 
@@ -143,6 +144,7 @@ class AnthropicMessagesLLMClient(
 
                         val parsed = parseSseData(data)
                         if (parsed.isToolUseBlock && parsed.toolName != null) {
+                            currentToolId = parsed.toolId
                             currentToolName = parsed.toolName
                             currentToolInput = StringBuilder()
                             AppLogger.debug(LogTags.Llm, "stream_tool_start", "tool" to parsed.toolName)
@@ -154,15 +156,42 @@ class AnthropicMessagesLLMClient(
                             fullText += parsed.deltaText
                             trySend(StreamFrame.TextDelta(parsed.deltaText, null))
                         }
+                        if (parsed.isContentBlockStop && currentToolName != null) {
+                            trySend(
+                                StreamFrame.ToolCallComplete(
+                                    id = currentToolId,
+                                    name = currentToolName.orEmpty(),
+                                    content = currentToolInput.toString(),
+                                    index = null,
+                                )
+                            )
+                            AppLogger.info(
+                                LogTags.Llm,
+                                "stream_tool_completed",
+                                "tool" to currentToolName,
+                                "inputLength" to currentToolInput.length,
+                            )
+                            currentToolId = null
+                            currentToolName = null
+                        }
                         if (parsed.finishReason != null) {
                             finishReason = parsed.finishReason
                             if (currentToolName != null) {
+                                trySend(
+                                    StreamFrame.ToolCallComplete(
+                                        id = currentToolId,
+                                        name = currentToolName.orEmpty(),
+                                        content = currentToolInput.toString(),
+                                        index = null,
+                                    )
+                                )
                                 AppLogger.info(
                                     LogTags.Llm,
                                     "stream_tool_completed",
                                     "tool" to currentToolName,
                                     "inputLength" to currentToolInput.length,
                                 )
+                                currentToolId = null
                                 currentToolName = null
                             }
                         }
@@ -196,7 +225,7 @@ class AnthropicMessagesLLMClient(
             }
         }
 
-        awaitClose { httpClient.dispatcher.executorService.shutdown() }
+        awaitClose { }
     }
 
     override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
@@ -419,10 +448,14 @@ class AnthropicMessagesLLMClient(
             if (block["type"]?.jsonPrimitive?.contentOrNull == "tool_use") {
                 return ParsedSse(
                     isToolUseBlock = true,
+                    toolId = block["id"]?.jsonPrimitive?.contentOrNull,
                     toolName = block["name"]?.jsonPrimitive?.contentOrNull,
                 )
             }
             return ParsedSse()
+        }
+        if (type == "content_block_stop") {
+            return ParsedSse(isContentBlockStop = true)
         }
         if (type != "content_block_delta") return ParsedSse()
 
@@ -445,9 +478,11 @@ class AnthropicMessagesLLMClient(
     private data class ParsedSse(
         val deltaText: String? = null,
         val finishReason: String? = null,
+        val toolId: String? = null,
         val toolName: String? = null,
         val toolInput: String? = null,
         val isToolUseBlock: Boolean = false,
+        val isContentBlockStop: Boolean = false,
     )
 
     private companion object {

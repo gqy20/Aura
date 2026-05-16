@@ -9,6 +9,7 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
+import ai.koog.prompt.streaming.toStreamFrames
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
@@ -26,7 +27,7 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -201,7 +202,23 @@ class KoogAgentFactoryImplTest {
             prompt: Prompt,
             model: LLModel,
             tools: List<ToolDescriptor>,
-        ): Flow<StreamFrame> = emptyFlow()
+        ): Flow<StreamFrame> {
+            toolNamesPerCall += tools.map { it.name }
+            return if (toolNamesPerCall.size == 1) {
+                listOf(
+                    Message.Tool.Call(
+                        id = "call-1",
+                        tool = "save_memory",
+                        content = """{"content":"User likes jasmine tea","type":"FACT","importance":0.9}""",
+                        metaInfo = ResponseMetaInfo(Clock.System.now()),
+                    )
+                ).toStreamFrames().asFlow()
+            } else {
+                listOf(Message.Assistant("remembered", ResponseMetaInfo(Clock.System.now())))
+                    .toStreamFrames()
+                    .asFlow()
+            }
+        }
 
         override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
             ModerationResult(isHarmful = false, categories = emptyMap())
@@ -225,7 +242,12 @@ class KoogAgentFactoryImplTest {
             prompt: Prompt,
             model: LLModel,
             tools: List<ToolDescriptor>,
-        ): Flow<StreamFrame> = emptyFlow()
+        ): Flow<StreamFrame> {
+            toolNamesPerCall += tools.map { it.name }
+            return listOf(Message.Assistant("这是一张图片。", ResponseMetaInfo(Clock.System.now())))
+                .toStreamFrames()
+                .asFlow()
+        }
 
         override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
             ModerationResult(isHarmful = false, categories = emptyMap())
