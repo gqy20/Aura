@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceReaction
@@ -34,6 +36,7 @@ import kotlin.math.sin
 fun PresenceAvatar(
     presence: PresenceUiState,
     modifier: Modifier = Modifier,
+    size: Dp = 54.dp,
     onClick: () -> Unit = {},
 ) {
     val transition = rememberInfiniteTransition(label = "presence")
@@ -69,17 +72,17 @@ fun PresenceAvatar(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(54.dp)
+            .size(size)
             .clickable(onClick = onClick)
             .semantics { contentDescription = presence.label },
     ) {
         Canvas(
             modifier = Modifier
-                .size(54.dp)
+                .fillMaxSize()
                 .scale((if (presence.mode == PresenceMode.SPEAKING) 1f + sin(pulse * 6.28f) * 0.025f else breath) * reactionScale),
         ) {
-            val w = size.width
-            val h = size.height
+            val w = this.size.width
+            val h = this.size.height
             val center = Offset(w / 2f, h / 2f)
             val glowRadius = w * (0.46f + pulse * 0.06f)
 
@@ -129,6 +132,13 @@ fun PresenceAvatar(
                 drawCircle(dotColor.copy(alpha = 0.72f), w * 0.045f, Offset(w * (0.23f + pulse * 0.08f), h * 0.24f))
                 drawCircle(dotColor.copy(alpha = 0.52f), w * 0.032f, Offset(w * (0.78f - pulse * 0.06f), h * 0.74f))
             }
+            drawPresenceModeAura(
+                mode = presence.mode,
+                palette = palette,
+                pulse = pulse,
+                width = w,
+                height = h,
+            )
             drawPresenceReaction(
                 reaction = presence.reaction,
                 palette = palette,
@@ -295,6 +305,86 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPresenceReactio
             )
         }
         PresenceReaction.RETURN_BLINK, null -> Unit
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPresenceModeAura(
+    mode: PresenceMode,
+    palette: PresencePalette,
+    pulse: Float,
+    width: Float,
+    height: Float,
+) {
+    val center = Offset(width / 2f, height / 2f)
+    when (mode) {
+        PresenceMode.LISTENING -> {
+            drawCircle(
+                color = palette.accent.copy(alpha = 0.18f + pulse * 0.12f),
+                radius = width * (0.44f + pulse * 0.06f),
+                center = center,
+                style = Stroke(width = width * 0.018f, cap = StrokeCap.Round),
+            )
+        }
+        PresenceMode.THINKING -> {
+            val angle = pulse * 6.28f
+            repeat(3) { index ->
+                val step = angle + index * 2.09f
+                drawCircle(
+                    color = palette.accent.copy(alpha = 0.46f),
+                    radius = width * 0.025f,
+                    center = Offset(
+                        x = center.x + kotlin.math.cos(step) * width * 0.33f,
+                        y = center.y + kotlin.math.sin(step) * height * 0.33f,
+                    ),
+                )
+            }
+        }
+        PresenceMode.SPEAKING -> {
+            repeat(2) { index ->
+                drawArc(
+                    color = palette.accent.copy(alpha = 0.24f - index * 0.07f),
+                    startAngle = -22f,
+                    sweepAngle = 44f,
+                    useCenter = false,
+                    topLeft = Offset(width * (0.16f - index * 0.055f), height * (0.38f - index * 0.035f)),
+                    size = Size(width * (0.68f + index * 0.11f), height * (0.31f + index * 0.07f)),
+                    style = Stroke(width = width * 0.018f, cap = StrokeCap.Round),
+                )
+                drawArc(
+                    color = palette.accent.copy(alpha = 0.24f - index * 0.07f),
+                    startAngle = 158f,
+                    sweepAngle = 44f,
+                    useCenter = false,
+                    topLeft = Offset(width * (0.16f - index * 0.055f), height * (0.38f - index * 0.035f)),
+                    size = Size(width * (0.68f + index * 0.11f), height * (0.31f + index * 0.07f)),
+                    style = Stroke(width = width * 0.018f, cap = StrokeCap.Round),
+                )
+            }
+        }
+        PresenceMode.SEARCHING -> {
+            val sweepX = width * (0.18f + pulse * 0.64f)
+            drawLine(
+                color = palette.accent.copy(alpha = 0.3f),
+                start = Offset(sweepX, height * 0.18f),
+                end = Offset(sweepX + width * 0.11f, height * 0.82f),
+                strokeWidth = width * 0.018f,
+                cap = StrokeCap.Round,
+            )
+        }
+        PresenceMode.REMEMBERING -> {
+            drawCircle(
+                color = palette.glow.copy(alpha = 0.18f),
+                radius = width * (0.36f + pulse * 0.08f),
+                center = center,
+                style = Stroke(width = width * 0.018f, cap = StrokeCap.Round),
+            )
+            drawCircle(
+                color = palette.accent.copy(alpha = 0.52f),
+                radius = width * 0.025f,
+                center = Offset(width * 0.72f, height * (0.25f + pulse * 0.08f)),
+            )
+        }
+        else -> Unit
     }
 }
 

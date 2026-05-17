@@ -23,6 +23,13 @@ class PresenceControllerTest {
     }
 
     @Test
+    fun derive_whenLoading_returnsThinking() {
+        val state = controller.derive(inputs(isLoading = true))
+
+        assertEquals(PresenceMode.THINKING, state.mode)
+    }
+
+    @Test
     fun derive_whenSearchingMemory_returnsSearching() {
         val state = controller.derive(
             inputs(
@@ -44,6 +51,13 @@ class PresenceControllerTest {
         )
 
         assertEquals(PresenceMode.REMEMBERING, state.mode)
+    }
+
+    @Test
+    fun derive_whenHasPendingImage_returnsListening() {
+        val state = controller.derive(inputs(hasPendingImage = true))
+
+        assertEquals(PresenceMode.LISTENING, state.mode)
     }
 
     @Test

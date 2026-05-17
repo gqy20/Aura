@@ -109,7 +109,7 @@ private fun AuraHomeContent(
                     ) {
                         PresenceAvatar(
                             presence = uiState.presence,
-                            modifier = Modifier.size(118.dp),
+                            size = 118.dp,
                             onClick = onPresenceTapped,
                         )
                         Text(
