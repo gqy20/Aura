@@ -99,6 +99,39 @@ class MessageDaoTest : BaseDaoTest() {
         assertEquals(3, count)
     }
 
+    @Test
+    fun getInteractionSummary_returnsCountsAndLastInteraction() = runTest {
+        dao.insert(makeMessage(id = "old", role = MessageRole.USER, timestamp = 1_000L))
+        dao.insert(makeMessage(id = "todayUser", role = MessageRole.USER, timestamp = 10_000L))
+        dao.insert(makeMessage(id = "todayAssistant", role = MessageRole.ASSISTANT, timestamp = 12_000L))
+        dao.insert(makeMessage(id = "otherSession", sessionId = "other", role = MessageRole.USER, timestamp = 20_000L))
+
+        val summary = dao.getInteractionSummary(sessionId = "default", startOfToday = 9_000L)
+
+        assertEquals(3, summary.messageCount)
+        assertEquals(2, summary.userMessageCount)
+        assertEquals(1, summary.assistantMessageCount)
+        assertEquals(2, summary.messagesToday)
+        assertEquals(1, summary.userMessagesToday)
+        assertEquals(1, summary.assistantMessagesToday)
+        assertEquals("ASSISTANT", summary.lastMessageRole)
+        assertEquals(12_000L, summary.lastMessageAt)
+        assertEquals(10_000L, summary.lastUserMessageAt)
+    }
+
+    @Test
+    fun getInteractionSummary_handlesEmptySession() = runTest {
+        val summary = dao.getInteractionSummary(sessionId = "missing", startOfToday = 9_000L)
+
+        assertEquals(0, summary.messageCount)
+        assertEquals(0, summary.userMessageCount)
+        assertEquals(0, summary.assistantMessageCount)
+        assertEquals(0, summary.messagesToday)
+        assertNull(summary.lastMessageRole)
+        assertEquals(0L, summary.lastMessageAt)
+        assertEquals(0L, summary.lastUserMessageAt)
+    }
+
     // --- deleteBySession ---
 
     @Test

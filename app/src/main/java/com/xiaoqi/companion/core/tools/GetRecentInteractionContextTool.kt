@@ -3,13 +3,11 @@ package com.xiaoqi.companion.core.tools
 import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
-import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
@@ -43,7 +41,6 @@ class GetRecentInteractionContextTool(
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.IO) {
             val sessionId = args.sessionId.ifBlank { DEFAULT_SESSION_ID }
-            val messages = messageDao.observeBySession(sessionId).first()
             val now = nowProvider()
             val startOfToday = Instant.ofEpochMilli(now)
                 .atZone(zoneProvider())
@@ -51,26 +48,22 @@ class GetRecentInteractionContextTool(
                 .atStartOfDay(zoneProvider())
                 .toInstant()
                 .toEpochMilli()
-            val lastMessage = messages.maxByOrNull { it.timestamp }
-            val lastUserMessage = messages
-                .filter { it.role == MessageRole.USER }
-                .maxByOrNull { it.timestamp }
-            val todayMessages = messages.filter { it.timestamp >= startOfToday }
+            val summary = messageDao.getInteractionSummary(sessionId, startOfToday)
 
             buildJsonObject {
                 put("sessionId", sessionId)
-                put("messageCount", messages.size)
-                put("userMessageCount", messages.count { it.role == MessageRole.USER })
-                put("assistantMessageCount", messages.count { it.role == MessageRole.ASSISTANT })
-                put("messagesToday", todayMessages.size)
-                put("userMessagesToday", todayMessages.count { it.role == MessageRole.USER })
-                put("assistantMessagesToday", todayMessages.count { it.role == MessageRole.ASSISTANT })
-                put("hasPreviousInteraction", lastMessage != null)
-                put("lastMessageRole", lastMessage?.role?.name ?: "")
-                put("lastMessageAt", lastMessage?.timestamp ?: 0L)
-                put("minutesSinceLastMessage", lastMessage?.let { minutesBetween(it.timestamp, now) } ?: -1L)
-                put("lastUserMessageAt", lastUserMessage?.timestamp ?: 0L)
-                put("minutesSinceLastUserMessage", lastUserMessage?.let { minutesBetween(it.timestamp, now) } ?: -1L)
+                put("messageCount", summary.messageCount)
+                put("userMessageCount", summary.userMessageCount)
+                put("assistantMessageCount", summary.assistantMessageCount)
+                put("messagesToday", summary.messagesToday)
+                put("userMessagesToday", summary.userMessagesToday)
+                put("assistantMessagesToday", summary.assistantMessagesToday)
+                put("hasPreviousInteraction", summary.messageCount > 0)
+                put("lastMessageRole", summary.lastMessageRole ?: "")
+                put("lastMessageAt", summary.lastMessageAt)
+                put("minutesSinceLastMessage", summary.lastMessageAt.takeIf { it > 0L }?.let { minutesBetween(it, now) } ?: -1L)
+                put("lastUserMessageAt", summary.lastUserMessageAt)
+                put("minutesSinceLastUserMessage", summary.lastUserMessageAt.takeIf { it > 0L }?.let { minutesBetween(it, now) } ?: -1L)
             }.toString()
         }
 

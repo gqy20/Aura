@@ -31,6 +31,21 @@ interface MemoryDao {
     @Query("SELECT * FROM memories ORDER BY importance DESC, lastAccessed DESC LIMIT :limit")
     suspend fun getPromptMemories(limit: Int): List<MemoryEntity>
 
+    @Query(
+        """
+        SELECT * FROM memories
+        WHERE (:type IS NULL OR type = :type)
+          AND content LIKE :pattern ESCAPE '\'
+        ORDER BY importance DESC, lastAccessed DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchByContent(
+        pattern: String,
+        type: com.xiaoqi.companion.data.db.converter.MemoryType?,
+        limit: Int,
+    ): List<MemoryEntity>
+
     @Query("DELETE FROM memories WHERE id = :id")
     suspend fun deleteById(id: String)
 }

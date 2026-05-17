@@ -95,6 +95,28 @@ class MemoryDaoTest : BaseDaoTest() {
     }
 
     @Test
+    fun searchByContent_matchesSubstringAndLimits() = runTest {
+        dao.insert(makeMemory(id = "m1", content = "User likes jasmine tea", importance = 0.9f))
+        dao.insert(makeMemory(id = "m2", content = "User likes jasmine flowers", importance = 0.8f))
+        dao.insert(makeMemory(id = "m3", content = "User visited Tokyo", importance = 0.7f))
+
+        val items = dao.searchByContent(pattern = "%jasmine%", type = null, limit = 1)
+
+        assertEquals(1, items.size)
+        assertEquals("m1", items.first().id)
+    }
+
+    @Test
+    fun searchByContent_filtersByType() = runTest {
+        dao.insert(makeMemory(id = "fact", type = MemoryType.FACT, content = "Likes cats"))
+        dao.insert(makeMemory(id = "episode", type = MemoryType.EPISODE, content = "Adopted a cat"))
+
+        val items = dao.searchByContent(pattern = "%cat%", type = MemoryType.EPISODE, limit = 10)
+
+        assertEquals(listOf("episode"), items.map { it.id })
+    }
+
+    @Test
     fun deleteById_removesMemory() = runTest {
         dao.insert(makeMemory(id = "m1"))
         dao.deleteById("m1")

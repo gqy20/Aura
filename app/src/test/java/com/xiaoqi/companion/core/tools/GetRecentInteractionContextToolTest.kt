@@ -1,12 +1,10 @@
 package com.xiaoqi.companion.core.tools
 
-import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.MessageDao
-import com.xiaoqi.companion.data.db.entity.MessageEntity
+import com.xiaoqi.companion.data.db.dao.MessageInteractionSummary
 import io.mockk.coEvery
 import io.mockk.mockk
 import java.time.ZoneId
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -18,11 +16,16 @@ class GetRecentInteractionContextToolTest {
 
     @Test
     fun execute_returnsRecentInteractionSummary() = runTest {
-        coEvery { messageDao.observeBySession("default") } returns flowOf(
-            listOf(
-                message(id = "m1", role = MessageRole.USER, timestamp = 1_699_999_400_000L),
-                message(id = "m2", role = MessageRole.ASSISTANT, timestamp = 1_699_999_700_000L),
-            )
+        coEvery { messageDao.getInteractionSummary("default", any()) } returns MessageInteractionSummary(
+            messageCount = 2,
+            userMessageCount = 1,
+            assistantMessageCount = 1,
+            messagesToday = 2,
+            userMessagesToday = 1,
+            assistantMessagesToday = 1,
+            lastMessageRole = "ASSISTANT",
+            lastMessageAt = 1_699_999_700_000L,
+            lastUserMessageAt = 1_699_999_400_000L,
         )
         val tool = GetRecentInteractionContextTool(
             messageDao = messageDao,
@@ -43,7 +46,17 @@ class GetRecentInteractionContextToolTest {
 
     @Test
     fun execute_handlesEmptySession() = runTest {
-        coEvery { messageDao.observeBySession("default") } returns flowOf(emptyList())
+        coEvery { messageDao.getInteractionSummary("default", any()) } returns MessageInteractionSummary(
+            messageCount = 0,
+            userMessageCount = 0,
+            assistantMessageCount = 0,
+            messagesToday = 0,
+            userMessagesToday = 0,
+            assistantMessagesToday = 0,
+            lastMessageRole = null,
+            lastMessageAt = 0L,
+            lastUserMessageAt = 0L,
+        )
         val tool = GetRecentInteractionContextTool(
             messageDao = messageDao,
             nowProvider = { 1_700_000_000_000L },
@@ -65,16 +78,4 @@ class GetRecentInteractionContextToolTest {
         assertEquals("get_recent_interaction_context", tool.name)
         assertTrue(tool.descriptor.description.contains("recent", ignoreCase = true))
     }
-
-    private fun message(
-        id: String,
-        role: MessageRole,
-        timestamp: Long,
-    ) = MessageEntity(
-        id = id,
-        sessionId = "default",
-        role = role,
-        content = "hello",
-        timestamp = timestamp,
-    )
 }

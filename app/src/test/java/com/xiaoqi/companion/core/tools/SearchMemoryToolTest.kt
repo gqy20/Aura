@@ -6,7 +6,6 @@ import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -22,7 +21,7 @@ class SearchMemoryToolTest {
             MemoryEntity(id = "1", type = MemoryType.FACT, content = "User likes jasmine tea", importance = 0.9f, timestamp = 1000L),
             MemoryEntity(id = "2", type = MemoryType.EPISODE, content = "User visited Tokyo last summer", importance = 0.7f, timestamp = 2000L),
         )
-        coEvery { memoryDao.observeAll() } returns flowOf(memories)
+        coEvery { memoryDao.searchByContent("%jasmine%", null, any()) } returns memories.take(1)
 
         val tool = SearchMemoryTool(memoryDao)
         val result = tool.execute(SearchMemoryTool.Args(query = "jasmine"))
@@ -37,13 +36,14 @@ class SearchMemoryToolTest {
             MemoryEntity(id = "1", type = MemoryType.FACT, content = "Likes cats", importance = 0.8f, timestamp = 1000L),
             MemoryEntity(id = "2", type = MemoryType.EPISODE, content = "Adopted a cat", importance = 0.6f, timestamp = 2000L),
         )
-        coEvery { memoryDao.observeAll() } returns flowOf(memories)
+        coEvery { memoryDao.searchByContent("%cat%", MemoryType.FACT, any()) } returns memories.take(1)
 
         val tool = SearchMemoryTool(memoryDao)
         val result = tool.execute(SearchMemoryTool.Args(query = "cat", type = "FACT"))
 
         assertTrue(result.contains("Likes cats"))
         assertTrue(!result.contains("Adopted a cat"))
+        coVerify { memoryDao.searchByContent("%cat%", MemoryType.FACT, any()) }
     }
 
     @Test
@@ -53,7 +53,7 @@ class SearchMemoryToolTest {
             MemoryEntity(id = "2", type = MemoryType.FACT, content = "Cat fact two", importance = 0.8f, timestamp = 2000L),
             MemoryEntity(id = "3", type = MemoryType.FACT, content = "Cat fact three", importance = 0.7f, timestamp = 3000L),
         )
-        coEvery { memoryDao.observeAll() } returns flowOf(memories)
+        coEvery { memoryDao.searchByContent("%cat%", null, any()) } returns memories
 
         val tool = SearchMemoryTool(memoryDao)
         val result = tool.execute(SearchMemoryTool.Args(query = "cat", limit = 2))
@@ -64,12 +64,22 @@ class SearchMemoryToolTest {
 
     @Test
     fun execute_returnsEmptyWhenNoMatch() = runTest {
-        coEvery { memoryDao.observeAll() } returns flowOf(emptyList())
+        coEvery { memoryDao.searchByContent("%nonexistent%", null, any()) } returns emptyList()
 
         val tool = SearchMemoryTool(memoryDao)
         val result = tool.execute(SearchMemoryTool.Args(query = "nonexistent"))
 
         assertTrue(result.contains("\"count\":0"))
+    }
+
+    @Test
+    fun execute_escapesLikeWildcards() = runTest {
+        coEvery { memoryDao.searchByContent("%100\\%%", null, any()) } returns emptyList()
+
+        val tool = SearchMemoryTool(memoryDao)
+        tool.execute(SearchMemoryTool.Args(query = "100%"))
+
+        coVerify { memoryDao.searchByContent("%100\\%%", null, any()) }
     }
 
     @Test
