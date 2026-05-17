@@ -28,7 +28,7 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         MoodSnapshotEntity::class,
         ToolCallEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -91,6 +91,17 @@ abstract class CompanionDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_summaries_type` ON `memory_summaries` (`type`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_summaries_lastAccessed` ON `memory_summaries` (`lastAccessed`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_summaries_startAt_endAt` ON `memory_summaries` (`startAt`, `endAt`)")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `memories` ADD COLUMN `confidence` REAL NOT NULL DEFAULT 0.7")
+                db.execSQL("ALTER TABLE `memories` ADD COLUMN `sourceMessageIds` TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE `memories` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `memories` ADD COLUMN `expiresAt` INTEGER")
+                db.execSQL("ALTER TABLE `memories` ADD COLUMN `sensitivity` TEXT NOT NULL DEFAULT 'normal'")
+                db.execSQL("UPDATE `memories` SET `updatedAt` = `timestamp` WHERE `updatedAt` = 0")
             }
         }
     }

@@ -19,6 +19,8 @@ import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
+import com.xiaoqi.companion.data.repository.MemoryRepository
+import com.xiaoqi.companion.data.repository.PromptMemoryContext
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
@@ -106,7 +108,14 @@ class ChatViewModelTest {
         promptBuilder = mockk(),
         outputParser = OutputParser(),
         messageRepository = messageRepo,
-        memoryDao = mockk<MemoryDao>(relaxed = true),
+        memoryRepository = mockk<MemoryRepository>(relaxed = true) {
+            coEvery { selectPromptContext(any()) } returns PromptMemoryContext(
+                memorySnippets = emptyList(),
+                memoryIds = emptyList(),
+                summarySnippets = emptyList(),
+                summaryIds = emptyList(),
+            )
+        },
         emotionMachine = mockk(relaxed = true),
         relationshipModel = mockk(relaxed = true),
     ) {

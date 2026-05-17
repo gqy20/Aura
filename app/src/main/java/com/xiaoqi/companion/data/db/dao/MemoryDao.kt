@@ -22,6 +22,21 @@ interface MemoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: MemoryEntity)
 
+    @Query(
+        """
+        SELECT * FROM memories
+        WHERE type = :type
+          AND content LIKE :pattern ESCAPE '\'
+        ORDER BY updatedAt DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun findSimilar(
+        pattern: String,
+        type: com.xiaoqi.companion.data.db.converter.MemoryType,
+        limit: Int,
+    ): List<MemoryEntity>
+
     @Query("UPDATE memories SET lastAccessed = :time WHERE id = :id")
     suspend fun updateLastAccessed(id: String, time: Long)
 
@@ -30,6 +45,9 @@ interface MemoryDao {
 
     @Query("SELECT * FROM memories ORDER BY importance DESC, lastAccessed DESC LIMIT :limit")
     suspend fun getPromptMemories(limit: Int): List<MemoryEntity>
+
+    @Query("SELECT * FROM memories ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentMemories(limit: Int): List<MemoryEntity>
 
     @Query(
         """

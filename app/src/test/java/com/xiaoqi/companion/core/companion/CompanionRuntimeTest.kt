@@ -11,10 +11,9 @@ import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.prompt.PromptBuilder
-import com.xiaoqi.companion.data.db.converter.MemoryType
-import com.xiaoqi.companion.data.db.dao.MemoryDao
-import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.MemoryRepository
+import com.xiaoqi.companion.data.repository.PromptMemoryContext
 import com.xiaoqi.companion.data.repository.MessageRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -54,8 +53,13 @@ class CompanionRuntimeTest {
     }
 
     private val messageRepo: MessageRepository = mockk(relaxed = true)
-    private val memoryDao: MemoryDao = mockk(relaxed = true) {
-        coEvery { getPromptMemories(any()) } returns emptyList()
+    private val memoryRepository: MemoryRepository = mockk(relaxed = true) {
+        coEvery { selectPromptContext(any()) } returns PromptMemoryContext(
+            memorySnippets = emptyList(),
+            memoryIds = emptyList(),
+            summarySnippets = emptyList(),
+            summaryIds = emptyList(),
+        )
     }
     private val emotionMachine: EmotionStateMachine = mockk(relaxed = true)
     private val relationshipModel: RelationshipModel = mockk(relaxed = true)
@@ -104,7 +108,7 @@ class CompanionRuntimeTest {
         promptBuilder = promptBuilder,
         outputParser = outputParser,
         messageRepository = messageRepo,
-        memoryDao = memoryDao,
+        memoryRepository = memoryRepository,
         emotionMachine = emotionMachine,
         relationshipModel = relationshipModel,
     )
@@ -259,14 +263,11 @@ class CompanionRuntimeTest {
 
     @Test
     fun send_injectsPromptMemoriesAndMarksThemAccessed() = runTest {
-        coEvery { memoryDao.getPromptMemories(any()) } returns listOf(
-            MemoryEntity(
-                id = "memory-1",
-                type = MemoryType.FACT,
-                content = "User likes jasmine tea",
-                timestamp = 1_000L,
-                lastAccessed = 1_000L,
-            )
+        coEvery { memoryRepository.selectPromptContext(any()) } returns PromptMemoryContext(
+            memorySnippets = listOf("User likes jasmine tea"),
+            memoryIds = listOf("memory-1"),
+            summarySnippets = listOf("Tea preferences: User enjoys jasmine tea."),
+            summaryIds = listOf("summary-1"),
         )
         val factory = FakeKoogAgentFactory()
 
@@ -280,9 +281,9 @@ class CompanionRuntimeTest {
                 any(),
                 any(),
                 any(),
-                match { it == listOf("User likes jasmine tea") },
+                match { it == listOf("User likes jasmine tea", "Tea preferences: User enjoys jasmine tea.") },
             )
-            memoryDao.updateLastAccessed("memory-1", any())
+            memoryRepository.selectPromptContext("what do I like?")
         }
     }
 }

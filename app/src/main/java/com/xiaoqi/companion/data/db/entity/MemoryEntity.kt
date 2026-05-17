@@ -19,6 +19,11 @@ data class MemoryEntity(
     val content: String,
     val source: String = "",
     @ColumnInfo(defaultValue = "0.5") val importance: Float = 0.5f,
+    @ColumnInfo(defaultValue = "0.7") val confidence: Float = 0.7f,
+    @ColumnInfo(defaultValue = "[]") val sourceMessageIds: String = "[]",
     val timestamp: Long,
+    val updatedAt: Long = timestamp,
+    val expiresAt: Long? = null,
+    @ColumnInfo(defaultValue = "normal") val sensitivity: String = "normal",
     val lastAccessed: Long = timestamp,
 )

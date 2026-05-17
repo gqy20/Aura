@@ -4,7 +4,7 @@ import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.data.db.converter.MemoryType
-import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.repository.MemoryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -15,7 +15,7 @@ import kotlinx.serialization.json.put
 import javax.inject.Inject
 
 class SearchMemoryTool @Inject constructor(
-    private val memoryDao: MemoryDao,
+    private val memoryRepository: MemoryRepository,
 ) : SimpleTool<SearchMemoryTool.Args>(
     typeToken<Args>(),
     name = "search_memory",
@@ -40,19 +40,13 @@ class SearchMemoryTool @Inject constructor(
                 ?.let { type ->
                     MemoryType.entries.firstOrNull { it.name == type }
                         ?: return@withContext invalidType(args.type)
-                }
+            }
             val limit = args.limit.coerceIn(1, MAX_RESULTS)
-            val candidateLimit = (limit * CANDIDATE_MULTIPLIER).coerceAtMost(MAX_CANDIDATES)
-            val candidates = memoryDao.searchByContent(
-                pattern = query.toLikePattern(),
+            val results = memoryRepository.searchMemories(
+                query = query,
                 type = filterType,
-                limit = candidateLimit,
-            )
-            val results = candidates
-                .map { memory -> MemorySearchHit(memory, scoreMemory(memory.content, query, memory.importance)) }
-                .sortedWith(compareByDescending<MemorySearchHit> { it.score }.thenByDescending { it.memory.lastAccessed })
-                .take(limit)
-                .map { it.memory }
+                limit = limit,
+            ).memories
             json.encodeToString(
                 SearchMemoryResult(
                     count = results.size,
@@ -63,6 +57,7 @@ class SearchMemoryTool @Inject constructor(
                             type = it.type.name,
                             content = it.content,
                             importance = it.importance,
+                            confidence = it.confidence,
                         )
                     },
                 )
@@ -82,17 +77,11 @@ class SearchMemoryTool @Inject constructor(
         val type: String,
         val content: String,
         val importance: Float,
-    )
-
-    private data class MemorySearchHit(
-        val memory: com.xiaoqi.companion.data.db.entity.MemoryEntity,
-        val score: Float,
+        val confidence: Float,
     )
 
     private companion object {
         const val MAX_RESULTS = 50
-        const val MAX_CANDIDATES = 200
-        const val CANDIDATE_MULTIPLIER = 4
         val json = Json { encodeDefaults = true }
     }
 
@@ -103,21 +92,4 @@ class SearchMemoryTool @Inject constructor(
             put("type", type)
             put("allowedTypes", MemoryType.entries.joinToString(",") { it.name })
         }.toString()
-}
-
-private fun String.toLikePattern(): String =
-    "%${replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")}%"
-
-private fun scoreMemory(content: String, query: String, importance: Float): Float {
-    if (query.isBlank()) return importance
-    val normalizedContent = content.lowercase()
-    val normalizedQuery = query.lowercase()
-    val terms = normalizedQuery.split(Regex("\\s+")).filter { it.isNotBlank() }
-    var score = importance * 3f
-    if (normalizedContent.contains(normalizedQuery)) score += 20f
-    terms.forEach { term ->
-        if (normalizedContent.contains(term)) score += 5f
-    }
-    if (normalizedContent.startsWith(normalizedQuery)) score += 4f
-    return score
 }

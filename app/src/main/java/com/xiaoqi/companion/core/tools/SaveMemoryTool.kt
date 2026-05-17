@@ -4,9 +4,8 @@ import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.data.db.converter.MemoryType
-import com.xiaoqi.companion.data.db.dao.MemoryDao
-import com.xiaoqi.companion.data.db.entity.MemoryEntity
-import java.util.UUID
+import com.xiaoqi.companion.data.repository.MemoryRepository
+import com.xiaoqi.companion.data.repository.SaveMemoryRequest
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,7 +14,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 class SaveMemoryTool @Inject constructor(
-    private val memoryDao: MemoryDao,
+    private val memoryRepository: MemoryRepository,
 ) : SimpleTool<SaveMemoryTool.Args>(
     typeToken<Args>(),
     name = "save_memory",
@@ -30,25 +29,26 @@ class SaveMemoryTool @Inject constructor(
         val type: String = "FACT",
         @param:LLMDescription("Importance from 0.0 to 1.0.")
         val importance: Float = 0.5f,
+        @param:LLMDescription("Confidence from 0.0 to 1.0. Use lower values for inferred or uncertain memories.")
+        val confidence: Float = 0.7f,
+        @param:LLMDescription("Sensitivity: normal, private, or sensitive.")
+        val sensitivity: String = "normal",
     )
 
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.IO) {
             val normalizedType = MemoryType.entries.firstOrNull { it.name == args.type.uppercase() }
                 ?: return@withContext invalidType(args.type)
-            val safeImportance = args.importance.coerceIn(0f, 1f)
-            val memoryId = UUID.randomUUID().toString()
-            memoryDao.insert(
-                MemoryEntity(
-                    id = memoryId,
-                    type = normalizedType,
+            val result = memoryRepository.saveMemory(
+                SaveMemoryRequest(
                     content = args.content,
-                    source = "tool:save_memory",
-                    importance = safeImportance,
-                    timestamp = System.currentTimeMillis(),
+                    type = normalizedType,
+                    importance = args.importance,
+                    confidence = args.confidence,
+                    sensitivity = args.sensitivity,
                 )
             )
-            """{"status":"saved","memoryId":"$memoryId"}"""
+            """{"status":"saved","memoryId":"${result.memory.id}","merged":${result.merged}}"""
         }
 
     private fun invalidType(type: String): String =

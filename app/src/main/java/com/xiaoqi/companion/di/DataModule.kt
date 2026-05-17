@@ -64,7 +64,11 @@ object DataModule {
             CompanionDatabase::class.java,
             "companion.db",
         )
-            .addMigrations(CompanionDatabase.MIGRATION_1_2, CompanionDatabase.MIGRATION_2_3)
+            .addMigrations(
+                CompanionDatabase.MIGRATION_1_2,
+                CompanionDatabase.MIGRATION_2_3,
+                CompanionDatabase.MIGRATION_3_4,
+            )
             .build()
 
     @Provides

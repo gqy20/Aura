@@ -117,6 +117,26 @@ class MemoryDaoTest : BaseDaoTest() {
     }
 
     @Test
+    fun findSimilar_filtersByTypeAndPattern() = runTest {
+        dao.insert(makeMemory(id = "fact", type = MemoryType.FACT, content = "Likes jasmine tea"))
+        dao.insert(makeMemory(id = "episode", type = MemoryType.EPISODE, content = "Bought jasmine tea"))
+
+        val items = dao.findSimilar(pattern = "%jasmine%", type = MemoryType.FACT, limit = 10)
+
+        assertEquals(listOf("fact"), items.map { it.id })
+    }
+
+    @Test
+    fun getRecentMemories_ordersByTimestampDesc() = runTest {
+        dao.insert(makeMemory(id = "old", timestamp = 1_000L))
+        dao.insert(makeMemory(id = "new", timestamp = 3_000L))
+
+        val items = dao.getRecentMemories(limit = 1)
+
+        assertEquals(listOf("new"), items.map { it.id })
+    }
+
+    @Test
     fun deleteById_removesMemory() = runTest {
         dao.insert(makeMemory(id = "m1"))
         dao.deleteById("m1")
@@ -133,8 +153,9 @@ class MemoryDaoTest : BaseDaoTest() {
         importance: Float = 0.5f,
         timestamp: Long = System.currentTimeMillis(),
         lastAccessed: Long = timestamp,
+        confidence: Float = 0.7f,
     ) = com.xiaoqi.companion.data.db.entity.MemoryEntity(
         id = id, type = type, content = content,
-        importance = importance, timestamp = timestamp, lastAccessed = lastAccessed,
+        importance = importance, confidence = confidence, timestamp = timestamp, lastAccessed = lastAccessed,
     )
 }

@@ -19,10 +19,12 @@ import com.xiaoqi.companion.core.tools.SaveMemoryTool
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.ToolCallEntity
 import com.xiaoqi.companion.data.repository.LlmConfig
+import com.xiaoqi.companion.data.repository.MemoryRepository
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlin.time.Clock
@@ -37,9 +39,11 @@ import org.junit.Test
 class KoogAgentFactoryImplTest {
 
     private val memoryDao: MemoryDao = mockk(relaxed = true)
+    private val memorySummaryDao: MemorySummaryDao = mockk(relaxed = true)
+    private val memoryRepository = MemoryRepository(memoryDao, memorySummaryDao)
     private val toolCallDao: ToolCallDao = mockk(relaxed = true)
     private val saveMemoryTool = SaveMemoryTool(
-        memoryDao = memoryDao,
+        memoryRepository = memoryRepository,
     )
     private val toolCallRecorder = ToolCallRecorder(toolCallDao)
 
