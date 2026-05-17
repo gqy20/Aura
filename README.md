@@ -6,13 +6,14 @@
 
 ## 特性
 
+- **当前版本：0.1.1** — 记忆系统增强版本，聚焦长期记忆选择、摘要接入和 Vision 后置记忆
 - **已实现：文本聊天闭环** — Compose 聊天页 + ChatViewModel + CompanionRuntime + Koog Agent
 - **已实现：流式对话** — Anthropic Messages 兼容 SSE 流式输出，聊天气泡逐字渲染
-- **已实现：长期记忆基础能力** — Room 存储消息、记忆、情绪快照、工具调用记录
+- **已实现：长期记忆体系增强** — Room 存储消息、记忆、摘要、情绪快照、工具调用记录；`MemoryRepository` 统一保存、搜索、prompt selection 和访问时间更新
 - **已实现：Agent 工具调用** — `save_memory`、`search_memory`、`update_mood`、`update_relationship`
 - **已实现：情绪与关系核心** — 情绪状态机和关系模型已接入 Agent 主循环
-- **部分实现：模型配置** — DataStore/BuildConfig 已支持 API Key 与模型名，设置页尚未实现
-- **规划中：多模态** — 底层 Vision prompt/client 支持已预留，CameraX 拍照/选图 UI 尚未实现
+- **已实现：模型与工具设置** — 设置弹层支持 provider、模型名、Base URL、API Key、MCP HTTP URL 与上下文工具开关
+- **部分实现：多模态** — 图片选择、Vision prompt 和底层图片输入已接入；Vision 主回复禁用 tools，但支持后置记忆抽取
 - **规划中：生命脉冲** — WorkManager 依赖已接入，后台 pulse/通知/主动关怀尚未实现
 
 ## 技术栈
@@ -99,20 +100,21 @@ make help        # 查看所有命令
 
 ```
 用户输入 (文本/图片/语音)
+  → MemoryRepository 选择相关记忆/摘要
   → PromptBuilder 组装（注入情绪 + 关系 + 记忆上下文）
     → Koog Agent 调用 LLM（流式输出）
       → OutputParser 解析结构化响应
         → 情绪状态机更新
         → 关系模型更新
-        → 记忆存储
+        → Agent tools / Vision 后置记忆抽取
         → UI 响应（表情 / 气泡 / 动作）
 ```
 
-当前已跑通的是文本输入链路；图片和语音输入的数据结构/底层能力在设计中预留，UI 与平台实现仍在 roadmap 中。
+当前已跑通文本输入链路和图片选择 Vision 输入链路；Vision 场景会先完成主回复，再用后置任务抽取明确值得保存的视觉记忆。语音输入和 CameraX 拍摄 UI 仍在 roadmap 中。
 
 ## 配置
 
-LLM 模型配置通过 DataStore 与 BuildConfig 管理。当前可以从 `.env` / 环境变量读取默认值，设置页切换尚未实现：
+LLM 模型配置通过 DataStore 与 BuildConfig 管理。可以从 `.env` / 环境变量读取默认值，也可以在应用内设置弹层切换 provider、模型名、Base URL 和 API Key：
 
 ```kotlin
 data class LlmConfig(

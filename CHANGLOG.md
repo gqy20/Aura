@@ -6,6 +6,52 @@
 
 ---
 
+## [0.1.1] - 2026-05-17
+
+Aura · 奥拉的记忆系统增强版本，重点完善长期记忆基础设施、prompt 记忆选择、摘要记忆接入、Vision 后置记忆和远程工具扩展，为后续记忆房间管理与端云协同打基础。
+
+### 新增
+
+**记忆系统**
+- 新增 `MemoryRepository`，统一封装记忆保存、搜索、prompt selection、`lastAccessed` 更新和轻量去重合并。
+- 新增 `memory_summaries` 摘要记忆表与 `save_summary` / `search_summaries` 工具，用于保存日、会话、主题、项目和关系弧线摘要。
+- `MemoryEntity` 新增 `confidence`、`sourceMessageIds`、`updatedAt`、`expiresAt` 和 `sensitivity` 元数据，为可信度、来源追踪、过期和隐私策略打底。
+- prompt 记忆注入从固定 top 8 改为「当前输入相关 + 高重要性 + 少量最近 + 摘要」的混合选择。
+- Vision 回复完成后新增后置记忆抽取，用户明确表达“这是/记住/提醒我”等场景时会保存视觉相关记忆。
+
+**工具与上下文**
+- 新增远程 MCP HTTP tools 注册能力，可通过设置中的 MCP HTTP URL 动态接入外部工具。
+- 新增记录搜索、摘要搜索、天气、本地提醒、设备状态、用户上下文设置等工具能力。
+- 工具调用状态继续写入 Room，并可驱动 Presence avatar 的搜索、保存记忆、失败等状态反馈。
+
+**体验**
+- Aura home 和聊天页记忆展示扩展到更多长期记忆条目。
+- Presence avatar 增加更细的加载、流式说话、工具调用、错误和触摸反馈状态。
+- 图片消息会保存 base64 并可从历史消息中恢复显示。
+
+### 变更
+
+- `save_memory` 和 `search_memory` 从直接访问 DAO 改为通过 `MemoryRepository` 执行。
+- 记忆搜索从简单工具内逻辑下沉到 DAO/repository，并加入候选集、评分排序和访问时间更新。
+- prompt selection 会过滤过期记忆；`private` / `sensitive` 记忆只在当前输入强相关时注入。
+- 图片输入仍禁用主 agent tools，但主回复前可注入只读记忆上下文，主回复后再执行后置记忆抽取。
+- `MessageRepository.sendMessage` 与 `saveAssistantMessage` 现在返回消息 id，便于记忆来源追踪。
+- Android 应用版本升级为 `versionCode = 2` / `versionName = "0.1.1"`。
+
+### 修复
+
+- 修复记忆工具非法类型处理和搜索结果排序不稳定的问题。
+- 修复 Vision 普通问句被误保存为记忆的风险，问句类图片识别请求会跳过后置记忆抽取。
+- 修复 prompt 注入中重要但已过期或敏感的记忆可能被无关场景带入的问题。
+
+### 工具链
+
+- Room 数据库 schema 升级到 version 4，并新增 `MIGRATION_3_4`。
+- 补充 `MemoryRepository`、Vision 后置记忆抽取、DAO 查询、runtime 集成和消息 id 返回相关单元测试。
+- 已验证 `testDebugUnitTest` 与 `assembleDebug`。
+
+---
+
 ## [0.1.0] - 2026-05-16
 
 Aura · 奥拉的首个 Android 技术预览版本，完成文本聊天闭环、Koog Agent 流式调用、基础本地存储、模型配置、上下文工具和设置页工具控制。这个版本重点验证「可对话、可记忆、可配置、可调用本地工具」的 Phase 1 agent tools 基线。
