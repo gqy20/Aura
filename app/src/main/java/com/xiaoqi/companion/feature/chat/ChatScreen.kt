@@ -88,6 +88,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onSettingsProviderChanged = { viewModel.updateSettingsProvider(it) },
         onSettingsModelNameChanged = { viewModel.updateSettingsModelName(it) },
         onSettingsBaseUrlChanged = { viewModel.updateSettingsBaseUrl(it) },
+        onSettingsMcpHttpUrlChanged = { viewModel.updateSettingsMcpHttpUrl(it) },
         onSaveSettings = { viewModel.saveSettings() },
         onDeviceStatusEnabledChanged = { viewModel.setDeviceStatusContextEnabled(it) },
         onLocationContextEnabledChanged = { viewModel.setLocationContextEnabled(it) },
@@ -115,6 +116,7 @@ fun ChatScreenContent(
     onSettingsProviderChanged: (LlmProvider) -> Unit,
     onSettingsModelNameChanged: (String) -> Unit,
     onSettingsBaseUrlChanged: (String) -> Unit,
+    onSettingsMcpHttpUrlChanged: (String) -> Unit,
     onSaveSettings: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
@@ -226,12 +228,14 @@ fun ChatScreenContent(
             provider = uiState.settingsProvider,
             modelName = uiState.settingsModelName,
             baseUrl = uiState.settingsBaseUrl,
+            mcpHttpUrl = uiState.settingsMcpHttpUrl,
             message = uiState.settingsMessage,
             toolSettings = uiState.toolCapabilitySettings,
             onApiKeyChanged = onSettingsApiKeyChanged,
             onProviderChanged = onSettingsProviderChanged,
             onModelNameChanged = onSettingsModelNameChanged,
             onBaseUrlChanged = onSettingsBaseUrlChanged,
+            onMcpHttpUrlChanged = onSettingsMcpHttpUrlChanged,
             onSave = onSaveSettings,
             onDeviceStatusEnabledChanged = onDeviceStatusEnabledChanged,
             onLocationContextEnabledChanged = onLocationContextEnabledChanged,
@@ -434,12 +438,14 @@ private fun SettingsDialog(
     provider: LlmProvider,
     modelName: String,
     baseUrl: String,
+    mcpHttpUrl: String,
     message: String?,
     toolSettings: ChatToolCapabilitySettings,
     onApiKeyChanged: (String) -> Unit,
     onProviderChanged: (LlmProvider) -> Unit,
     onModelNameChanged: (String) -> Unit,
     onBaseUrlChanged: (String) -> Unit,
+    onMcpHttpUrlChanged: (String) -> Unit,
     onSave: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
@@ -522,6 +528,15 @@ private fun SettingsDialog(
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("API Key") },
                     placeholder = { Text("留空则保留当前 Key") },
+                    singleLine = true,
+                )
+
+                OutlinedTextField(
+                    value = mcpHttpUrl,
+                    onValueChange = onMcpHttpUrlChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("MCP HTTP URL") },
+                    placeholder = { Text("https://example.com/mcp") },
                     singleLine = true,
                 )
 
@@ -633,6 +648,15 @@ private fun ToolCapabilitiesSection(
             tools = "create_local_reminder",
             enabled = settings.reminderToolEnabled,
             onEnabledChanged = onReminderToolEnabledChanged,
+        )
+        ToolCapabilityRow(
+            title = "Remote MCP",
+            detail = settings.mcpHttpUrl.ifBlank { "No remote MCP server configured" },
+            meta = "HTTP",
+            tools = "mcp__*",
+            enabled = settings.mcpHttpUrl.isNotBlank(),
+            locked = true,
+            onEnabledChanged = {},
         )
         ToolCapabilityRow(
             title = "通知开关",

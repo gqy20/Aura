@@ -1,0 +1,63 @@
+package com.xiaoqi.companion.core.mcp
+
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class McpToolAdapterTest {
+
+    @Test
+    fun remoteTool_exposesPrefixedDescriptorAndCallsOriginalToolName() = runTest {
+        val client = RecordingMcpClient()
+        val tool = McpRemoteTool(
+            serverUrl = "https://mcp.example.com/mcp",
+            spec = McpToolSpec(
+                name = "web_search",
+                description = "Search the web",
+                inputSchema = buildJsonObject {
+                    put("type", "object")
+                    put(
+                        "properties",
+                        buildJsonObject {
+                            put(
+                                "query",
+                                buildJsonObject {
+                                    put("type", "string")
+                                    put("description", "Query text")
+                                },
+                            )
+                        },
+                    )
+                    put("required", kotlinx.serialization.json.buildJsonArray { add(JsonPrimitive("query")) })
+                },
+            ),
+            client = client,
+        )
+
+        val result = tool.execute(buildJsonObject { put("query", "android") })
+
+        assertEquals("ok", result)
+        assertTrue(tool.descriptor.name.startsWith("mcp__mcp_example_com__web_search"))
+        assertEquals("web_search", client.calledToolName)
+        assertEquals("android", client.arguments["query"]?.let { (it as JsonPrimitive).content })
+        assertEquals(listOf("query"), tool.descriptor.requiredParameters.map { it.name })
+    }
+
+    private class RecordingMcpClient : RemoteMcpClient {
+        lateinit var calledToolName: String
+        lateinit var arguments: JsonObject
+
+        override suspend fun listTools(serverUrl: String): List<McpToolSpec> = emptyList()
+
+        override suspend fun callTool(serverUrl: String, toolName: String, arguments: JsonObject): String {
+            calledToolName = toolName
+            this.arguments = arguments
+            return "ok"
+        }
+    }
+}

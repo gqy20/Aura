@@ -66,6 +66,7 @@ data class ChatToolCapabilitySettings(
     val weatherContextEnabled: Boolean = true,
     val reminderToolEnabled: Boolean = true,
     val notificationEnabled: Boolean = true,
+    val mcpHttpUrl: String = "",
 )
 
 data class ChatImageAttachment(
@@ -86,6 +87,7 @@ data class ChatUiState(
     val isSettingsOpen: Boolean = false,
     val settingsApiKey: String = "",
     val settingsBaseUrl: String = "",
+    val settingsMcpHttpUrl: String = "",
     val settingsProvider: LlmProvider = LlmProvider.GLM,
     val settingsModelName: String = "glm-5v-turbo",
     val settingsMessage: String? = null,

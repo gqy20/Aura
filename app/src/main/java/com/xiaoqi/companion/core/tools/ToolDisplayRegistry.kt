@@ -34,7 +34,11 @@ class ToolDisplayRegistry @Inject constructor() {
                 "已更新关系",
                 "关系更新失败",
             )
-            else -> ToolDisplayLabels("使用工具中", "工具已完成", "工具失败")
+            else -> if (toolName.startsWith("mcp__")) {
+                ToolDisplayLabels("Calling remote MCP", "Remote MCP done", "Remote MCP failed")
+            } else {
+                ToolDisplayLabels("使用工具中", "工具已完成", "工具失败")
+            }
         }
 
     private data class ToolDisplayLabels(
