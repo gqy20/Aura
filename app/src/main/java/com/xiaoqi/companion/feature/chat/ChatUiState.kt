@@ -47,6 +47,8 @@ data class ChatMemory(
     val content: String,
     val type: String,
     val importance: Float,
+    val source: String = "",
+    val timestamp: Long = 0L,
 )
 
 data class ChatConfigStatus(

@@ -64,6 +64,7 @@ class ChatViewModel @Inject constructor(
         private const val STREAMING_IDLE_TIMEOUT_MS = 30_000L
         private const val STREAMING_RENDER_BATCH_MS = 90L
         private const val STREAMING_RENDER_BATCH_CHARS = 48
+        private const val IMAGE_ONLY_PROMPT = "我想给你看这张图片。先说说你看到了什么，再自然地回应我。"
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -137,7 +138,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             memoryDao.observeAll().collect { memories ->
                 _uiState.update { state ->
-                    state.copy(memories = memories.take(5).map { it.toChatMemory() }).withPresence()
+                    state.copy(memories = memories.take(24).map { it.toChatMemory() }).withPresence()
                 }
             }
         }
@@ -239,11 +240,12 @@ class ChatViewModel @Inject constructor(
             "hasImage" to (attachment != null),
         )
 
-        val userContent = trimmed.ifBlank { "请看这张图片，并结合我们的对话自然回应。" }
+        val userPrompt = trimmed.ifBlank { IMAGE_ONLY_PROMPT }
+        val userDisplayContent = trimmed.ifBlank { "Shared a picture" }
         val userMsg = ChatMessage(
             id = UUID.randomUUID().toString(),
             role = "USER",
-            content = userContent,
+            content = userDisplayContent,
             imageUri = attachment?.uriString,
         )
         _uiState.update {
@@ -337,12 +339,13 @@ class ChatViewModel @Inject constructor(
 
                 val userInput = if (attachment != null) {
                     UserInput.Vision(
-                        text = userContent,
+                        text = userPrompt,
                         imageBase64 = attachment.imageBase64,
                         mediaType = attachment.mediaType,
+                        displayText = userDisplayContent,
                     )
                 } else {
-                    UserInput.Text(userContent)
+                    UserInput.Text(userPrompt)
                 }
 
                 runtime.send(userInput).collect { event ->
@@ -445,6 +448,12 @@ class ChatViewModel @Inject constructor(
 
     fun closeMemoryRoom() {
         _uiState.update { it.copy(isMemoryRoomOpen = false) }
+    }
+
+    fun deleteMemory(memoryId: String) {
+        viewModelScope.launch {
+            memoryDao.deleteById(memoryId)
+        }
     }
 
     fun openSettings() {
@@ -591,6 +600,7 @@ class ChatViewModel @Inject constructor(
             },
             content = content,
             timestamp = timestamp,
+            imageUri = imageBase64?.let { "data:image/jpeg;base64,$it" },
         )
 
     private fun MemoryEntity.toChatMemory(): ChatMemory =
@@ -599,6 +609,8 @@ class ChatViewModel @Inject constructor(
             content = content,
             type = type.name,
             importance = importance,
+            source = source,
+            timestamp = timestamp,
         )
 
     private fun CompanionStatus.after(

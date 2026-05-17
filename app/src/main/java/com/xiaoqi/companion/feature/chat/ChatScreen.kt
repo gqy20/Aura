@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -83,6 +81,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onClearError = { viewModel.clearError() },
         onOpenMemoryRoom = { viewModel.openMemoryRoom() },
         onCloseMemoryRoom = { viewModel.closeMemoryRoom() },
+        onDeleteMemory = { viewModel.deleteMemory(it) },
         onOpenSettings = { viewModel.openSettings() },
         onCloseSettings = { viewModel.closeSettings() },
         onSettingsApiKeyChanged = { viewModel.updateSettingsApiKey(it) },
@@ -109,6 +108,7 @@ fun ChatScreenContent(
     onClearError: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
     onCloseMemoryRoom: () -> Unit,
+    onDeleteMemory: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onCloseSettings: () -> Unit,
     onSettingsApiKeyChanged: (String) -> Unit,
@@ -216,6 +216,7 @@ fun ChatScreenContent(
         MemoryRoomDialog(
             memories = uiState.memories,
             onDismiss = onCloseMemoryRoom,
+            onDeleteMemory = onDeleteMemory,
         )
     }
 
@@ -731,6 +732,7 @@ private fun CapabilityMetaPill(text: String) {
 private fun MemoryRoomDialog(
     memories: List<ChatMemory>,
     onDismiss: () -> Unit,
+    onDeleteMemory: (String) -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -757,7 +759,7 @@ private fun MemoryRoomDialog(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Long-term things Aura remembers",
+                            text = memoryRoomSubtitle(memories),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -784,7 +786,10 @@ private fun MemoryRoomDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(memories, key = { it.id }) { memory ->
-                            MemoryRoomItem(memory = memory)
+                            MemoryRoomItemCard(
+                                memory = memory,
+                                onDelete = { onDeleteMemory(memory.id) },
+                            )
                         }
                     }
                 }
@@ -818,6 +823,85 @@ private fun MemoryRoomItem(memory: ChatMemory) {
         }
     }
 }
+
+@Composable
+private fun MemoryRoomItemCard(
+    memory: ChatMemory,
+    onDelete: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CapabilityMetaPill(text = memory.type.memoryTypeLabel())
+                    Text(
+                        text = memory.source.memorySourceLabel(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                Text(
+                    text = memory.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Importance ${String.format("%.2f", memory.importance)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                )
+            }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.semantics { contentDescription = "Delete memory" },
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private fun memoryRoomSubtitle(memories: List<ChatMemory>): String {
+    val facts = memories.count { it.type == "FACT" }
+    val episodes = memories.count { it.type == "EPISODE" }
+    val procedures = memories.count { it.type == "PROCEDURAL" }
+    return "${memories.size} memories · $facts facts · $episodes moments · $procedures habits"
+}
+
+private fun String.memoryTypeLabel(): String =
+    when (this) {
+        "FACT" -> "About you"
+        "EPISODE" -> "Moment"
+        "PROCEDURAL" -> "Habit"
+        else -> lowercase()
+    }
+
+private fun String.memorySourceLabel(): String =
+    when {
+        isBlank() -> "Saved by Aura"
+        startsWith("tool:") -> "Saved by Aura"
+        else -> this
+    }
 
 @Composable
 private fun InputBar(
@@ -910,31 +994,52 @@ private fun PendingImagePreview(
     imageUri: String,
     onRemoveImage: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .heightIn(max = 148.dp)
-            .widthIn(max = 190.dp),
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        AsyncImage(
-            model = imageUri,
-            contentDescription = "Selected image",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .height(132.dp)
-                .width(176.dp)
-                .clip(RoundedCornerShape(8.dp)),
-        )
-        IconButton(
-            onClick = onRemoveImage,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .semantics { contentDescription = "Remove image" },
+        Row(
+            modifier = Modifier.padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary,
+            AsyncImage(
+                model = imageUri,
+                contentDescription = "Selected image",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .height(78.dp)
+                    .width(96.dp)
+                    .clip(RoundedCornerShape(10.dp)),
             )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = "Ready to share",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Add a thought, or send it as-is.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            IconButton(
+                onClick = onRemoveImage,
+                modifier = Modifier.semantics { contentDescription = "Remove image" },
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -214,6 +214,31 @@ class CompanionRuntimeTest {
         }
         coVerify { promptBuilder.build(match<UserInput> { it is UserInput.Vision }, any(), any(), any()) }
     }
+
+    @Test
+    fun send_visionInput_storesImageWithUserMessage() = runTest {
+        val factory = FakeKoogAgentFactory()
+        makeRuntime(factory).send(
+            UserInput.Vision(
+                text = "Describe this",
+                imageBase64 = "base64img",
+                mediaType = "image/jpeg",
+                displayText = "Shared a picture",
+            )
+        ).test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify {
+            messageRepo.sendMessage(
+                sessionId = "default",
+                content = "Shared a picture",
+                imageBase64 = "base64img",
+            )
+        }
+    }
+
     @Test
     fun send_agentToolEvents_emitsObservableToolEvents() = runTest {
         val factory = FakeKoogAgentFactory().apply { emitToolEvents = true }

@@ -13,6 +13,7 @@ import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
@@ -252,7 +253,45 @@ class ChatViewModelTest {
 
         val input = fakeRuntime.lastInput
         assertTrue(input is UserInput.Vision)
-        assertTrue((input as UserInput.Vision).text.contains("请看这张图片"))
+        input as UserInput.Vision
+        assertTrue(input.text.contains("给你看这张图片"))
+        assertEquals("Shared a picture", input.content)
+        assertTrue(viewModel.uiState.value.messages.any { it.content == "Shared a picture" })
+    }
+
+    @Test
+    fun restoredImageMessage_usesDataUriForDisplay() = runTest {
+        val imageMessageRepo: MessageRepository = mockk(relaxed = true) {
+            every { getMessagesBySession("default") } returns flowOf(
+                listOf(
+                    MessageEntity(
+                        id = "image-message",
+                        sessionId = "default",
+                        role = MessageRole.USER,
+                        content = "Shared a picture",
+                        imageBase64 = "stored-base64",
+                        timestamp = 1_000L,
+                    )
+                )
+            )
+        }
+        val imageViewModel = ChatViewModel(
+            fakeRuntime,
+            ToolDisplayRegistry(),
+            toolCallRepository,
+            configRepo,
+            imageProcessor,
+            imageMessageRepo,
+            memoryDao,
+            agentStateDao,
+            PresenceController(),
+            appPreferences,
+        )
+
+        advanceUntilIdle()
+
+        val message = imageViewModel.uiState.value.messages.single()
+        assertEquals("data:image/jpeg;base64,stored-base64", message.imageUri)
     }
 
     @Test
@@ -265,6 +304,14 @@ class ChatViewModelTest {
         assertNull(viewModel.uiState.value.pendingImage)
         assertEquals("图片处理失败，请换一张试试。", viewModel.uiState.value.error)
         assertFalse(viewModel.uiState.value.isPreparingImage)
+    }
+
+    @Test
+    fun deleteMemory_removesMemoryById() = runTest {
+        viewModel.deleteMemory("memory-1")
+        advanceUntilIdle()
+
+        coVerify { memoryDao.deleteById("memory-1") }
     }
 
     @Test

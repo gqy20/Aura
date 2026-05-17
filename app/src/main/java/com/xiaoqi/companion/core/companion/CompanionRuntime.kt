@@ -70,7 +70,11 @@ open class CompanionRuntime @Inject constructor(
             )
             val agent = koogAgentFactory.create(config)
 
-            messageRepository.sendMessage(sessionId = DEFAULT_SESSION_ID, content = input.content)
+            messageRepository.sendMessage(
+                sessionId = DEFAULT_SESSION_ID,
+                content = input.content,
+                imageBase64 = (input as? UserInput.Vision)?.imageBase64,
+            )
 
             var rawResponse = ""
             val job = launch(Dispatchers.IO) {

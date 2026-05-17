@@ -10,8 +10,9 @@ sealed class UserInput {
         val text: String,
         val imageBase64: String,
         val mediaType: String = "image/jpeg",
+        val displayText: String = text,
     ) : UserInput() {
-        override val content get() = text
+        override val content get() = displayText.ifBlank { "Shared a picture" }
     }
     data class Speech(val transcript: String) : UserInput() {
         override val content get() = transcript
