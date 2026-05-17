@@ -85,12 +85,48 @@ class MemoryRepositoryTest : BaseDaoTest() {
         assertFalse(context.summarySnippets.single().isBlank())
     }
 
+    @Test
+    fun selectPromptContext_excludesExpiredMemories() = runTest {
+        memoryDao.insert(
+            memory(
+                id = "expired",
+                content = "User used to live in Tokyo",
+                importance = 0.95f,
+                expiresAt = System.currentTimeMillis() - 1_000L,
+            )
+        )
+
+        val context = repository.selectPromptContext("Where did I live?")
+
+        assertFalse(context.memoryIds.contains("expired"))
+    }
+
+    @Test
+    fun selectPromptContext_onlyIncludesPrivateMemoryWhenRelevant() = runTest {
+        memoryDao.insert(
+            memory(
+                id = "private",
+                content = "User private journal mentions jasmine tea",
+                importance = 0.95f,
+                sensitivity = "private",
+            )
+        )
+
+        val unrelated = repository.selectPromptContext("What should I cook tonight?")
+        val related = repository.selectPromptContext("Do I mention jasmine tea?")
+
+        assertFalse(unrelated.memoryIds.contains("private"))
+        assertTrue(related.memoryIds.contains("private"))
+    }
+
     private fun memory(
         id: String,
         content: String,
         importance: Float = 0.5f,
         timestamp: Long = System.currentTimeMillis(),
         lastAccessed: Long = timestamp,
+        expiresAt: Long? = null,
+        sensitivity: String = "normal",
     ) = MemoryEntity(
         id = id,
         type = MemoryType.FACT,
@@ -98,6 +134,8 @@ class MemoryRepositoryTest : BaseDaoTest() {
         importance = importance,
         timestamp = timestamp,
         lastAccessed = lastAccessed,
+        expiresAt = expiresAt,
+        sensitivity = sensitivity,
     )
 
     private fun summary(

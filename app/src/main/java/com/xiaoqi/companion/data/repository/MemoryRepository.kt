@@ -108,7 +108,9 @@ class MemoryRepository @Inject constructor(
             val query = inputText.trim()
             val relevant = searchPromptCandidates(query)
             val important = memoryDao.getPromptMemories(PROMPT_IMPORTANT_LIMIT)
+                .filterUsableForPrompt(query, allowPrivateWhenRelevant = false)
             val recent = memoryDao.getRecentMemories(PROMPT_RECENT_LIMIT)
+                .filterUsableForPrompt(query, allowPrivateWhenRelevant = false)
             val selectedMemories = mergeMemoryBuckets(relevant, important, recent).take(PROMPT_MEMORY_LIMIT)
             val summaries = searchPromptSummaries(query)
 
@@ -141,6 +143,7 @@ class MemoryRepository @Inject constructor(
             .flatMap { term -> searchMemories(query = term, limit = PROMPT_RELEVANT_LIMIT).memories }
         return (fullPhraseMatches + termMatches)
             .distinctBy { it.id }
+            .filterUsableForPrompt(query, allowPrivateWhenRelevant = true)
             .take(PROMPT_RELEVANT_LIMIT)
     }
 
@@ -288,3 +291,28 @@ private fun normalizeSensitivity(value: String): String =
         "sensitive" -> "sensitive"
         else -> "normal"
     }
+
+private fun List<MemoryEntity>.filterUsableForPrompt(
+    query: String,
+    allowPrivateWhenRelevant: Boolean,
+): List<MemoryEntity> {
+    val now = System.currentTimeMillis()
+    val terms = query.keyTerms()
+    return filter { memory ->
+        val isExpired = memory.expiresAt?.let { it <= now } == true
+        if (isExpired) return@filter false
+
+        when (normalizeSensitivity(memory.sensitivity)) {
+            "normal" -> true
+            "private" -> allowPrivateWhenRelevant && memory.matchesAnyTerm(terms)
+            "sensitive" -> allowPrivateWhenRelevant && memory.matchesAnyTerm(terms) && terms.size >= 2
+            else -> true
+        }
+    }
+}
+
+private fun MemoryEntity.matchesAnyTerm(terms: List<String>): Boolean {
+    if (terms.isEmpty()) return false
+    val haystack = content.lowercase()
+    return terms.any { haystack.contains(it) }
+}

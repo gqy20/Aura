@@ -26,6 +26,7 @@ open class CompanionRuntime @Inject constructor(
     private val outputParser: OutputParser,
     private val messageRepository: MessageRepository,
     private val memoryRepository: MemoryRepository,
+    private val visionMemoryExtractor: VisionMemoryExtractor,
     private val emotionMachine: EmotionStateMachine,
     private val relationshipModel: RelationshipModel,
 ) {
@@ -67,7 +68,7 @@ open class CompanionRuntime @Inject constructor(
             )
             val agent = koogAgentFactory.create(config)
 
-            messageRepository.sendMessage(
+            val userMessageId = messageRepository.sendMessage(
                 sessionId = DEFAULT_SESSION_ID,
                 content = input.content,
                 imageBase64 = (input as? UserInput.Vision)?.imageBase64,
@@ -104,7 +105,7 @@ open class CompanionRuntime @Inject constructor(
                 trySend(AgentEvent.Error(AgentError.ParseError("Empty model response")))
             } else {
                 val parsed = outputParser.parse(rawResponse)
-                messageRepository.saveAssistantMessage(
+                val assistantMessageId = messageRepository.saveAssistantMessage(
                     sessionId = DEFAULT_SESSION_ID,
                     content = parsed.textReply,
                 )
@@ -118,6 +119,21 @@ open class CompanionRuntime @Inject constructor(
 
                 emotionMachine.feed(parsed.emotionSignal)
                 relationshipModel.update(parsed.interactionSignal)
+                (input as? UserInput.Vision)?.let { visionInput ->
+                    runCatching {
+                        visionMemoryExtractor.extractAndSave(
+                            input = visionInput,
+                            assistantReply = parsed.textReply,
+                            sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
+                        )
+                    }.onFailure { error ->
+                        AppLogger.warn(
+                            LogTags.Runtime,
+                            "vision_memory_extract_failed",
+                            "message" to (error.message ?: error::class.simpleName.orEmpty()),
+                        )
+                    }
+                }
 
                 AppLogger.info(
                     LogTags.Runtime,

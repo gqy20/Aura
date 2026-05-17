@@ -63,6 +63,9 @@ class CompanionRuntimeTest {
     }
     private val emotionMachine: EmotionStateMachine = mockk(relaxed = true)
     private val relationshipModel: RelationshipModel = mockk(relaxed = true)
+    private val visionMemoryExtractor: VisionMemoryExtractor = mockk(relaxed = true) {
+        coEvery { extractAndSave(any(), any(), any()) } returns false
+    }
 
     private class FakeKoogAgentFactory : KoogAgentFactory {
         var lastConfig: com.xiaoqi.companion.data.repository.LlmConfig? = null
@@ -109,6 +112,7 @@ class CompanionRuntimeTest {
         outputParser = outputParser,
         messageRepository = messageRepo,
         memoryRepository = memoryRepository,
+        visionMemoryExtractor = visionMemoryExtractor,
         emotionMachine = emotionMachine,
         relationshipModel = relationshipModel,
     )
@@ -239,6 +243,33 @@ class CompanionRuntimeTest {
                 sessionId = "default",
                 content = "Shared a picture",
                 imageBase64 = "base64img",
+            )
+        }
+    }
+
+    @Test
+    fun send_visionInput_runsPostResponseMemoryExtraction() = runTest {
+        val factory = FakeKoogAgentFactory()
+        coEvery { messageRepo.sendMessage(any(), any(), any()) } returns "user-message"
+        coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
+
+        makeRuntime(factory).send(
+            UserInput.Vision(
+                text = "这是我的猫，叫奶茶",
+                imageBase64 = "base64img",
+                mediaType = "image/jpeg",
+                displayText = "这是我的猫，叫奶茶",
+            )
+        ).test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify {
+            visionMemoryExtractor.extractAndSave(
+                match { it.text.contains("奶茶") },
+                any(),
+                listOf("user-message", "assistant-message"),
             )
         }
     }

@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.Flow
 
 interface MessageRepository {
     fun getMessagesBySession(sessionId: String): Flow<List<MessageEntity>>
-    suspend fun sendMessage(sessionId: String, content: String, imageBase64: String? = null)
-    suspend fun saveAssistantMessage(sessionId: String, content: String)
+    suspend fun sendMessage(sessionId: String, content: String, imageBase64: String? = null): String
+    suspend fun saveAssistantMessage(sessionId: String, content: String): String
     suspend fun deleteSession(sessionId: String)
 }
 
@@ -21,7 +21,7 @@ class MessageRepositoryImpl @Inject constructor(private val dao: MessageDao) : M
     override fun getMessagesBySession(sessionId: String): Flow<List<MessageEntity>> =
         dao.observeBySession(sessionId)
 
-    override suspend fun sendMessage(sessionId: String, content: String, imageBase64: String?) {
+    override suspend fun sendMessage(sessionId: String, content: String, imageBase64: String?): String {
         AppLogger.debug(
             LogTags.Repo,
             "message_insert_started",
@@ -29,9 +29,10 @@ class MessageRepositoryImpl @Inject constructor(private val dao: MessageDao) : M
             "contentLength" to content.length,
             "hasImage" to (imageBase64 != null),
         )
+        val id = java.util.UUID.randomUUID().toString()
         dao.insert(
             MessageEntity(
-                id = java.util.UUID.randomUUID().toString(),
+                id = id,
                 sessionId = sessionId,
                 role = MessageRole.USER,
                 content = content,
@@ -39,24 +40,27 @@ class MessageRepositoryImpl @Inject constructor(private val dao: MessageDao) : M
                 timestamp = System.currentTimeMillis(),
             )
         )
+        return id
     }
 
-    override suspend fun saveAssistantMessage(sessionId: String, content: String) {
+    override suspend fun saveAssistantMessage(sessionId: String, content: String): String {
         AppLogger.debug(
             LogTags.Repo,
             "assistant_message_insert_started",
             "sessionHash" to LogFieldSanitizer.hash(sessionId),
             "contentLength" to content.length,
         )
+        val id = java.util.UUID.randomUUID().toString()
         dao.insert(
             MessageEntity(
-                id = java.util.UUID.randomUUID().toString(),
+                id = id,
                 sessionId = sessionId,
                 role = MessageRole.ASSISTANT,
                 content = content,
                 timestamp = System.currentTimeMillis(),
             )
         )
+        return id
     }
 
     override suspend fun deleteSession(sessionId: String) {

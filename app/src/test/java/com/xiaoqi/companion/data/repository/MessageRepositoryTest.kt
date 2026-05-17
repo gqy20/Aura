@@ -40,10 +40,11 @@ class MessageRepositoryTest {
         }
 
         val repo = MessageRepositoryImpl(dao)
-        repo.sendMessage(sessionId = "s1", content = "hello")
+        val id = repo.sendMessage(sessionId = "s1", content = "hello")
 
+        assertEquals(36, id.length)
         coVerify { dao.insert(match<MessageEntity> {
-            it.role == MessageRole.USER && it.content == "hello" && it.sessionId == "s1"
+            it.id == id && it.role == MessageRole.USER && it.content == "hello" && it.sessionId == "s1"
         }) }
     }
 
@@ -54,11 +55,12 @@ class MessageRepositoryTest {
         }
 
         val repo = MessageRepositoryImpl(dao)
-        repo.saveAssistantMessage(sessionId = "s1", content = "hello back")
+        val id = repo.saveAssistantMessage(sessionId = "s1", content = "hello back")
 
+        assertEquals(36, id.length)
         coVerify {
             dao.insert(match<MessageEntity> {
-                it.role == MessageRole.ASSISTANT && it.content == "hello back" && it.sessionId == "s1"
+                it.id == id && it.role == MessageRole.ASSISTANT && it.content == "hello back" && it.sessionId == "s1"
             })
         }
     }
