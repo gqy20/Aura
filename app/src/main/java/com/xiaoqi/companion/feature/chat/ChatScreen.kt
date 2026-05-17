@@ -670,7 +670,7 @@ private fun ToolCapabilitiesSection(
             title = "记忆、情绪与关系",
             detail = "本地记忆与陪伴状态更新",
             meta = "本地 · 始终可用",
-            tools = "save_memory · search_memory · update_mood · update_relationship",
+            tools = "save_memory · search_memory · search_records · save_summary · search_summaries",
             enabled = true,
             locked = true,
             onEnabledChanged = {},

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -27,6 +28,63 @@ interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getById(id: String): MessageEntity?
+
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE session_id = :sessionId
+          AND (:role IS NULL OR role = :role)
+          AND (:after IS NULL OR timestamp >= :after)
+          AND (:before IS NULL OR timestamp <= :before)
+          AND (
+              :hasImage IS NULL
+              OR (:hasImage = 1 AND imageBase64 IS NOT NULL)
+              OR (:hasImage = 0 AND imageBase64 IS NULL)
+          )
+          AND content LIKE :pattern ESCAPE '\'
+        ORDER BY timestamp DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchRecords(
+        sessionId: String,
+        pattern: String,
+        role: MessageRole?,
+        after: Long?,
+        before: Long?,
+        hasImage: Boolean?,
+        limit: Int,
+    ): List<MessageEntity>
+
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE session_id = :sessionId
+          AND timestamp < :timestamp
+        ORDER BY timestamp DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun getMessagesBefore(
+        sessionId: String,
+        timestamp: Long,
+        limit: Int,
+    ): List<MessageEntity>
+
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE session_id = :sessionId
+          AND timestamp > :timestamp
+        ORDER BY timestamp ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun getMessagesAfter(
+        sessionId: String,
+        timestamp: Long,
+        limit: Int,
+    ): List<MessageEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: MessageEntity)

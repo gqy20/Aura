@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 
 enum class MessageRole { USER, ASSISTANT, SYSTEM }
 enum class MemoryType { FACT, EPISODE, PROCEDURAL }
+enum class SummaryType { DAILY, SESSION, TOPIC, PROJECT, RELATIONSHIP }
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 enum class LlmProvider { GLM, KIMI }
 
@@ -37,6 +38,12 @@ object Converters {
     fun memoryTypeToString(type: MemoryType): String = type.name
     @TypeConverter
     fun stringToMemoryType(value: String): MemoryType = enumValueOf(value)
+
+    // --- SummaryType ---
+    @TypeConverter
+    fun summaryTypeToString(type: SummaryType): String = type.name
+    @TypeConverter
+    fun stringToSummaryType(value: String): SummaryType = enumValueOf(value)
 
     // --- ThemeMode ---
     @TypeConverter

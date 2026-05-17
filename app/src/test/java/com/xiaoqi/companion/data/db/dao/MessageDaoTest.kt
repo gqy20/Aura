@@ -132,6 +132,40 @@ class MessageDaoTest : BaseDaoTest() {
         assertEquals(0L, summary.lastUserMessageAt)
     }
 
+    @Test
+    fun searchRecords_findsRawMessagesWithFilters() = runTest {
+        dao.insert(makeMessage(id = "m1", role = MessageRole.USER, content = "We discussed MCP records", timestamp = 1_000L))
+        dao.insert(makeMessage(id = "m2", role = MessageRole.ASSISTANT, content = "MCP summary is separate", timestamp = 2_000L))
+        dao.insert(makeMessage(id = "m3", role = MessageRole.USER, content = "Vision photo note", imageBase64 = "base64", timestamp = 3_000L))
+        dao.insert(makeMessage(id = "other", sessionId = "other", role = MessageRole.USER, content = "MCP elsewhere", timestamp = 4_000L))
+
+        val results = dao.searchRecords(
+            sessionId = "default",
+            pattern = "%MCP%",
+            role = MessageRole.USER,
+            after = 500L,
+            before = 2_500L,
+            hasImage = false,
+            limit = 10,
+        )
+
+        assertEquals(listOf("m1"), results.map { it.id })
+    }
+
+    @Test
+    fun getMessagesBeforeAndAfter_returnsNearbyContext() = runTest {
+        dao.insert(makeMessage(id = "m1", timestamp = 1_000L))
+        dao.insert(makeMessage(id = "m2", timestamp = 2_000L))
+        dao.insert(makeMessage(id = "m3", timestamp = 3_000L))
+        dao.insert(makeMessage(id = "m4", timestamp = 4_000L))
+
+        val before = dao.getMessagesBefore(sessionId = "default", timestamp = 3_000L, limit = 2)
+        val after = dao.getMessagesAfter(sessionId = "default", timestamp = 2_000L, limit = 2)
+
+        assertEquals(listOf("m2", "m1"), before.map { it.id })
+        assertEquals(listOf("m3", "m4"), after.map { it.id })
+    }
+
     // --- deleteBySession ---
 
     @Test

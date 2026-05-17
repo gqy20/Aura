@@ -11,6 +11,7 @@ import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.db.CompanionDatabase
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
@@ -63,7 +64,7 @@ object DataModule {
             CompanionDatabase::class.java,
             "companion.db",
         )
-            .addMigrations(CompanionDatabase.MIGRATION_1_2)
+            .addMigrations(CompanionDatabase.MIGRATION_1_2, CompanionDatabase.MIGRATION_2_3)
             .build()
 
     @Provides
@@ -77,6 +78,10 @@ object DataModule {
     @Provides
     fun provideMemoryDao(database: CompanionDatabase): MemoryDao =
         database.memoryDao()
+
+    @Provides
+    fun provideMemorySummaryDao(database: CompanionDatabase): MemorySummaryDao =
+        database.memorySummaryDao()
 
     @Provides
     fun provideMoodSnapshotDao(database: CompanionDatabase): MoodSnapshotDao =

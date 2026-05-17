@@ -11,6 +11,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class SaveMemoryTool @Inject constructor(
     private val memoryDao: MemoryDao,
@@ -32,8 +34,8 @@ class SaveMemoryTool @Inject constructor(
 
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.IO) {
-            val normalizedType = runCatching { MemoryType.valueOf(args.type.uppercase()) }
-                .getOrDefault(MemoryType.FACT)
+            val normalizedType = MemoryType.entries.firstOrNull { it.name == args.type.uppercase() }
+                ?: return@withContext invalidType(args.type)
             val safeImportance = args.importance.coerceIn(0f, 1f)
             val memoryId = UUID.randomUUID().toString()
             memoryDao.insert(
@@ -48,4 +50,12 @@ class SaveMemoryTool @Inject constructor(
             )
             """{"status":"saved","memoryId":"$memoryId"}"""
         }
+
+    private fun invalidType(type: String): String =
+        buildJsonObject {
+            put("status", "error")
+            put("reason", "invalid_memory_type")
+            put("type", type)
+            put("allowedTypes", MemoryType.entries.joinToString(",") { it.name })
+        }.toString()
 }

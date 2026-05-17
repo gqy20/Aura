@@ -10,6 +10,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 
 class SearchMemoryTool @Inject constructor(
@@ -33,7 +35,12 @@ class SearchMemoryTool @Inject constructor(
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.IO) {
             val query = args.query.trim()
-            val filterType = args.type.uppercase().takeIf { it.isNotBlank() }?.let { runCatching { MemoryType.valueOf(it) }.getOrNull() }
+            val filterType = args.type.uppercase()
+                .takeIf { it.isNotBlank() }
+                ?.let { type ->
+                    MemoryType.entries.firstOrNull { it.name == type }
+                        ?: return@withContext invalidType(args.type)
+                }
             val limit = args.limit.coerceIn(1, MAX_RESULTS)
             val candidateLimit = (limit * CANDIDATE_MULTIPLIER).coerceAtMost(MAX_CANDIDATES)
             val candidates = memoryDao.searchByContent(
@@ -88,6 +95,14 @@ class SearchMemoryTool @Inject constructor(
         const val CANDIDATE_MULTIPLIER = 4
         val json = Json { encodeDefaults = true }
     }
+
+    private fun invalidType(type: String): String =
+        buildJsonObject {
+            put("status", "error")
+            put("reason", "invalid_memory_type")
+            put("type", type)
+            put("allowedTypes", MemoryType.entries.joinToString(",") { it.name })
+        }.toString()
 }
 
 private fun String.toLikePattern(): String =

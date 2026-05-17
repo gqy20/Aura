@@ -9,11 +9,13 @@ import com.xiaoqi.companion.data.db.converter.Converters
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
+import com.xiaoqi.companion.data.db.entity.MemorySummaryEntity
 import com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity
 import com.xiaoqi.companion.data.db.entity.ToolCallEntity
 
@@ -21,11 +23,12 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
     entities = [
         MessageEntity::class,
         MemoryEntity::class,
+        MemorySummaryEntity::class,
         AgentStateEntity::class,
         MoodSnapshotEntity::class,
         ToolCallEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -33,6 +36,7 @@ abstract class CompanionDatabase : RoomDatabase() {
 
     abstract fun messageDao(): MessageDao
     abstract fun memoryDao(): MemoryDao
+    abstract fun memorySummaryDao(): MemorySummaryDao
     abstract fun agentStateDao(): AgentStateDao
     abstract fun moodSnapshotDao(): MoodSnapshotDao
     abstract fun toolCallDao(): ToolCallDao
@@ -60,6 +64,33 @@ abstract class CompanionDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_tool_calls_toolName` ON `tool_calls` (`toolName`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_tool_calls_status` ON `tool_calls` (`status`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_tool_calls_createdAt` ON `tool_calls` (`createdAt`)")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `memory_summaries` (
+                        `id` TEXT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `summary` TEXT NOT NULL,
+                        `keywords` TEXT NOT NULL DEFAULT '[]',
+                        `sourceMessageIds` TEXT NOT NULL DEFAULT '[]',
+                        `startAt` INTEGER,
+                        `endAt` INTEGER,
+                        `importance` REAL NOT NULL DEFAULT 0.5,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `lastAccessed` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_summaries_type` ON `memory_summaries` (`type`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_summaries_lastAccessed` ON `memory_summaries` (`lastAccessed`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_summaries_startAt_endAt` ON `memory_summaries` (`startAt`, `endAt`)")
             }
         }
     }
