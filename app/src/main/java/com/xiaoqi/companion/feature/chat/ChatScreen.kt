@@ -86,6 +86,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onOpenMemoryRoom = { viewModel.openMemoryRoom() },
         onCloseMemoryRoom = { viewModel.closeMemoryRoom() },
         onDeleteMemory = { viewModel.deleteMemory(it) },
+        onOpenReminders = { viewModel.openReminders() },
+        onCloseReminders = { viewModel.closeReminders() },
+        onCancelReminder = { viewModel.cancelReminder(it) },
         onOpenSettings = { viewModel.openSettings() },
         onCloseSettings = { viewModel.closeSettings() },
         onOpenMcpSettings = { viewModel.openMcpSettings() },
@@ -132,6 +135,9 @@ fun ChatScreenContent(
     onOpenMemoryRoom: () -> Unit,
     onCloseMemoryRoom: () -> Unit,
     onDeleteMemory: (String) -> Unit,
+    onOpenReminders: () -> Unit,
+    onCloseReminders: () -> Unit,
+    onCancelReminder: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onCloseSettings: () -> Unit,
     onOpenMcpSettings: () -> Unit,
@@ -187,8 +193,10 @@ fun ChatScreenContent(
                 presence = uiState.presence,
                 configStatus = uiState.configStatus,
                 memories = uiState.memories,
+                reminders = uiState.reminders,
                 mcpHttpUrl = uiState.toolCapabilitySettings.mcpHttpUrl,
                 onOpenMemoryRoom = onOpenMemoryRoom,
+                onOpenReminders = onOpenReminders,
                 onOpenMcpSettings = onOpenMcpSettings,
                 onOpenSettings = onOpenSettings,
                 onPresenceTapped = onPresenceTapped,
@@ -260,6 +268,13 @@ fun ChatScreenContent(
         )
     }
 
+    if (uiState.isRemindersOpen) {
+        RemindersDialog(
+            reminders = uiState.reminders,
+            onDismiss = onCloseReminders,
+            onCancelReminder = onCancelReminder,
+        )
+    }
 
     if (uiState.isSettingsOpen) {
         SettingsDialog(
@@ -339,12 +354,15 @@ private fun CompanionHeader(
     presence: PresenceUiState,
     configStatus: ChatConfigStatus,
     memories: List<ChatMemory>,
+    reminders: List<ChatReminder>,
     mcpHttpUrl: String,
     onOpenMemoryRoom: () -> Unit,
+    onOpenReminders: () -> Unit,
     onOpenMcpSettings: () -> Unit,
     onOpenSettings: () -> Unit,
     onPresenceTapped: () -> Unit,
 ) {
+    val scheduledReminderCount = reminders.count { it.status == "SCHEDULED" }
 
     Column(
         modifier = Modifier
@@ -390,6 +408,16 @@ private fun CompanionHeader(
                 ) {
                     Text(
                         text = "记忆 ${memories.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                TextButton(
+                    onClick = onOpenReminders,
+                    modifier = Modifier.semantics { contentDescription = "Open reminders" },
+                ) {
+                    Text(
+                        text = "提醒 $scheduledReminderCount",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -1006,6 +1034,131 @@ private fun MemoryRoomDialog(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemindersDialog(
+    reminders: List<ChatReminder>,
+    onDismiss: () -> Unit,
+    onCancelReminder: (String) -> Unit,
+) {
+    val scheduledReminderCount = reminders.count { it.status == "SCHEDULED" }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.72f),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text(
+                            text = "提醒",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "$scheduledReminderCount scheduled · ${reminders.size} total",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(onClick = onDismiss) {
+                        Text("关闭")
+                    }
+                }
+
+                if (reminders.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "No reminders yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(reminders, key = { it.id }) { reminder ->
+                            ReminderItemCard(
+                                reminder = reminder,
+                                onCancel = { onCancelReminder(reminder.id) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReminderItemCard(
+    reminder: ChatReminder,
+    onCancel: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CapabilityMetaPill(text = if (reminder.exact) "Exact" else "Flexible")
+                    CapabilityMetaPill(text = reminder.status.lowercase())
+                }
+                Text(
+                    text = reminder.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = reminder.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "At ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(reminder.triggerAtMillis))}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                )
+            }
+            if (reminder.status == "SCHEDULED") {
+                TextButton(onClick = onCancel) {
+                    Text("取消")
                 }
             }
         }

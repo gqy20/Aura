@@ -11,12 +11,14 @@ import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
+import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MemorySummaryEntity
 import com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity
+import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.data.db.entity.ToolCallEntity
 
 @Database(
@@ -27,8 +29,9 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         AgentStateEntity::class,
         MoodSnapshotEntity::class,
         ToolCallEntity::class,
+        ReminderEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -40,6 +43,7 @@ abstract class CompanionDatabase : RoomDatabase() {
     abstract fun agentStateDao(): AgentStateDao
     abstract fun moodSnapshotDao(): MoodSnapshotDao
     abstract fun toolCallDao(): ToolCallDao
+    abstract fun reminderDao(): ReminderDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -102,6 +106,33 @@ abstract class CompanionDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `memories` ADD COLUMN `expiresAt` INTEGER")
                 db.execSQL("ALTER TABLE `memories` ADD COLUMN `sensitivity` TEXT NOT NULL DEFAULT 'normal'")
                 db.execSQL("UPDATE `memories` SET `updatedAt` = `timestamp` WHERE `updatedAt` = 0")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `reminders` (
+                        `id` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `message` TEXT NOT NULL,
+                        `triggerAtMillis` INTEGER NOT NULL,
+                        `delayMillis` INTEGER NOT NULL,
+                        `exact` INTEGER NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `source` TEXT NOT NULL DEFAULT 'tool:create_local_reminder',
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `firedAt` INTEGER,
+                        `canceledAt` INTEGER,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_triggerAtMillis` ON `reminders` (`triggerAtMillis`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_status` ON `reminders` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_createdAt` ON `reminders` (`createdAt`)")
             }
         }
     }

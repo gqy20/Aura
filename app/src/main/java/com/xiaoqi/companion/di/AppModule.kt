@@ -26,6 +26,8 @@ import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.ConfigRepositoryImpl
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.MessageRepositoryImpl
+import com.xiaoqi.companion.data.repository.ReminderRepository
+import com.xiaoqi.companion.data.repository.ReminderRepositoryImpl
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepositoryImpl
 import com.xiaoqi.companion.feature.chat.AndroidChatImageProcessor
@@ -75,6 +77,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindToolCallRepository(repository: ToolCallRepositoryImpl): ToolCallRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindReminderRepository(repository: ReminderRepositoryImpl): ReminderRepository
 
     @Binds
     @Singleton

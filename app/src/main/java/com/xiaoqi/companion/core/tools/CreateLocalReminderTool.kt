@@ -4,9 +4,8 @@ import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.core.context.ContextPermissionReader
-import com.xiaoqi.companion.core.reminder.ReminderRequest
-import com.xiaoqi.companion.core.reminder.ReminderScheduler
 import com.xiaoqi.companion.data.datastore.AppPreferences
+import com.xiaoqi.companion.data.repository.ReminderRepository
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -18,7 +17,7 @@ import kotlinx.serialization.json.put
 class CreateLocalReminderTool(
     private val appPreferences: AppPreferences,
     private val permissionReader: ContextPermissionReader,
-    private val reminderScheduler: ReminderScheduler,
+    private val reminderRepository: ReminderRepository,
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
 ) : SimpleTool<CreateLocalReminderTool.Args>(
     typeToken<Args>(),
@@ -30,11 +29,11 @@ class CreateLocalReminderTool(
     constructor(
         appPreferences: AppPreferences,
         permissionReader: ContextPermissionReader,
-        reminderScheduler: ReminderScheduler,
+        reminderRepository: ReminderRepository,
     ) : this(
         appPreferences = appPreferences,
         permissionReader = permissionReader,
-        reminderScheduler = reminderScheduler,
+        reminderRepository = reminderRepository,
         nowProvider = { System.currentTimeMillis() },
     )
 
@@ -69,17 +68,15 @@ class CreateLocalReminderTool(
                 ?: args.delayMinutes?.let { now + it.coerceAtLeast(1L) * MILLIS_PER_MINUTE }
                 ?: return@withContext disabled("missing_trigger_time")
             if (triggerAt <= now) return@withContext disabled("trigger_time_must_be_future")
-            if (args.exact && !reminderScheduler.canScheduleExactReminders()) {
+            if (args.exact && !reminderRepository.canScheduleExactReminders()) {
                 return@withContext disabled("exact_alarm_permission_missing")
             }
 
-            val scheduled = reminderScheduler.schedule(
-                ReminderRequest(
-                    title = args.title,
-                    message = args.message,
-                    triggerAtMillis = triggerAt,
-                    exact = args.exact,
-                )
+            val scheduled = reminderRepository.createReminder(
+                title = args.title,
+                message = args.message,
+                triggerAtMillis = triggerAt,
+                exact = args.exact,
             )
             buildJsonObject {
                 put("status", "scheduled")

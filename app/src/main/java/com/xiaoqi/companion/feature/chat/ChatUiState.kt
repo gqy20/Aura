@@ -51,6 +51,14 @@ data class ChatMemory(
     val timestamp: Long = 0L,
 )
 
+data class ChatReminder(
+    val id: String,
+    val title: String,
+    val message: String,
+    val triggerAtMillis: Long,
+    val exact: Boolean,
+    val status: String,
+)
 
 data class ChatConfigStatus(
     val label: String = "模型配置检查中",
@@ -91,11 +99,13 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val toolCalls: List<ChatToolCall> = emptyList(),
     val memories: List<ChatMemory> = emptyList(),
+    val reminders: List<ChatReminder> = emptyList(),
     val status: CompanionStatus = CompanionStatus(),
     val presenceReaction: PresenceReaction? = null,
     val presence: PresenceUiState = PresenceUiState(),
     val configStatus: ChatConfigStatus = ChatConfigStatus(),
     val isMemoryRoomOpen: Boolean = false,
+    val isRemindersOpen: Boolean = false,
     val isSettingsOpen: Boolean = false,
     val isMcpSettingsOpen: Boolean = false,
     val settingsApiKey: String = "",

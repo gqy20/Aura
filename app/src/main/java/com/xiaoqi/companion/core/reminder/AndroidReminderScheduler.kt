@@ -9,7 +9,6 @@ import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -35,14 +34,13 @@ class AndroidReminderScheduler(
     override fun schedule(request: ReminderRequest): ScheduledReminder {
         val now = nowProvider()
         val delayMillis = (request.triggerAtMillis - now).coerceAtLeast(MIN_DELAY_MILLIS)
-        val reminderId = UUID.randomUUID().toString()
         if (request.exact) {
-            scheduleExactAlarm(request, reminderId, delayMillis)
+            scheduleExactAlarm(request, delayMillis)
         } else {
-            scheduleWork(request, reminderId, delayMillis)
+            scheduleWork(request, delayMillis)
         }
         return ScheduledReminder(
-            id = reminderId,
+            id = request.id,
             title = request.title,
             triggerAtMillis = request.triggerAtMillis,
             delayMillis = delayMillis,
@@ -50,12 +48,18 @@ class AndroidReminderScheduler(
         )
     }
 
-    private fun scheduleWork(request: ReminderRequest, reminderId: String, delayMillis: Long) {
+    override fun cancel(reminderId: String) {
+        WorkManager.getInstance(context).cancelWorkById(java.util.UUID.fromString(reminderId))
+        cancelExactAlarm(reminderId)
+    }
+
+    private fun scheduleWork(request: ReminderRequest, delayMillis: Long) {
         val work = OneTimeWorkRequestBuilder<ReminderNotificationWorker>()
-            .setId(UUID.fromString(reminderId))
+            .setId(java.util.UUID.fromString(request.id))
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
             .setInputData(
                 Data.Builder()
+                    .putString(ReminderNotificationWorker.KEY_REMINDER_ID, request.id)
                     .putString(ReminderNotificationWorker.KEY_TITLE, request.title)
                     .putString(ReminderNotificationWorker.KEY_MESSAGE, request.message)
                     .putLong(ReminderNotificationWorker.KEY_TRIGGER_AT, request.triggerAtMillis)
@@ -66,13 +70,14 @@ class AndroidReminderScheduler(
         WorkManager.getInstance(context).enqueue(work)
     }
 
-    private fun scheduleExactAlarm(request: ReminderRequest, reminderId: String, delayMillis: Long) {
+    private fun scheduleExactAlarm(request: ReminderRequest, delayMillis: Long) {
         check(canScheduleExactReminders()) { "Exact alarm permission is not available" }
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            reminderId.hashCode(),
+            request.id.hashCode(),
             Intent(context, ReminderAlarmReceiver::class.java).apply {
+                putExtra(ReminderAlarmReceiver.EXTRA_REMINDER_ID, request.id)
                 putExtra(ReminderAlarmReceiver.EXTRA_TITLE, request.title)
                 putExtra(ReminderAlarmReceiver.EXTRA_MESSAGE, request.message)
             },
@@ -85,6 +90,18 @@ class AndroidReminderScheduler(
             @Suppress("DEPRECATION")
             alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         }
+    }
+
+    private fun cancelExactAlarm(reminderId: String) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            reminderId.hashCode(),
+            Intent(context, ReminderAlarmReceiver::class.java),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) ?: return
+        alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
     }
 
     private companion object {

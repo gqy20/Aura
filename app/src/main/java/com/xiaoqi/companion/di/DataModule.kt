@@ -14,6 +14,7 @@ import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
+import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import dagger.Module
 import dagger.Provides
@@ -68,6 +69,7 @@ object DataModule {
                 CompanionDatabase.MIGRATION_1_2,
                 CompanionDatabase.MIGRATION_2_3,
                 CompanionDatabase.MIGRATION_3_4,
+                CompanionDatabase.MIGRATION_4_5,
             )
             .build()
 
@@ -94,4 +96,8 @@ object DataModule {
     @Provides
     fun provideAgentStateDao(database: CompanionDatabase): AgentStateDao =
         database.agentStateDao()
+
+    @Provides
+    fun provideReminderDao(database: CompanionDatabase): ReminderDao =
+        database.reminderDao()
 }

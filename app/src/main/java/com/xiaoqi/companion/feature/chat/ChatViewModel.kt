@@ -23,10 +23,12 @@ import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
+import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MessageRepository
+import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -55,6 +57,7 @@ class ChatViewModel @Inject constructor(
     private val agentStateDao: AgentStateDao,
     private val presenceController: PresenceController,
     private val appPreferences: AppPreferences,
+    private val reminderRepository: ReminderRepository,
 ) : ViewModel() {
 
     companion object {
@@ -157,6 +160,14 @@ class ChatViewModel @Inject constructor(
             memoryDao.observeAll().collect { memories ->
                 _uiState.update { state ->
                     state.copy(memories = memories.take(24).map { it.toChatMemory() }).withPresence()
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            reminderRepository.observeReminders().collect { reminders ->
+                _uiState.update { state ->
+                    state.copy(reminders = reminders.map { it.toChatReminder() })
                 }
             }
         }
@@ -473,6 +484,20 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(isMemoryRoomOpen = false) }
     }
 
+    fun openReminders() {
+        _uiState.update { it.copy(isRemindersOpen = true) }
+    }
+
+    fun closeReminders() {
+        _uiState.update { it.copy(isRemindersOpen = false) }
+    }
+
+    fun cancelReminder(reminderId: String) {
+        viewModelScope.launch {
+            reminderRepository.cancelReminder(reminderId)
+        }
+    }
+
     fun deleteMemory(memoryId: String) {
         viewModelScope.launch {
             memoryDao.deleteById(memoryId)
@@ -688,6 +713,16 @@ class ChatViewModel @Inject constructor(
             importance = importance,
             source = source,
             timestamp = timestamp,
+        )
+
+    private fun ReminderEntity.toChatReminder(): ChatReminder =
+        ChatReminder(
+            id = id,
+            title = title,
+            message = message,
+            triggerAtMillis = triggerAtMillis,
+            exact = exact,
+            status = status,
         )
 
     private fun CompanionStatus.after(

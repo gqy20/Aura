@@ -1,10 +1,10 @@
 package com.xiaoqi.companion.core.tools
 
 import com.xiaoqi.companion.core.context.ContextPermissionReader
-import com.xiaoqi.companion.core.reminder.ReminderRequest
-import com.xiaoqi.companion.core.reminder.ReminderScheduler
 import com.xiaoqi.companion.core.reminder.ScheduledReminder
 import com.xiaoqi.companion.data.datastore.AppPreferences
+import com.xiaoqi.companion.data.db.entity.ReminderEntity
+import com.xiaoqi.companion.data.repository.ReminderRepository
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
@@ -17,11 +17,11 @@ class CreateLocalReminderToolTest {
 
     @Test
     fun execute_schedulesReminderFromDelay() = runTest {
-        val scheduler = FakeReminderScheduler(now = 1_000L)
+        val reminders = FakeReminderRepository(now = 1_000L)
         val tool = CreateLocalReminderTool(
             appPreferences = preferences(reminders = true, notifications = true),
             permissionReader = permissions(notifications = true),
-            reminderScheduler = scheduler,
+            reminderRepository = reminders,
             nowProvider = { 1_000L },
         )
 
@@ -34,17 +34,17 @@ class CreateLocalReminderToolTest {
         )
 
         assertTrue(result.contains(""""status":"scheduled""""))
-        assertEquals(601_000L, scheduler.lastRequest!!.triggerAtMillis)
-        assertEquals(false, scheduler.lastRequest!!.exact)
+        assertEquals(601_000L, reminders.lastTriggerAtMillis)
+        assertEquals(false, reminders.lastExact)
     }
 
     @Test
     fun execute_schedulesExactReminderWhenPermissionAvailable() = runTest {
-        val scheduler = FakeReminderScheduler(now = 1_000L, exactAvailable = true)
+        val reminders = FakeReminderRepository(now = 1_000L, exactAvailable = true)
         val tool = CreateLocalReminderTool(
             appPreferences = preferences(reminders = true, notifications = true),
             permissionReader = permissions(notifications = true),
-            reminderScheduler = scheduler,
+            reminderRepository = reminders,
             nowProvider = { 1_000L },
         )
 
@@ -59,16 +59,16 @@ class CreateLocalReminderToolTest {
 
         assertTrue(result.contains(""""status":"scheduled""""))
         assertTrue(result.contains(""""exact":true"""))
-        assertEquals(true, scheduler.lastRequest!!.exact)
+        assertEquals(true, reminders.lastExact)
     }
 
     @Test
     fun execute_returnsDisabledWhenExactAlarmPermissionMissing() = runTest {
-        val scheduler = FakeReminderScheduler(now = 1_000L, exactAvailable = false)
+        val reminders = FakeReminderRepository(now = 1_000L, exactAvailable = false)
         val tool = CreateLocalReminderTool(
             appPreferences = preferences(reminders = true, notifications = true),
             permissionReader = permissions(notifications = true),
-            reminderScheduler = scheduler,
+            reminderRepository = reminders,
             nowProvider = { 1_000L },
         )
 
@@ -83,7 +83,7 @@ class CreateLocalReminderToolTest {
 
         assertTrue(result.contains(""""status":"disabled""""))
         assertTrue(result.contains("exact_alarm_permission_missing"))
-        assertEquals(null, scheduler.lastRequest)
+        assertEquals(null, reminders.lastTriggerAtMillis)
     }
 
     @Test
@@ -91,7 +91,7 @@ class CreateLocalReminderToolTest {
         val tool = CreateLocalReminderTool(
             appPreferences = preferences(reminders = true, notifications = true),
             permissionReader = permissions(notifications = false),
-            reminderScheduler = FakeReminderScheduler(now = 1_000L),
+            reminderRepository = FakeReminderRepository(now = 1_000L),
             nowProvider = { 1_000L },
         )
 
@@ -106,7 +106,7 @@ class CreateLocalReminderToolTest {
         val tool = CreateLocalReminderTool(
             appPreferences = preferences(reminders = true, notifications = true),
             permissionReader = permissions(notifications = true),
-            reminderScheduler = FakeReminderScheduler(now = 1_000L),
+            reminderRepository = FakeReminderRepository(now = 1_000L),
             nowProvider = { 1_000L },
         )
 
@@ -127,23 +127,35 @@ class CreateLocalReminderToolTest {
             override fun hasPostNotifications() = notifications
         }
 
-    private class FakeReminderScheduler(
+    private class FakeReminderRepository(
         private val now: Long,
         private val exactAvailable: Boolean = true,
-    ) : ReminderScheduler {
-        var lastRequest: ReminderRequest? = null
+    ) : ReminderRepository {
+        var lastTriggerAtMillis: Long? = null
+        var lastExact: Boolean? = null
+
+        override fun observeReminders() = flowOf(emptyList<ReminderEntity>())
 
         override fun canScheduleExactReminders(): Boolean = exactAvailable
 
-        override fun schedule(request: ReminderRequest): ScheduledReminder {
-            lastRequest = request
+        override suspend fun createReminder(
+            title: String,
+            message: String,
+            triggerAtMillis: Long,
+            exact: Boolean,
+            source: String,
+        ): ScheduledReminder {
+            lastTriggerAtMillis = triggerAtMillis
+            lastExact = exact
             return ScheduledReminder(
                 id = "reminder-1",
-                title = request.title,
-                triggerAtMillis = request.triggerAtMillis,
-                delayMillis = request.triggerAtMillis - now,
-                exact = request.exact,
+                title = title,
+                triggerAtMillis = triggerAtMillis,
+                delayMillis = triggerAtMillis - now,
+                exact = exact,
             )
         }
+
+        override suspend fun cancelReminder(reminderId: String) = Unit
     }
 }

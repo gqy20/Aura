@@ -15,6 +15,7 @@ import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
+import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
@@ -22,6 +23,7 @@ import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.PromptMemoryContext
 import com.xiaoqi.companion.data.repository.MessageRepository
+import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import io.mockk.coEvery
@@ -29,6 +31,7 @@ import io.mockk.every
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +58,7 @@ class ChatViewModelTest {
     private lateinit var viewModel: ChatViewModel
     private lateinit var fakeRuntime: FakeCompanionRuntime
     private lateinit var toolCallRepository: FakeToolCallRepository
+    private lateinit var reminderRepository: FakeReminderRepository
     private lateinit var imageProcessor: FakeChatImageProcessor
     private lateinit var memoryDao: MemoryDao
     private lateinit var agentStateDao: AgentStateDao
@@ -98,6 +102,25 @@ class ChatViewModelTest {
         val calls = MutableStateFlow<List<ToolCallSnapshot>>(emptyList())
 
         override fun observeBySession(sessionId: String) = calls
+    }
+
+    private class FakeReminderRepository : ReminderRepository {
+        val reminders = MutableStateFlow<List<ReminderEntity>>(emptyList())
+        val canceledIds = mutableListOf<String>()
+
+        override fun observeReminders(): Flow<List<ReminderEntity>> = reminders
+        override fun canScheduleExactReminders(): Boolean = true
+        override suspend fun createReminder(
+            title: String,
+            message: String,
+            triggerAtMillis: Long,
+            exact: Boolean,
+            source: String,
+        ) = error("not used in ChatViewModelTest")
+
+        override suspend fun cancelReminder(reminderId: String) {
+            canceledIds += reminderId
+        }
     }
 
     private class FakeCompanionRuntime(
@@ -178,6 +201,7 @@ class ChatViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeRuntime = FakeCompanionRuntime(configRepo, messageRepo)
         toolCallRepository = FakeToolCallRepository()
+        reminderRepository = FakeReminderRepository()
         imageProcessor = FakeChatImageProcessor()
         memoryDao = mockk(relaxed = true) {
             every { observeAll() } returns flowOf(emptyList())
@@ -197,6 +221,7 @@ class ChatViewModelTest {
             agentStateDao,
             PresenceController(),
             appPreferences,
+            reminderRepository,
         )
     }
 
@@ -302,6 +327,7 @@ class ChatViewModelTest {
             agentStateDao,
             PresenceController(),
             appPreferences,
+            reminderRepository,
         )
 
         advanceUntilIdle()
@@ -362,6 +388,7 @@ class ChatViewModelTest {
             agentStateDao,
             PresenceController(),
             appPreferences,
+            reminderRepository,
         )
 
         blockedViewModel.sendMessage("hello")
@@ -429,6 +456,25 @@ class ChatViewModelTest {
 
         assertEquals("MCP URL must start with http:// or https://", viewModel.uiState.value.mcpSettingsMessage)
         assertTrue(viewModel.uiState.value.isMcpSettingsOpen)
+    }
+
+    @Test
+    fun observeReminders_updatesReminderState() = runTest {
+        reminderRepository.reminders.value = listOf(
+            reminderEntity(id = "reminder-1", title = "Water", status = "SCHEDULED")
+        )
+        advanceUntilIdle()
+
+        assertEquals("Water", viewModel.uiState.value.reminders.single().title)
+        assertEquals("SCHEDULED", viewModel.uiState.value.reminders.single().status)
+    }
+
+    @Test
+    fun cancelReminder_delegatesToRepository() = runTest {
+        viewModel.cancelReminder("reminder-1")
+        advanceUntilIdle()
+
+        assertEquals(listOf("reminder-1"), reminderRepository.canceledIds)
     }
 
     @Test
@@ -621,5 +667,21 @@ class ChatViewModelTest {
         errorMessage = errorMessage,
         startedAt = 1_000L,
         completedAt = completedAt,
+    )
+
+    private fun reminderEntity(
+        id: String,
+        title: String,
+        status: String,
+    ) = ReminderEntity(
+        id = id,
+        title = title,
+        message = "Time to $title",
+        triggerAtMillis = 2_000L,
+        delayMillis = 1_000L,
+        exact = true,
+        status = status,
+        createdAt = 1_000L,
+        updatedAt = 1_000L,
     )
 }
