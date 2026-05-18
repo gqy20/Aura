@@ -117,6 +117,7 @@ class ChatViewModelTest {
             )
         },
         visionMemoryExtractor = mockk(relaxed = true),
+        textMemoryExtractor = mockk(relaxed = true),
         emotionMachine = mockk(relaxed = true),
         relationshipModel = mockk(relaxed = true),
     ) {

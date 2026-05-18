@@ -109,4 +109,29 @@ sections:
         assertTrue(config.base.contains("Line one"))
         assertTrue(config.base.contains("Line two"))
     }
+
+    @Test
+    fun parseLines_sectionMultilinePlaceholder_attachesToSection() {
+        val yaml = """
+name: "Bot"
+base: |
+  Base prompt
+sections:
+  tools:
+    title: "Tools"
+    placeholder: |
+      Use save_memory for durable user facts.
+      Use search_memory when the user asks what you remember.
+  memory:
+    title: "Memory"
+    placeholder: "{{memories}}"
+""".trimIndent()
+
+        val config = PromptConfigLoader.parseLines(yaml.lines())
+
+        assertEquals("Tools", config.sections["tools"]?.title)
+        assertTrue(config.sections["tools"]?.placeholder.orEmpty().contains("save_memory"))
+        assertTrue(config.sections["tools"]?.placeholder.orEmpty().contains("search_memory"))
+        assertEquals("{{memories}}", config.sections["memory"]?.placeholder)
+    }
 }

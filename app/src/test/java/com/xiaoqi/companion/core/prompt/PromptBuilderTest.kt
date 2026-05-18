@@ -74,6 +74,40 @@ class PromptBuilderTest {
     }
 
     @Test
+    fun build_replacesDoubleBracePlaceholdersAndIncludesTools() {
+        val config = PromptConfig(
+            name = "Companion",
+            base = "Base {{name}}\n",
+            sections = mapOf(
+                "emotion" to PromptConfig.SectionTemplate("Emotion", "{{emotion_context}}"),
+                "relationship" to PromptConfig.SectionTemplate("Relationship", "{{relationship_context}}"),
+                "memory" to PromptConfig.SectionTemplate("Memory", "{{memories}}"),
+                "tools" to PromptConfig.SectionTemplate(
+                    "Tools",
+                    "Use save_memory for durable facts. Use search_memory for recall.",
+                ),
+            ),
+        )
+        SystemPersona.initForTesting(config)
+
+        val result = builder.build(
+            input = UserInput.Text("hello"),
+            emotionContext = "calm",
+            relationshipContext = "close",
+            memories = listOf("User likes jasmine tea"),
+        )
+
+        assertTrue(result.systemPrompt.contains("calm"))
+        assertTrue(result.systemPrompt.contains("close"))
+        assertTrue(result.systemPrompt.contains("User likes jasmine tea"))
+        assertTrue(result.systemPrompt.contains("save_memory"))
+        assertTrue(result.systemPrompt.contains("search_memory"))
+        assertFalse(result.systemPrompt.contains("{{memories}}"))
+        assertFalse(result.systemPrompt.contains("{User likes jasmine tea}"))
+        initSystemPersonaFromYaml()
+    }
+
+    @Test
     fun build_emptyMemories_omitsSection() {
         val result = builder.build(
             input = UserInput.Text("test"),

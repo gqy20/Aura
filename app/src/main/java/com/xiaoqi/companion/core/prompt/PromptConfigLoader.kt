@@ -29,6 +29,7 @@ object PromptConfigLoader {
     internal fun parseLines(lines: List<String>): PromptConfig {
         val builder = ConfigBuilder()
         var multilineKey: String? = null
+        var multilineSectionName: String? = null
         var multilineBuffer = StringBuilder()
         var multilineIndent = 0
         var inMultiline = false
@@ -55,15 +56,20 @@ object PromptConfigLoader {
 
             if (inMultiline) {
                 // Still inside multiline block?
-                if (indent > multilineIndent || (line.startsWith(" ") && line.trim().isNotEmpty())) {
+                if (indent >= multilineIndent) {
                     multilineBuffer.appendLine(line.trimStart())
                     i++
                     continue
                 }
                 // Multiline block ended — flush and reprocess this line
-                builder.setTopLevel(multilineKey!!, multilineBuffer.toString().trimEnd('\n'))
+                builder.setMultiline(
+                    section = multilineSectionName,
+                    key = multilineKey!!,
+                    value = multilineBuffer.toString().trimEnd('\n'),
+                )
                 inMultiline = false
                 multilineKey = null
+                multilineSectionName = null
                 // Don't increment i; fall through to process lines[i] as normal
             }
 
@@ -75,13 +81,6 @@ object PromptConfigLoader {
             val rest = line.substring(colonIndex + 1).trim()
 
             when {
-                // Section field (4+ spaces under a section name)
-                sectionName != null && indent >= 4 -> {
-                    if (key in listOf("title", "placeholder") && rest.isNotEmpty() && rest != "|") {
-                        builder.setSectionField(sectionName!!, key, rest.unquote())
-                    }
-                }
-
                 // "sections:" map opener
                 key == "sections" -> {
                     sectionName = ""
@@ -92,9 +91,26 @@ object PromptConfigLoader {
                     sectionName = key
                 }
 
+                // Section multi-line field (e.g. placeholder: |)
+                sectionName != null && indent >= 4 && key in listOf("title", "placeholder") && rest == "|" -> {
+                    multilineKey = key
+                    multilineSectionName = sectionName
+                    multilineBuffer = StringBuilder()
+                    multilineIndent = indent + 2
+                    inMultiline = true
+                }
+
+                // Section field (4+ spaces under a section name)
+                sectionName != null && indent >= 4 -> {
+                    if (key in listOf("title", "placeholder") && rest.isNotEmpty()) {
+                        builder.setSectionField(sectionName, key, rest.unquote())
+                    }
+                }
+
                 // Multi-line scalar ("key: |")
                 rest == "|" -> {
                     multilineKey = key
+                    multilineSectionName = null
                     multilineBuffer = StringBuilder()
                     multilineIndent = indent + 2
                     inMultiline = true
@@ -114,7 +130,11 @@ object PromptConfigLoader {
 
         // Flush trailing multiline if file ends mid-block
         if (inMultiline && multilineKey != null) {
-            builder.setTopLevel(multilineKey, multilineBuffer.toString().trimEnd('\n'))
+            builder.setMultiline(
+                section = multilineSectionName,
+                key = multilineKey,
+                value = multilineBuffer.toString().trimEnd('\n'),
+            )
         }
 
         return builder.build()
@@ -137,6 +157,14 @@ object PromptConfigLoader {
 
         fun setSectionField(section: String, field: String, value: String) {
             sections.getOrPut(section) { mutableMapOf() }[field] = value
+        }
+
+        fun setMultiline(section: String?, key: String, value: String) {
+            if (section != null) {
+                setSectionField(section, key, value)
+            } else {
+                setTopLevel(key, value)
+            }
         }
 
         fun build(): PromptConfig {

@@ -54,7 +54,7 @@ object SystemPersona {
         val section = config.sections[key] ?: return ""
         return buildString {
             appendLine()
-            append("## ${section.title}")
+            appendLine("## ${section.title}")
             append(section.placeholder)
         }
     }

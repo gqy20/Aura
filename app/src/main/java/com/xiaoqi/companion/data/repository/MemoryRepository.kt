@@ -107,7 +107,7 @@ class MemoryRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             val query = inputText.trim()
             val relevant = searchPromptCandidates(query)
-            val important = memoryDao.getPromptMemories(PROMPT_IMPORTANT_LIMIT)
+            val important = memoryDao.getPromptMemories(PROMPT_MEMORY_LIMIT)
                 .filterUsableForPrompt(query, allowPrivateWhenRelevant = false)
             val recent = memoryDao.getRecentMemories(PROMPT_RECENT_LIMIT)
                 .filterUsableForPrompt(query, allowPrivateWhenRelevant = false)
@@ -181,11 +181,6 @@ class MemoryRepository @Inject constructor(
         buckets
             .flatMap { it }
             .distinctBy { it.id }
-            .sortedWith(
-                compareByDescending<MemoryEntity> { it.importance }
-                    .thenByDescending { it.confidence }
-                    .thenByDescending { it.lastAccessed }
-            )
 
     private data class MemoryHit(val memory: MemoryEntity, val score: Float)
     private data class SummaryHit(val summary: MemorySummaryEntity, val score: Float)
@@ -196,7 +191,6 @@ class MemoryRepository @Inject constructor(
         const val CANDIDATE_MULTIPLIER = 4
         const val PROMPT_MEMORY_LIMIT = 8
         const val PROMPT_RELEVANT_LIMIT = 5
-        const val PROMPT_IMPORTANT_LIMIT = 5
         const val PROMPT_RECENT_LIMIT = 3
         const val PROMPT_SUMMARY_LIMIT = 2
         const val PROMPT_SUMMARY_CANDIDATES = 20

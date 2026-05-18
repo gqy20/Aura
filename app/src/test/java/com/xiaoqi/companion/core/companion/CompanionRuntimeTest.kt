@@ -66,6 +66,9 @@ class CompanionRuntimeTest {
     private val visionMemoryExtractor: VisionMemoryExtractor = mockk(relaxed = true) {
         coEvery { extractAndSave(any(), any(), any()) } returns false
     }
+    private val textMemoryExtractor: TextMemoryExtractor = mockk(relaxed = true) {
+        coEvery { extractAndSave(any(), any()) } returns false
+    }
 
     private class FakeKoogAgentFactory : KoogAgentFactory {
         var lastConfig: com.xiaoqi.companion.data.repository.LlmConfig? = null
@@ -113,6 +116,7 @@ class CompanionRuntimeTest {
         messageRepository = messageRepo,
         memoryRepository = memoryRepository,
         visionMemoryExtractor = visionMemoryExtractor,
+        textMemoryExtractor = textMemoryExtractor,
         emotionMachine = emotionMachine,
         relationshipModel = relationshipModel,
     )
@@ -186,6 +190,25 @@ class CompanionRuntimeTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify { messageRepo.sendMessage("default", "用户消息") }
+    }
+
+    @Test
+    fun send_textInput_runsPostResponseMemoryExtraction() = runTest {
+        val factory = FakeKoogAgentFactory()
+        coEvery { messageRepo.sendMessage(any(), any(), any()) } returns "user-message"
+        coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
+
+        makeRuntime(factory).send(UserInput.Text("remember that I like jasmine tea")).test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify {
+            textMemoryExtractor.extractAndSave(
+                match { it.content == "remember that I like jasmine tea" },
+                listOf("user-message", "assistant-message"),
+            )
+        }
     }
 
     @Test

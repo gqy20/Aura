@@ -86,6 +86,17 @@ class MemoryRepositoryTest : BaseDaoTest() {
     }
 
     @Test
+    fun selectPromptContext_whenQueryIsUnrelated_stillIncludesImportantMemories() = runTest {
+        memoryDao.insert(memory(id = "important", content = "User likes jasmine tea", importance = 0.95f, timestamp = 1_000L))
+        memoryDao.insert(memory(id = "recent", content = "User started learning pottery", importance = 0.3f, timestamp = 9_000L))
+
+        val context = repository.selectPromptContext("Tell me a joke")
+
+        assertTrue(context.memoryIds.contains("important"))
+        assertTrue(context.memoryIds.contains("recent"))
+    }
+
+    @Test
     fun selectPromptContext_excludesExpiredMemories() = runTest {
         memoryDao.insert(
             memory(

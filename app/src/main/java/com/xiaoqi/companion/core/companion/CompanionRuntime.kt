@@ -27,6 +27,7 @@ open class CompanionRuntime @Inject constructor(
     private val messageRepository: MessageRepository,
     private val memoryRepository: MemoryRepository,
     private val visionMemoryExtractor: VisionMemoryExtractor,
+    private val textMemoryExtractor: TextMemoryExtractor,
     private val emotionMachine: EmotionStateMachine,
     private val relationshipModel: RelationshipModel,
 ) {
@@ -119,6 +120,20 @@ open class CompanionRuntime @Inject constructor(
 
                 emotionMachine.feed(parsed.emotionSignal)
                 relationshipModel.update(parsed.interactionSignal)
+                if (input !is UserInput.Vision) {
+                    runCatching {
+                        textMemoryExtractor.extractAndSave(
+                            input = input,
+                            sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
+                        )
+                    }.onFailure { error ->
+                        AppLogger.warn(
+                            LogTags.Runtime,
+                            "text_memory_extract_failed",
+                            "message" to (error.message ?: error::class.simpleName.orEmpty()),
+                        )
+                    }
+                }
                 (input as? UserInput.Vision)?.let { visionInput ->
                     runCatching {
                         visionMemoryExtractor.extractAndSave(
