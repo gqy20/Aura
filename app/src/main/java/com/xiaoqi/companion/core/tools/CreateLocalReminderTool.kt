@@ -4,6 +4,8 @@ import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.core.context.ContextPermissionReader
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ReminderRepository
 import javax.inject.Inject
@@ -53,6 +55,13 @@ class CreateLocalReminderTool(
 
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.Default) {
+            AppLogger.info(
+                LogTags.Tools,
+                "reminder_tool_requested",
+                "delayMinutes" to args.delayMinutes,
+                "triggerAtEpochMillis" to args.triggerAtEpochMillis,
+                "exact" to args.exact,
+            )
             if (!appPreferences.reminderToolEnabled.first()) {
                 return@withContext disabled("reminder_tool_disabled")
             }
@@ -78,6 +87,14 @@ class CreateLocalReminderTool(
                 triggerAtMillis = triggerAt,
                 exact = args.exact,
             )
+            AppLogger.info(
+                LogTags.Tools,
+                "reminder_tool_scheduled",
+                "reminderId" to scheduled.id,
+                "triggerAtMillis" to scheduled.triggerAtMillis,
+                "delayMillis" to scheduled.delayMillis,
+                "exact" to scheduled.exact,
+            )
             buildJsonObject {
                 put("status", "scheduled")
                 put("reminderId", scheduled.id)
@@ -88,11 +105,13 @@ class CreateLocalReminderTool(
             }.toString()
         }
 
-    private fun disabled(reason: String): String =
-        buildJsonObject {
+    private fun disabled(reason: String): String {
+        AppLogger.warn(LogTags.Tools, "reminder_tool_disabled", "reason" to reason)
+        return buildJsonObject {
             put("status", "disabled")
             put("reason", reason)
         }.toString()
+    }
 
     private companion object {
         const val MILLIS_PER_MINUTE = 60_000L

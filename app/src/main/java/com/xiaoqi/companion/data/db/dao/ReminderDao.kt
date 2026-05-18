@@ -13,6 +13,9 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders ORDER BY triggerAtMillis ASC")
     fun observeAll(): Flow<List<ReminderEntity>>
 
+    @Query("SELECT * FROM reminders WHERE status = 'SCHEDULED' ORDER BY triggerAtMillis ASC")
+    fun observeScheduled(): Flow<List<ReminderEntity>>
+
     @Query("SELECT * FROM reminders WHERE id = :id")
     suspend fun getById(id: String): ReminderEntity?
 

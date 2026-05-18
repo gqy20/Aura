@@ -3,6 +3,8 @@ package com.xiaoqi.companion.data.repository
 import com.xiaoqi.companion.core.reminder.ReminderRequest
 import com.xiaoqi.companion.core.reminder.ReminderScheduler
 import com.xiaoqi.companion.core.reminder.ScheduledReminder
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import java.util.UUID
@@ -30,7 +32,7 @@ class ReminderRepositoryImpl @Inject constructor(
 ) : ReminderRepository {
 
     override fun observeReminders(): Flow<List<ReminderEntity>> =
-        reminderDao.observeAll()
+        reminderDao.observeScheduled()
 
     override fun canScheduleExactReminders(): Boolean =
         reminderScheduler.canScheduleExactReminders()
@@ -43,6 +45,13 @@ class ReminderRepositoryImpl @Inject constructor(
         source: String,
     ): ScheduledReminder = withContext(Dispatchers.IO) {
         val id = UUID.randomUUID().toString()
+        AppLogger.info(
+            LogTags.Reminder,
+            "reminder_create_requested",
+            "reminderId" to id,
+            "triggerAtMillis" to triggerAtMillis,
+            "exact" to exact,
+        )
         val scheduled = reminderScheduler.schedule(
             ReminderRequest(
                 id = id,
@@ -67,11 +76,19 @@ class ReminderRepositoryImpl @Inject constructor(
                 updatedAt = now,
             )
         )
+        AppLogger.info(
+            LogTags.Reminder,
+            "reminder_created",
+            "reminderId" to scheduled.id,
+            "delayMillis" to scheduled.delayMillis,
+            "exact" to scheduled.exact,
+        )
         scheduled
     }
 
     override suspend fun cancelReminder(reminderId: String) = withContext(Dispatchers.IO) {
         reminderScheduler.cancel(reminderId)
         reminderDao.markCanceled(reminderId, System.currentTimeMillis())
+        AppLogger.info(LogTags.Reminder, "reminder_canceled", "reminderId" to reminderId)
     }
 }

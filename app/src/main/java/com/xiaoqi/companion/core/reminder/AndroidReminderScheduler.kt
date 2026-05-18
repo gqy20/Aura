@@ -8,6 +8,8 @@ import android.os.Build
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -51,6 +53,7 @@ class AndroidReminderScheduler(
     override fun cancel(reminderId: String) {
         WorkManager.getInstance(context).cancelWorkById(java.util.UUID.fromString(reminderId))
         cancelExactAlarm(reminderId)
+        AppLogger.info(LogTags.Reminder, "reminder_schedule_canceled", "reminderId" to reminderId)
     }
 
     private fun scheduleWork(request: ReminderRequest, delayMillis: Long) {
@@ -68,6 +71,13 @@ class AndroidReminderScheduler(
             .build()
 
         WorkManager.getInstance(context).enqueue(work)
+        AppLogger.info(
+            LogTags.Reminder,
+            "reminder_work_enqueued",
+            "reminderId" to request.id,
+            "delayMillis" to delayMillis,
+            "triggerAtMillis" to request.triggerAtMillis,
+        )
     }
 
     private fun scheduleExactAlarm(request: ReminderRequest, delayMillis: Long) {
@@ -90,6 +100,13 @@ class AndroidReminderScheduler(
             @Suppress("DEPRECATION")
             alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         }
+        AppLogger.info(
+            LogTags.Reminder,
+            "reminder_exact_alarm_scheduled",
+            "reminderId" to request.id,
+            "delayMillis" to delayMillis,
+            "triggerAtMillis" to triggerAt,
+        )
     }
 
     private fun cancelExactAlarm(reminderId: String) {

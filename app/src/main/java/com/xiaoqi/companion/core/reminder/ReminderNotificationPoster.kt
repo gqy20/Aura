@@ -10,15 +10,22 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import com.xiaoqi.companion.MainActivity
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 
 object ReminderNotificationPoster {
 
     fun post(context: Context, title: String, message: String) {
-        if (!canPostNotifications(context)) return
+        if (!canPostNotifications(context)) {
+            AppLogger.warn(LogTags.Reminder, "reminder_notification_skipped", "reason" to "post_notifications_denied")
+            return
+        }
 
         val manager = context.getSystemService(NotificationManager::class.java)
         ensureChannel(manager)
-        manager.notify(title.hashCode() xor message.hashCode(), buildNotification(context, title, message))
+        val notificationId = title.hashCode() xor message.hashCode()
+        manager.notify(notificationId, buildNotification(context, title, message))
+        AppLogger.info(LogTags.Reminder, "reminder_notification_posted", "notificationId" to notificationId)
     }
 
     private fun canPostNotifications(context: Context): Boolean =

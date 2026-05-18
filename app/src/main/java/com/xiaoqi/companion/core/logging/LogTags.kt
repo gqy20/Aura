@@ -8,6 +8,8 @@ object LogTags {
     const val Prompt = "Companion.Prompt"
     const val Parser = "Companion.Parser"
     const val Repo = "Companion.Repo"
+    const val Tools = "Companion.Tools"
+    const val Reminder = "Companion.Reminder"
     const val Config = "Companion.Config"
     const val Emotion = "Companion.Emotion"
     const val Relation = "Companion.Relation"
