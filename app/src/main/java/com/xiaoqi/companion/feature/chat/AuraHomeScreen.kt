@@ -107,9 +107,9 @@ private fun AuraHomeContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        PresenceAvatar(
+                        AuraPetAvatar(
                             presence = uiState.presence,
-                            size = 118.dp,
+                            size = 148.dp,
                             onClick = onPresenceTapped,
                         )
                         Text(

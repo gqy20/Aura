@@ -52,6 +52,7 @@ class CompanionToolRegistry @Inject constructor(
     }
 
     private fun addRemoteMcpTools(builder: ai.koog.agents.core.tools.ToolRegistryBuilder) {
+        val serverName = runBlocking { appPreferences.mcpServerName.first() }.trim()
         val serverUrl = runBlocking { appPreferences.mcpHttpUrl.first() }.trim()
         if (serverUrl.isBlank()) return
 
@@ -62,6 +63,7 @@ class CompanionToolRegistry @Inject constructor(
                 builder.tool(
                     McpRemoteTool(
                         serverUrl = serverUrl,
+                        serverName = serverName,
                         spec = spec,
                         client = remoteMcpClient,
                     )
@@ -71,6 +73,7 @@ class CompanionToolRegistry @Inject constructor(
                 LogTags.Llm,
                 "mcp_tools_registered",
                 "count" to specs.size,
+                "serverName" to serverName.ifBlank { serverUrl },
             )
         }.onFailure { error ->
             AppLogger.warn(

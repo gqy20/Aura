@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 2,
+  "id": "aura-original-lumina",
+  "displayName": "Aura Lumina",
+  "description": "Original Aura pet pack: a warm luminous companion with compact, expressive facial proportions.",
+  "render": {
+    "mode": "sheet",
+    "displayWidth": 86,
+    "displayHeight": 92,
+    "pixelated": false
+  },
+  "sprite": {
+    "frameWidth": 192,
+    "frameHeight": 208,
+    "columns": 5,
+    "rows": 4,
+    "frameCount": 20,
+    "image": "aura_pet_spritesheet.webp"
+  },
+  "states": {
+    "idle": {
+      "frames": [
+        {
+          "sprite": 0,
+          "duration": 520
+        },
+        {
+          "sprite": 1,
+          "duration": 520
+        },
+        {
+          "sprite": 2,
+          "duration": 520
+        },
+        {
+          "sprite": 3,
+          "duration": 520
+        }
+      ],
+      "loop": true
+    },
+    "listen": {
+      "frames": [
+        {
+          "sprite": 4,
+          "duration": 420
+        },
+        {
+          "sprite": 5,
+          "duration": 420
+        }
+      ],
+      "loop": true
+    },
+    "talk": {
+      "frames": [
+        {
+          "sprite": 6,
+          "duration": 160
+        },
+        {
+          "sprite": 7,
+          "duration": 160
+        },
+        {
+          "sprite": 8,
+          "duration": 160
+        },
+        {
+          "sprite": 9,
+          "duration": 160
+        }
+      ],
+      "loop": true
+    },
+    "happy": {
+      "frames": [
+        {
+          "sprite": 10,
+          "duration": 300
+        },
+        {
+          "sprite": 11,
+          "duration": 300
+        }
+      ],
+      "loop": true
+    },
+    "thinking": {
+      "frames": [
+        {
+          "sprite": 12,
+          "duration": 320
+        },
+        {
+          "sprite": 13,
+          "duration": 320
+        }
+      ],
+      "loop": true
+    },
+    "search": {
+      "frames": [
+        {
+          "sprite": 14,
+          "duration": 260
+        },
+        {
+          "sprite": 15,
+          "duration": 260
+        }
+      ],
+      "loop": true
+    },
+    "memory": {
+      "frames": [
+        {
+          "sprite": 16,
+          "duration": 700
+        }
+      ],
+      "loop": true
+    },
+    "sad": {
+      "frames": [
+        {
+          "sprite": 17,
+          "duration": 700
+        }
+      ],
+      "loop": true
+    },
+    "sleep": {
+      "frames": [
+        {
+          "sprite": 18,
+          "duration": 900
+        }
+      ],
+      "loop": true
+    },
+    "error": {
+      "frames": [
+        {
+          "sprite": 19,
+          "duration": 600
+        }
+      ],
+      "loop": true
+    }
+  },
+  "presenceModeMap": {
+    "IDLE": "idle",
+    "LISTENING": "listen",
+    "SPEAKING": "talk",
+    "HAPPY": "happy",
+    "SAD": "sad",
+    "TIRED": "sleep",
+    "SLEEPING": "sleep",
+    "THINKING": "thinking",
+    "SEARCHING": "search",
+    "REMEMBERING": "memory",
+    "ERROR": "error"
+  }
+}

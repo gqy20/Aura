@@ -75,6 +75,7 @@ data class ChatToolCapabilitySettings(
     val weatherContextEnabled: Boolean = true,
     val reminderToolEnabled: Boolean = true,
     val notificationEnabled: Boolean = true,
+    val mcpServerName: String = "",
     val mcpHttpUrl: String = "",
 )
 
@@ -113,6 +114,7 @@ data class ChatUiState(
     val settingsProvider: LlmProvider = LlmProvider.GLM,
     val settingsModelName: String = "glm-5v-turbo",
     val settingsMessage: String? = null,
+    val mcpSettingsName: String = "",
     val mcpSettingsUrl: String = "",
     val mcpSettingsMessage: String? = null,
     val toolCapabilitySettings: ChatToolCapabilitySettings = ChatToolCapabilitySettings(),

@@ -25,6 +25,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val locationContextEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.locationContextEnabled] ?: true }
     val weatherContextEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.weatherContextEnabled] ?: true }
     val reminderToolEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.reminderToolEnabled] ?: true }
+    val mcpServerName: Flow<String> = dataStore.data.map { it[Keys.mcpServerName] ?: "" }
     val mcpHttpUrl: Flow<String> = dataStore.data.map { it[Keys.mcpHttpUrl] ?: "" }
     val llmProvider: Flow<LlmProvider> = dataStore.data.map {
         LlmProvider.valueOf(it[Keys.llmProvider] ?: defaultLlmProvider.name)
@@ -41,6 +42,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     suspend fun setLocationContextEnabled(value: Boolean) { dataStore.edit { it[Keys.locationContextEnabled] = value } }
     suspend fun setWeatherContextEnabled(value: Boolean) { dataStore.edit { it[Keys.weatherContextEnabled] = value } }
     suspend fun setReminderToolEnabled(value: Boolean) { dataStore.edit { it[Keys.reminderToolEnabled] = value } }
+    suspend fun setMcpServerName(value: String) { dataStore.edit { it[Keys.mcpServerName] = value } }
     suspend fun setMcpHttpUrl(value: String) { dataStore.edit { it[Keys.mcpHttpUrl] = value } }
     suspend fun setLlmProvider(value: LlmProvider) { dataStore.edit { it[Keys.llmProvider] = value.name } }
     suspend fun setModelName(value: String) { dataStore.edit { it[Keys.modelName] = value } }
@@ -56,6 +58,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val locationContextEnabled = booleanPreferencesKey("location_context_enabled")
         val weatherContextEnabled = booleanPreferencesKey("weather_context_enabled")
         val reminderToolEnabled = booleanPreferencesKey("reminder_tool_enabled")
+        val mcpServerName = stringPreferencesKey("mcp_server_name")
         val mcpHttpUrl = stringPreferencesKey("mcp_http_url")
         val llmProvider = stringPreferencesKey("llm_provider")
         val modelName = stringPreferencesKey("model_name")

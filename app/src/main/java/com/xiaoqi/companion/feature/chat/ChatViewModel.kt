@@ -133,10 +133,15 @@ class ChatViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            appPreferences.mcpHttpUrl.collect { mcpHttpUrl ->
+            combine(
+                appPreferences.mcpServerName,
+                appPreferences.mcpHttpUrl,
+            ) { mcpServerName, mcpHttpUrl -> mcpServerName to mcpHttpUrl }
+                .collect { (mcpServerName, mcpHttpUrl) ->
                 _uiState.update { state ->
                     state.copy(
                         toolCapabilitySettings = state.toolCapabilitySettings.copy(
+                            mcpServerName = mcpServerName,
                             mcpHttpUrl = mcpHttpUrl,
                         )
                     )
@@ -600,10 +605,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun openMcpSettings() {
+        val currentName = _uiState.value.toolCapabilitySettings.mcpServerName
         val currentUrl = _uiState.value.toolCapabilitySettings.mcpHttpUrl
         _uiState.update {
             it.copy(
                 isMcpSettingsOpen = true,
+                mcpSettingsName = currentName,
                 mcpSettingsUrl = currentUrl,
                 mcpSettingsMessage = null,
             )
@@ -618,17 +625,28 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(mcpSettingsUrl = value, mcpSettingsMessage = null) }
     }
 
+    fun updateMcpSettingsName(value: String) {
+        _uiState.update { it.copy(mcpSettingsName = value, mcpSettingsMessage = null) }
+    }
+
     fun saveMcpSettings() {
+        val name = _uiState.value.mcpSettingsName.trim()
         val url = _uiState.value.mcpSettingsUrl.trim()
+        if (url.isNotBlank() && name.isBlank()) {
+            _uiState.update { it.copy(mcpSettingsMessage = "MCP name is required when a URL is set") }
+            return
+        }
         if (url.isNotBlank() && !url.startsWith("http://") && !url.startsWith("https://")) {
             _uiState.update { it.copy(mcpSettingsMessage = "MCP URL must start with http:// or https://") }
             return
         }
         viewModelScope.launch {
+            appPreferences.setMcpServerName(name)
             appPreferences.setMcpHttpUrl(url)
             _uiState.update {
                 it.copy(
                     isMcpSettingsOpen = false,
+                    mcpSettingsName = name,
                     mcpSettingsUrl = url,
                     mcpSettingsMessage = null,
                 )

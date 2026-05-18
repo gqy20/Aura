@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -31,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
@@ -63,6 +65,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
@@ -93,6 +96,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onCloseSettings = { viewModel.closeSettings() },
         onOpenMcpSettings = { viewModel.openMcpSettings() },
         onCloseMcpSettings = { viewModel.closeMcpSettings() },
+        onMcpNameChanged = { viewModel.updateMcpSettingsName(it) },
         onMcpUrlChanged = { viewModel.updateMcpSettingsUrl(it) },
         onSaveMcpSettings = { viewModel.saveMcpSettings() },
         onSettingsApiKeyChanged = { viewModel.updateSettingsApiKey(it) },
@@ -142,6 +146,7 @@ fun ChatScreenContent(
     onCloseSettings: () -> Unit,
     onOpenMcpSettings: () -> Unit,
     onCloseMcpSettings: () -> Unit,
+    onMcpNameChanged: (String) -> Unit,
     onMcpUrlChanged: (String) -> Unit,
     onSaveMcpSettings: () -> Unit,
     onSettingsApiKeyChanged: (String) -> Unit,
@@ -194,7 +199,7 @@ fun ChatScreenContent(
                 configStatus = uiState.configStatus,
                 memories = uiState.memories,
                 reminders = uiState.reminders,
-                mcpHttpUrl = uiState.toolCapabilitySettings.mcpHttpUrl,
+                mcpLabel = uiState.toolCapabilitySettings.mcpDisplayLabel(),
                 onOpenMemoryRoom = onOpenMemoryRoom,
                 onOpenReminders = onOpenReminders,
                 onOpenMcpSettings = onOpenMcpSettings,
@@ -303,9 +308,12 @@ fun ChatScreenContent(
 
     if (uiState.isMcpSettingsOpen) {
         McpSettingsDialog(
+            mcpServerName = uiState.mcpSettingsName,
             mcpHttpUrl = uiState.mcpSettingsUrl,
+            currentMcpServerName = uiState.toolCapabilitySettings.mcpServerName,
             currentMcpHttpUrl = uiState.toolCapabilitySettings.mcpHttpUrl,
             message = uiState.mcpSettingsMessage,
+            onMcpServerNameChanged = onMcpNameChanged,
             onMcpHttpUrlChanged = onMcpUrlChanged,
             onSave = onSaveMcpSettings,
             onDismiss = onCloseMcpSettings,
@@ -355,7 +363,7 @@ private fun CompanionHeader(
     configStatus: ChatConfigStatus,
     memories: List<ChatMemory>,
     reminders: List<ChatReminder>,
-    mcpHttpUrl: String,
+    mcpLabel: String,
     onOpenMemoryRoom: () -> Unit,
     onOpenReminders: () -> Unit,
     onOpenMcpSettings: () -> Unit,
@@ -381,7 +389,7 @@ private fun CompanionHeader(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PresenceAvatar(
+                AuraPetAvatar(
                     presence = presence,
                     onClick = onPresenceTapped,
                 )
@@ -394,42 +402,60 @@ private fun CompanionHeader(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = "在线 · ${status.moodLabel()} · ${status.relationshipLabel}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 TextButton(
                     onClick = onOpenMemoryRoom,
-                    modifier = Modifier.semantics { contentDescription = "打开记忆房间" },
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .widthIn(max = 72.dp)
+                        .semantics { contentDescription = "打开记忆房间" },
                 ) {
                     Text(
                         text = "记忆 ${memories.size}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 TextButton(
                     onClick = onOpenReminders,
-                    modifier = Modifier.semantics { contentDescription = "Open reminders" },
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .widthIn(max = 72.dp)
+                        .semantics { contentDescription = "Open reminders" },
                 ) {
                     Text(
                         text = "提醒 $scheduledReminderCount",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 TextButton(
                     onClick = onOpenMcpSettings,
-                    modifier = Modifier.semantics { contentDescription = "Open MCP settings" },
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .widthIn(max = 72.dp)
+                        .semantics { contentDescription = "Open MCP settings" },
                 ) {
                     Text(
-                        text = if (mcpHttpUrl.isBlank()) "MCP" else "MCP on",
+                        text = mcpLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 IconButton(
@@ -701,9 +727,12 @@ private fun SettingsDialog(
 
 @Composable
 private fun McpSettingsDialog(
+    mcpServerName: String,
     mcpHttpUrl: String,
+    currentMcpServerName: String,
     currentMcpHttpUrl: String,
     message: String?,
+    onMcpServerNameChanged: (String) -> Unit,
     onMcpHttpUrlChanged: (String) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
@@ -733,6 +762,15 @@ private fun McpSettingsDialog(
                 }
 
                 OutlinedTextField(
+                    value = mcpServerName,
+                    onValueChange = onMcpServerNameChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Server name") },
+                    placeholder = { Text("e.g. Notes, Browser, Research") },
+                    singleLine = true,
+                )
+
+                OutlinedTextField(
                     value = mcpHttpUrl,
                     onValueChange = onMcpHttpUrlChanged,
                     modifier = Modifier.fillMaxWidth(),
@@ -751,7 +789,11 @@ private fun McpSettingsDialog(
                         verticalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
                         Text(
-                            text = if (currentMcpHttpUrl.isBlank()) "No MCP server configured" else "Active MCP server",
+                            text = if (currentMcpHttpUrl.isBlank()) {
+                                "No MCP server configured"
+                            } else {
+                                currentMcpServerName.ifBlank { "Active MCP server" }
+                            },
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -986,8 +1028,8 @@ private fun MemoryRoomDialog(
                 .fillMaxHeight(0.72f),
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1000,16 +1042,28 @@ private fun MemoryRoomDialog(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        Text(
-                            text = memoryRoomSubtitle(memories),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
-                    TextButton(onClick = onDismiss) {
-                        Text("关闭")
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                    ) {
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .semantics { contentDescription = "Close memory room" },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                 }
+
+                MemoryRoomStats(memories = memories)
 
                 if (memories.isEmpty()) {
                     Box(
@@ -1025,7 +1079,7 @@ private fun MemoryRoomDialog(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(memories, key = { it.id }) { memory ->
                             MemoryRoomItemCard(
@@ -1036,6 +1090,48 @@ private fun MemoryRoomDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MemoryRoomStats(memories: List<ChatMemory>) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MemoryStatPill(label = "All", value = memories.size.toString())
+        MemoryStatPill(label = "Facts", value = memories.count { it.type == "FACT" }.toString())
+        MemoryStatPill(label = "Moments", value = memories.count { it.type == "EPISODE" }.toString())
+        MemoryStatPill(label = "Habits", value = memories.count { it.type == "PROCEDURAL" }.toString())
+    }
+}
+
+@Composable
+private fun MemoryStatPill(label: String, value: String) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }
@@ -1197,19 +1293,20 @@ private fun MemoryRoomItemCard(
     onDelete: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(13.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.Top,
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -1221,38 +1318,42 @@ private fun MemoryRoomItemCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Text(
                     text = memory.content,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Importance ${String.format("%.2f", memory.importance)}",
+                    text = "Importance ${(memory.importance * 100).toInt().coerceIn(0, 100)}%",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 )
             }
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.semantics { contentDescription = "Delete memory" },
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .semantics { contentDescription = "Delete memory" },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
     }
-}
-
-private fun memoryRoomSubtitle(memories: List<ChatMemory>): String {
-    val facts = memories.count { it.type == "FACT" }
-    val episodes = memories.count { it.type == "EPISODE" }
-    val procedures = memories.count { it.type == "PROCEDURAL" }
-    return "${memories.size} memories · $facts facts · $episodes moments · $procedures habits"
 }
 
 private fun String.memoryTypeLabel(): String =
@@ -1268,6 +1369,13 @@ private fun String.memorySourceLabel(): String =
         isBlank() -> "Saved by Aura"
         startsWith("tool:") -> "Saved by Aura"
         else -> this
+    }
+
+private fun ChatToolCapabilitySettings.mcpDisplayLabel(): String =
+    when {
+        mcpHttpUrl.isBlank() -> "MCP"
+        mcpServerName.isNotBlank() -> mcpServerName
+        else -> "MCP on"
     }
 
 @Composable

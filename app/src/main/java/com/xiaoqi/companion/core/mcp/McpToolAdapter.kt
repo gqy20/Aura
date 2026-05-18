@@ -14,12 +14,13 @@ import kotlinx.serialization.json.jsonPrimitive
 
 class McpRemoteTool(
     serverUrl: String,
+    serverName: String,
     spec: McpToolSpec,
     private val client: RemoteMcpClient,
 ) : Tool<JsonObject, String>(
     typeToken<JsonObject>(),
     typeToken<String>(),
-    descriptor = spec.toToolDescriptor(toolName = spec.toKoogToolName(serverUrl)),
+    descriptor = spec.toToolDescriptor(toolName = spec.toKoogToolName(serverName, serverUrl)),
 ) {
     private val remoteName = spec.name
     private val remoteServerUrl = serverUrl
@@ -32,8 +33,10 @@ class McpRemoteTool(
         )
 }
 
-fun McpToolSpec.toKoogToolName(serverUrl: String): String =
-    "mcp__${serverUrl.hostSlug()}__${name.sanitizeToolName()}".take(MAX_TOOL_NAME_LENGTH)
+fun McpToolSpec.toKoogToolName(serverName: String, serverUrl: String): String {
+    val serverSlug = serverName.ifBlank { serverUrl.hostSlug() }.sanitizeToolName()
+    return "mcp__${serverSlug}__${name.sanitizeToolName()}".take(MAX_TOOL_NAME_LENGTH)
+}
 
 private fun McpToolSpec.toToolDescriptor(toolName: String): ToolDescriptor {
     val properties = inputSchema["properties"]?.jsonObject.orEmpty()
