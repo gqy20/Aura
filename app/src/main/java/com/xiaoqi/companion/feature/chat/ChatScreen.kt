@@ -88,11 +88,14 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onDeleteMemory = { viewModel.deleteMemory(it) },
         onOpenSettings = { viewModel.openSettings() },
         onCloseSettings = { viewModel.closeSettings() },
+        onOpenMcpSettings = { viewModel.openMcpSettings() },
+        onCloseMcpSettings = { viewModel.closeMcpSettings() },
+        onMcpUrlChanged = { viewModel.updateMcpSettingsUrl(it) },
+        onSaveMcpSettings = { viewModel.saveMcpSettings() },
         onSettingsApiKeyChanged = { viewModel.updateSettingsApiKey(it) },
         onSettingsProviderChanged = { viewModel.updateSettingsProvider(it) },
         onSettingsModelNameChanged = { viewModel.updateSettingsModelName(it) },
         onSettingsBaseUrlChanged = { viewModel.updateSettingsBaseUrl(it) },
-        onSettingsMcpHttpUrlChanged = { viewModel.updateSettingsMcpHttpUrl(it) },
         onSaveSettings = { viewModel.saveSettings() },
         onDeviceStatusEnabledChanged = { viewModel.setDeviceStatusContextEnabled(it) },
         onLocationContextEnabledChanged = { viewModel.setLocationContextEnabled(it) },
@@ -131,11 +134,14 @@ fun ChatScreenContent(
     onDeleteMemory: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onCloseSettings: () -> Unit,
+    onOpenMcpSettings: () -> Unit,
+    onCloseMcpSettings: () -> Unit,
+    onMcpUrlChanged: (String) -> Unit,
+    onSaveMcpSettings: () -> Unit,
     onSettingsApiKeyChanged: (String) -> Unit,
     onSettingsProviderChanged: (LlmProvider) -> Unit,
     onSettingsModelNameChanged: (String) -> Unit,
     onSettingsBaseUrlChanged: (String) -> Unit,
-    onSettingsMcpHttpUrlChanged: (String) -> Unit,
     onSaveSettings: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
@@ -181,7 +187,9 @@ fun ChatScreenContent(
                 presence = uiState.presence,
                 configStatus = uiState.configStatus,
                 memories = uiState.memories,
+                mcpHttpUrl = uiState.toolCapabilitySettings.mcpHttpUrl,
                 onOpenMemoryRoom = onOpenMemoryRoom,
+                onOpenMcpSettings = onOpenMcpSettings,
                 onOpenSettings = onOpenSettings,
                 onPresenceTapped = onPresenceTapped,
             )
@@ -252,20 +260,19 @@ fun ChatScreenContent(
         )
     }
 
+
     if (uiState.isSettingsOpen) {
         SettingsDialog(
             apiKey = uiState.settingsApiKey,
             provider = uiState.settingsProvider,
             modelName = uiState.settingsModelName,
             baseUrl = uiState.settingsBaseUrl,
-            mcpHttpUrl = uiState.settingsMcpHttpUrl,
             message = uiState.settingsMessage,
             toolSettings = uiState.toolCapabilitySettings,
             onApiKeyChanged = onSettingsApiKeyChanged,
             onProviderChanged = onSettingsProviderChanged,
             onModelNameChanged = onSettingsModelNameChanged,
             onBaseUrlChanged = onSettingsBaseUrlChanged,
-            onMcpHttpUrlChanged = onSettingsMcpHttpUrlChanged,
             onSave = onSaveSettings,
             onDeviceStatusEnabledChanged = onDeviceStatusEnabledChanged,
             onLocationContextEnabledChanged = onLocationContextEnabledChanged,
@@ -276,6 +283,17 @@ fun ChatScreenContent(
                 contextPermissionLauncher.launch(contextPermissions())
             },
             onDismiss = onCloseSettings,
+        )
+    }
+
+    if (uiState.isMcpSettingsOpen) {
+        McpSettingsDialog(
+            mcpHttpUrl = uiState.mcpSettingsUrl,
+            currentMcpHttpUrl = uiState.toolCapabilitySettings.mcpHttpUrl,
+            message = uiState.mcpSettingsMessage,
+            onMcpHttpUrlChanged = onMcpUrlChanged,
+            onSave = onSaveMcpSettings,
+            onDismiss = onCloseMcpSettings,
         )
     }
 }
@@ -321,10 +339,13 @@ private fun CompanionHeader(
     presence: PresenceUiState,
     configStatus: ChatConfigStatus,
     memories: List<ChatMemory>,
+    mcpHttpUrl: String,
     onOpenMemoryRoom: () -> Unit,
+    onOpenMcpSettings: () -> Unit,
     onOpenSettings: () -> Unit,
     onPresenceTapped: () -> Unit,
 ) {
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -369,6 +390,16 @@ private fun CompanionHeader(
                 ) {
                     Text(
                         text = "记忆 ${memories.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                TextButton(
+                    onClick = onOpenMcpSettings,
+                    modifier = Modifier.semantics { contentDescription = "Open MCP settings" },
+                ) {
+                    Text(
+                        text = if (mcpHttpUrl.isBlank()) "MCP" else "MCP on",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -514,14 +545,12 @@ private fun SettingsDialog(
     provider: LlmProvider,
     modelName: String,
     baseUrl: String,
-    mcpHttpUrl: String,
     message: String?,
     toolSettings: ChatToolCapabilitySettings,
     onApiKeyChanged: (String) -> Unit,
     onProviderChanged: (LlmProvider) -> Unit,
     onModelNameChanged: (String) -> Unit,
     onBaseUrlChanged: (String) -> Unit,
-    onMcpHttpUrlChanged: (String) -> Unit,
     onSave: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
@@ -607,15 +636,6 @@ private fun SettingsDialog(
                     singleLine = true,
                 )
 
-                OutlinedTextField(
-                    value = mcpHttpUrl,
-                    onValueChange = onMcpHttpUrlChanged,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("MCP HTTP URL") },
-                    placeholder = { Text("https://example.com/mcp") },
-                    singleLine = true,
-                )
-
                 ToolCapabilitiesSection(
                     settings = toolSettings,
                     onDeviceStatusEnabledChanged = onDeviceStatusEnabledChanged,
@@ -644,6 +664,100 @@ private fun SettingsDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = onSave) {
                         Text("保存")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun McpSettingsDialog(
+    mcpHttpUrl: String,
+    currentMcpHttpUrl: String,
+    message: String?,
+    onMcpHttpUrlChanged: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Remote MCP",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Connect Aura to one HTTP MCP endpoint. Tools are loaded when a new agent run starts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                OutlinedTextField(
+                    value = mcpHttpUrl,
+                    onValueChange = onMcpHttpUrlChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("MCP HTTP URL") },
+                    placeholder = { Text("https://example.com/mcp") },
+                    singleLine = true,
+                )
+
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Text(
+                            text = if (currentMcpHttpUrl.isBlank()) "No MCP server configured" else "Active MCP server",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = currentMcpHttpUrl.ifBlank { "Save a URL to register remote MCP tools." },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "Remote tool names appear as mcp__host__tool_name.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                        )
+                    }
+                }
+
+                message?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = onSave) {
+                        Text("Save MCP")
                     }
                 }
             }

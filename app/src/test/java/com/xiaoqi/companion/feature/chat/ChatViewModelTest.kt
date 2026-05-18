@@ -91,6 +91,7 @@ class ChatViewModelTest {
             every { weatherContextEnabled } returns flowOf(true)
             every { reminderToolEnabled } returns flowOf(true)
             every { notificationEnabled } returns flowOf(true)
+            every { mcpHttpUrl } returns flowOf("https://old.example/mcp")
         }
 
     private class FakeToolCallRepository : ToolCallRepository {
@@ -395,6 +396,39 @@ class ChatViewModelTest {
 
         assertEquals("模型名称不能为空", viewModel.uiState.value.settingsMessage)
         assertTrue(viewModel.uiState.value.isSettingsOpen)
+    }
+
+    @Test
+    fun openMcpSettings_loadsCurrentMcpUrl() = runTest {
+        advanceUntilIdle()
+
+        viewModel.openMcpSettings()
+
+        assertTrue(viewModel.uiState.value.isMcpSettingsOpen)
+        assertEquals("https://old.example/mcp", viewModel.uiState.value.mcpSettingsUrl)
+    }
+
+    @Test
+    fun saveMcpSettings_persistsMcpUrl() = runTest {
+        viewModel.openMcpSettings()
+        viewModel.updateMcpSettingsUrl("https://new.example/mcp")
+
+        viewModel.saveMcpSettings()
+        advanceUntilIdle()
+
+        coVerify { appPreferences.setMcpHttpUrl("https://new.example/mcp") }
+        assertFalse(viewModel.uiState.value.isMcpSettingsOpen)
+    }
+
+    @Test
+    fun saveMcpSettings_rejectsInvalidUrl() = runTest {
+        viewModel.openMcpSettings()
+        viewModel.updateMcpSettingsUrl("ftp://bad.example/mcp")
+
+        viewModel.saveMcpSettings()
+
+        assertEquals("MCP URL must start with http:// or https://", viewModel.uiState.value.mcpSettingsMessage)
+        assertTrue(viewModel.uiState.value.isMcpSettingsOpen)
     }
 
     @Test

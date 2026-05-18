@@ -487,7 +487,6 @@ class ChatViewModel @Inject constructor(
                 settingsProvider = state.configStatus.provider,
                 settingsModelName = state.configStatus.modelName,
                 settingsBaseUrl = state.configStatus.baseUrl,
-                settingsMcpHttpUrl = state.toolCapabilitySettings.mcpHttpUrl,
                 settingsMessage = null,
             )
         }
@@ -524,10 +523,6 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(settingsBaseUrl = value, settingsMessage = null) }
     }
 
-    fun updateSettingsMcpHttpUrl(value: String) {
-        _uiState.update { it.copy(settingsMcpHttpUrl = value, settingsMessage = null) }
-    }
-
     fun setDeviceStatusContextEnabled(value: Boolean) {
         viewModelScope.launch { appPreferences.setDeviceStatusContextEnabled(value) }
     }
@@ -552,7 +547,6 @@ class ChatViewModel @Inject constructor(
         val state = _uiState.value
         val model = state.settingsModelName.trim()
         val baseUrl = state.settingsBaseUrl.trim()
-        val mcpHttpUrl = state.settingsMcpHttpUrl.trim()
         if (model.isBlank()) {
             _uiState.update { it.copy(settingsMessage = "模型名称不能为空") }
             return
@@ -561,15 +555,10 @@ class ChatViewModel @Inject constructor(
             _uiState.update { it.copy(settingsMessage = "Base URL 不能为空") }
             return
         }
-        if (mcpHttpUrl.isNotBlank() && !mcpHttpUrl.startsWith("http://") && !mcpHttpUrl.startsWith("https://")) {
-            _uiState.update { it.copy(settingsMessage = "MCP URL must start with http:// or https://") }
-            return
-        }
         viewModelScope.launch {
             configRepository.setLlmProvider(state.settingsProvider)
             configRepository.setModelName(model)
             configRepository.setBaseUrl(baseUrl)
-            appPreferences.setMcpHttpUrl(mcpHttpUrl)
             state.settingsApiKey.trim().takeIf { it.isNotEmpty() }?.let { apiKey ->
                 configRepository.setApiKey(apiKey)
             }
@@ -579,8 +568,44 @@ class ChatViewModel @Inject constructor(
                     settingsApiKey = "",
                     settingsModelName = model,
                     settingsBaseUrl = baseUrl,
-                    settingsMcpHttpUrl = mcpHttpUrl,
                     settingsMessage = null,
+                )
+            }
+        }
+    }
+
+    fun openMcpSettings() {
+        val currentUrl = _uiState.value.toolCapabilitySettings.mcpHttpUrl
+        _uiState.update {
+            it.copy(
+                isMcpSettingsOpen = true,
+                mcpSettingsUrl = currentUrl,
+                mcpSettingsMessage = null,
+            )
+        }
+    }
+
+    fun closeMcpSettings() {
+        _uiState.update { it.copy(isMcpSettingsOpen = false, mcpSettingsMessage = null) }
+    }
+
+    fun updateMcpSettingsUrl(value: String) {
+        _uiState.update { it.copy(mcpSettingsUrl = value, mcpSettingsMessage = null) }
+    }
+
+    fun saveMcpSettings() {
+        val url = _uiState.value.mcpSettingsUrl.trim()
+        if (url.isNotBlank() && !url.startsWith("http://") && !url.startsWith("https://")) {
+            _uiState.update { it.copy(mcpSettingsMessage = "MCP URL must start with http:// or https://") }
+            return
+        }
+        viewModelScope.launch {
+            appPreferences.setMcpHttpUrl(url)
+            _uiState.update {
+                it.copy(
+                    isMcpSettingsOpen = false,
+                    mcpSettingsUrl = url,
+                    mcpSettingsMessage = null,
                 )
             }
         }

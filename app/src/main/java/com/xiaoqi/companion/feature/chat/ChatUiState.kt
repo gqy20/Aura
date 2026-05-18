@@ -51,6 +51,7 @@ data class ChatMemory(
     val timestamp: Long = 0L,
 )
 
+
 data class ChatConfigStatus(
     val label: String = "模型配置检查中",
     val isReady: Boolean = false,
@@ -96,12 +97,14 @@ data class ChatUiState(
     val configStatus: ChatConfigStatus = ChatConfigStatus(),
     val isMemoryRoomOpen: Boolean = false,
     val isSettingsOpen: Boolean = false,
+    val isMcpSettingsOpen: Boolean = false,
     val settingsApiKey: String = "",
     val settingsBaseUrl: String = "",
-    val settingsMcpHttpUrl: String = "",
     val settingsProvider: LlmProvider = LlmProvider.GLM,
     val settingsModelName: String = "glm-5v-turbo",
     val settingsMessage: String? = null,
+    val mcpSettingsUrl: String = "",
+    val mcpSettingsMessage: String? = null,
     val toolCapabilitySettings: ChatToolCapabilitySettings = ChatToolCapabilitySettings(),
     val pendingImage: ChatImageAttachment? = null,
     val isPreparingImage: Boolean = false,
