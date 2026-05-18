@@ -124,6 +124,7 @@ class ChatViewModelTest {
         var rawResponse = "[mood:happy][intensity:0.7] 你好呀！"
         var shouldFail = false
         var emitToolEvents = false
+        var toolEvents: List<AgentToolCall> = emptyList()
         var emitStreaming = false
         var streamingDeltas: List<String> = emptyList()
         var completeDelayMs = 0L
@@ -139,6 +140,9 @@ class ChatViewModelTest {
                 if (emitToolEvents) {
                     emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)))
                     emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
+                }
+                toolEvents.forEach { call ->
+                    emit(AgentEvent.ToolCallUpdated(call))
                 }
                 if (emitStreaming) {
                     emit(AgentEvent.Streaming("hello"))
@@ -439,6 +443,39 @@ class ChatViewModelTest {
 
         val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
         assertEquals("已保存记忆", assistant.toolStatus)
+    }
+
+    @Test
+    fun sendMessage_exactReminderMissingPermission_showsPermissionPrompt() = runTest {
+        fakeRuntime.toolEvents = listOf(
+            AgentToolCall(
+                name = "create_local_reminder",
+                status = ToolCallStatus.SUCCEEDED,
+                resultJson = """{"status":"disabled","reason":"exact_alarm_permission_missing"}""",
+            )
+        )
+
+        viewModel.sendMessage("remind me exactly in 10 minutes")
+
+        val prompt = viewModel.uiState.value.permissionPrompt
+        assertEquals(ChatPermissionType.EXACT_ALARM, prompt?.type)
+        assertEquals("Open settings", prompt?.primaryActionLabel)
+    }
+
+    @Test
+    fun dismissPermissionPrompt_clearsPrompt() = runTest {
+        fakeRuntime.toolEvents = listOf(
+            AgentToolCall(
+                name = "create_local_reminder",
+                status = ToolCallStatus.SUCCEEDED,
+                resultJson = """{"status":"disabled","reason":"exact_alarm_permission_missing"}""",
+            )
+        )
+        viewModel.sendMessage("remind me exactly in 10 minutes")
+
+        viewModel.dismissPermissionPrompt()
+
+        assertEquals(null, viewModel.uiState.value.permissionPrompt)
     }
 
     @Test

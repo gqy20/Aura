@@ -35,6 +35,55 @@ class CreateLocalReminderToolTest {
 
         assertTrue(result.contains(""""status":"scheduled""""))
         assertEquals(601_000L, scheduler.lastRequest!!.triggerAtMillis)
+        assertEquals(false, scheduler.lastRequest!!.exact)
+    }
+
+    @Test
+    fun execute_schedulesExactReminderWhenPermissionAvailable() = runTest {
+        val scheduler = FakeReminderScheduler(now = 1_000L, exactAvailable = true)
+        val tool = CreateLocalReminderTool(
+            appPreferences = preferences(reminders = true, notifications = true),
+            permissionReader = permissions(notifications = true),
+            reminderScheduler = scheduler,
+            nowProvider = { 1_000L },
+        )
+
+        val result = tool.execute(
+            CreateLocalReminderTool.Args(
+                title = "Stand up",
+                message = "Move a bit",
+                delayMinutes = 5,
+                exact = true,
+            )
+        )
+
+        assertTrue(result.contains(""""status":"scheduled""""))
+        assertTrue(result.contains(""""exact":true"""))
+        assertEquals(true, scheduler.lastRequest!!.exact)
+    }
+
+    @Test
+    fun execute_returnsDisabledWhenExactAlarmPermissionMissing() = runTest {
+        val scheduler = FakeReminderScheduler(now = 1_000L, exactAvailable = false)
+        val tool = CreateLocalReminderTool(
+            appPreferences = preferences(reminders = true, notifications = true),
+            permissionReader = permissions(notifications = true),
+            reminderScheduler = scheduler,
+            nowProvider = { 1_000L },
+        )
+
+        val result = tool.execute(
+            CreateLocalReminderTool.Args(
+                title = "Stand up",
+                message = "Move a bit",
+                delayMinutes = 5,
+                exact = true,
+            )
+        )
+
+        assertTrue(result.contains(""""status":"disabled""""))
+        assertTrue(result.contains("exact_alarm_permission_missing"))
+        assertEquals(null, scheduler.lastRequest)
     }
 
     @Test
@@ -78,8 +127,13 @@ class CreateLocalReminderToolTest {
             override fun hasPostNotifications() = notifications
         }
 
-    private class FakeReminderScheduler(private val now: Long) : ReminderScheduler {
+    private class FakeReminderScheduler(
+        private val now: Long,
+        private val exactAvailable: Boolean = true,
+    ) : ReminderScheduler {
         var lastRequest: ReminderRequest? = null
+
+        override fun canScheduleExactReminders(): Boolean = exactAvailable
 
         override fun schedule(request: ReminderRequest): ScheduledReminder {
             lastRequest = request
@@ -88,6 +142,7 @@ class CreateLocalReminderToolTest {
                 title = request.title,
                 triggerAtMillis = request.triggerAtMillis,
                 delayMillis = request.triggerAtMillis - now,
+                exact = request.exact,
             )
         }
     }

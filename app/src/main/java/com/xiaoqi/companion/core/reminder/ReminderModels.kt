@@ -4,6 +4,7 @@ data class ReminderRequest(
     val title: String,
     val message: String,
     val triggerAtMillis: Long,
+    val exact: Boolean = false,
 )
 
 data class ScheduledReminder(
@@ -11,8 +12,10 @@ data class ScheduledReminder(
     val title: String,
     val triggerAtMillis: Long,
     val delayMillis: Long,
+    val exact: Boolean = false,
 )
 
 interface ReminderScheduler {
+    fun canScheduleExactReminders(): Boolean = true
     fun schedule(request: ReminderRequest): ScheduledReminder
 }

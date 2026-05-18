@@ -375,6 +375,7 @@ class ChatViewModel @Inject constructor(
                             scheduleStreamingRender()
                         }
                         is AgentEvent.ToolCallUpdated -> {
+                            maybeShowPermissionPrompt(event.call)
                             updateAssistantToolStatus(
                                 assistantId,
                                 toolDisplayRegistry.label(event.call.name, event.call.status),
@@ -454,6 +455,10 @@ class ChatViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun dismissPermissionPrompt() {
+        _uiState.update { it.copy(permissionPrompt = null) }
     }
 
     fun onPresenceTapped() {
@@ -595,6 +600,23 @@ class ChatViewModel @Inject constructor(
 
     private fun updateAssistantToolStatus(assistantId: String, status: String) {
         updateAssistantMessage(assistantId) { it.copy(toolStatus = status) }
+    }
+
+    private fun maybeShowPermissionPrompt(call: com.xiaoqi.companion.core.companion.model.AgentToolCall) {
+        if (call.name != "create_local_reminder" || call.status != ToolCallStatus.SUCCEEDED) return
+        val result = call.resultJson.orEmpty()
+        if (!result.contains("exact_alarm_permission_missing")) return
+
+        _uiState.update { state ->
+            state.copy(
+                permissionPrompt = ChatPermissionPrompt(
+                    type = ChatPermissionType.EXACT_ALARM,
+                    title = "Enable precise reminders",
+                    message = "Aura needs the Android alarm permission to deliver exact reminders on time.",
+                    primaryActionLabel = "Open settings",
+                )
+            )
+        }
     }
 
     private fun ToolCallSnapshot.toChatToolCall(): ChatToolCall =

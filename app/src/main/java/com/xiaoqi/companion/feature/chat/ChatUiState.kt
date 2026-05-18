@@ -75,6 +75,17 @@ data class ChatImageAttachment(
     val mediaType: String = "image/jpeg",
 )
 
+enum class ChatPermissionType {
+    EXACT_ALARM,
+}
+
+data class ChatPermissionPrompt(
+    val type: ChatPermissionType,
+    val title: String,
+    val message: String,
+    val primaryActionLabel: String,
+)
+
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val toolCalls: List<ChatToolCall> = emptyList(),
@@ -96,5 +107,6 @@ data class ChatUiState(
     val isPreparingImage: Boolean = false,
     val isLoading: Boolean = false,
     val inputText: String = "",
+    val permissionPrompt: ChatPermissionPrompt? = null,
     val error: String? = null,
 )

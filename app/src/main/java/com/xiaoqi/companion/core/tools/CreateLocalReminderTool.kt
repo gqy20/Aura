@@ -48,6 +48,8 @@ class CreateLocalReminderTool(
         val delayMinutes: Long? = null,
         @param:LLMDescription("Absolute trigger time in epoch milliseconds. Use this for exact reminders.")
         val triggerAtEpochMillis: Long? = null,
+        @param:LLMDescription("Set true only when the user asks for a precise alarm-style reminder.")
+        val exact: Boolean = false,
     )
 
     override suspend fun execute(args: Args): String =
@@ -67,12 +69,16 @@ class CreateLocalReminderTool(
                 ?: args.delayMinutes?.let { now + it.coerceAtLeast(1L) * MILLIS_PER_MINUTE }
                 ?: return@withContext disabled("missing_trigger_time")
             if (triggerAt <= now) return@withContext disabled("trigger_time_must_be_future")
+            if (args.exact && !reminderScheduler.canScheduleExactReminders()) {
+                return@withContext disabled("exact_alarm_permission_missing")
+            }
 
             val scheduled = reminderScheduler.schedule(
                 ReminderRequest(
                     title = args.title,
                     message = args.message,
                     triggerAtMillis = triggerAt,
+                    exact = args.exact,
                 )
             )
             buildJsonObject {
@@ -81,6 +87,7 @@ class CreateLocalReminderTool(
                 put("title", scheduled.title)
                 put("triggerAtEpochMillis", scheduled.triggerAtMillis)
                 put("delayMillis", scheduled.delayMillis)
+                put("exact", scheduled.exact)
             }.toString()
         }
 

@@ -1,8 +1,10 @@
 package com.xiaoqi.companion.feature.chat
 
 import android.Manifest
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -54,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -74,6 +77,7 @@ import com.xiaoqi.companion.data.db.converter.LlmProvider
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     ChatScreenContent(
         uiState = uiState,
         onSendMessage = { viewModel.sendMessage(uiState.inputText) },
@@ -95,6 +99,21 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onWeatherContextEnabledChanged = { viewModel.setWeatherContextEnabled(it) },
         onReminderToolEnabledChanged = { viewModel.setReminderToolEnabled(it) },
         onNotificationEnabledChanged = { viewModel.setNotificationEnabled(it) },
+        onOpenPermissionSettings = { prompt ->
+            when (prompt.type) {
+                ChatPermissionType.EXACT_ALARM -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        context.startActivity(
+                            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                        )
+                    }
+                }
+            }
+            viewModel.dismissPermissionPrompt()
+        },
+        onDismissPermissionPrompt = { viewModel.dismissPermissionPrompt() },
         onAttachImage = { viewModel.attachImage(it.toString()) },
         onRemoveImage = { viewModel.removePendingImage() },
         onPresenceTapped = { viewModel.onPresenceTapped() },
@@ -123,6 +142,8 @@ fun ChatScreenContent(
     onWeatherContextEnabledChanged: (Boolean) -> Unit,
     onReminderToolEnabledChanged: (Boolean) -> Unit,
     onNotificationEnabledChanged: (Boolean) -> Unit,
+    onOpenPermissionSettings: (ChatPermissionPrompt) -> Unit,
+    onDismissPermissionPrompt: () -> Unit,
     onAttachImage: (Uri) -> Unit,
     onRemoveImage: () -> Unit,
     onPresenceTapped: () -> Unit,
@@ -184,6 +205,15 @@ fun ChatScreenContent(
                         MessageBubble(message = message)
                     }
                 }
+            }
+
+            uiState.permissionPrompt?.let { prompt ->
+                PermissionPromptCard(
+                    prompt = prompt,
+                    onOpenSettings = { onOpenPermissionSettings(prompt) },
+                    onDismiss = onDismissPermissionPrompt,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
             }
 
             InputBar(
@@ -427,6 +457,52 @@ private fun ConfigStatusCard(
                 TextButton(onClick = onOpenSettings) {
                     Text("设置")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionPromptCard(
+    prompt: ChatPermissionPrompt,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedCard(
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.64f),
+        ),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text(
+                    text = prompt.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                Text(
+                    text = prompt.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.78f),
+                )
+            }
+            TextButton(onClick = onDismiss) {
+                Text("Later")
+            }
+            Button(onClick = onOpenSettings) {
+                Text(prompt.primaryActionLabel)
             }
         }
     }
