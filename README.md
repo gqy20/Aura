@@ -6,7 +6,7 @@
 
 ## 特性
 
-- **当前版本：0.1.1** — 记忆系统增强版本，聚焦长期记忆选择、摘要接入和 Vision 后置记忆
+- **当前版本：0.1.2** — 上下文预算与模型配置增强版本，聚焦最近对话、长期记忆/摘要预算注入、默认 GLM/Kimi 配置和空回复兜底
 - **已实现：文本聊天闭环** — Compose 聊天页 + ChatViewModel + CompanionRuntime + Koog Agent
 - **已实现：流式对话** — Anthropic Messages 兼容 SSE 流式输出，聊天气泡逐字渲染
 - **已实现：长期记忆体系增强** — Room 存储消息、记忆、摘要、情绪快照、工具调用记录；`MemoryRepository` 统一保存、搜索、prompt selection 和访问时间更新

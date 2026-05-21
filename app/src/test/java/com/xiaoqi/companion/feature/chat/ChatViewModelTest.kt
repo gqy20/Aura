@@ -97,6 +97,7 @@ class ChatViewModelTest {
             every { weatherContextEnabled } returns flowOf(true)
             every { reminderToolEnabled } returns flowOf(true)
             every { notificationEnabled } returns flowOf(true)
+            every { mcpServerName } returns flowOf("Local MCP")
             every { mcpHttpUrl } returns flowOf("https://old.example/mcp")
         }
 

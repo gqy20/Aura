@@ -6,6 +6,61 @@
 
 ---
 
+## [0.1.2] - 2026-05-21
+
+Aura 0.1.2 是 0.1.1 之后的体验与可靠性增强版本，覆盖最近对话上下文、文本记忆恢复、提醒管理、MCP 专用设置、宠物头像与聊天 UI 打磨，并补齐模型配置安全化和 prompt 预算控制。
+
+### 新增
+
+**上下文与记忆**
+- 新增 `ConversationContextBuilder`，将最近对话历史注入主 prompt；上下文窗口按约 `20K token` 预算保留最近消息，而不是只按固定条数截断。
+- 恢复并强化文本消息后置记忆抽取，新增 `TextMemoryExtractor`，支持从用户文本与助手回复中提取应保存的长期记忆。
+- 长期记忆 prompt 注入改为约 `10K token` 预算，候选最多取 200 条；超长单条记忆会按剩余预算截断。
+- 摘要 prompt 注入改为约 `5K token` 预算，支持超过 2 条摘要进入上下文；超长摘要会截断并保留摘要来源 id。
+- 新增最近消息 DAO / repository 查询能力，为运行时上下文、手动场景测试和后续记忆房间联动打基础。
+
+**提醒管理**
+- 新增 Room `reminders` 表、`ReminderDao`、`ReminderRepository` 与数据库 schema version 5，用于本地持久化提醒。
+- 新增提醒管理 UI，支持在聊天页查看、完成、删除本地提醒。
+- 新增精确闹钟权限流程：创建提醒时可检测 `SCHEDULE_EXACT_ALARM` 能力，并在 UI 中引导用户授权。
+- 新增 `ReminderAlarmReceiver` 与 `ReminderNotificationPoster`，将提醒触发、通知展示和 WorkManager 兜底拆分得更清晰。
+
+**设置与工具**
+- 新增独立 MCP 设置入口，聊天页可单独管理 MCP HTTP URL 与远程工具开关。
+- 内置 GLM 与 Kimi 的默认 provider 配置，用户可直接切换配置后填入 API Key。
+- GLM 默认模型为 `glm-5v-turbo`，Kimi 默认模型为 `kimi-for-coding`。
+- Kimi 默认 Base URL 更新为 `https://api.kimi.com/coding`，GLM 默认 Base URL 使用项目配置中的 GLM 兼容接口。
+
+**聊天体验**
+- 新增 `AuraPetAvatar` 组件、宠物 spritesheet 与 manifest 资源，用于主界面的动态宠物头像展示。
+- 聊天页增加更完整的状态视图：模型配置、MCP 设置、提醒管理、记忆房间统计和权限提示可以在同一页面内更顺畅地切换。
+
+### 变更
+
+- API Key 不再写入 `BuildConfig`，改为仅通过运行时用户配置/DataStore 使用，避免明文打进 APK。
+- 调整 prompt 模板与 persona 规则，使最近对话、长期记忆、摘要记忆和文本记忆抽取的职责更清晰。
+- MCP 工具适配器与工具注册表支持更完整的设置项、状态展示和记忆房间统计去重。
+- 提醒工具 `create_local_reminder` 增加持久化、精确闹钟可用性检查、日志和错误信息，减少只调度不落库或失败不可见的问题。
+- 聊天气泡和主界面视觉细节继续打磨，降低工具状态、记忆统计和设置面板对输入区的干扰。
+- MCP 初始化上报的 Aura Android client 版本升级到 `0.1.2`。
+- Android 应用版本升级为 `versionCode = 3` / `versionName = "0.1.2"`。
+
+### 修复
+
+- 修复 0.1.1 后文本记忆 prompt 注入和后置文本记忆抽取没有完整恢复的问题。
+- 修复模型只返回结构化标签、解析后正文为空时仍被当作成功回复并保存空 assistant 消息的问题；现在会返回 ParseError，避免写入空消息、触发情绪/关系更新或后置记忆抽取。
+- 修复提醒通知链路中 Hilt Worker / Receiver 日志不足、失败难定位的问题。
+- 修复提醒调度、通知展示和提醒状态更新中的若干边界问题，提升真机调试时的可观测性。
+- 修复记忆房间统计重复计数的问题。
+
+### 工具链
+
+- 更新 release 版本号相关 Gradle 配置、MCP client version 和文档示例。
+- 新增/更新 `ConversationContextBuilderTest`、`ConversationContextManualScenariosTest`、`TextMemoryExtractorTest`、`CreateLocalReminderToolTest`、`ChatViewModelTest`、`MemoryRepositoryTest` 等单元测试。
+- 已验证 `testDebugUnitTest` 与 `assembleDebug`。
+
+---
+
 ## [0.1.1] - 2026-05-17
 
 Aura · 奥拉的记忆系统增强版本，重点完善长期记忆基础设施、prompt 记忆选择、摘要记忆接入、Vision 后置记忆和远程工具扩展，为后续记忆房间管理与端云协同打基础。
