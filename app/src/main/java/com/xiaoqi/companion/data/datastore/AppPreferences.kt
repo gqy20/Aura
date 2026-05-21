@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.ThemeMode
 import javax.inject.Inject
@@ -30,7 +31,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val llmProvider: Flow<LlmProvider> = dataStore.data.map {
         LlmProvider.valueOf(it[Keys.llmProvider] ?: defaultLlmProvider.name)
     }
-    val modelName: Flow<String> = dataStore.data.map { it[Keys.modelName] ?: "glm-5v-turbo" }
+    val modelName: Flow<String> = dataStore.data.map { it[Keys.modelName] ?: DefaultLlmValues.GLM_MODEL }
 
     suspend fun setApiKey(value: String?) { dataStore.edit { if (value != null) it[Keys.apiKey] = value else it.remove(Keys.apiKey) } }
     suspend fun setBaseUrl(value: String) { dataStore.edit { it[Keys.baseUrl] = value } }

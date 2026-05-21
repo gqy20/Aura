@@ -72,10 +72,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
+import com.xiaoqi.companion.data.repository.DefaultLlmValues
 
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
@@ -655,29 +657,46 @@ private fun SettingsDialog(
                     )
                 }
 
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DefaultLlmValues.modelOptions(provider).forEach { option ->
+                        FilterChip(
+                            selected = modelName == option,
+                            onClick = { onModelNameChanged(option) },
+                            label = { Text(option) },
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = modelName,
                     onValueChange = onModelNameChanged,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("模型名称") },
+                    readOnly = true,
                     singleLine = true,
                 )
 
                 Text(
                     text = when (provider) {
-                        LlmProvider.GLM -> "默认模型：glm-5v-turbo。Base URL 可使用 GLM 兼容接口。"
-                        LlmProvider.KIMI -> "默认 Base URL：https://api.moonshot.cn/v1"
+                        LlmProvider.GLM -> "默认模型：${DefaultLlmValues.GLM_MODEL}"
+                        LlmProvider.KIMI -> "默认模型：${DefaultLlmValues.KIMI_MODEL}"
                     },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Text(
+                    text = "当前端点：${DefaultLlmValues.defaultBaseUrl(provider)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 OutlinedTextField(
                     value = baseUrl,
-                    onValueChange = onBaseUrlChanged,
+                    onValueChange = {},
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Base URL") },
-                    placeholder = { Text("例如：https://api.moonshot.cn/v1") },
+                    readOnly = true,
                     singleLine = true,
                 )
 
@@ -688,6 +707,8 @@ private fun SettingsDialog(
                     label = { Text("API Key") },
                     placeholder = { Text("留空则保留当前 Key") },
                     singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 )
 
                 ToolCapabilitiesSection(

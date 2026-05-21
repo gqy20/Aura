@@ -2,6 +2,7 @@ package com.xiaoqi.companion.feature.chat
 
 import app.cash.turbine.test
 import com.xiaoqi.companion.core.companion.CompanionRuntime
+import com.xiaoqi.companion.core.companion.ConversationContextBuilder
 import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
@@ -18,6 +19,7 @@ import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MemoryRepository
@@ -140,6 +142,7 @@ class ChatViewModelTest {
                 summaryIds = emptyList(),
             )
         },
+        conversationContextBuilder = ConversationContextBuilder(messageRepo),
         visionMemoryExtractor = mockk(relaxed = true),
         textMemoryExtractor = mockk(relaxed = true),
         emotionMachine = mockk(relaxed = true),
@@ -401,28 +404,29 @@ class ChatViewModelTest {
     fun saveSettings_persistsProviderModelAndApiKey() = runTest {
         viewModel.openSettings()
         viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.KIMI)
-        viewModel.updateSettingsModelName("kimi-latest")
+        viewModel.updateSettingsModelName(DefaultLlmValues.KIMI_MODEL)
         viewModel.updateSettingsApiKey("new-key")
 
         viewModel.saveSettings()
         advanceUntilIdle()
 
         coVerify { configRepo.setLlmProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.KIMI) }
-        coVerify { configRepo.setModelName("kimi-latest") }
-        coVerify { configRepo.setBaseUrl("https://api.moonshot.cn/v1") }
+        coVerify { configRepo.setModelName(DefaultLlmValues.KIMI_MODEL) }
+        coVerify { configRepo.setBaseUrl(DefaultLlmValues.KIMI_BASE_URL) }
         coVerify { configRepo.setApiKey("new-key") }
         assertFalse(viewModel.uiState.value.isSettingsOpen)
     }
 
     @Test
-    fun saveSettings_rejectsBlankModelName() = runTest {
+    fun saveSettings_blankModelNameFallsBackToProviderDefault() = runTest {
         viewModel.openSettings()
         viewModel.updateSettingsModelName("   ")
 
         viewModel.saveSettings()
+        advanceUntilIdle()
 
-        assertEquals("模型名称不能为空", viewModel.uiState.value.settingsMessage)
-        assertTrue(viewModel.uiState.value.isSettingsOpen)
+        coVerify { configRepo.setModelName(DefaultLlmValues.GLM_MODEL) }
+        assertFalse(viewModel.uiState.value.isSettingsOpen)
     }
 
     @Test

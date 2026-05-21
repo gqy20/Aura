@@ -4,6 +4,7 @@ import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
+import com.xiaoqi.companion.data.repository.DefaultLlmValues
 
 data class ChatMessage(
     val id: String,
@@ -65,7 +66,7 @@ data class ChatConfigStatus(
     val isReady: Boolean = false,
     val detail: String = "",
     val provider: LlmProvider = LlmProvider.GLM,
-    val modelName: String = "glm-5v-turbo",
+    val modelName: String = DefaultLlmValues.GLM_MODEL,
     val baseUrl: String = "",
 )
 
@@ -112,7 +113,7 @@ data class ChatUiState(
     val settingsApiKey: String = "",
     val settingsBaseUrl: String = "",
     val settingsProvider: LlmProvider = LlmProvider.GLM,
-    val settingsModelName: String = "glm-5v-turbo",
+    val settingsModelName: String = DefaultLlmValues.GLM_MODEL,
     val settingsMessage: String? = null,
     val mcpSettingsName: String = "",
     val mcpSettingsUrl: String = "",

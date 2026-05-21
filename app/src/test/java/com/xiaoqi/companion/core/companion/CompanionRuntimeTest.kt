@@ -11,6 +11,8 @@ import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.prompt.PromptBuilder
+import com.xiaoqi.companion.data.db.converter.MessageRole
+import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.PromptMemoryContext
@@ -43,7 +45,7 @@ class CompanionRuntimeTest {
     }
 
     private val promptBuilder: PromptBuilder = mockk {
-        every { build(any(), any(), any(), any()) } returns BuiltPrompt(
+        every { build(any(), any(), any(), any(), any(), any()) } returns BuiltPrompt(
             systemPrompt = "system", userMessage = "hello",
         )
     }
@@ -52,7 +54,9 @@ class CompanionRuntimeTest {
         every { parse(any<String>()) } returns ParsedOutput(textReply = "你好！")
     }
 
-    private val messageRepo: MessageRepository = mockk(relaxed = true)
+    private val messageRepo: MessageRepository = mockk(relaxed = true) {
+        coEvery { getRecentMessages(any(), any()) } returns emptyList()
+    }
     private val memoryRepository: MemoryRepository = mockk(relaxed = true) {
         coEvery { selectPromptContext(any()) } returns PromptMemoryContext(
             memorySnippets = emptyList(),
@@ -115,6 +119,7 @@ class CompanionRuntimeTest {
         outputParser = outputParser,
         messageRepository = messageRepo,
         memoryRepository = memoryRepository,
+        conversationContextBuilder = ConversationContextBuilder(messageRepo),
         visionMemoryExtractor = visionMemoryExtractor,
         textMemoryExtractor = textMemoryExtractor,
         emotionMachine = emotionMachine,
@@ -151,7 +156,7 @@ class CompanionRuntimeTest {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify { promptBuilder.build(match<UserInput> { it.content == "你好世界" }, any(), any(), any()) }
+        coVerify { promptBuilder.build(match<UserInput> { it.content == "你好世界" }, any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -243,7 +248,7 @@ class CompanionRuntimeTest {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify { promptBuilder.build(match<UserInput> { it is UserInput.Vision }, any(), any(), any()) }
+        coVerify { promptBuilder.build(match<UserInput> { it is UserInput.Vision }, any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -335,9 +340,53 @@ class CompanionRuntimeTest {
                 any(),
                 any(),
                 any(),
-                match { it == listOf("User likes jasmine tea", "Tea preferences: User enjoys jasmine tea.") },
+                any(),
+                match { it == listOf("User likes jasmine tea") },
+                match { it == listOf("Tea preferences: User enjoys jasmine tea.") },
             )
             memoryRepository.selectPromptContext("what do I like?")
+        }
+    }
+
+    @Test
+    fun send_injectsRecentConversationWindowSeparatelyFromMemories() = runTest {
+        coEvery { messageRepo.getRecentMessages("default", any()) } returns listOf(
+            MessageEntity(
+                id = "m2",
+                sessionId = "default",
+                role = MessageRole.ASSISTANT,
+                content = "We discussed adding a short-term context window.",
+                timestamp = 2_000L,
+            ),
+            MessageEntity(
+                id = "m1",
+                sessionId = "default",
+                role = MessageRole.USER,
+                content = "How is memory designed?",
+                timestamp = 1_000L,
+            ),
+        )
+        val factory = FakeKoogAgentFactory()
+
+        makeRuntime(factory).send(UserInput.Text("continue")).test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify {
+            promptBuilder.build(
+                any(),
+                any(),
+                any(),
+                match {
+                    it == listOf(
+                        "User: How is memory designed?",
+                        "Aura: We discussed adding a short-term context window.",
+                    )
+                },
+                any(),
+                any(),
+            )
         }
     }
 }

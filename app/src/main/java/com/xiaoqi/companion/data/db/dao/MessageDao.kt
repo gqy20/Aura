@@ -33,6 +33,19 @@ interface MessageDao {
         """
         SELECT * FROM messages
         WHERE session_id = :sessionId
+        ORDER BY timestamp DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun getRecentMessages(
+        sessionId: String,
+        limit: Int,
+    ): List<MessageEntity>
+
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE session_id = :sessionId
           AND (:role IS NULL OR role = :role)
           AND (:after IS NULL OR timestamp >= :after)
           AND (:before IS NULL OR timestamp <= :before)

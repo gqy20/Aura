@@ -49,6 +49,22 @@ class MessageRepositoryTest {
     }
 
     @Test
+    fun getRecentMessages_delegatesToDaoWithSafeLimit() = runTest {
+        val dao: MessageDao = mockk {
+            coEvery { getRecentMessages("s1", 1) } returns listOf(
+                MessageEntity(id = "m1", sessionId = "s1", role = MessageRole.USER, content = "hi", timestamp = 1)
+            )
+        }
+
+        val repo = MessageRepositoryImpl(dao)
+        val messages = repo.getRecentMessages("s1", 0)
+
+        assertEquals(1, messages.size)
+        assertEquals("m1", messages.single().id)
+        coVerify { dao.getRecentMessages("s1", 1) }
+    }
+
+    @Test
     fun saveAssistantMessage_insertsWithAssistantRoleAndTimestamp() = runTest {
         val dao: MessageDao = mockk(relaxed = true) {
             coEvery { insert(any()) } returns Unit

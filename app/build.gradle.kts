@@ -30,16 +30,7 @@ android {
             useSupportLibrary = true
         }
 
-        val envFile = rootProject.file(".env")
-        val envProps = Properties()
-        if (envFile.exists()) envProps.load(envFile.inputStream())
-
-        val llmApiKey = envProps.getProperty("LLM_API_KEY") ?: System.getenv("LLM_API_KEY") ?: ""
-        val llmBaseUrl = envProps.getProperty("LLM_BASE_URL") ?: System.getenv("LLM_BASE_URL") ?: ""
-        val llmModel = envProps.getProperty("LLM_MODEL") ?: System.getenv("LLM_MODEL") ?: "glm-5v-turbo"
-        buildConfigField("String", "LLM_API_KEY", "\"$llmApiKey\"")
-        buildConfigField("String", "LLM_BASE_URL", "\"$llmBaseUrl\"")
-        buildConfigField("String", "LLM_MODEL", "\"$llmModel\"")
+        // LLM secrets are user-configured at runtime and must not be embedded in BuildConfig.
     }
 
     // Signing: use release keystore if keystore.properties exists, otherwise fallback to debug

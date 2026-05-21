@@ -16,6 +16,7 @@ class McpToolAdapterTest {
         val client = RecordingMcpClient()
         val tool = McpRemoteTool(
             serverUrl = "https://mcp.example.com/mcp",
+            serverName = "",
             spec = McpToolSpec(
                 name = "web_search",
                 description = "Search the web",

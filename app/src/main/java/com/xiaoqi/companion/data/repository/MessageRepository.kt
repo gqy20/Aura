@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface MessageRepository {
     fun getMessagesBySession(sessionId: String): Flow<List<MessageEntity>>
+    suspend fun getRecentMessages(sessionId: String, limit: Int): List<MessageEntity>
     suspend fun sendMessage(sessionId: String, content: String, imageBase64: String? = null): String
     suspend fun saveAssistantMessage(sessionId: String, content: String): String
     suspend fun deleteSession(sessionId: String)
@@ -20,6 +21,9 @@ class MessageRepositoryImpl @Inject constructor(private val dao: MessageDao) : M
 
     override fun getMessagesBySession(sessionId: String): Flow<List<MessageEntity>> =
         dao.observeBySession(sessionId)
+
+    override suspend fun getRecentMessages(sessionId: String, limit: Int): List<MessageEntity> =
+        dao.getRecentMessages(sessionId = sessionId, limit = limit.coerceAtLeast(1))
 
     override suspend fun sendMessage(sessionId: String, content: String, imageBase64: String?): String {
         AppLogger.debug(

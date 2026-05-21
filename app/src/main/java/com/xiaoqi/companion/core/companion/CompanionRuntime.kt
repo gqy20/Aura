@@ -26,6 +26,7 @@ open class CompanionRuntime @Inject constructor(
     private val outputParser: OutputParser,
     private val messageRepository: MessageRepository,
     private val memoryRepository: MemoryRepository,
+    private val conversationContextBuilder: ConversationContextBuilder,
     private val visionMemoryExtractor: VisionMemoryExtractor,
     private val textMemoryExtractor: TextMemoryExtractor,
     private val emotionMachine: EmotionStateMachine,
@@ -43,11 +44,14 @@ open class CompanionRuntime @Inject constructor(
             )
 
             val memoryContext = memoryRepository.selectPromptContext(input.content)
+            val conversationContext = conversationContextBuilder.build(DEFAULT_SESSION_ID)
             val prompt = promptBuilder.build(
                 input = input,
                 emotionContext = emotionMachine.getContext(),
                 relationshipContext = relationshipModel.contextModifier(),
-                memories = memoryContext.memorySnippets + memoryContext.summarySnippets,
+                recentConversation = conversationContext.recentMessages,
+                memories = memoryContext.memorySnippets,
+                summaries = memoryContext.summarySnippets,
             )
             AppLogger.debug(
                 LogTags.Runtime,
@@ -57,6 +61,9 @@ open class CompanionRuntime @Inject constructor(
                 "hasImage" to prompt.hasImage,
                 "memoryCount" to memoryContext.memorySnippets.size,
                 "summaryCount" to memoryContext.summarySnippets.size,
+                "recentConversationCount" to conversationContext.recentMessages.size,
+                "recentConversationTokens" to conversationContext.estimatedTokens,
+                "omittedOlderMessages" to conversationContext.omittedOlderMessageCount,
             )
 
             val config = configRepository.getCurrentLlmConfig().first()

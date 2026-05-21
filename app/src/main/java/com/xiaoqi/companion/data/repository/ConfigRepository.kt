@@ -1,6 +1,5 @@
 package com.xiaoqi.companion.data.repository
 
-import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.datastore.AppPreferences
@@ -16,6 +15,31 @@ data class LlmConfig(
     val apiKey: String,
     val modelName: String,
 )
+
+object DefaultLlmValues {
+    const val GLM_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
+    const val GLM_MODEL = "glm-5v-turbo"
+    const val KIMI_BASE_URL = "https://api.kimi.com/coding"
+    const val KIMI_MODEL = "kimi-for-coding"
+
+    fun defaultBaseUrl(provider: LlmProvider): String =
+        when (provider) {
+            LlmProvider.GLM -> GLM_BASE_URL
+            LlmProvider.KIMI -> KIMI_BASE_URL
+        }
+
+    fun defaultModel(provider: LlmProvider): String =
+        when (provider) {
+            LlmProvider.GLM -> GLM_MODEL
+            LlmProvider.KIMI -> KIMI_MODEL
+        }
+
+    fun modelOptions(provider: LlmProvider): List<String> =
+        when (provider) {
+            LlmProvider.GLM -> listOf(GLM_MODEL)
+            LlmProvider.KIMI -> listOf(KIMI_MODEL)
+        }
+}
 
 data class LlmConfigStatus(
     val provider: LlmProvider,
@@ -57,10 +81,11 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
     override val themeMode get() = prefs.themeMode
 
     override fun getCurrentLlmConfig(): Flow<LlmConfig> =
-        combine(prefs.llmProvider, prefs.apiKey, prefs.modelName, prefs.baseUrl) { provider, key, model, baseUrl ->
-            val resolvedModel = model.ifBlank { BuildConfig.LLM_MODEL }
-            val resolvedKey = key?.takeIf { it.isNotBlank() } ?: BuildConfig.LLM_API_KEY
-            val resolvedBaseUrl = baseUrl.ifBlank { provider.defaultBaseUrl() }
+        combine(prefs.llmProvider, prefs.apiKey, prefs.modelName, prefs.baseUrl) { provider, key, model, _ ->
+            val resolvedModel = model.takeIf { it in DefaultLlmValues.modelOptions(provider) }
+                ?: DefaultLlmValues.defaultModel(provider)
+            val resolvedKey = key?.takeIf { it.isNotBlank() }.orEmpty()
+            val resolvedBaseUrl = DefaultLlmValues.defaultBaseUrl(provider)
             if (resolvedKey.isEmpty()) {
                 AppLogger.warn(
                     LogTags.Config,
@@ -103,9 +128,4 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
         prefs.setModelName(name)
     }
 
-    private fun LlmProvider.defaultBaseUrl(): String =
-        when (this) {
-            LlmProvider.GLM -> BuildConfig.LLM_BASE_URL
-            LlmProvider.KIMI -> "https://api.moonshot.cn/v1"
-        }
 }

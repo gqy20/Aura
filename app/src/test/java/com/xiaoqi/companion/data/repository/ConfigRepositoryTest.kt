@@ -30,7 +30,7 @@ class ConfigRepositoryTest {
             val config = awaitItem()
             assertEquals(LlmProvider.GLM, config.provider)
             assertEquals("test-key-123", config.apiKey)
-            assertEquals("https://example.test/v1", config.baseUrl)
+            assertEquals(DefaultLlmValues.GLM_BASE_URL, config.baseUrl)
             assertEquals("glm-5v-turbo", config.modelName)
             cancelAndIgnoreRemainingEvents()
         }
@@ -41,7 +41,7 @@ class ConfigRepositoryTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf("kimi-key")
             every { llmProvider } returns flowOf(LlmProvider.KIMI)
-            every { modelName } returns flowOf("kimi-latest")
+            every { modelName } returns flowOf(DefaultLlmValues.KIMI_MODEL)
             every { baseUrl } returns flowOf("")
         }
 
@@ -50,8 +50,8 @@ class ConfigRepositoryTest {
         repo.getCurrentLlmConfig().test {
             val config = awaitItem()
             assertEquals(LlmProvider.KIMI, config.provider)
-            assertEquals("https://api.moonshot.cn/v1", config.baseUrl)
-            assertEquals("kimi-latest", config.modelName)
+            assertEquals(DefaultLlmValues.KIMI_BASE_URL, config.baseUrl)
+            assertEquals(DefaultLlmValues.KIMI_MODEL, config.modelName)
             cancelAndIgnoreRemainingEvents()
         }
     }

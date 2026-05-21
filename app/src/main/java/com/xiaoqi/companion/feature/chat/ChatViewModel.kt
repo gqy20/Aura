@@ -2,7 +2,6 @@ package com.xiaoqi.companion.feature.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
@@ -26,6 +25,7 @@ import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ReminderRepository
@@ -531,10 +531,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun updateSettingsProvider(value: LlmProvider) {
-        val defaultModel = when (value) {
-            LlmProvider.GLM -> "glm-5v-turbo"
-            LlmProvider.KIMI -> "kimi-latest"
-        }
+        val defaultModel = DefaultLlmValues.defaultModel(value)
         _uiState.update {
             it.copy(
                 settingsProvider = value,
@@ -575,8 +572,11 @@ class ChatViewModel @Inject constructor(
 
     fun saveSettings() {
         val state = _uiState.value
+        val provider = state.settingsProvider
         val model = state.settingsModelName.trim()
-        val baseUrl = state.settingsBaseUrl.trim()
+            .takeIf { it in DefaultLlmValues.modelOptions(provider) }
+            ?: DefaultLlmValues.defaultModel(provider)
+        val baseUrl = DefaultLlmValues.defaultBaseUrl(provider)
         if (model.isBlank()) {
             _uiState.update { it.copy(settingsMessage = "模型名称不能为空") }
             return
@@ -586,7 +586,7 @@ class ChatViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            configRepository.setLlmProvider(state.settingsProvider)
+            configRepository.setLlmProvider(provider)
             configRepository.setModelName(model)
             configRepository.setBaseUrl(baseUrl)
             state.settingsApiKey.trim().takeIf { it.isNotEmpty() }?.let { apiKey ->
@@ -776,10 +776,7 @@ class ChatViewModel @Inject constructor(
         }
 
     private fun defaultBaseUrl(provider: LlmProvider): String =
-        when (provider) {
-            LlmProvider.GLM -> BuildConfig.LLM_BASE_URL
-            LlmProvider.KIMI -> "https://api.moonshot.cn/v1"
-        }
+        DefaultLlmValues.defaultBaseUrl(provider)
 
     private fun persistStatus(status: CompanionStatus) {
         viewModelScope.launch {
