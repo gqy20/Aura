@@ -115,7 +115,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Aura ${{ github.ref_name }}
-          draft: true
+          draft: false
           body_path: release-notes.md
           files: |
             release/aura-v${{ steps.version.outputs.VERSION }}-android-release.apk
