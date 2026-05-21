@@ -97,6 +97,83 @@ class MemoryRepositoryTest : BaseDaoTest() {
     }
 
     @Test
+    fun selectPromptContext_includesMoreThanEightMemoriesWhenWithinTokenBudget() = runTest {
+        repeat(12) { index ->
+            memoryDao.insert(
+                memory(
+                    id = "memory-$index",
+                    content = "Stable preference ${index + 1}",
+                    importance = 0.9f - index * 0.01f,
+                    timestamp = 1_000L + index,
+                )
+            )
+        }
+
+        val context = repository.selectPromptContext("unmatched")
+
+        assertEquals(12, context.memoryIds.size)
+        assertTrue(context.memoryIds.contains("memory-11"))
+    }
+
+    @Test
+    fun selectPromptContext_truncatesSingleMemoryToTokenBudget() = runTest {
+        val longContent = "a".repeat(31_000)
+        memoryDao.insert(memory(id = "long", content = longContent, importance = 0.99f))
+        memoryDao.insert(memory(id = "small", content = "small memory", importance = 0.1f))
+
+        val context = repository.selectPromptContext("unmatched")
+
+        assertEquals(listOf("long"), context.memoryIds)
+        assertTrue(context.memorySnippets.single().length <= 30_000)
+        assertTrue(context.memorySnippets.single().endsWith("..."))
+    }
+
+    @Test
+    fun selectPromptContext_includesMoreThanTwoSummariesWhenWithinTokenBudget() = runTest {
+        repeat(4) { index ->
+            summaryDao.insert(
+                summary(
+                    id = "summary-$index",
+                    title = "Topic ${index + 1}",
+                    summary = "The user mentioned summary detail ${index + 1}.",
+                    keywords = """["topic"]""",
+                )
+            )
+        }
+
+        val context = repository.selectPromptContext("topic")
+
+        assertEquals(4, context.summaryIds.size)
+        assertTrue(context.summarySnippets.all { it.contains(":") })
+    }
+
+    @Test
+    fun selectPromptContext_truncatesSummaryToTokenBudget() = runTest {
+        summaryDao.insert(
+            summary(
+                id = "long-summary",
+                title = "Long Summary",
+                summary = "s".repeat(16_000),
+                keywords = """["long"]""",
+            )
+        )
+        summaryDao.insert(
+            summary(
+                id = "small-summary",
+                title = "Small Summary",
+                summary = "short",
+                keywords = """["small"]""",
+            )
+        )
+
+        val context = repository.selectPromptContext("long")
+
+        assertEquals(listOf("long-summary"), context.summaryIds)
+        assertTrue(context.summarySnippets.single().length <= 15_000)
+        assertTrue(context.summarySnippets.single().endsWith("..."))
+    }
+
+    @Test
     fun selectPromptContext_excludesExpiredMemories() = runTest {
         memoryDao.insert(
             memory(

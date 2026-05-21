@@ -107,21 +107,27 @@ class MemoryRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             val query = inputText.trim()
             val relevant = searchPromptCandidates(query)
-            val important = memoryDao.getPromptMemories(PROMPT_MEMORY_LIMIT)
+            val important = memoryDao.getPromptMemories(PROMPT_MEMORY_CANDIDATE_LIMIT)
                 .filterUsableForPrompt(query, allowPrivateWhenRelevant = false)
             val recent = memoryDao.getRecentMemories(PROMPT_RECENT_LIMIT)
                 .filterUsableForPrompt(query, allowPrivateWhenRelevant = false)
-            val selectedMemories = mergeMemoryBuckets(relevant, important, recent).take(PROMPT_MEMORY_LIMIT)
-            val summaries = searchPromptSummaries(query)
+            val selectedMemories = selectMemoriesWithinTokenBudget(
+                mergeMemoryBuckets(relevant, important, recent),
+                PROMPT_MEMORY_TOKEN_BUDGET,
+            )
+            val selectedSummaries = selectSummariesWithinTokenBudget(
+                searchPromptSummaries(query),
+                PROMPT_SUMMARY_TOKEN_BUDGET,
+            )
 
-            markMemoriesAccessed(selectedMemories)
-            markSummariesAccessed(summaries)
+            markMemoriesAccessed(selectedMemories.map { it.memory })
+            markSummariesAccessed(selectedSummaries.map { it.summary })
 
             PromptMemoryContext(
-                memorySnippets = selectedMemories.map { it.content },
-                memoryIds = selectedMemories.map { it.id },
-                summarySnippets = summaries.map { "${it.title}: ${it.summary}" },
-                summaryIds = summaries.map { it.id },
+                memorySnippets = selectedMemories.map { it.snippet },
+                memoryIds = selectedMemories.map { it.memory.id },
+                summarySnippets = selectedSummaries.map { it.snippet },
+                summaryIds = selectedSummaries.map { it.summary.id },
             )
         }
 
@@ -161,7 +167,6 @@ class MemoryRepository @Inject constructor(
         return candidates
             .map { summary -> SummaryHit(summary, scoreSummary(summary, query)) }
             .sortedWith(compareByDescending<SummaryHit> { it.score }.thenByDescending { it.summary.lastAccessed })
-            .take(PROMPT_SUMMARY_LIMIT)
             .map { it.summary }
     }
 
@@ -182,18 +187,80 @@ class MemoryRepository @Inject constructor(
             .flatMap { it }
             .distinctBy { it.id }
 
+    private fun selectMemoriesWithinTokenBudget(
+        memories: List<MemoryEntity>,
+        tokenBudget: Int,
+    ): List<PromptMemorySelection> {
+        if (memories.isEmpty() || tokenBudget <= 0) return emptyList()
+
+        val selected = mutableListOf<PromptMemorySelection>()
+        var usedTokens = 0
+
+        for (memory in memories) {
+            val tokens = estimateTokens(memory.content)
+            if (usedTokens + tokens <= tokenBudget) {
+                selected += PromptMemorySelection(memory = memory, snippet = memory.content)
+                usedTokens += tokens
+                continue
+            }
+
+            val remainingTokens = tokenBudget - usedTokens
+            if (remainingTokens > 0) {
+                val truncated = memory.content.truncateToTokenBudget(remainingTokens)
+                selected += PromptMemorySelection(memory = memory, snippet = truncated)
+            }
+            break
+        }
+
+        return selected
+    }
+
+    private fun selectSummariesWithinTokenBudget(
+        summaries: List<MemorySummaryEntity>,
+        tokenBudget: Int,
+    ): List<PromptSummarySelection> {
+        if (summaries.isEmpty() || tokenBudget <= 0) return emptyList()
+
+        val selected = mutableListOf<PromptSummarySelection>()
+        var usedTokens = 0
+
+        for (summary in summaries) {
+            val snippet = summary.toPromptSnippet()
+            val tokens = estimateTokens(snippet)
+            if (usedTokens + tokens <= tokenBudget) {
+                selected += PromptSummarySelection(summary = summary, snippet = snippet)
+                usedTokens += tokens
+                continue
+            }
+
+            val remainingTokens = tokenBudget - usedTokens
+            if (remainingTokens > 0) {
+                selected += PromptSummarySelection(
+                    summary = summary,
+                    snippet = snippet.truncateToTokenBudget(remainingTokens),
+                )
+            }
+            break
+        }
+
+        return selected
+    }
+
     private data class MemoryHit(val memory: MemoryEntity, val score: Float)
     private data class SummaryHit(val summary: MemorySummaryEntity, val score: Float)
+    private data class PromptMemorySelection(val memory: MemoryEntity, val snippet: String)
+    private data class PromptSummarySelection(val summary: MemorySummaryEntity, val snippet: String)
 
     private companion object {
         const val MAX_MEMORY_RESULTS = 50
         const val MAX_MEMORY_CANDIDATES = 200
         const val CANDIDATE_MULTIPLIER = 4
-        const val PROMPT_MEMORY_LIMIT = 8
+        const val PROMPT_MEMORY_TOKEN_BUDGET = 10_000
+        const val PROMPT_MEMORY_CANDIDATE_LIMIT = 200
         const val PROMPT_RELEVANT_LIMIT = 5
         const val PROMPT_RECENT_LIMIT = 3
-        const val PROMPT_SUMMARY_LIMIT = 2
         const val PROMPT_SUMMARY_CANDIDATES = 20
+        const val PROMPT_SUMMARY_TOKEN_BUDGET = 5_000
         const val MERGE_CANDIDATE_LIMIT = 8
         const val MERGE_THRESHOLD = 0.72f
         val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
@@ -229,6 +296,19 @@ private fun scoreSummary(summary: MemorySummaryEntity, query: String): Float {
     }
     if (summary.title.lowercase().contains(normalizedQuery)) score += 6f
     return score
+}
+
+private fun MemorySummaryEntity.toPromptSnippet(): String =
+    "$title: $summary"
+
+private fun estimateTokens(text: String): Int =
+    ((text.length + 2) / 3).coerceAtLeast(1)
+
+private fun String.truncateToTokenBudget(tokenBudget: Int): String {
+    val maxChars = (tokenBudget * 3).coerceAtLeast(1)
+    if (length <= maxChars) return this
+    if (maxChars <= 3) return take(maxChars)
+    return take(maxChars - 3).trimEnd().let { "$it..." }
 }
 
 private fun similarityScore(a: String, b: String): Float {

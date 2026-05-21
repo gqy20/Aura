@@ -242,6 +242,26 @@ class CompanionRuntimeTest {
     }
 
     @Test
+    fun send_whenParsedReplyIsEmpty_emitsParseErrorAndDoesNotSaveAssistantMessage() = runTest {
+        val factory = FakeKoogAgentFactory()
+        every { outputParser.parse(any()) } returns ParsedOutput(
+            textReply = "",
+            emotionSignal = EmotionSignal(mood = "happy", intensity = 0.7f),
+        )
+
+        makeRuntime(factory).send(UserInput.Text("hi")).test {
+            assertTrue(awaitItem() is AgentEvent.Streaming)
+            val event = awaitItem()
+            assertTrue(event is AgentEvent.Error)
+            assertTrue((event as AgentEvent.Error).error is AgentError.ParseError)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify(exactly = 0) { messageRepo.saveAssistantMessage(any(), any()) }
+        coVerify(exactly = 0) { emotionMachine.feed(any()) }
+    }
+
+    @Test
     fun send_visionInput_passesToPromptBuilder() = runTest {
         val factory = FakeKoogAgentFactory()
         makeRuntime(factory).send(UserInput.Vision("看这个", "base64img", "image/jpeg")).test {

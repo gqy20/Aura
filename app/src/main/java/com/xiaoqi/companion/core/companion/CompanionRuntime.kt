@@ -113,57 +113,67 @@ open class CompanionRuntime @Inject constructor(
                 trySend(AgentEvent.Error(AgentError.ParseError("Empty model response")))
             } else {
                 val parsed = outputParser.parse(rawResponse)
-                val assistantMessageId = messageRepository.saveAssistantMessage(
-                    sessionId = DEFAULT_SESSION_ID,
-                    content = parsed.textReply,
-                )
-                AppLogger.debug(
-                    LogTags.Runtime,
-                    "response_parsed",
-                    "mood" to parsed.emotionSignal.mood,
-                    "replyLength" to parsed.textReply.length,
-                    "actionCount" to parsed.actions.size,
-                )
+                if (parsed.textReply.isBlank()) {
+                    AppLogger.warn(
+                        LogTags.Runtime,
+                        "empty_parsed_reply",
+                        "rawResponseLength" to rawResponse.length,
+                        "durationMs" to (System.currentTimeMillis() - startedAt),
+                    )
+                    trySend(AgentEvent.Error(AgentError.ParseError("Empty assistant reply")))
+                } else {
+                    val assistantMessageId = messageRepository.saveAssistantMessage(
+                        sessionId = DEFAULT_SESSION_ID,
+                        content = parsed.textReply,
+                    )
+                    AppLogger.debug(
+                        LogTags.Runtime,
+                        "response_parsed",
+                        "mood" to parsed.emotionSignal.mood,
+                        "replyLength" to parsed.textReply.length,
+                        "actionCount" to parsed.actions.size,
+                    )
 
-                emotionMachine.feed(parsed.emotionSignal)
-                relationshipModel.update(parsed.interactionSignal)
-                if (input !is UserInput.Vision) {
-                    runCatching {
-                        textMemoryExtractor.extractAndSave(
-                            input = input,
-                            sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
-                        )
-                    }.onFailure { error ->
-                        AppLogger.warn(
-                            LogTags.Runtime,
-                            "text_memory_extract_failed",
-                            "message" to (error.message ?: error::class.simpleName.orEmpty()),
-                        )
+                    emotionMachine.feed(parsed.emotionSignal)
+                    relationshipModel.update(parsed.interactionSignal)
+                    if (input !is UserInput.Vision) {
+                        runCatching {
+                            textMemoryExtractor.extractAndSave(
+                                input = input,
+                                sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
+                            )
+                        }.onFailure { error ->
+                            AppLogger.warn(
+                                LogTags.Runtime,
+                                "text_memory_extract_failed",
+                                "message" to (error.message ?: error::class.simpleName.orEmpty()),
+                            )
+                        }
                     }
-                }
-                (input as? UserInput.Vision)?.let { visionInput ->
-                    runCatching {
-                        visionMemoryExtractor.extractAndSave(
-                            input = visionInput,
-                            assistantReply = parsed.textReply,
-                            sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
-                        )
-                    }.onFailure { error ->
-                        AppLogger.warn(
-                            LogTags.Runtime,
-                            "vision_memory_extract_failed",
-                            "message" to (error.message ?: error::class.simpleName.orEmpty()),
-                        )
+                    (input as? UserInput.Vision)?.let { visionInput ->
+                        runCatching {
+                            visionMemoryExtractor.extractAndSave(
+                                input = visionInput,
+                                assistantReply = parsed.textReply,
+                                sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
+                            )
+                        }.onFailure { error ->
+                            AppLogger.warn(
+                                LogTags.Runtime,
+                                "vision_memory_extract_failed",
+                                "message" to (error.message ?: error::class.simpleName.orEmpty()),
+                            )
+                        }
                     }
-                }
 
-                AppLogger.info(
-                    LogTags.Runtime,
-                    "pipeline_completed",
-                    "durationMs" to (System.currentTimeMillis() - startedAt),
-                    "replyLength" to parsed.textReply.length,
-                )
-                trySend(AgentEvent.Complete(parsed))
+                    AppLogger.info(
+                        LogTags.Runtime,
+                        "pipeline_completed",
+                        "durationMs" to (System.currentTimeMillis() - startedAt),
+                        "replyLength" to parsed.textReply.length,
+                    )
+                    trySend(AgentEvent.Complete(parsed))
+                }
             }
         } catch (e: Exception) {
             AppLogger.error(
