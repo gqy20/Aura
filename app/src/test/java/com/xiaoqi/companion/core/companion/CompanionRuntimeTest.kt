@@ -204,7 +204,8 @@ class CompanionRuntimeTest {
         coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
 
         makeRuntime(factory).send(UserInput.Text("remember that I like jasmine tea")).test {
-            awaitItem()
+            assertTrue(awaitItem() is AgentEvent.Streaming)
+            assertTrue(awaitItem() is AgentEvent.Complete)
             cancelAndIgnoreRemainingEvents()
         }
 
@@ -242,7 +243,7 @@ class CompanionRuntimeTest {
     }
 
     @Test
-    fun send_whenParsedReplyIsEmpty_emitsParseErrorAndDoesNotSaveAssistantMessage() = runTest {
+    fun send_whenParsedReplyIsEmpty_usesRawResponseFallback() = runTest {
         val factory = FakeKoogAgentFactory()
         every { outputParser.parse(any()) } returns ParsedOutput(
             textReply = "",
@@ -252,13 +253,13 @@ class CompanionRuntimeTest {
         makeRuntime(factory).send(UserInput.Text("hi")).test {
             assertTrue(awaitItem() is AgentEvent.Streaming)
             val event = awaitItem()
-            assertTrue(event is AgentEvent.Error)
-            assertTrue((event as AgentEvent.Error).error is AgentError.ParseError)
+            assertTrue(event is AgentEvent.Complete)
+            assertEquals(factory.responseText, (event as AgentEvent.Complete).parsed.textReply)
             cancelAndIgnoreRemainingEvents()
         }
 
-        coVerify(exactly = 0) { messageRepo.saveAssistantMessage(any(), any()) }
-        coVerify(exactly = 0) { emotionMachine.feed(any()) }
+        coVerify { messageRepo.saveAssistantMessage("default", factory.responseText) }
+        coVerify { emotionMachine.feed(match { it.mood == "happy" }) }
     }
 
     @Test

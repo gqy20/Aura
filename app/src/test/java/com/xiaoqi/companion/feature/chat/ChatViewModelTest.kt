@@ -153,8 +153,10 @@ class ChatViewModelTest {
         var shouldFail = false
         var emitToolEvents = false
         var toolEvents: List<AgentToolCall> = emptyList()
+        var memorySavedCount = 0
         var emitStreaming = false
         var streamingDeltas: List<String> = emptyList()
+        var failAfterStreaming = false
         var completeDelayMs = 0L
         var sendCalled = false
         var lastInput: UserInput? = null
@@ -172,11 +174,18 @@ class ChatViewModelTest {
                 toolEvents.forEach { call ->
                     emit(AgentEvent.ToolCallUpdated(call))
                 }
+                if (memorySavedCount > 0) {
+                    emit(AgentEvent.MemorySaved(memorySavedCount))
+                }
                 if (emitStreaming) {
                     emit(AgentEvent.Streaming("hello"))
                 }
                 streamingDeltas.forEach { delta ->
                     emit(AgentEvent.Streaming(delta))
+                }
+                if (failAfterStreaming) {
+                    emit(AgentEvent.Error(AgentError.ApiError("stream interrupted")))
+                    return@flow
                 }
                 if (completeDelayMs > 0L) {
                     delay(completeDelayMs)
@@ -492,6 +501,21 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun sendMessage_errorAfterStreaming_keepsPartialAssistantMessage() = runTest {
+        fakeRuntime.streamingDeltas = listOf("partial reply")
+        fakeRuntime.failAfterStreaming = true
+
+        viewModel.sendMessage("hi")
+
+        val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
+        assertEquals("partial reply", assistant.content)
+        assertFalse(assistant.isStreaming)
+        assertEquals("回复未完整完成", assistant.toolStatus)
+        assertNotNull(viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
     fun sendMessage_afterError_canRetry() = runTest {
         fakeRuntime.shouldFail = true
         viewModel.sendMessage("fail")
@@ -528,6 +552,16 @@ class ChatViewModelTest {
 
         val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
         assertEquals("已保存记忆", assistant.toolStatus)
+    }
+
+    @Test
+    fun sendMessage_memorySavedEvent_showsPostResponseMemoryStatus() = runTest {
+        fakeRuntime.memorySavedCount = 1
+
+        viewModel.sendMessage("remember tea")
+
+        val assistant = viewModel.uiState.value.messages.first { it.role == "ASSISTANT" }
+        assertEquals("已记住 1 条", assistant.toolStatus)
     }
 
     @Test

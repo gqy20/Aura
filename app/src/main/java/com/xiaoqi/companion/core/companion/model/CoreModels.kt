@@ -26,6 +26,7 @@ sealed class AgentEvent {
     data class ToolCallUpdated(val call: AgentToolCall) : AgentEvent()
     data class ToolStarted(val name: String) : AgentEvent()
     data class ToolFinished(val name: String) : AgentEvent()
+    data class MemorySaved(val count: Int) : AgentEvent()
     data class Complete(val parsed: ParsedOutput) : AgentEvent()
     data class Error(val error: AgentError) : AgentEvent()
 }

@@ -15,13 +15,9 @@ interface AgentToolRegistry {
 }
 
 class CompanionToolRegistry @Inject constructor(
-    private val saveMemoryTool: SaveMemoryTool,
     private val searchMemoryTool: SearchMemoryTool,
     private val searchRecordsTool: SearchRecordsTool,
-    private val saveSummaryTool: SaveSummaryTool,
     private val searchSummariesTool: SearchSummariesTool,
-    private val updateMoodTool: UpdateMoodTool,
-    private val updateRelationshipTool: UpdateRelationshipTool,
     private val getCurrentTimeTool: GetCurrentTimeTool,
     private val getRecentInteractionContextTool: GetRecentInteractionContextTool,
     private val getUserContextSettingsTool: GetUserContextSettingsTool,
@@ -33,13 +29,9 @@ class CompanionToolRegistry @Inject constructor(
 ) : AgentToolRegistry {
     override fun create(): ToolRegistry {
         val builder = ToolRegistry.builder()
-            .tool(saveMemoryTool)
             .tool(searchMemoryTool)
             .tool(searchRecordsTool)
-            .tool(saveSummaryTool)
             .tool(searchSummariesTool)
-            .tool(updateMoodTool)
-            .tool(updateRelationshipTool)
             .tool(getCurrentTimeTool)
             .tool(getRecentInteractionContextTool)
             .tool(getUserContextSettingsTool)

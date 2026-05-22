@@ -113,10 +113,22 @@ open class CompanionRuntime @Inject constructor(
                 trySend(AgentEvent.Error(AgentError.ParseError("Empty model response")))
             } else {
                 val parsed = outputParser.parse(rawResponse)
-                if (parsed.textReply.isBlank()) {
+                val finalParsed = if (parsed.textReply.isBlank() && rawResponse.isNotBlank()) {
                     AppLogger.warn(
                         LogTags.Runtime,
-                        "empty_parsed_reply",
+                        "empty_parsed_reply_using_raw_fallback",
+                        "rawResponseLength" to rawResponse.length,
+                        "durationMs" to (System.currentTimeMillis() - startedAt),
+                    )
+                    parsed.copy(textReply = rawResponse.trim())
+                } else {
+                    parsed
+                }
+
+                if (finalParsed.textReply.isBlank()) {
+                    AppLogger.warn(
+                        LogTags.Runtime,
+                        "empty_assistant_reply_after_fallback",
                         "rawResponseLength" to rawResponse.length,
                         "durationMs" to (System.currentTimeMillis() - startedAt),
                     )
@@ -124,24 +136,27 @@ open class CompanionRuntime @Inject constructor(
                 } else {
                     val assistantMessageId = messageRepository.saveAssistantMessage(
                         sessionId = DEFAULT_SESSION_ID,
-                        content = parsed.textReply,
+                        content = finalParsed.textReply,
                     )
                     AppLogger.debug(
                         LogTags.Runtime,
                         "response_parsed",
-                        "mood" to parsed.emotionSignal.mood,
-                        "replyLength" to parsed.textReply.length,
-                        "actionCount" to parsed.actions.size,
+                        "mood" to finalParsed.emotionSignal.mood,
+                        "replyLength" to finalParsed.textReply.length,
+                        "actionCount" to finalParsed.actions.size,
                     )
 
-                    emotionMachine.feed(parsed.emotionSignal)
-                    relationshipModel.update(parsed.interactionSignal)
+                    emotionMachine.feed(finalParsed.emotionSignal)
+                    relationshipModel.update(finalParsed.interactionSignal)
+                    var savedMemoryCount = 0
                     if (input !is UserInput.Vision) {
                         runCatching {
                             textMemoryExtractor.extractAndSave(
                                 input = input,
                                 sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
                             )
+                        }.onSuccess { saved ->
+                            if (saved) savedMemoryCount += 1
                         }.onFailure { error ->
                             AppLogger.warn(
                                 LogTags.Runtime,
@@ -154,9 +169,11 @@ open class CompanionRuntime @Inject constructor(
                         runCatching {
                             visionMemoryExtractor.extractAndSave(
                                 input = visionInput,
-                                assistantReply = parsed.textReply,
+                                assistantReply = finalParsed.textReply,
                                 sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
                             )
+                        }.onSuccess { saved ->
+                            if (saved) savedMemoryCount += 1
                         }.onFailure { error ->
                             AppLogger.warn(
                                 LogTags.Runtime,
@@ -165,14 +182,17 @@ open class CompanionRuntime @Inject constructor(
                             )
                         }
                     }
+                    if (savedMemoryCount > 0) {
+                        trySend(AgentEvent.MemorySaved(savedMemoryCount))
+                    }
 
                     AppLogger.info(
                         LogTags.Runtime,
                         "pipeline_completed",
                         "durationMs" to (System.currentTimeMillis() - startedAt),
-                        "replyLength" to parsed.textReply.length,
+                        "replyLength" to finalParsed.textReply.length,
                     )
-                    trySend(AgentEvent.Complete(parsed))
+                    trySend(AgentEvent.Complete(finalParsed))
                 }
             }
         } catch (e: Exception) {

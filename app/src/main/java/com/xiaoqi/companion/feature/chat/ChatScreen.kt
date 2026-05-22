@@ -949,9 +949,9 @@ private fun ToolCapabilitiesSection(
         )
         ToolCapabilityRow(
             title = "记忆、情绪与关系",
-            detail = "本地记忆与陪伴状态更新",
+            detail = "回复完成后整理记忆与陪伴状态",
             meta = "本地 · 始终可用",
-            tools = "save_memory · search_memory · search_records · save_summary · search_summaries",
+            tools = "search_memory · search_records · search_summaries · post-response reflection",
             enabled = true,
             locked = true,
             onEnabledChanged = {},

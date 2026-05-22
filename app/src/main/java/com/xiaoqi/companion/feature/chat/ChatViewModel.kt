@@ -350,9 +350,29 @@ class ChatViewModel @Inject constructor(
             fun finishWithError(message: String) {
                 idleTimeoutJob?.cancel()
                 streamingRenderJob?.cancel()
+                flushStreamingContent()
                 _uiState.update { state ->
+                    val hasPartialAssistantReply = assistantContent.isNotBlank() ||
+                        state.messages.any { it.id == assistantId && it.content.isNotBlank() }
+                    val messages = if (hasPartialAssistantReply) {
+                        state.messages.map { msg ->
+                            if (msg.id == assistantId) {
+                                msg.copy(
+                                    isStreaming = false,
+                                    renderBlocks = emptyList(),
+                                    renderDraft = "",
+                                    isRenderDraftCode = false,
+                                    toolStatus = "回复未完整完成",
+                                )
+                            } else {
+                                msg
+                            }
+                        }
+                    } else {
+                        state.messages.filter { it.id != assistantId }
+                    }
                     state.copy(
-                        messages = state.messages.filter { it.id != assistantId },
+                        messages = messages,
                         isLoading = false,
                         error = message,
                     )
@@ -407,6 +427,12 @@ class ChatViewModel @Inject constructor(
                             updateAssistantToolStatus(
                                 assistantId,
                                 toolDisplayRegistry.label(event.name, ToolCallStatus.SUCCEEDED),
+                            )
+                        }
+                        is AgentEvent.MemorySaved -> {
+                            updateAssistantToolStatus(
+                                assistantId,
+                                if (event.count == 1) "已记住 1 条" else "已记住 ${event.count} 条",
                             )
                         }
                         is AgentEvent.Complete -> {
