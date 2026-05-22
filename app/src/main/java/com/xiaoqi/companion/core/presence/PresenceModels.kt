@@ -27,6 +27,7 @@ enum class PresenceReaction {
 sealed class PresenceEvent {
     data object UserTapped : PresenceEvent()
     data object AppReturned : PresenceEvent()
+    data class MemorySaved(val count: Int) : PresenceEvent()
     data class ToolChanged(
         val name: String,
         val status: ToolCallStatus,

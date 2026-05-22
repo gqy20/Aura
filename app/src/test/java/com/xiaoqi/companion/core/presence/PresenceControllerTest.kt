@@ -42,7 +42,7 @@ class PresenceControllerTest {
     }
 
     @Test
-    fun derive_whenSavingMemory_returnsRemembering() {
+    fun derive_whenFormerMemoryWriteToolStarts_returnsThinking() {
         val state = controller.derive(
             inputs(
                 latestToolName = "save_memory",
@@ -50,7 +50,7 @@ class PresenceControllerTest {
             )
         )
 
-        assertEquals(PresenceMode.REMEMBERING, state.mode)
+        assertEquals(PresenceMode.THINKING, state.mode)
     }
 
     @Test
@@ -93,9 +93,7 @@ class PresenceControllerTest {
 
     @Test
     fun reactionFor_whenMemorySaved_returnsMemorySpark() {
-        val reaction = controller.reactionFor(
-            PresenceEvent.ToolChanged("save_memory", ToolCallStatus.SUCCEEDED)
-        )
+        val reaction = controller.reactionFor(PresenceEvent.MemorySaved(1))
 
         assertEquals(PresenceReaction.MEMORY_SPARK, reaction)
     }

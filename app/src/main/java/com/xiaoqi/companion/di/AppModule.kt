@@ -2,8 +2,10 @@ package com.xiaoqi.companion.di
 
 import com.xiaoqi.companion.core.companion.EmotionStateMachine
 import com.xiaoqi.companion.core.companion.EmotionStateMachineImpl
+import com.xiaoqi.companion.core.companion.ConversationReflection
 import com.xiaoqi.companion.core.companion.KoogAgentFactory
 import com.xiaoqi.companion.core.companion.KoogAgentFactoryImpl
+import com.xiaoqi.companion.core.companion.LlmConversationReflection
 import com.xiaoqi.companion.core.companion.RelationshipModel
 import com.xiaoqi.companion.core.companion.RelationshipModelImpl
 import com.xiaoqi.companion.core.context.AndroidContextPermissionReader
@@ -57,6 +59,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindKoogPromptExecutorFactory(factory: DefaultKoogPromptExecutorFactory): KoogPromptExecutorFactory
+
+    @Binds
+    @Singleton
+    abstract fun bindConversationReflection(reflection: LlmConversationReflection): ConversationReflection
 
     @Binds
     @Singleton

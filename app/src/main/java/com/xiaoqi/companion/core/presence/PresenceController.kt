@@ -11,9 +11,7 @@ class PresenceController @Inject constructor() {
             inputs.hasError -> PresenceMode.ERROR
             inputs.latestToolStatus == ToolCallStatus.FAILED -> PresenceMode.ERROR
             inputs.latestToolStatus == ToolCallStatus.STARTED && inputs.latestToolName.isMemorySearch() -> PresenceMode.SEARCHING
-            inputs.latestToolStatus == ToolCallStatus.STARTED && inputs.latestToolName.isMemoryWrite() -> PresenceMode.REMEMBERING
             inputs.latestToolStatus == ToolCallStatus.STARTED -> PresenceMode.THINKING
-            inputs.latestToolStatus == ToolCallStatus.SUCCEEDED && inputs.latestToolName.isMemoryWrite() -> PresenceMode.REMEMBERING
             inputs.isStreaming -> PresenceMode.SPEAKING
             inputs.isLoading -> PresenceMode.THINKING
             inputs.hasInputText || inputs.hasPendingImage -> PresenceMode.LISTENING
@@ -38,8 +36,8 @@ class PresenceController @Inject constructor() {
             PresenceEvent.UserTapped -> PresenceReaction.TOUCH_NUZZLE
             PresenceEvent.AppReturned -> PresenceReaction.RETURN_BLINK
             PresenceEvent.ErrorShown -> PresenceReaction.ERROR_RECOVER
+            is PresenceEvent.MemorySaved -> PresenceReaction.MEMORY_SPARK
             is PresenceEvent.ToolChanged -> when {
-                event.status == ToolCallStatus.SUCCEEDED && event.name.isMemoryWrite() -> PresenceReaction.MEMORY_SPARK
                 event.status == ToolCallStatus.STARTED && event.name.isMemorySearch() -> PresenceReaction.SEARCH_SWEEP
                 event.status == ToolCallStatus.FAILED -> PresenceReaction.ERROR_RECOVER
                 else -> PresenceReaction.RETURN_BLINK
@@ -48,9 +46,6 @@ class PresenceController @Inject constructor() {
 
     private fun String?.isMemorySearch(): Boolean =
         this == "search_memory"
-
-    private fun String?.isMemoryWrite(): Boolean =
-        this == "save_memory"
 
     private fun String.isHappyMood(): Boolean =
         this in setOf("happy", "joy", "excited", "warm", "calm")

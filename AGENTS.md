@@ -75,3 +75,95 @@ make check
 - `docs/architecture.md` — 架构目标与当前实现状态
 - `docs/koog-android-integration.md` — Koog Android 集成状态与注意事项
 - `docs/engineering-standards.md` — 测试、CI、代码规范
+
+## ADB 日志与本地数据排查
+
+调试手机上“发了消息但 UI/记忆不对”时，优先确认当前前台包、进程、logcat 和 Room 数据库。debug 包名通常是 `com.xiaoqi.companion.debug`，release 包名是 `com.xiaoqi.companion`。
+
+### 1. 确认设备、前台包和进程
+
+```powershell
+& 'D:\tools\ADB_Cli\adb.exe' devices
+& 'D:\tools\ADB_Cli\adb.exe' shell dumpsys window | Select-String -Pattern 'mCurrentFocus|mFocusedApp|topResumedActivity'
+& 'D:\tools\ADB_Cli\adb.exe' shell dumpsys activity activities | Select-String -Pattern 'topResumedActivity|ResumedActivity|com.xiaoqi.companion'
+& 'D:\tools\ADB_Cli\adb.exe' shell pidof com.xiaoqi.companion.debug
+```
+
+### 2. 查看日志
+
+拿到 PID 后用 `--pid` 过滤当前 App。重点看 `pipeline_started`、`message_send_started`、`request_built`、`response_received`、`agent_error_received`、`pipeline_failed`、`AndroidRuntime`、`FATAL EXCEPTION`。
+
+```powershell
+$pid = (& 'D:\tools\ADB_Cli\adb.exe' shell pidof com.xiaoqi.companion.debug).Trim()
+& 'D:\tools\ADB_Cli\adb.exe' logcat -d --pid=$pid -v time -t 1000
+& 'D:\tools\ADB_Cli\adb.exe' logcat -d --pid=$pid -v time '*:W' -t 300
+& 'D:\tools\ADB_Cli\adb.exe' logcat -d -v time -t 2000 |
+  Select-String -Pattern 'FATAL EXCEPTION|AndroidRuntime|xiaoqi|companion|Aura|pipeline_|agent_error|LLM|Runtime|Chat|MCP|HTTP|Exception|ANR|crash'
+```
+
+如果没有看到业务日志，不代表用户没有发消息；继续查 Room 数据库。
+
+### 3. 拉取 debug Room 数据库
+
+`run-as` 只能用于 debuggable 包。PowerShell 普通 `>` 会把 SQLite 二进制写坏成 UTF-16，必须用 `cmd /c` 做二进制重定向，或用其他二进制安全方式。
+
+```powershell
+$out = 'D:\C\Desktop\ai\android\tmp-adb-db'
+New-Item -ItemType Directory -Force -Path $out | Out-Null
+cmd /c "D:\tools\ADB_Cli\adb.exe exec-out run-as com.xiaoqi.companion.debug cat databases/companion.db > D:\C\Desktop\ai\android\tmp-adb-db\companion.db"
+cmd /c "D:\tools\ADB_Cli\adb.exe exec-out run-as com.xiaoqi.companion.debug cat databases/companion.db-wal > D:\C\Desktop\ai\android\tmp-adb-db\companion.db-wal"
+cmd /c "D:\tools\ADB_Cli\adb.exe exec-out run-as com.xiaoqi.companion.debug cat databases/companion.db-shm > D:\C\Desktop\ai\android\tmp-adb-db\companion.db-shm"
+Format-Hex -Path "$out\companion.db" | Select-Object -First 2
+```
+
+正常 SQLite 文件头应显示 `SQLite format 3`。如果开头是 `FF FE 53 00...`，说明被 PowerShell 文本重定向写坏了，需要重新拉取。
+
+### 4. 查询最近消息、工具调用和记忆
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+@'
+import sqlite3, datetime
+path = r'D:\C\Desktop\ai\android\tmp-adb-db\companion.db'
+conn = sqlite3.connect(path)
+conn.row_factory = sqlite3.Row
+
+def ms(ts):
+    if ts is None:
+        return None
+    return datetime.datetime.fromtimestamp(ts / 1000).strftime('%Y-%m-%d %H:%M:%S')
+
+def preview(value, limit=220):
+    return (value or '').replace('\n', ' ')[:limit]
+
+print('recent messages:')
+for r in conn.execute('select id, session_id, role, content, timestamp, imageBase64 is not null as hasImage from messages order by timestamp desc limit 20'):
+    d = dict(r)
+    content = d.pop('content') or ''
+    d['time'] = ms(d.pop('timestamp'))
+    d['content_len'] = len(content)
+    d['content_preview'] = preview(content)
+    print(d)
+
+print('\nrecent tool calls:')
+for r in conn.execute('select id, sessionId, toolName, status, createdAt, completedAt, errorMessage, substr(argumentsJson,1,260) as args, substr(resultJson,1,260) as result from tool_calls order by createdAt desc limit 20'):
+    d = dict(r)
+    d['createdAt'] = ms(d['createdAt'])
+    d['completedAt'] = ms(d['completedAt'])
+    print(d)
+
+print('\nrecent memories:')
+for r in conn.execute('select id, type, source, importance, confidence, timestamp, updatedAt, substr(content,1,260) as content from memories order by updatedAt desc limit 20'):
+    d = dict(r)
+    d['timestamp'] = ms(d['timestamp'])
+    d['updatedAt'] = ms(d['updatedAt'])
+    print(d)
+'@ | python -
+```
+
+排查重点：
+
+- `messages` 有用户消息但没有 assistant：通常是 Runtime/LLM 失败或发送前配置失败。
+- `messages` 里 assistant 只有 `[mood:...]` 标签：模型输出了结构标签但正文为空，需要看 parser/兜底逻辑。
+- `tool_calls` 只有 `search_memory` 且结果 `count:0`：说明模型查了记忆但没有写入。
+- `memories` 没有对应内容：说明后处理抽取或保存没有命中。

@@ -11,6 +11,7 @@ data class BuiltPrompt(
     val hasImage: Boolean = false,
     val imageBase64: String? = null,
     val imageMediaType: String? = null,
+    val allowTools: Boolean = true,
 )
 
 class PromptBuilder {

@@ -28,7 +28,7 @@
 - Anthropic Messages 兼容 LLM client，支持 SSE streaming、tool schema 序列化、底层图片 content 组装。
 - Room 持久化：messages、memories、agent_state、mood_snapshots、tool_calls。
 - DataStore 配置仓库：API key、provider、model name、theme mode。
-- Agent tools：`save_memory`、`search_memory`、`update_mood`、`update_relationship`。
+- Agent tools：只读上下文工具、`search_memory`、`search_records`、`search_summaries`、时间/设备/天气/提醒与远程 MCP 工具；记忆、情绪、关系写入改为回复完成后的系统阶段。
 - App 启动时恢复 Room 中的聊天历史。
 - 聊天页顶部展示当前情绪和关系状态。
 - 情绪/关系状态写入 `agent_state`，App 重启后可恢复。
@@ -45,7 +45,7 @@
 - **模型切换**：Repository/Config 基础能力、聊天页配置状态提示和设置弹层已存在；仍缺少独立设置页与连通性检查。
 - **Vision**：`UserInput.Vision` 和 LLM client 图片 content 支持已存在，但 CameraX 拍照/选图 UI 尚未实现。
 - **情绪与关系**：核心状态更新、持久化恢复和聊天页可视化已接入，但头像/表情层尚未完成。
-- **记忆**：工具保存/搜索、prompt 注入、聊天页只读展示和只读记忆房间弹层已实现，但还没有完整记忆管理能力。
+- **记忆**：LLM reflection 后置保存、工具搜索、prompt 注入、聊天页只读展示和只读记忆房间弹层已实现，但还没有完整记忆管理能力。
 - **Release 构建**：ProGuard 与 debug 签名 fallback 已有，真实 release keystore 仍需验证。
 - **端云智能体能力**：总体方案已整理到 `docs/plan/agent-capability-server-plan.md`，但 Android 远程 runtime、Agent Server、MCP Gateway、Browser Worker、云端记忆、长期任务和 Skills 系统尚未实现。
 - **Presence Layer**：已明确产品方向，优先考虑 Rive 状态机 + Compose，把 idle/listening/thinking/speaking/searching/remembering/sleeping/return reaction 等状态接入现有情绪、关系、工具事件和 pulse；尚未实现动画资源、状态控制器和交互层。

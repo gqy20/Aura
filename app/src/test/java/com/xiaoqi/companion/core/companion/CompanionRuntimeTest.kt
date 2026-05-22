@@ -24,6 +24,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.KSerializer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -67,11 +68,8 @@ class CompanionRuntimeTest {
     }
     private val emotionMachine: EmotionStateMachine = mockk(relaxed = true)
     private val relationshipModel: RelationshipModel = mockk(relaxed = true)
-    private val visionMemoryExtractor: VisionMemoryExtractor = mockk(relaxed = true) {
-        coEvery { extractAndSave(any(), any(), any()) } returns false
-    }
-    private val textMemoryExtractor: TextMemoryExtractor = mockk(relaxed = true) {
-        coEvery { extractAndSave(any(), any()) } returns false
+    private val conversationReflection: ConversationReflection = mockk(relaxed = true) {
+        coEvery { reflectAndSave(any(), any(), any()) } returns ConversationReflectionResult()
     }
 
     private class FakeKoogAgentFactory : KoogAgentFactory {
@@ -91,6 +89,12 @@ class CompanionRuntimeTest {
                     if (shouldFail) throw RuntimeException("API error")
                     return responseText
                 }
+
+                override suspend fun <T> runStructured(
+                    prompt: BuiltPrompt,
+                    serializer: KSerializer<T>,
+                    examples: List<T>,
+                ): T = error("structured output is not used by CompanionRuntimeTest")
 
                 override fun runStreaming(prompt: BuiltPrompt) = flow {
                     if (shouldFail) throw RuntimeException("API error")
@@ -120,8 +124,7 @@ class CompanionRuntimeTest {
         messageRepository = messageRepo,
         memoryRepository = memoryRepository,
         conversationContextBuilder = ConversationContextBuilder(messageRepo),
-        visionMemoryExtractor = visionMemoryExtractor,
-        textMemoryExtractor = textMemoryExtractor,
+        conversationReflection = conversationReflection,
         emotionMachine = emotionMachine,
         relationshipModel = relationshipModel,
     )
@@ -198,7 +201,7 @@ class CompanionRuntimeTest {
     }
 
     @Test
-    fun send_textInput_runsPostResponseMemoryExtraction() = runTest {
+    fun send_textInput_runsConversationReflectionAfterReply() = runTest {
         val factory = FakeKoogAgentFactory()
         coEvery { messageRepo.sendMessage(any(), any(), any()) } returns "user-message"
         coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
@@ -210,10 +213,40 @@ class CompanionRuntimeTest {
         }
 
         coVerify {
-            textMemoryExtractor.extractAndSave(
-                match { it.content == "remember that I like jasmine tea" },
-                listOf("user-message", "assistant-message"),
+            conversationReflection.reflectAndSave(
+                match {
+                    it.userInput.content == "remember that I like jasmine tea" &&
+                        it.sourceMessageIds == listOf("user-message", "assistant-message")
+                },
+                any(),
+                any(),
             )
+        }
+    }
+
+    @Test
+    fun send_whenReflectionSavesMemory_emitsMemorySavedBeforeComplete() = runTest {
+        val factory = FakeKoogAgentFactory()
+        coEvery { conversationReflection.reflectAndSave(any(), any(), any()) } returns
+            ConversationReflectionResult(savedMemoryCount = 2)
+
+        makeRuntime(factory).send(UserInput.Text("remember that I like jasmine tea")).test {
+            assertTrue(awaitItem() is AgentEvent.Streaming)
+            assertEquals(AgentEvent.MemorySaved(2), awaitItem())
+            assertTrue(awaitItem() is AgentEvent.Complete)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun send_whenReflectionFails_stillCompletesReply() = runTest {
+        val factory = FakeKoogAgentFactory()
+        coEvery { conversationReflection.reflectAndSave(any(), any(), any()) } throws RuntimeException("bad reflection")
+
+        makeRuntime(factory).send(UserInput.Text("remember that I like jasmine tea")).test {
+            assertTrue(awaitItem() is AgentEvent.Streaming)
+            assertTrue(awaitItem() is AgentEvent.Complete)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -297,7 +330,7 @@ class CompanionRuntimeTest {
     }
 
     @Test
-    fun send_visionInput_runsPostResponseMemoryExtraction() = runTest {
+    fun send_visionInput_runsConversationReflection() = runTest {
         val factory = FakeKoogAgentFactory()
         coEvery { messageRepo.sendMessage(any(), any(), any()) } returns "user-message"
         coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
@@ -315,10 +348,13 @@ class CompanionRuntimeTest {
         }
 
         coVerify {
-            visionMemoryExtractor.extractAndSave(
-                match { it.text.contains("奶茶") },
+            conversationReflection.reflectAndSave(
+                match {
+                    it.userInput is UserInput.Vision &&
+                        it.sourceMessageIds == listOf("user-message", "assistant-message")
+                },
                 any(),
-                listOf("user-message", "assistant-message"),
+                any(),
             )
         }
     }

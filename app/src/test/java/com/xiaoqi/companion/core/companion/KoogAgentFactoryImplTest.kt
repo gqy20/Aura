@@ -2,6 +2,7 @@ package com.xiaoqi.companion.core.companion
 
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolRegistry
+import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.prompt.dsl.ModerationResult
 import ai.koog.prompt.dsl.Prompt
 import ai.koog.prompt.executor.model.PromptExecutor
@@ -15,16 +16,12 @@ import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
-import com.xiaoqi.companion.core.tools.SaveMemoryTool
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
 import com.xiaoqi.companion.data.db.converter.LlmProvider
-import com.xiaoqi.companion.data.db.dao.MemoryDao
-import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
-import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.ToolCallEntity
 import com.xiaoqi.companion.data.repository.LlmConfig
-import com.xiaoqi.companion.data.repository.MemoryRepository
+import ai.koog.serialization.typeToken
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlin.time.Clock
@@ -32,19 +29,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.Serializable
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KoogAgentFactoryImplTest {
 
-    private val memoryDao: MemoryDao = mockk(relaxed = true)
-    private val memorySummaryDao: MemorySummaryDao = mockk(relaxed = true)
-    private val memoryRepository = MemoryRepository(memoryDao, memorySummaryDao)
     private val toolCallDao: ToolCallDao = mockk(relaxed = true)
-    private val saveMemoryTool = SaveMemoryTool(
-        memoryRepository = memoryRepository,
-    )
+    private val noteTool = TestNoteTool()
     private val toolCallRecorder = ToolCallRecorder(toolCallDao)
 
     @Test
@@ -58,7 +51,7 @@ class KoogAgentFactoryImplTest {
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
                     ToolRegistry.builder()
-                        .tool(saveMemoryTool)
+                        .tool(noteTool)
                         .build()
             },
         )
@@ -71,22 +64,18 @@ class KoogAgentFactoryImplTest {
         )
 
         assertEquals("remembered", response)
-        assertTrue(executor.toolNamesPerCall.first().contains("save_memory"))
+        assertTrue(executor.toolNamesPerCall.first().contains("test_note"))
         assertEquals(2, executor.toolNamesPerCall.size)
         coVerify {
-            memoryDao.insert(match<MemoryEntity> {
-                it.content == "User likes jasmine tea" &&
-                    it.source == "tool:save_memory"
-            })
             toolCallDao.insert(match<ToolCallEntity> {
                 it.id == "call-1" &&
-                    it.toolName == "save_memory" &&
+                    it.toolName == "test_note" &&
                     it.status == "RUNNING"
             })
             toolCallDao.updateResult(
                 id = "call-1",
                 status = "SUCCESS",
-                resultJson = match { it.contains("memoryId") },
+                resultJson = match { it.contains("noted") },
                 errorMessage = null,
                 completedAt = any(),
             )
@@ -104,7 +93,7 @@ class KoogAgentFactoryImplTest {
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
                     ToolRegistry.builder()
-                        .tool(saveMemoryTool)
+                        .tool(noteTool)
                         .build()
             },
         )
@@ -118,31 +107,31 @@ class KoogAgentFactoryImplTest {
 
         assertTrue(events.any {
             val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
-            call?.name == "save_memory" &&
+            call?.name == "test_note" &&
                 call.status == ToolCallStatus.STARTED &&
                 call.callId == "call-1" &&
                 call.argumentsJson?.contains("jasmine tea") == true
         })
         assertTrue(events.any {
             val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
-            call?.name == "save_memory" &&
+            call?.name == "test_note" &&
                 call.status == ToolCallStatus.SUCCEEDED &&
                 call.callId == "call-1" &&
-                call.resultJson?.contains("memoryId") == true
+                call.resultJson?.contains("noted") == true
         })
         assertTrue(events.contains(KoogAgentEvent.TextDelta("remembered")))
         coVerify {
             toolCallDao.insert(match<ToolCallEntity> {
                 it.id == "call-1" &&
                     it.sessionId == "default" &&
-                    it.toolName == "save_memory" &&
+                    it.toolName == "test_note" &&
                     it.argumentsJson.contains("jasmine tea") &&
                     it.status == "RUNNING"
             })
             toolCallDao.updateResult(
                 id = "call-1",
                 status = "SUCCESS",
-                resultJson = match { it.contains("memoryId") },
+                resultJson = match { it.contains("noted") },
                 errorMessage = null,
                 completedAt = any(),
             )
@@ -180,7 +169,7 @@ class KoogAgentFactoryImplTest {
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
                     ToolRegistry.builder()
-                        .tool(saveMemoryTool)
+                        .tool(noteTool)
                         .build()
             },
         )
@@ -192,6 +181,34 @@ class KoogAgentFactoryImplTest {
                 hasImage = true,
                 imageBase64 = "base64-image",
                 imageMediaType = "image/jpeg",
+            )
+        )
+
+        assertEquals("这是一张图片。", response)
+        assertEquals(listOf(emptyList<String>()), executor.toolNamesPerCall)
+    }
+
+    @Test
+    fun run_whenPromptDisallowsTools_usesEmptyToolRegistry() = runTest {
+        val executor = VisionPromptExecutor()
+        val factory = KoogAgentFactoryImpl(
+            executorFactory = object : KoogPromptExecutorFactory {
+                override fun create(config: LlmConfig): PromptExecutor = executor
+            },
+            toolCallRecorder = toolCallRecorder,
+            toolRegistry = object : AgentToolRegistry {
+                override fun create(): ToolRegistry =
+                    ToolRegistry.builder()
+                        .tool(noteTool)
+                        .build()
+            },
+        )
+
+        val response = factory.create(testConfig).run(
+            BuiltPrompt(
+                systemPrompt = "You are a reflection module.",
+                userMessage = "Return memory JSON.",
+                allowTools = false,
             )
         )
 
@@ -212,8 +229,8 @@ class KoogAgentFactoryImplTest {
                 listOf(
                     Message.Tool.Call(
                         id = "call-1",
-                        tool = "save_memory",
-                        content = """{"content":"User likes jasmine tea","type":"FACT","importance":0.9}""",
+                        tool = "test_note",
+                        content = """{"content":"User likes jasmine tea"}""",
                         metaInfo = ResponseMetaInfo(Clock.System.now()),
                     )
                 )
@@ -232,8 +249,8 @@ class KoogAgentFactoryImplTest {
                 listOf(
                     Message.Tool.Call(
                         id = "call-1",
-                        tool = "save_memory",
-                        content = """{"content":"User likes jasmine tea","type":"FACT","importance":0.9}""",
+                        tool = "test_note",
+                        content = """{"content":"User likes jasmine tea"}""",
                         metaInfo = ResponseMetaInfo(Clock.System.now()),
                     )
                 ).toStreamFrames().asFlow()
@@ -301,6 +318,18 @@ class KoogAgentFactoryImplTest {
             ModerationResult(isHarmful = false, categories = emptyMap())
 
         override fun close() = Unit
+    }
+
+    private class TestNoteTool : SimpleTool<TestNoteTool.Args>(
+        typeToken<Args>(),
+        name = "test_note",
+        description = "Test-only note tool.",
+    ) {
+        @Serializable
+        data class Args(val content: String = "")
+
+        override suspend fun execute(args: Args): String =
+            """{"status":"noted","content":"${args.content}"}"""
     }
 
     private companion object {

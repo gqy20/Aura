@@ -14,6 +14,7 @@ import ai.koog.agents.core.environment.result
 import ai.koog.agents.features.eventHandler.feature.EventHandler
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.model.PromptExecutor
+import ai.koog.prompt.executor.model.executeStructured
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.serialization.KSerializer
 
 @Singleton
 class KoogAgentFactoryImpl @Inject constructor(
@@ -84,6 +86,20 @@ private class KoogPromptExecutorWrapper(
     override suspend fun run(prompt: BuiltPrompt): String =
         createAgent(prompt, observer = null).run(prompt.userMessage)
 
+    override suspend fun <T> runStructured(
+        prompt: BuiltPrompt,
+        serializer: KSerializer<T>,
+        examples: List<T>,
+    ): T {
+        val structuredPrompt = prompt.copy(allowTools = false)
+        return executor.executeStructured(
+            prompt = structuredPrompt.toKoogAgentPrompt(),
+            model = model,
+            serializer = serializer,
+            examples = examples,
+        ).getOrThrow().data
+    }
+
     override fun runStreaming(prompt: BuiltPrompt): Flow<String> =
         runEvents(prompt).mapNotNull { event ->
             (event as? KoogAgentEvent.TextDelta)?.text
@@ -126,7 +142,7 @@ private class KoogPromptExecutorWrapper(
             .promptExecutor(executor)
             .llmModel(model)
             .prompt(prompt.toKoogAgentPrompt())
-            .toolRegistry(if (prompt.hasImage) ToolRegistry.EMPTY else toolRegistry.create())
+            .toolRegistry(if (prompt.hasImage || !prompt.allowTools) ToolRegistry.EMPTY else toolRegistry.create())
             .maxIterations(MAX_AGENT_ITERATIONS)
             .id("companion-agent-${config.provider.name.lowercase()}")
             .graphStrategy(streamingSingleRunStrategy())

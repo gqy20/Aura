@@ -6,9 +6,15 @@ import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.data.repository.LlmConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.KSerializer
 
 interface KoogAgentWrapper {
     suspend fun run(prompt: BuiltPrompt): String
+    suspend fun <T> runStructured(
+        prompt: BuiltPrompt,
+        serializer: KSerializer<T>,
+        examples: List<T> = emptyList(),
+    ): T
     fun runStreaming(prompt: BuiltPrompt): Flow<String>
     fun runEvents(prompt: BuiltPrompt): Flow<KoogAgentEvent> =
         runStreaming(prompt).map { KoogAgentEvent.TextDelta(it) }

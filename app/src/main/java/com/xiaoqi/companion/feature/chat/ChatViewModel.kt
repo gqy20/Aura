@@ -434,6 +434,9 @@ class ChatViewModel @Inject constructor(
                                 assistantId,
                                 if (event.count == 1) "已记住 1 条" else "已记住 ${event.count} 条",
                             )
+                            triggerPresenceReaction(
+                                presenceController.reactionFor(PresenceEvent.MemorySaved(event.count))
+                            )
                         }
                         is AgentEvent.Complete -> {
                             idleTimeoutJob?.cancel()

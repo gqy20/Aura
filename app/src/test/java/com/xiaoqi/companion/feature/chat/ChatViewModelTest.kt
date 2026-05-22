@@ -3,6 +3,7 @@ package com.xiaoqi.companion.feature.chat
 import app.cash.turbine.test
 import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.ConversationContextBuilder
+import com.xiaoqi.companion.core.companion.ConversationReflectionResult
 import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
@@ -144,8 +145,9 @@ class ChatViewModelTest {
             )
         },
         conversationContextBuilder = ConversationContextBuilder(messageRepo),
-        visionMemoryExtractor = mockk(relaxed = true),
-        textMemoryExtractor = mockk(relaxed = true),
+        conversationReflection = mockk(relaxed = true) {
+            coEvery { reflectAndSave(any(), any(), any()) } returns ConversationReflectionResult()
+        },
         emotionMachine = mockk(relaxed = true),
         relationshipModel = mockk(relaxed = true),
     ) {

@@ -16,7 +16,7 @@
 
 - 已实现 Compose 聊天页、`ChatViewModel`、`CompanionRuntime` 和 Koog `AIAgent` 流式调用链路。
 - 已实现 Room/DataStore/Hilt 基础设施，消息、记忆、情绪快照、工具调用记录可持久化。
-- 已实现 `save_memory`、`search_memory`、`update_mood`、`update_relationship` 四个 Agent tools。
+- 已实现只读上下文工具、记忆/摘要搜索、设备/时间/天气/提醒与远程 MCP 工具；记忆、情绪、关系写入由回复完成后的系统阶段处理，不再作为主对话工具暴露。
 - 已通过 `testDebugUnitTest` 与 `assembleDebug` 验证。
 
 仍处于规划或部分实现状态的模块：

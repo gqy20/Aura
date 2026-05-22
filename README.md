@@ -9,11 +9,11 @@
 - **当前版本：0.1.2** — 上下文预算与模型配置增强版本，聚焦最近对话、长期记忆/摘要预算注入、默认 GLM/Kimi 配置和空回复兜底
 - **已实现：文本聊天闭环** — Compose 聊天页 + ChatViewModel + CompanionRuntime + Koog Agent
 - **已实现：流式对话** — Anthropic Messages 兼容 SSE 流式输出，聊天气泡逐字渲染
-- **已实现：长期记忆体系增强** — Room 存储消息、记忆、摘要、情绪快照、工具调用记录；`MemoryRepository` 统一保存、搜索、prompt selection 和访问时间更新
-- **已实现：Agent 工具调用** — `save_memory`、`search_memory`、`update_mood`、`update_relationship`
+- **已实现：长期记忆体系增强** — Room 存储消息、记忆、摘要、情绪快照、工具调用记录；`MemoryRepository` 统一保存、搜索、prompt selection 和访问时间更新；回复完成后由 LLM reflection 判断是否写入记忆
+- **已实现：Agent 工具调用** — 只读上下文工具、记忆搜索、摘要搜索、设备/时间/天气/提醒与远程 MCP 工具；记忆/情绪/关系写入已从工具阶段移到后置系统阶段
 - **已实现：情绪与关系核心** — 情绪状态机和关系模型已接入 Agent 主循环
 - **已实现：模型与工具设置** — 设置弹层支持 provider、模型名、Base URL、API Key、MCP HTTP URL 与上下文工具开关
-- **部分实现：多模态** — 图片选择、Vision prompt 和底层图片输入已接入；Vision 主回复禁用 tools，但支持后置记忆抽取
+- **部分实现：多模态** — 图片选择、Vision prompt 和底层图片输入已接入；Vision 主回复禁用 tools，但支持后置 reflection 记忆整理
 - **规划中：生命脉冲** — WorkManager 依赖已接入，后台 pulse/通知/主动关怀尚未实现
 
 ## 技术栈
@@ -102,15 +102,16 @@ make help        # 查看所有命令
 用户输入 (文本/图片/语音)
   → MemoryRepository 选择相关记忆/摘要
   → PromptBuilder 组装（注入情绪 + 关系 + 记忆上下文）
-    → Koog Agent 调用 LLM（流式输出）
+    → Koog Agent 调用 LLM（流式输出，可用只读/外部工具）
       → OutputParser 解析结构化响应
+        → 保存 assistant 消息
         → 情绪状态机更新
         → 关系模型更新
-        → Agent tools / Vision 后置记忆抽取
-        → UI 响应（表情 / 气泡 / 动作）
+        → LLM reflection 判断并写入值得保留的记忆
+        → UI 响应（表情 / 气泡 / 动作 / 已记住提示）
 ```
 
-当前已跑通文本输入链路和图片选择 Vision 输入链路；Vision 场景会先完成主回复，再用后置任务抽取明确值得保存的视觉记忆。语音输入和 CameraX 拍摄 UI 仍在 roadmap 中。
+当前已跑通文本输入链路和图片选择 Vision 输入链路；文本与 Vision 场景都会先完成主回复，再用后置 reflection 判断是否保存记忆。语音输入和 CameraX 拍摄 UI 仍在 roadmap 中。
 
 ## 配置
 

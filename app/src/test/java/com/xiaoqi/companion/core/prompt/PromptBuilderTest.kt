@@ -84,7 +84,7 @@ class PromptBuilderTest {
                 "memory" to PromptConfig.SectionTemplate("Memory", "{{memories}}"),
                 "tools" to PromptConfig.SectionTemplate(
                     "Tools",
-                    "Use save_memory for durable facts. Use search_memory for recall.",
+                    "Use search_memory for recall. Memory saving is handled after the reply.",
                 ),
             ),
         )
@@ -100,7 +100,6 @@ class PromptBuilderTest {
         assertTrue(result.systemPrompt.contains("calm"))
         assertTrue(result.systemPrompt.contains("close"))
         assertTrue(result.systemPrompt.contains("User likes jasmine tea"))
-        assertTrue(result.systemPrompt.contains("save_memory"))
         assertTrue(result.systemPrompt.contains("search_memory"))
         assertFalse(result.systemPrompt.contains("{{memories}}"))
         assertFalse(result.systemPrompt.contains("{User likes jasmine tea}"))

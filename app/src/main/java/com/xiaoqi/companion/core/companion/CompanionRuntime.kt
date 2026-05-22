@@ -27,8 +27,7 @@ open class CompanionRuntime @Inject constructor(
     private val messageRepository: MessageRepository,
     private val memoryRepository: MemoryRepository,
     private val conversationContextBuilder: ConversationContextBuilder,
-    private val visionMemoryExtractor: VisionMemoryExtractor,
-    private val textMemoryExtractor: TextMemoryExtractor,
+    private val conversationReflection: ConversationReflection,
     private val emotionMachine: EmotionStateMachine,
     private val relationshipModel: RelationshipModel,
 ) {
@@ -148,40 +147,23 @@ open class CompanionRuntime @Inject constructor(
 
                     emotionMachine.feed(finalParsed.emotionSignal)
                     relationshipModel.update(finalParsed.interactionSignal)
-                    var savedMemoryCount = 0
-                    if (input !is UserInput.Vision) {
-                        runCatching {
-                            textMemoryExtractor.extractAndSave(
-                                input = input,
-                                sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
-                            )
-                        }.onSuccess { saved ->
-                            if (saved) savedMemoryCount += 1
-                        }.onFailure { error ->
-                            AppLogger.warn(
-                                LogTags.Runtime,
-                                "text_memory_extract_failed",
-                                "message" to (error.message ?: error::class.simpleName.orEmpty()),
-                            )
-                        }
-                    }
-                    (input as? UserInput.Vision)?.let { visionInput ->
-                        runCatching {
-                            visionMemoryExtractor.extractAndSave(
-                                input = visionInput,
+                    val savedMemoryCount = runCatching {
+                        conversationReflection.reflectAndSave(
+                            input = ConversationReflectionInput(
+                                userInput = input,
                                 assistantReply = finalParsed.textReply,
                                 sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
-                            )
-                        }.onSuccess { saved ->
-                            if (saved) savedMemoryCount += 1
-                        }.onFailure { error ->
-                            AppLogger.warn(
-                                LogTags.Runtime,
-                                "vision_memory_extract_failed",
-                                "message" to (error.message ?: error::class.simpleName.orEmpty()),
-                            )
-                        }
-                    }
+                            ),
+                            config = config,
+                            agent = agent,
+                        ).savedMemoryCount
+                    }.onFailure { error ->
+                        AppLogger.warn(
+                            LogTags.Runtime,
+                            "conversation_reflection_failed",
+                            "message" to (error.message ?: error::class.simpleName.orEmpty()),
+                        )
+                    }.getOrDefault(0)
                     if (savedMemoryCount > 0) {
                         trySend(AgentEvent.MemorySaved(savedMemoryCount))
                     }
