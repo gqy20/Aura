@@ -127,9 +127,30 @@ private class KoogPromptExecutorWrapper(
 
         val job = launch {
             try {
+                AppLogger.info(
+                    LogTags.Llm,
+                    "agent_run_started",
+                    "model" to model.id,
+                    "allowTools" to prompt.allowTools,
+                    "hasImage" to prompt.hasImage,
+                    "userMessageLength" to prompt.userMessage.length,
+                )
                 createAgent(prompt, observer).run(prompt.userMessage)
+                AppLogger.info(
+                    LogTags.Llm,
+                    "agent_run_completed",
+                    "model" to model.id,
+                    "hasStreamingText" to hasStreamingText,
+                )
                 close()
             } catch (e: Throwable) {
+                AppLogger.error(
+                    LogTags.Llm,
+                    e,
+                    "agent_run_failed",
+                    "model" to model.id,
+                    "hasStreamingText" to hasStreamingText,
+                )
                 close(e)
             }
         }
@@ -231,10 +252,25 @@ private class KoogPromptExecutorWrapper(
                     }
                 }
 
+                AppLogger.info(
+                    LogTags.Llm,
+                    "tool_result_llm_request_started",
+                    "resultCount" to results.size,
+                )
                 requestLLMStreaming()
                     .toList()
                     .toMessageResponses()
-                    .also { appendPrompt { messages(it) } }
+                    .also { responses ->
+                        AppLogger.info(
+                            LogTags.Llm,
+                            "tool_result_llm_request_completed",
+                            "resultCount" to results.size,
+                            "responseCount" to responses.size,
+                            "assistantTextLength" to responses.sumOf { it.content.length },
+                            "toolCallCount" to responses.count { it is Message.Tool.Call },
+                        )
+                        appendPrompt { messages(responses) }
+                    }
             }
         }
 

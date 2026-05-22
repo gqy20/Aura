@@ -5,6 +5,8 @@ import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MemorySummaryEntity
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -47,8 +49,17 @@ class MemoryRepository @Inject constructor(
 
     suspend fun saveMemory(request: SaveMemoryRequest): SaveMemoryResult =
         withContext(Dispatchers.IO) {
+            val startedAt = System.currentTimeMillis()
             val now = System.currentTimeMillis()
             val normalizedContent = request.content.trim()
+            AppLogger.info(
+                LogTags.Repo,
+                "memory_save_started",
+                "type" to request.type,
+                "source" to request.source,
+                "contentLength" to normalizedContent.length,
+                "sourceMessageCount" to request.sourceMessageIds.size,
+            )
             val sourceIdsJson = json.encodeToString(request.sourceMessageIds.map { it.trim() }.filter { it.isNotBlank() })
             val existing = findMergeTarget(normalizedContent, request.type)
             val entity = existing?.let {
@@ -78,7 +89,19 @@ class MemoryRepository @Inject constructor(
                 lastAccessed = now,
             )
             memoryDao.insert(entity)
-            SaveMemoryResult(memory = entity, merged = existing != null)
+            SaveMemoryResult(memory = entity, merged = existing != null).also {
+                AppLogger.info(
+                    LogTags.Repo,
+                    "memory_save_completed",
+                    "memoryId" to entity.id,
+                    "type" to entity.type,
+                    "source" to entity.source,
+                    "merged" to (existing != null),
+                    "importance" to entity.importance,
+                    "confidence" to entity.confidence,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+            }
         }
 
     suspend fun searchMemories(
@@ -105,6 +128,7 @@ class MemoryRepository @Inject constructor(
 
     suspend fun selectPromptContext(inputText: String): PromptMemoryContext =
         withContext(Dispatchers.IO) {
+            val startedAt = System.currentTimeMillis()
             val query = inputText.trim()
             val relevant = searchPromptCandidates(query)
             val important = memoryDao.getPromptMemories(PROMPT_MEMORY_CANDIDATE_LIMIT)
@@ -128,7 +152,21 @@ class MemoryRepository @Inject constructor(
                 memoryIds = selectedMemories.map { it.memory.id },
                 summarySnippets = selectedSummaries.map { it.snippet },
                 summaryIds = selectedSummaries.map { it.summary.id },
-            )
+            ).also {
+                AppLogger.debug(
+                    LogTags.Repo,
+                    "memory_prompt_context_selected",
+                    "queryLength" to query.length,
+                    "relevantCount" to relevant.size,
+                    "importantCount" to important.size,
+                    "recentCount" to recent.size,
+                    "selectedMemoryCount" to it.memorySnippets.size,
+                    "selectedSummaryCount" to it.summarySnippets.size,
+                    "memoryTokenBudget" to PROMPT_MEMORY_TOKEN_BUDGET,
+                    "summaryTokenBudget" to PROMPT_SUMMARY_TOKEN_BUDGET,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+            }
         }
 
     private suspend fun findMergeTarget(content: String, type: MemoryType): MemoryEntity? {

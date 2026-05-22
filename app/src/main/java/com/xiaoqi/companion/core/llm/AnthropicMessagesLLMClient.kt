@@ -41,7 +41,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 
-private const val DEFAULT_MAX_TOKENS = 1024
+private const val DEFAULT_MAX_TOKENS = 4096
 private const val ANTHROPIC_VERSION = "2023-06-01"
 
 class AnthropicMessagesLLMClient(
@@ -120,6 +120,12 @@ class AnthropicMessagesLLMClient(
 
         launch(Dispatchers.IO) {
             try {
+                AppLogger.info(
+                    LogTags.Llm,
+                    "stream_request_started",
+                    "model" to model.id,
+                    "toolCount" to tools.size,
+                )
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         AppLogger.warn(
@@ -134,7 +140,16 @@ class AnthropicMessagesLLMClient(
                         return@launch
                     }
 
-                    val source = response.body?.source() ?: run { close(); return@launch }
+                    val source = response.body?.source() ?: run {
+                        AppLogger.warn(
+                            LogTags.Llm,
+                            "stream_response_body_missing",
+                            "model" to model.id,
+                            "durationMs" to (System.currentTimeMillis() - startedAt),
+                        )
+                        close()
+                        return@launch
+                    }
                     while (!source.exhausted()) {
                         val line = source.readUtf8Line() ?: continue
                         if (!line.startsWith("data: ")) continue
@@ -221,6 +236,15 @@ class AnthropicMessagesLLMClient(
                 trySend(StreamFrame.End(finishReason, ResponseMetaInfo(clock.now())))
                 close()
             } catch (e: Exception) {
+                AppLogger.error(
+                    LogTags.Llm,
+                    e,
+                    "stream_request_failed",
+                    "model" to model.id,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                    "responseLength" to fullText.length,
+                    "finishReason" to finishReason,
+                )
                 close(e)
             }
         }

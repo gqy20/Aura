@@ -1,6 +1,8 @@
 package com.xiaoqi.companion.core.weather
 
 import javax.inject.Inject
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -74,10 +76,43 @@ class OpenMeteoWeatherProvider @Inject constructor(
         }
 
     private fun getJson(url: String): JsonObject {
-        val response = client.newCall(Request.Builder().url(url).get().build()).execute()
-        response.use {
-            if (!it.isSuccessful) error("Weather request failed: HTTP ${it.code}")
-            return json.parseToJsonElement(it.body?.string().orEmpty()).jsonObject
+        val startedAt = System.currentTimeMillis()
+        val host = url.substringAfter("://", url).substringBefore("/")
+        AppLogger.info(LogTags.Tools, "weather_request_started", "host" to host)
+        try {
+            val response = client.newCall(Request.Builder().url(url).get().build()).execute()
+            response.use {
+                val body = it.body?.string().orEmpty()
+                if (!it.isSuccessful) {
+                    AppLogger.warn(
+                        LogTags.Tools,
+                        "weather_request_http_error",
+                        "host" to host,
+                        "statusCode" to it.code,
+                        "bodyLength" to body.length,
+                        "durationMs" to (System.currentTimeMillis() - startedAt),
+                    )
+                    error("Weather request failed: HTTP ${it.code}")
+                }
+                return json.parseToJsonElement(body).jsonObject.also {
+                    AppLogger.info(
+                        LogTags.Tools,
+                        "weather_request_completed",
+                        "host" to host,
+                        "bodyLength" to body.length,
+                        "durationMs" to (System.currentTimeMillis() - startedAt),
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.error(
+                LogTags.Tools,
+                e,
+                "weather_request_failed",
+                "host" to host,
+                "durationMs" to (System.currentTimeMillis() - startedAt),
+            )
+            throw e
         }
     }
 

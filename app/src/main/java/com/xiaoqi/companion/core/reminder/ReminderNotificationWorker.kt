@@ -21,11 +21,28 @@ class ReminderNotificationWorker @AssistedInject constructor(
         val reminderId = inputData.getString(KEY_REMINDER_ID)
         val title = inputData.getString(KEY_TITLE)?.takeIf { it.isNotBlank() } ?: "Aura reminder"
         val message = inputData.getString(KEY_MESSAGE)?.takeIf { it.isNotBlank() } ?: "You asked me to remind you."
-        AppLogger.info(LogTags.Reminder, "reminder_worker_started", "reminderId" to reminderId)
-        ReminderNotificationPoster.post(applicationContext, title, message)
-        reminderId?.let { reminderDao.markFired(it, System.currentTimeMillis()) }
-        AppLogger.info(LogTags.Reminder, "reminder_worker_finished", "reminderId" to reminderId)
-        return Result.success()
+        val startedAt = System.currentTimeMillis()
+        return try {
+            AppLogger.info(LogTags.Reminder, "reminder_worker_started", "reminderId" to reminderId)
+            ReminderNotificationPoster.post(applicationContext, title, message)
+            reminderId?.let { reminderDao.markFired(it, System.currentTimeMillis()) }
+            AppLogger.info(
+                LogTags.Reminder,
+                "reminder_worker_completed",
+                "reminderId" to reminderId,
+                "durationMs" to (System.currentTimeMillis() - startedAt),
+            )
+            Result.success()
+        } catch (e: Exception) {
+            AppLogger.error(
+                LogTags.Reminder,
+                e,
+                "reminder_worker_failed",
+                "reminderId" to reminderId,
+                "durationMs" to (System.currentTimeMillis() - startedAt),
+            )
+            Result.failure()
+        }
     }
 
     companion object {

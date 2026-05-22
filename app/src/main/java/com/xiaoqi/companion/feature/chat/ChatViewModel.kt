@@ -528,13 +528,27 @@ class ChatViewModel @Inject constructor(
 
     fun cancelReminder(reminderId: String) {
         viewModelScope.launch {
-            reminderRepository.cancelReminder(reminderId)
+            try {
+                AppLogger.info(LogTags.Reminder, "ui_cancel_reminder_started", "reminderId" to reminderId)
+                reminderRepository.cancelReminder(reminderId)
+                AppLogger.info(LogTags.Reminder, "ui_cancel_reminder_completed", "reminderId" to reminderId)
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Reminder, e, "ui_cancel_reminder_failed", "reminderId" to reminderId)
+                _uiState.update { it.copy(error = "Cancel reminder failed. Please try again.") }
+            }
         }
     }
 
     fun deleteMemory(memoryId: String) {
         viewModelScope.launch {
-            memoryDao.deleteById(memoryId)
+            try {
+                AppLogger.info(LogTags.Repo, "ui_delete_memory_started", "memoryId" to memoryId)
+                memoryDao.deleteById(memoryId)
+                AppLogger.info(LogTags.Repo, "ui_delete_memory_completed", "memoryId" to memoryId)
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_delete_memory_failed", "memoryId" to memoryId)
+                _uiState.update { it.copy(error = "Delete memory failed. Please try again.") }
+            }
         }
     }
 
@@ -580,23 +594,23 @@ class ChatViewModel @Inject constructor(
     }
 
     fun setDeviceStatusContextEnabled(value: Boolean) {
-        viewModelScope.launch { appPreferences.setDeviceStatusContextEnabled(value) }
+        updateBooleanPreference("device_status_context", value) { appPreferences.setDeviceStatusContextEnabled(value) }
     }
 
     fun setLocationContextEnabled(value: Boolean) {
-        viewModelScope.launch { appPreferences.setLocationContextEnabled(value) }
+        updateBooleanPreference("location_context", value) { appPreferences.setLocationContextEnabled(value) }
     }
 
     fun setWeatherContextEnabled(value: Boolean) {
-        viewModelScope.launch { appPreferences.setWeatherContextEnabled(value) }
+        updateBooleanPreference("weather_context", value) { appPreferences.setWeatherContextEnabled(value) }
     }
 
     fun setReminderToolEnabled(value: Boolean) {
-        viewModelScope.launch { appPreferences.setReminderToolEnabled(value) }
+        updateBooleanPreference("reminder_tool", value) { appPreferences.setReminderToolEnabled(value) }
     }
 
     fun setNotificationEnabled(value: Boolean) {
-        viewModelScope.launch { appPreferences.setNotificationEnabled(value) }
+        updateBooleanPreference("notification", value) { appPreferences.setNotificationEnabled(value) }
     }
 
     fun saveSettings() {
@@ -615,20 +629,41 @@ class ChatViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            configRepository.setLlmProvider(provider)
-            configRepository.setModelName(model)
-            configRepository.setBaseUrl(baseUrl)
-            state.settingsApiKey.trim().takeIf { it.isNotEmpty() }?.let { apiKey ->
-                configRepository.setApiKey(apiKey)
-            }
-            _uiState.update {
-                it.copy(
-                    isSettingsOpen = false,
-                    settingsApiKey = "",
-                    settingsModelName = model,
-                    settingsBaseUrl = baseUrl,
-                    settingsMessage = null,
+            val startedAt = System.currentTimeMillis()
+            try {
+                AppLogger.info(LogTags.Config, "settings_save_started", "provider" to provider, "model" to model)
+                configRepository.setLlmProvider(provider)
+                configRepository.setModelName(model)
+                configRepository.setBaseUrl(baseUrl)
+                state.settingsApiKey.trim().takeIf { it.isNotEmpty() }?.let { apiKey ->
+                    configRepository.setApiKey(apiKey)
+                }
+                _uiState.update {
+                    it.copy(
+                        isSettingsOpen = false,
+                        settingsApiKey = "",
+                        settingsModelName = model,
+                        settingsBaseUrl = baseUrl,
+                        settingsMessage = null,
+                    )
+                }
+                AppLogger.info(
+                    LogTags.Config,
+                    "settings_save_completed",
+                    "provider" to provider,
+                    "model" to model,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
                 )
+            } catch (e: Exception) {
+                AppLogger.error(
+                    LogTags.Config,
+                    e,
+                    "settings_save_failed",
+                    "provider" to provider,
+                    "model" to model,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+                _uiState.update { it.copy(settingsMessage = "Save settings failed. Please try again.") }
             }
         }
     }
@@ -670,15 +705,53 @@ class ChatViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            appPreferences.setMcpServerName(name)
-            appPreferences.setMcpHttpUrl(url)
-            _uiState.update {
-                it.copy(
-                    isMcpSettingsOpen = false,
-                    mcpSettingsName = name,
-                    mcpSettingsUrl = url,
-                    mcpSettingsMessage = null,
+            val startedAt = System.currentTimeMillis()
+            try {
+                AppLogger.info(LogTags.Config, "mcp_settings_save_started", "serverName" to name, "hasUrl" to url.isNotBlank())
+                appPreferences.setMcpServerName(name)
+                appPreferences.setMcpHttpUrl(url)
+                _uiState.update {
+                    it.copy(
+                        isMcpSettingsOpen = false,
+                        mcpSettingsName = name,
+                        mcpSettingsUrl = url,
+                        mcpSettingsMessage = null,
+                    )
+                }
+                AppLogger.info(
+                    LogTags.Config,
+                    "mcp_settings_save_completed",
+                    "serverName" to name,
+                    "hasUrl" to url.isNotBlank(),
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
                 )
+            } catch (e: Exception) {
+                AppLogger.error(
+                    LogTags.Config,
+                    e,
+                    "mcp_settings_save_failed",
+                    "serverName" to name,
+                    "hasUrl" to url.isNotBlank(),
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+                _uiState.update { it.copy(mcpSettingsMessage = "Save MCP settings failed. Please try again.") }
+            }
+        }
+    }
+
+    private fun updateBooleanPreference(
+        name: String,
+        value: Boolean,
+        update: suspend () -> Unit,
+    ) {
+        viewModelScope.launch {
+            try {
+                AppLogger.info(LogTags.Config, "preference_update_started", "name" to name, "value" to value)
+                update()
+                AppLogger.info(LogTags.Config, "preference_update_completed", "name" to name, "value" to value)
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Config, e, "preference_update_failed", "name" to name, "value" to value)
+                _uiState.update { it.copy(error = "Update setting failed. Please try again.") }
             }
         }
     }

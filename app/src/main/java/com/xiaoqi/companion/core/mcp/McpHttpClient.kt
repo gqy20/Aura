@@ -51,36 +51,92 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     override suspend fun listTools(serverUrl: String): List<McpToolSpec> =
         withContext(Dispatchers.IO) {
             if (serverUrl.isBlank()) return@withContext emptyList()
-            toolCache[serverUrl]?.let { return@withContext it }
-            ensureInitialized(serverUrl)
-            val response = rpc(
-                serverUrl = serverUrl,
-                method = "tools/list",
-                params = buildJsonObject {},
-            )
-            response.resultObject()["tools"]?.jsonArray
-                ?.mapNotNull { element -> element.jsonObject.toToolSpecOrNull() }
-                .orEmpty()
-                .also { toolCache[serverUrl] = it }
+            val startedAt = System.currentTimeMillis()
+            toolCache[serverUrl]?.let {
+                AppLogger.debug(LogTags.Tools, "mcp_list_tools_cache_hit", "toolCount" to it.size)
+                return@withContext it
+            }
+            AppLogger.info(LogTags.Tools, "mcp_list_tools_started", "serverHost" to serverUrl.hostForLog())
+            try {
+                ensureInitialized(serverUrl)
+                val response = rpc(
+                    serverUrl = serverUrl,
+                    method = "tools/list",
+                    params = buildJsonObject {},
+                )
+                response.resultObject()["tools"]?.jsonArray
+                    ?.mapNotNull { element -> element.jsonObject.toToolSpecOrNull() }
+                    .orEmpty()
+                    .also {
+                        toolCache[serverUrl] = it
+                        AppLogger.info(
+                            LogTags.Tools,
+                            "mcp_list_tools_completed",
+                            "serverHost" to serverUrl.hostForLog(),
+                            "toolCount" to it.size,
+                            "durationMs" to (System.currentTimeMillis() - startedAt),
+                        )
+                    }
+            } catch (e: Exception) {
+                AppLogger.error(
+                    LogTags.Tools,
+                    e,
+                    "mcp_list_tools_failed",
+                    "serverHost" to serverUrl.hostForLog(),
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+                throw e
+            }
         }
 
     override suspend fun callTool(serverUrl: String, toolName: String, arguments: JsonObject): String =
         withContext(Dispatchers.IO) {
-            ensureInitialized(serverUrl)
-            val response = rpc(
-                serverUrl = serverUrl,
-                method = "tools/call",
-                params = buildJsonObject {
-                    put("name", toolName)
-                    put("arguments", arguments)
-                },
+            val startedAt = System.currentTimeMillis()
+            AppLogger.info(
+                LogTags.Tools,
+                "mcp_call_tool_started",
+                "serverHost" to serverUrl.hostForLog(),
+                "toolName" to toolName,
+                "argumentLength" to arguments.toString().length,
             )
-            response.resultObject().toToolResultString()
+            try {
+                ensureInitialized(serverUrl)
+                val response = rpc(
+                    serverUrl = serverUrl,
+                    method = "tools/call",
+                    params = buildJsonObject {
+                        put("name", toolName)
+                        put("arguments", arguments)
+                    },
+                )
+                response.resultObject().toToolResultString().also {
+                    AppLogger.info(
+                        LogTags.Tools,
+                        "mcp_call_tool_completed",
+                        "serverHost" to serverUrl.hostForLog(),
+                        "toolName" to toolName,
+                        "resultLength" to it.length,
+                        "durationMs" to (System.currentTimeMillis() - startedAt),
+                    )
+                }
+            } catch (e: Exception) {
+                AppLogger.error(
+                    LogTags.Tools,
+                    e,
+                    "mcp_call_tool_failed",
+                    "serverHost" to serverUrl.hostForLog(),
+                    "toolName" to toolName,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+                throw e
+            }
         }
 
     private fun ensureInitialized(serverUrl: String) {
         if (sessions.containsKey(serverUrl)) return
 
+        val startedAt = System.currentTimeMillis()
+        AppLogger.info(LogTags.Tools, "mcp_initialize_started", "serverHost" to serverUrl.hostForLog())
         val response = postJson(
             serverUrl = serverUrl,
             payload = buildRequest(
@@ -101,6 +157,13 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         )
         response.sessionId?.let { sessions[serverUrl] = it }
         response.json.throwIfJsonRpcError()
+        AppLogger.info(
+            LogTags.Tools,
+            "mcp_initialize_completed",
+            "serverHost" to serverUrl.hostForLog(),
+            "hasSession" to (response.sessionId != null),
+            "durationMs" to (System.currentTimeMillis() - startedAt),
+        )
 
         runCatching {
             postJson(
@@ -132,6 +195,8 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     }
 
     private fun postJson(serverUrl: String, payload: JsonObject, includeSession: Boolean): McpHttpResponse {
+        val startedAt = System.currentTimeMillis()
+        val method = payload["method"]?.jsonPrimitive?.contentOrNull.orEmpty()
         val body = payload.toString().toRequestBody("application/json".toMediaType())
         val requestBuilder = Request.Builder()
             .url(serverUrl)
@@ -146,6 +211,15 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         httpClient.newCall(requestBuilder.build()).execute().use { response ->
             val rawBody = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
+                AppLogger.warn(
+                    LogTags.Tools,
+                    "mcp_http_error",
+                    "serverHost" to serverUrl.hostForLog(),
+                    "method" to method,
+                    "statusCode" to response.code,
+                    "bodyLength" to rawBody.length,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
                 throw RuntimeException("MCP HTTP ${response.code}: ${rawBody.take(300)}")
             }
             return McpHttpResponse(
@@ -224,3 +298,9 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         val json = Json { ignoreUnknownKeys = true }
     }
 }
+
+private fun String.hostForLog(): String =
+    substringAfter("://", this)
+        .substringBefore("/")
+        .substringBefore(":")
+        .ifBlank { "unknown" }
