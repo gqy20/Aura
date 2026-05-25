@@ -6,6 +6,27 @@
 
 ---
 
+## [0.1.3] - 2026-05-25
+
+Aura 0.1.3 是 0.1.2 之后的稳定性与发布流程增强版本，重点收敛聊天响应链路、后置记忆写入结构和真机排障日志，并让 GitHub Release 能直接产出可下载包。
+
+### 变更
+
+- Release workflow 改为 tag 推送后直接创建正式 GitHub Release，并上传版本化 release APK 与 SHA-256 校验文件。
+- 记忆后置 reflection 写入改为结构化结果处理，降低非结构化模型输出导致记忆保存不稳定的风险。
+- MCP 初始化上报的 Aura Android client 版本升级到 `0.1.3`。
+- Android 应用版本升级为 `versionCode = 4` / `versionName = "0.1.3"`。
+
+### 修复
+
+- 稳定聊天 response pipeline，减少运行时异常、空响应或阶段状态不一致时对 UI 和持久化链路的影响。
+
+### 工具链
+
+- 增强 Koog agent、LLM client、MCP HTTP client、定位、天气、提醒通知、工具调用记录和记忆仓库的诊断日志，便于真机通过 logcat 定位问题。
+
+---
+
 ## [0.1.2] - 2026-05-21
 
 Aura 0.1.2 是 0.1.1 之后的体验与可靠性增强版本，覆盖最近对话上下文、文本记忆恢复、提醒管理、MCP 专用设置、宠物头像与聊天 UI 打磨，并补齐模型配置安全化和 prompt 预算控制。

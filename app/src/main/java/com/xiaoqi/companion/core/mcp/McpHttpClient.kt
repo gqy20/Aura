@@ -148,7 +148,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                         "clientInfo",
                         buildJsonObject {
                             put("name", "Aura Android")
-                            put("version", "0.1.2")
+                            put("version", "0.1.3")
                         },
                     )
                 },
