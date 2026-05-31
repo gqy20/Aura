@@ -10,6 +10,8 @@ import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloadState
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
@@ -66,6 +68,7 @@ class ChatViewModelTest {
     private lateinit var memoryDao: MemoryDao
     private lateinit var agentStateDao: AgentStateDao
     private lateinit var appPreferences: AppPreferences
+    private lateinit var localQwenDownloader: FakeLocalQwenModelDownloader
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val configRepo: ConfigRepository = mockk(relaxed = true) {
@@ -124,6 +127,42 @@ class ChatViewModelTest {
 
         override suspend fun cancelReminder(reminderId: String) {
             canceledIds += reminderId
+        }
+    }
+
+    private class FakeLocalQwenModelDownloader : LocalQwenModelDownloader {
+        val requestedDownloads = mutableListOf<String>()
+        var installed = false
+
+        override fun observeStatus(modelName: String): Flow<LocalQwenModelDownloadState> =
+            flowOf(
+                LocalQwenModelDownloadState(
+                    modelName = modelName,
+                    isInstalled = installed,
+                    message = if (installed) "Installed" else "Not installed",
+                )
+            )
+
+        override fun download(modelName: String): Flow<LocalQwenModelDownloadState> = flow {
+            requestedDownloads += modelName
+            emit(
+                LocalQwenModelDownloadState(
+                    modelName = modelName,
+                    isInstalled = false,
+                    isDownloading = true,
+                    progress = 0.5f,
+                    message = "Downloading",
+                )
+            )
+            installed = true
+            emit(
+                LocalQwenModelDownloadState(
+                    modelName = modelName,
+                    isInstalled = true,
+                    progress = 1f,
+                    message = "Download complete",
+                )
+            )
         }
     }
 
@@ -225,6 +264,7 @@ class ChatViewModelTest {
             every { observeByCompanionId("default") } returns flowOf(null)
         }
         appPreferences = mockAppPreferences()
+        localQwenDownloader = FakeLocalQwenModelDownloader()
         viewModel = ChatViewModel(
             fakeRuntime,
             ToolDisplayRegistry(),
@@ -237,6 +277,7 @@ class ChatViewModelTest {
             PresenceController(),
             appPreferences,
             reminderRepository,
+            localQwenDownloader,
         )
     }
 
@@ -343,6 +384,7 @@ class ChatViewModelTest {
             PresenceController(),
             appPreferences,
             reminderRepository,
+            localQwenDownloader,
         )
 
         advanceUntilIdle()
@@ -404,6 +446,7 @@ class ChatViewModelTest {
             PresenceController(),
             appPreferences,
             reminderRepository,
+            localQwenDownloader,
         )
 
         blockedViewModel.sendMessage("hello")
@@ -439,6 +482,20 @@ class ChatViewModelTest {
 
         coVerify { configRepo.setModelName(DefaultLlmValues.GLM_MODEL) }
         assertFalse(viewModel.uiState.value.isSettingsOpen)
+    }
+
+    @Test
+    fun downloadSelectedLocalQwenModel_updatesModelDownloadState() = runTest {
+        viewModel.openSettings()
+        viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN)
+        viewModel.updateSettingsModelName(DefaultLlmValues.LOCAL_QWEN_MODEL)
+
+        viewModel.downloadSelectedLocalQwenModel()
+        advanceUntilIdle()
+
+        assertEquals(listOf(DefaultLlmValues.LOCAL_QWEN_MODEL), localQwenDownloader.requestedDownloads)
+        assertTrue(viewModel.uiState.value.localQwenDownload.isInstalled)
+        assertEquals(1f, viewModel.uiState.value.localQwenDownload.progress, 0.001f)
     }
 
     @Test

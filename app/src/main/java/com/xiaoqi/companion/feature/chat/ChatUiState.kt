@@ -80,6 +80,17 @@ data class ChatToolCapabilitySettings(
     val mcpHttpUrl: String = "",
 )
 
+data class LocalQwenDownloadUiState(
+    val modelName: String = DefaultLlmValues.LOCAL_QWEN_MODEL,
+    val isInstalled: Boolean = false,
+    val isDownloading: Boolean = false,
+    val progress: Float = 0f,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long? = null,
+    val message: String? = null,
+    val error: String? = null,
+)
+
 data class ChatImageAttachment(
     val uriString: String,
     val imageBase64: String,
@@ -115,6 +126,7 @@ data class ChatUiState(
     val settingsProvider: LlmProvider = LlmProvider.GLM,
     val settingsModelName: String = DefaultLlmValues.GLM_MODEL,
     val settingsMessage: String? = null,
+    val localQwenDownload: LocalQwenDownloadUiState = LocalQwenDownloadUiState(),
     val mcpSettingsName: String = "",
     val mcpSettingsUrl: String = "",
     val mcpSettingsMessage: String? = null,

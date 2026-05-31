@@ -22,7 +22,9 @@ object DefaultLlmValues {
     const val KIMI_BASE_URL = "https://api.kimi.com/coding"
     const val KIMI_MODEL = "kimi-for-coding"
     const val LOCAL_QWEN_BASE_URL = ""
-    const val LOCAL_QWEN_MODEL = "Qwen3.5-2B-MNN"
+    const val LOCAL_QWEN_MODEL = "Qwen3.5-0.8B-MNN"
+    const val LOCAL_QWEN_2B_MODEL = "Qwen3.5-2B-MNN"
+    const val LOCAL_QWEN_4B_MODEL = "Qwen3.5-4B-MNN"
 
     fun defaultBaseUrl(provider: LlmProvider): String =
         when (provider) {
@@ -42,7 +44,11 @@ object DefaultLlmValues {
         when (provider) {
             LlmProvider.GLM -> listOf(GLM_MODEL)
             LlmProvider.KIMI -> listOf(KIMI_MODEL)
-            LlmProvider.LOCAL_QWEN -> listOf(LOCAL_QWEN_MODEL)
+            LlmProvider.LOCAL_QWEN -> listOf(
+                LOCAL_QWEN_MODEL,
+                LOCAL_QWEN_2B_MODEL,
+                LOCAL_QWEN_4B_MODEL,
+            )
         }
 }
 

@@ -47,6 +47,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -90,6 +91,7 @@ import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
@@ -118,6 +120,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         onSettingsModelNameChanged = { viewModel.updateSettingsModelName(it) },
         onSettingsBaseUrlChanged = { viewModel.updateSettingsBaseUrl(it) },
         onSaveSettings = { viewModel.saveSettings() },
+        onDownloadLocalQwenModel = { viewModel.downloadSelectedLocalQwenModel() },
         onDeviceStatusEnabledChanged = { viewModel.setDeviceStatusContextEnabled(it) },
         onLocationContextEnabledChanged = { viewModel.setLocationContextEnabled(it) },
         onWeatherContextEnabledChanged = { viewModel.setWeatherContextEnabled(it) },
@@ -168,6 +171,7 @@ fun ChatScreenContent(
     onSettingsModelNameChanged: (String) -> Unit,
     onSettingsBaseUrlChanged: (String) -> Unit,
     onSaveSettings: () -> Unit,
+    onDownloadLocalQwenModel: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
     onWeatherContextEnabledChanged: (Boolean) -> Unit,
@@ -302,12 +306,14 @@ fun ChatScreenContent(
             modelName = uiState.settingsModelName,
             baseUrl = uiState.settingsBaseUrl,
             message = uiState.settingsMessage,
+            localQwenDownload = uiState.localQwenDownload,
             toolSettings = uiState.toolCapabilitySettings,
             onApiKeyChanged = onSettingsApiKeyChanged,
             onProviderChanged = onSettingsProviderChanged,
             onModelNameChanged = onSettingsModelNameChanged,
             onBaseUrlChanged = onSettingsBaseUrlChanged,
             onSave = onSaveSettings,
+            onDownloadLocalQwenModel = onDownloadLocalQwenModel,
             onDeviceStatusEnabledChanged = onDeviceStatusEnabledChanged,
             onLocationContextEnabledChanged = onLocationContextEnabledChanged,
             onWeatherContextEnabledChanged = onWeatherContextEnabledChanged,
@@ -614,12 +620,14 @@ private fun SettingsDialog(
     modelName: String,
     baseUrl: String,
     message: String?,
+    localQwenDownload: LocalQwenDownloadUiState,
     toolSettings: ChatToolCapabilitySettings,
     onApiKeyChanged: (String) -> Unit,
     onProviderChanged: (LlmProvider) -> Unit,
     onModelNameChanged: (String) -> Unit,
     onBaseUrlChanged: (String) -> Unit,
     onSave: () -> Unit,
+    onDownloadLocalQwenModel: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
     onWeatherContextEnabledChanged: (Boolean) -> Unit,
@@ -693,6 +701,13 @@ private fun SettingsDialog(
                     singleLine = true,
                 )
 
+                if (provider == LlmProvider.LOCAL_QWEN) {
+                    LocalQwenDownloadSection(
+                        state = localQwenDownload,
+                        onDownload = onDownloadLocalQwenModel,
+                    )
+                }
+
                 Text(
                     text = when (provider) {
                         LlmProvider.GLM -> "默认模型：${DefaultLlmValues.GLM_MODEL}"
@@ -762,6 +777,69 @@ private fun SettingsDialog(
             }
         }
     }
+}
+
+@Composable
+private fun LocalQwenDownloadSection(
+    state: LocalQwenDownloadUiState,
+    onDownload: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        val status = when {
+            state.isDownloading -> "Downloading ${formatPercent(state.progress)}"
+            state.isInstalled -> "Installed"
+            state.error != null -> "Download failed"
+            else -> "Not installed"
+        }
+        Text(
+            text = "ModelScope: $status",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (state.error != null) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+        if (state.isDownloading) {
+            LinearProgressIndicator(
+                progress = { state.progress.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = formatBytes(state.downloadedBytes, state.totalBytes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        state.message?.takeIf { it.isNotBlank() && !state.isDownloading }?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        state.error?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        Button(
+            onClick = onDownload,
+            enabled = !state.isDownloading,
+        ) {
+            Text(if (state.isInstalled) "Re-download from ModelScope" else "Download from ModelScope")
+        }
+    }
+}
+
+private fun formatPercent(value: Float): String =
+    "${(value.coerceIn(0f, 1f) * 100f).toInt()}%"
+
+private fun formatBytes(downloadedBytes: Long, totalBytes: Long?): String {
+    fun mb(bytes: Long): String = String.format(Locale.US, "%.1f MB", bytes / 1024f / 1024f)
+    return totalBytes?.let { "${mb(downloadedBytes)} / ${mb(it)}" } ?: mb(downloadedBytes)
 }
 
 @Composable

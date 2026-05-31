@@ -19,8 +19,10 @@ import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.local.LocalQwenEngine
 import com.xiaoqi.companion.core.local.LocalQwenModelLocator
 import com.xiaoqi.companion.core.local.AppFilesLocalQwenModelLocator
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.core.local.MnnLlmBridgeFactory
 import com.xiaoqi.companion.core.local.MnnLocalQwenEngine
+import com.xiaoqi.companion.core.local.ModelScopeLocalQwenModelDownloader
 import com.xiaoqi.companion.core.local.NativeMnnLlmBridgeFactory
 import com.xiaoqi.companion.core.mcp.McpHttpClient
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
@@ -73,6 +75,12 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindLocalQwenModelLocator(locator: AppFilesLocalQwenModelLocator): LocalQwenModelLocator
+
+    @Binds
+    @Singleton
+    abstract fun bindLocalQwenModelDownloader(
+        downloader: ModelScopeLocalQwenModelDownloader,
+    ): LocalQwenModelDownloader
 
     @Binds
     @Singleton
