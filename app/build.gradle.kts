@@ -35,6 +35,9 @@ android {
             cmake {
                 cppFlags += "-std=c++17"
                 arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                providers.environmentVariable("AURA_MNN_HOME").orNull?.let { mnnHome ->
+                    arguments += "-DAURA_MNN_HOME=$mnnHome"
+                }
             }
         }
         ndk {
