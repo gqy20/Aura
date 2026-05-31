@@ -16,6 +16,8 @@ import com.xiaoqi.companion.core.context.CurrentLocationProvider
 import com.xiaoqi.companion.core.context.DeviceStatusProvider
 import com.xiaoqi.companion.core.llm.DefaultKoogPromptExecutorFactory
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
+import com.xiaoqi.companion.core.local.LocalQwenEngine
+import com.xiaoqi.companion.core.local.MnnLocalQwenEngine
 import com.xiaoqi.companion.core.mcp.McpHttpClient
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.core.reminder.AndroidReminderScheduler
@@ -59,6 +61,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindKoogPromptExecutorFactory(factory: DefaultKoogPromptExecutorFactory): KoogPromptExecutorFactory
+
+    @Binds
+    @Singleton
+    abstract fun bindLocalQwenEngine(engine: MnnLocalQwenEngine): LocalQwenEngine
 
     @Binds
     @Singleton

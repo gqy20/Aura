@@ -667,6 +667,11 @@ private fun SettingsDialog(
                         onClick = { onProviderChanged(LlmProvider.KIMI) },
                         label = { Text("Kimi") },
                     )
+                    FilterChip(
+                        selected = provider == LlmProvider.LOCAL_QWEN,
+                        onClick = { onProviderChanged(LlmProvider.LOCAL_QWEN) },
+                        label = { Text("Local Qwen") },
+                    )
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -692,6 +697,7 @@ private fun SettingsDialog(
                     text = when (provider) {
                         LlmProvider.GLM -> "默认模型：${DefaultLlmValues.GLM_MODEL}"
                         LlmProvider.KIMI -> "默认模型：${DefaultLlmValues.KIMI_MODEL}"
+                        else -> "Default model: ${DefaultLlmValues.defaultModel(provider)}"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

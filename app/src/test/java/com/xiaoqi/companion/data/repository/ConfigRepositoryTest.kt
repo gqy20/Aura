@@ -57,6 +57,50 @@ class ConfigRepositoryTest {
     }
 
     @Test
+    fun getCurrentLlmConfig_localQwenProvider_doesNotRequireApiKey() = runTest {
+        val prefs: AppPreferences = mockk {
+            every { apiKey } returns flowOf(null)
+            every { llmProvider } returns flowOf(LlmProvider.LOCAL_QWEN)
+            every { modelName } returns flowOf("")
+            every { baseUrl } returns flowOf("")
+        }
+
+        val repo = ConfigRepositoryImpl(prefs)
+
+        repo.getCurrentLlmConfig().test {
+            val config = awaitItem()
+            assertEquals(LlmProvider.LOCAL_QWEN, config.provider)
+            assertEquals("", config.apiKey)
+            assertEquals("", config.baseUrl)
+            assertEquals(DefaultLlmValues.LOCAL_QWEN_MODEL, config.modelName)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun observeLlmConfigStatus_localQwenProvider_isReadyWithoutApiKey() = runTest {
+        val prefs: AppPreferences = mockk {
+            every { apiKey } returns flowOf(null)
+            every { llmProvider } returns flowOf(LlmProvider.LOCAL_QWEN)
+            every { modelName } returns flowOf(DefaultLlmValues.LOCAL_QWEN_MODEL)
+            every { baseUrl } returns flowOf("")
+        }
+
+        val repo = ConfigRepositoryImpl(prefs)
+
+        repo.observeLlmConfigStatus().test {
+            val status = awaitItem()
+            assertEquals(LlmProvider.LOCAL_QWEN, status.provider)
+            assertEquals(DefaultLlmValues.LOCAL_QWEN_MODEL, status.modelName)
+            assertEquals("", status.baseUrl)
+            assertEquals(false, status.hasApiKey)
+            assertEquals(true, status.isReady)
+            assertEquals(null, status.missingReason)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun themeMode_flowDelegatesToPrefs() = runTest {
         val prefs: AppPreferences = mockk {
             every { themeMode } returns flowOf(ThemeMode.DARK)
