@@ -19,9 +19,9 @@ import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.local.LocalQwenEngine
 import com.xiaoqi.companion.core.local.LocalQwenModelLocator
 import com.xiaoqi.companion.core.local.AppFilesLocalQwenModelLocator
-import com.xiaoqi.companion.core.local.MissingNativeMnnLlmBridgeFactory
 import com.xiaoqi.companion.core.local.MnnLlmBridgeFactory
 import com.xiaoqi.companion.core.local.MnnLocalQwenEngine
+import com.xiaoqi.companion.core.local.NativeMnnLlmBridgeFactory
 import com.xiaoqi.companion.core.mcp.McpHttpClient
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.core.reminder.AndroidReminderScheduler
@@ -76,7 +76,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindMnnLlmBridgeFactory(factory: MissingNativeMnnLlmBridgeFactory): MnnLlmBridgeFactory
+    abstract fun bindMnnLlmBridgeFactory(factory: NativeMnnLlmBridgeFactory): MnnLlmBridgeFactory
 
     @Binds
     @Singleton
