@@ -724,6 +724,7 @@ private fun SettingsDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
+                if (provider != LlmProvider.LOCAL_QWEN) {
                 OutlinedTextField(
                     value = baseUrl,
                     onValueChange = {},
@@ -743,6 +744,7 @@ private fun SettingsDialog(
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 )
+                }
 
                 ToolCapabilitiesSection(
                     settings = toolSettings,

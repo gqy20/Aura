@@ -485,6 +485,21 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun saveSettings_localQwenDoesNotRequireBaseUrlOrApiKey() = runTest {
+        viewModel.openSettings()
+        viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN)
+        viewModel.updateSettingsModelName(DefaultLlmValues.LOCAL_QWEN_MODEL)
+
+        viewModel.saveSettings()
+        advanceUntilIdle()
+
+        coVerify { configRepo.setLlmProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN) }
+        coVerify { configRepo.setModelName(DefaultLlmValues.LOCAL_QWEN_MODEL) }
+        coVerify { configRepo.setBaseUrl(DefaultLlmValues.LOCAL_QWEN_BASE_URL) }
+        assertFalse(viewModel.uiState.value.isSettingsOpen)
+    }
+
+    @Test
     fun downloadSelectedLocalQwenModel_updatesModelDownloadState() = runTest {
         viewModel.openSettings()
         viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN)

@@ -636,7 +636,7 @@ class ChatViewModel @Inject constructor(
             _uiState.update { it.copy(settingsMessage = "模型名称不能为空") }
             return
         }
-        if (baseUrl.isBlank()) {
+        if (provider != LlmProvider.LOCAL_QWEN && baseUrl.isBlank()) {
             _uiState.update { it.copy(settingsMessage = "Base URL 不能为空") }
             return
         }
