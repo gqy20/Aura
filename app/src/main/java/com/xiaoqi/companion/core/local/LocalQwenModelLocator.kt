@@ -1,6 +1,8 @@
 package com.xiaoqi.companion.core.local
 
 import android.content.Context
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -20,7 +22,29 @@ class AppFilesLocalQwenModelLocator @Inject constructor(
             File(context.filesDir, "models/$modelName"),
             File(context.getExternalFilesDir(null), "models/$modelName"),
         )
-        return candidates.firstOrNull { File(it, CONFIG_FILE_NAME).isFile }
+        AppLogger.debug(
+            LogTags.LocalModel,
+            "local_model_lookup_started",
+            "model" to modelName,
+            "candidateCount" to candidates.size,
+        )
+        val found = candidates.firstOrNull { File(it, CONFIG_FILE_NAME).isFile }
+        if (found == null) {
+            AppLogger.warn(
+                LogTags.LocalModel,
+                "local_model_lookup_missing",
+                "model" to modelName,
+                "candidates" to candidates.joinToString(separator = "|") { it.absolutePath },
+            )
+        } else {
+            AppLogger.info(
+                LogTags.LocalModel,
+                "local_model_lookup_found",
+                "model" to modelName,
+                "path" to found.absolutePath,
+            )
+        }
+        return found
     }
 
     private companion object {

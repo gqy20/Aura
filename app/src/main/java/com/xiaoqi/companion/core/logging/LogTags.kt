@@ -5,6 +5,7 @@ object LogTags {
     const val Chat = "Companion.Chat"
     const val Runtime = "Companion.Runtime"
     const val Llm = "Companion.LLM"
+    const val LocalModel = "Companion.LocalModel"
     const val Prompt = "Companion.Prompt"
     const val Parser = "Companion.Parser"
     const val Repo = "Companion.Repo"

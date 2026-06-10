@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.local
 
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import javax.inject.Inject
 
 class NativeMnnLlmBridgeFactory @Inject constructor() : MnnLlmBridgeFactory {
@@ -13,15 +15,31 @@ class NativeMnnLlmBridge(
     private var instanceId: Long = 0L
 
     override suspend fun load(configPath: String) {
+        AppLogger.info(
+            LogTags.LocalModel,
+            "mnn_bridge_load_started",
+            "configPath" to configPath,
+        )
         ensureNativeAvailable()
         instanceId = native.init(configPath)
         if (instanceId == 0L) {
             throw IllegalStateException("MNN native session failed to load: $configPath")
         }
+        AppLogger.info(
+            LogTags.LocalModel,
+            "mnn_bridge_load_completed",
+            "configPath" to configPath,
+            "instanceLoaded" to (instanceId != 0L),
+        )
     }
 
     override fun generate(prompt: String, onToken: (String) -> Boolean): Map<String, Any> {
         ensureLoaded()
+        AppLogger.info(
+            LogTags.LocalModel,
+            "mnn_bridge_generate_started",
+            "promptLength" to prompt.length,
+        )
         return native.submit(
             instanceId = instanceId,
             prompt = prompt,
@@ -29,13 +47,25 @@ class NativeMnnLlmBridge(
                 override fun onProgress(token: String?): Boolean =
                     token?.let(onToken) ?: false
             },
-        )
+        ).also { stats ->
+            AppLogger.info(
+                LogTags.LocalModel,
+                "mnn_bridge_generate_completed",
+                "statKeys" to stats.keys.joinToString(separator = ","),
+            )
+        }
     }
 
     override fun release() {
         if (instanceId != 0L && native.loadLibrary()) {
+            AppLogger.debug(
+                LogTags.LocalModel,
+                "mnn_bridge_release_started",
+                "instanceLoaded" to true,
+            )
             native.release(instanceId)
             instanceId = 0L
+            AppLogger.debug(LogTags.LocalModel, "mnn_bridge_release_completed")
         }
     }
 
@@ -79,9 +109,21 @@ private object JniNativeMnnLlmApi : NativeMnnLlmApi {
         if (!libraryLoadAttempted) {
             synchronized(this) {
                 if (!libraryLoadAttempted) {
+                    AppLogger.info(LogTags.LocalModel, "mnn_native_library_load_started")
                     libraryLoaded = runCatching {
                         System.loadLibrary("aura_mnn_llm")
+                    }.onFailure { throwable ->
+                        AppLogger.error(
+                            LogTags.LocalModel,
+                            throwable,
+                            "mnn_native_library_load_failed",
+                        )
                     }.isSuccess
+                    AppLogger.info(
+                        LogTags.LocalModel,
+                        "mnn_native_library_load_result",
+                        "loaded" to libraryLoaded,
+                    )
                     libraryLoadAttempted = true
                 }
             }

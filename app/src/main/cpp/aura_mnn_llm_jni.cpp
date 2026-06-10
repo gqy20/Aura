@@ -1,5 +1,6 @@
 #include <jni.h>
 
+#include <android/log.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -14,7 +15,18 @@
 
 namespace {
 
+constexpr const char* LOG_TAG = "Companion.LocalModel.Native";
+
+void logInfo(const std::string& message) {
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "%s", message.c_str());
+}
+
+void logError(const std::string& message) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "%s", message.c_str());
+}
+
 void throwIllegalState(JNIEnv* env, const std::string& message) {
+    logError(message);
     jclass exClass = env->FindClass("java/lang/IllegalStateException");
     if (exClass != nullptr) {
         env->ThrowNew(exClass, message.c_str());
@@ -174,6 +186,7 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
     }
 
     try {
+        logInfo("mnn_init_started configPath=" + path);
         std::unique_ptr<MNN::Transformer::Llm, void (*)(MNN::Transformer::Llm*)> llm(
                 MNN::Transformer::Llm::createLLM(path),
                 destroyLlm);
@@ -193,6 +206,7 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
         }
 
         auto* session = new AuraMnnSession(std::move(llm));
+        logInfo("mnn_init_completed configPath=" + path);
         return reinterpret_cast<jlong>(session);
     } catch (const std::exception& ex) {
         throwIllegalState(env, std::string("MNN native load failed: ") + ex.what());
@@ -224,6 +238,7 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_submitNative(
 
     try {
         const std::string input = toString(env, prompt);
+        logInfo("mnn_submit_started promptLength=" + std::to_string(input.size()));
         JniTokenCallback tokenCallback(env, listener);
         Utf8StreamProcessor utf8([&tokenCallback](const std::string& token) {
             return tokenCallback.emit(token);
@@ -246,6 +261,7 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_submitNative(
             putLong(env, hashMap, "decode_us", context->decode_us);
             putLong(env, hashMap, "load_us", context->load_us);
         }
+        logInfo("mnn_submit_completed");
         return hashMap;
     } catch (const std::exception& ex) {
         throwIllegalState(env, std::string("MNN native generation failed: ") + ex.what());
@@ -264,7 +280,9 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_releaseNative(
         jlong instanceId) {
 #ifdef AURA_MNN_LINKED
     try {
+        logInfo("mnn_release_started");
         delete reinterpret_cast<AuraMnnSession*>(instanceId);
+        logInfo("mnn_release_completed");
     } catch (...) {
         throwIllegalState(env, "MNN native release failed.");
     }

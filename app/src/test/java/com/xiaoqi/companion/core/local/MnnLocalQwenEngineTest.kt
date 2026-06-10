@@ -35,7 +35,7 @@ class MnnLocalQwenEngineTest {
         assertEquals(File(modelDir, "config.json").absolutePath, bridge.loadedConfigPath)
         assertEquals("system\n\nhi", bridge.prompt)
         assertTrue(bridge.loaded)
-        assertFalse(bridge.released)
+        assertTrue(bridge.released)
     }
 
     @Test

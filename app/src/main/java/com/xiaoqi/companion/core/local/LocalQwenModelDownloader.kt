@@ -1,6 +1,8 @@
 package com.xiaoqi.companion.core.local
 
 import android.content.Context
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.IOException
@@ -43,6 +45,13 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
         val spec = LocalQwenModelCatalog.requireSpec(modelName)
         val modelDir = File(context.filesDir, "models/${spec.modelName}")
         val partialDir = File(context.filesDir, "models/.${spec.modelName}.partial")
+        AppLogger.info(
+            LogTags.LocalModel,
+            "local_model_download_started",
+            "model" to modelName,
+            "targetDir" to modelDir.absolutePath,
+            "requiredFileCount" to LocalQwenModelCatalog.requiredFiles.size,
+        )
         partialDir.deleteRecursively()
         if (!partialDir.mkdirs() && !partialDir.isDirectory) {
             throw IOException("Cannot create model download directory: ${partialDir.absolutePath}")
@@ -56,6 +65,13 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
             val target = File(partialDir, fileName)
             val existing = File(modelDir, fileName)
             if (existing.isFile && existing.length() > 0L) {
+                AppLogger.debug(
+                    LogTags.LocalModel,
+                    "local_model_download_reusing_file",
+                    "model" to modelName,
+                    "file" to fileName,
+                    "bytes" to existing.length(),
+                )
                 existing.copyTo(target, overwrite = true)
                 downloadedBytes += existing.length()
                 emit(
@@ -72,9 +88,22 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
                 return@forEachIndexed
             }
             val url = spec.downloadUrl(fileName)
+            AppLogger.debug(
+                LogTags.LocalModel,
+                "local_model_download_file_started",
+                "model" to modelName,
+                "file" to fileName,
+            )
             val request = Request.Builder().url(url).build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
+                    AppLogger.warn(
+                        LogTags.LocalModel,
+                        "local_model_download_file_failed",
+                        "model" to modelName,
+                        "file" to fileName,
+                        "code" to response.code,
+                    )
                     throw IOException("ModelScope download failed (${response.code}): $fileName")
                 }
                 val body = response.body ?: throw IOException("Empty response body: $fileName")
@@ -102,6 +131,13 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
                         }
                     }
                 }
+                AppLogger.info(
+                    LogTags.LocalModel,
+                    "local_model_download_file_completed",
+                    "model" to modelName,
+                    "file" to fileName,
+                    "bytes" to target.length(),
+                )
             }
         }
 
@@ -111,6 +147,12 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
             partialDir.copyRecursively(modelDir, overwrite = true)
             partialDir.deleteRecursively()
         }
+        AppLogger.info(
+            LogTags.LocalModel,
+            "local_model_download_completed",
+            "model" to modelName,
+            "targetDir" to modelDir.absolutePath,
+        )
         emit(status(modelName).copy(message = "Download complete"))
     }.flowOn(Dispatchers.IO)
 
