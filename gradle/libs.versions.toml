@@ -8,6 +8,7 @@ compileSdk = "36"
 minSdk = "26"
 targetSdk = "36"
 ndk = "27.0.12077973"
+androidx-core = "1.15.0"
 
 # Jetpack Compose
 compose-bom = "2026.05.00"
@@ -53,6 +54,7 @@ robolectric = "4.14.1"
 
 [libraries]
 # --- Compose UI ---
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core" }
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }

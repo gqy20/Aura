@@ -111,6 +111,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.core.ktx)
+
     // Compose UI
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

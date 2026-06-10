@@ -26,4 +26,19 @@ class LocalQwenModelCatalogTest {
             spec.downloadUrl("config.json"),
         )
     }
+
+    @Test
+    fun requiredFiles_includeMnnLlmMetadata() {
+        assertEquals(
+            listOf(
+                "config.json",
+                "llm_config.json",
+                "llm.mnn",
+                "llm.mnn.json",
+                "llm.mnn.weight",
+                "tokenizer.txt",
+            ),
+            LocalQwenModelCatalog.requiredFiles,
+        )
+    }
 }

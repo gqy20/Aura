@@ -54,6 +54,23 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
         var totalBytes = LocalQwenCatalogSizes.estimatedTotalBytes(modelName)
         LocalQwenModelCatalog.requiredFiles.forEachIndexed { index, fileName ->
             val target = File(partialDir, fileName)
+            val existing = File(modelDir, fileName)
+            if (existing.isFile && existing.length() > 0L) {
+                existing.copyTo(target, overwrite = true)
+                downloadedBytes += existing.length()
+                emit(
+                    LocalQwenModelDownloadState(
+                        modelName = modelName,
+                        isInstalled = false,
+                        isDownloading = true,
+                        progress = progress(index, downloadedBytes, totalBytes),
+                        downloadedBytes = downloadedBytes,
+                        totalBytes = totalBytes,
+                        message = "Reusing $fileName",
+                    )
+                )
+                return@forEachIndexed
+            }
             val url = spec.downloadUrl(fileName)
             val request = Request.Builder().url(url).build()
             httpClient.newCall(request).execute().use { response ->
@@ -129,8 +146,8 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
         fun estimatedTotalBytes(modelName: String): Long? =
             when (modelName) {
                 "Qwen3.5-0.8B-MNN" -> 600L * 1024L * 1024L
-                "Qwen3.5-2B-MNN" -> 1_500L * 1024L * 1024L
-                "Qwen3.5-4B-MNN" -> 3_000L * 1024L * 1024L
+                "Qwen3.5-2B-MNN" -> 1_600L * 1024L * 1024L
+                "Qwen3.5-4B-MNN" -> 3_200L * 1024L * 1024L
                 else -> null
             }
     }

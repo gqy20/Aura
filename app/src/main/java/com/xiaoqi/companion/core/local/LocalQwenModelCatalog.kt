@@ -25,7 +25,9 @@ object LocalQwenModelCatalog {
 
     val requiredFiles: List<String> = listOf(
         "config.json",
+        "llm_config.json",
         "llm.mnn",
+        "llm.mnn.json",
         "llm.mnn.weight",
         "tokenizer.txt",
     )
