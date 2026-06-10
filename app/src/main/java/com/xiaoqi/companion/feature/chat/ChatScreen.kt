@@ -1,17 +1,18 @@
 package com.xiaoqi.companion.feature.chat
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,9 +30,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -66,9 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.size
@@ -91,6 +89,7 @@ import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
+import kotlinx.coroutines.delay
 
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
@@ -1412,7 +1411,7 @@ private fun ChatToolCapabilitySettings.mcpDisplayLabel(): String =
         else -> "MCP on"
     }
 
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun InputBar(
     inputText: String,
@@ -1430,20 +1429,9 @@ private fun InputBar(
         isConfigReady &&
         !isLoading &&
         !isPreparingImage
-    val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
     val inputView = LocalView.current
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    var inputHasFocus by remember { mutableStateOf(false) }
-
-    LaunchedEffect(inputHasFocus) {
-        if (inputHasFocus) {
-            delay(80)
-            keyboardController?.show()
-            inputView.requestImeVisibility("focus_gained")
-            delay(120)
-            bringIntoViewRequester.bringIntoView()
-        }
-    }
+    var imeStuck by remember { mutableStateOf(false) }
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -1477,15 +1465,17 @@ private fun InputBar(
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = onInputTextChanged,
-                    modifier = Modifier
-                        .weight(1f)
-                        .bringIntoViewRequester(bringIntoViewRequester)
-                        .onFocusChanged { inputHasFocus = it.isFocused },
+                    modifier = Modifier.weight(1f),
                     placeholder = { Text("Talk to Aura") },
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Default,
+                        imeAction = ImeAction.Send,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSend = {
+                            if (canSend) onSendMessage()
+                        },
                     ),
                     shape = RoundedCornerShape(22.dp),
                 )
@@ -1507,86 +1497,84 @@ private fun InputBar(
                     }
                 }
             }
+            ImeRecoveryHint(
+                visible = imeStuck,
+                onSwitchInputMethod = { context.showInputMethodPicker() },
+            )
+        }
+    }
+
+    LaunchedEffect(inputView) {
+        while (true) {
+            delay(IME_STUCK_CHECK_INTERVAL_MS)
+            val state = inputView.currentImeSnapshot()
+            val stuck = state.isWeChatInputMethod &&
+                state.bottomInset in 1 until (inputView.height * MIN_USEFUL_IME_HEIGHT_RATIO).toInt()
+            if (stuck != imeStuck) {
+                imeStuck = stuck
+            }
+            if (stuck) {
+                AppLogger.warn(
+                    LogTags.Chat,
+                    "ime_stuck_small_panel",
+                    "defaultIme" to state.defaultIme,
+                    "imeBottom" to state.bottomInset,
+                    "viewHeight" to inputView.height,
+                    "hasWindowFocus" to inputView.hasWindowFocus(),
+                    "hasViewFocus" to inputView.hasFocus(),
+                )
+            }
         }
     }
 }
 
-private fun View.requestImeVisibility(reason: String) {
-    post {
-        val defaultIme = runCatching {
-            Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
-        }.getOrNull()
-        val beforeImeBottom = imeBottomInset()
-        AppLogger.debug(
-            LogTags.Chat,
-            "ime_show_requested",
-            "reason" to reason,
-            "attached" to isAttachedToWindow,
-            "hasWindowFocus" to hasWindowFocus(),
-            "hasViewFocus" to hasFocus(),
-            "height" to height,
-            "imeBottomBefore" to beforeImeBottom,
-            "defaultIme" to defaultIme,
-        )
-        ViewCompat.getWindowInsetsController(this)
-            ?.show(WindowInsetsCompat.Type.ime())
-        postDelayed({
-            val imeBottom = imeBottomInset()
-            val smallPanel = hasSuspiciouslySmallImePanel(imeBottom)
-            val event = if (smallPanel) {
-                "ime_small_panel_detected"
-            } else {
-                "ime_show_result"
-            }
-            AppLogger.logImeResult(
-                event = event,
-                reason = reason,
-                view = this,
-                imeBottom = imeBottom,
-                defaultIme = defaultIme,
-            )
-        }, 220)
-    }
-}
-
-private fun AppLogger.logImeResult(
-    event: String,
-    reason: String,
-    view: View,
-    imeBottom: Int,
-    defaultIme: String?,
+@Composable
+private fun ImeRecoveryHint(
+    visible: Boolean,
+    onSwitchInputMethod: () -> Unit,
 ) {
-    val ratio = if (view.height > 0) {
-        imeBottom.toFloat() / view.height.toFloat()
-    } else {
-        0f
+    if (!visible) {
+        return
     }
-    val fields = arrayOf(
-        "reason" to reason,
-        "attached" to view.isAttachedToWindow,
-        "hasWindowFocus" to view.hasWindowFocus(),
-        "hasViewFocus" to view.hasFocus(),
-        "height" to view.height,
-        "imeBottom" to imeBottom,
-        "imeRatio" to "%.3f".format(Locale.US, ratio),
-        "defaultIme" to defaultIme,
-    )
-    if (event == "ime_small_panel_detected") {
-        warn(LogTags.Chat, event, *fields)
-    } else {
-        debug(LogTags.Chat, event, *fields)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = onSwitchInputMethod) {
+            Text("切换输入法")
+        }
     }
 }
 
-private fun View.imeBottomInset(): Int =
-    ViewCompat.getRootWindowInsets(this)
+private fun View.currentImeSnapshot(): ImeSnapshot {
+    val defaultIme = runCatching {
+        Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+    }.getOrNull()
+    val bottomInset = ViewCompat.getRootWindowInsets(this)
         ?.getInsets(WindowInsetsCompat.Type.ime())
         ?.bottom ?: 0
+    return ImeSnapshot(
+        defaultIme = defaultIme,
+        bottomInset = bottomInset,
+    )
+}
 
-private fun View.hasSuspiciouslySmallImePanel(imeBottom: Int): Boolean =
-    height > 0 && imeBottom in 1 until (height * MIN_USEFUL_IME_HEIGHT_RATIO).toInt()
+private fun Context.showInputMethodPicker() {
+    val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+    imm?.showInputMethodPicker()
+}
+
+private data class ImeSnapshot(
+    val defaultIme: String?,
+    val bottomInset: Int,
+) {
+    val isWeChatInputMethod: Boolean =
+        defaultIme?.startsWith("com.tencent.wetype/") == true
+}
 
 private const val MIN_USEFUL_IME_HEIGHT_RATIO = 0.12f
+private const val IME_STUCK_CHECK_INTERVAL_MS = 350L
 
 @Composable
 private fun PendingImagePreview(
