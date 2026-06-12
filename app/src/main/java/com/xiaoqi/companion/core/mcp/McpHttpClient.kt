@@ -46,6 +46,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             .callTimeout(45, TimeUnit.SECONDS)
             .build()
     private val sessions = mutableMapOf<String, String>()
+    private val protocolVersions = mutableMapOf<String, String>()
     private val toolCache = mutableMapOf<String, List<McpToolSpec>>()
     private val ids = AtomicLong(1)
 
@@ -164,11 +165,13 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         )
         response.sessionId?.let { sessions[serverUrl] = it }
         response.json?.throwIfJsonRpcError()
+        response.json?.negotiatedProtocolVersion()?.let { protocolVersions[serverUrl] = it }
         AppLogger.info(
             LogTags.Tools,
             "mcp_initialize_completed",
             "serverHost" to serverUrl.hostForLog(),
             "hasSession" to (response.sessionId != null),
+            "protocolVersion" to (protocolVersions[serverUrl] ?: MCP_PROTOCOL_VERSION),
             "durationMs" to (System.currentTimeMillis() - startedAt),
         )
 
@@ -220,10 +223,10 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             .url(serverUrl)
             .header("content-type", "application/json")
             .header("accept", "application/json, text/event-stream")
-            .header("MCP-Protocol-Version", MCP_PROTOCOL_VERSION)
             .post(body)
         if (includeSession) {
             sessions[serverUrl]?.let { requestBuilder.header("Mcp-Session-Id", it) }
+            requestBuilder.header("MCP-Protocol-Version", protocolVersions[serverUrl] ?: MCP_PROTOCOL_VERSION)
         }
 
         httpClient.newCall(requestBuilder.build()).execute().use { response ->
@@ -236,6 +239,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                     "durationMs" to (System.currentTimeMillis() - startedAt),
                 )
                 sessions.remove(serverUrl)
+                protocolVersions.remove(serverUrl)
                 ensureInitialized(serverUrl)
                 return postJson(
                     serverUrl = serverUrl,
@@ -331,6 +335,12 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         val message = error["message"]?.jsonPrimitive?.contentOrNull ?: error.toString()
         throw RuntimeException("MCP error: $message")
     }
+
+    private fun JsonObject.negotiatedProtocolVersion(): String? =
+        (this["result"] as? JsonObject)
+            ?.get("protocolVersion")
+            ?.jsonPrimitive
+            ?.contentOrNull
 
     private fun JsonObject.matchesId(expectedResponseId: Long): Boolean =
         this["id"]?.jsonPrimitive?.contentOrNull == expectedResponseId.toString()

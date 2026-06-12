@@ -34,7 +34,7 @@ class McpHttpClientTest {
                 body.contains("\"method\":\"initialize\"") -> {
                     exchange.responseHeaders.add("Mcp-Session-Id", "session-1")
                     exchange.respondJson(
-                        """{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{},"serverInfo":{"name":"test","version":"1"}}}"""
+                        """{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26","capabilities":{},"serverInfo":{"name":"test","version":"1"}}}"""
                     )
                 }
                 body.contains("\"method\":\"notifications/initialized\"") ->
@@ -82,7 +82,8 @@ class McpHttpClientTest {
         assertTrue(requests.any { it.contains("\"method\":\"initialize\"") })
         assertTrue(requests.any { it.contains("\"method\":\"tools/list\"") })
         assertTrue(sessionHeaders.any { it == "session-1" })
-        assertTrue(protocolHeaders.all { it == "2025-11-25" })
+        assertTrue(protocolHeaders.any { it == null })
+        assertTrue(protocolHeaders.any { it == "2025-03-26" })
     }
 
     @Test
