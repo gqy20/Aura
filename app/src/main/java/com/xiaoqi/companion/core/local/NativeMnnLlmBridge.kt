@@ -33,16 +33,22 @@ class NativeMnnLlmBridge(
         )
     }
 
-    override fun generate(prompt: String, onToken: (String) -> Boolean): Map<String, Any> {
+    override fun generate(
+        systemPrompt: String,
+        userMessage: String,
+        onToken: (String) -> Boolean,
+    ): Map<String, Any> {
         ensureLoaded()
         AppLogger.info(
             LogTags.LocalModel,
             "mnn_bridge_generate_started",
-            "promptLength" to prompt.length,
+            "systemPromptLength" to systemPrompt.length,
+            "userMessageLength" to userMessage.length,
         )
         return native.submit(
             instanceId = instanceId,
-            prompt = prompt,
+            systemPrompt = systemPrompt,
+            userMessage = userMessage,
             listener = object : NativeMnnProgressListener {
                 override fun onProgress(token: String?): Boolean =
                     token?.let(onToken) ?: false
@@ -93,7 +99,8 @@ interface NativeMnnLlmApi {
     fun init(configPath: String): Long
     fun submit(
         instanceId: Long,
-        prompt: String,
+        systemPrompt: String,
+        userMessage: String,
         listener: NativeMnnProgressListener,
     ): Map<String, Any>
     fun release(instanceId: Long)
@@ -136,10 +143,11 @@ private object JniNativeMnnLlmApi : NativeMnnLlmApi {
 
     override fun submit(
         instanceId: Long,
-        prompt: String,
+        systemPrompt: String,
+        userMessage: String,
         listener: NativeMnnProgressListener,
     ): Map<String, Any> =
-        submitNative(instanceId, prompt, listener)
+        submitNative(instanceId, systemPrompt, userMessage, listener)
 
     override fun release(instanceId: Long) {
         releaseNative(instanceId)
@@ -148,7 +156,8 @@ private object JniNativeMnnLlmApi : NativeMnnLlmApi {
     private external fun initNative(configPath: String): Long
     private external fun submitNative(
         instanceId: Long,
-        prompt: String,
+        systemPrompt: String,
+        userMessage: String,
         listener: NativeMnnProgressListener,
     ): HashMap<String, Any>
     private external fun releaseNative(instanceId: Long)

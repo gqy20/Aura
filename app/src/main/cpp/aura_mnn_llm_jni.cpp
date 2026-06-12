@@ -82,6 +82,14 @@ std::string parentDir(const std::string& path) {
     return path.substr(0, pos);
 }
 
+std::string baseName(const std::string& path) {
+    const auto pos = path.find_last_of('/');
+    if (pos == std::string::npos) {
+        return path;
+    }
+    return path.substr(pos + 1);
+}
+
 class JniTokenCallback {
 public:
     JniTokenCallback(JNIEnv* env, jobject listener)
@@ -309,10 +317,13 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
 
         const std::string modelDir = parentDir(path);
         const std::string tmpDir = modelDir + "/tmp";
+        const std::string prefixCacheDir = tmpDir + "/prefixcache";
         mkdir(tmpDir.c_str(), 0700);
+        mkdir(prefixCacheDir.c_str(), 0700);
         const int effectiveMaxNewTokens = readMaxNewTokens(path);
         llm->set_config(
                 "{\"tmp_path\":\"" + tmpDir +
+                "\",\"prefix_cache_path\":\"" + prefixCacheDir +
                 "\",\"use_mmap\":true,\"kvcache_mmap\":true,"
                 "\"reuse_kv\":true,"
                 "\"prompt_cache\":true,"
@@ -324,11 +335,15 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
             return 0;
         }
 
+        const std::string prefixCacheFile = "aura_" + baseName(modelDir);
+        const bool prefixCacheReady = llm->setPrefixCacheFile(prefixCacheFile);
         auto* session = new AuraMnnSession(std::move(llm));
         session->maxNewTokens = effectiveMaxNewTokens;
         logInfo(
                 "mnn_init_completed configPath=" + path +
-                " maxNewTokens=" + std::to_string(session->maxNewTokens));
+                " maxNewTokens=" + std::to_string(session->maxNewTokens) +
+                " prefixCacheReady=" + (prefixCacheReady ? "true" : "false") +
+                " prefixCacheFile=" + prefixCacheFile);
         return reinterpret_cast<jlong>(session);
     } catch (const std::exception& ex) {
         throwIllegalState(env, std::string("MNN native load failed: ") + ex.what());
@@ -345,7 +360,8 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_submitNative(
         JNIEnv* env,
         jobject /* thiz */,
         jlong instanceId,
-        jstring prompt,
+        jstring systemPrompt,
+        jstring userMessage,
         jobject listener) {
     jobject hashMap = newHashMap(env);
 #ifndef AURA_MNN_LINKED
@@ -359,22 +375,32 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_submitNative(
     }
 
     try {
-        const std::string input = toString(env, prompt);
-        logInfo("mnn_submit_started promptLength=" + std::to_string(input.size()));
+        const std::string system = toString(env, systemPrompt);
+        const std::string user = toString(env, userMessage);
+        logInfo(
+                "mnn_submit_started systemPromptLength=" + std::to_string(system.size()) +
+                " userMessageLength=" + std::to_string(user.size()));
         JniTokenCallback tokenCallback(env, listener);
         AndroidSteppingState steppingState;
+        std::string responseText;
         Utf8StreamProcessor utf8([&tokenCallback, &steppingState](const std::string& token) {
             return steppingState.processToken(token, [&tokenCallback](const std::string& value) {
                 return tokenCallback.emit(value);
             });
         });
-        CallbackStreamBuffer streamBuffer([&utf8](const char* s, size_t n) {
+        CallbackStreamBuffer streamBuffer([&utf8, &responseText](const char* s, size_t n) {
+            const std::string chunk(s, n);
+            responseText += chunk;
             return utf8.process(s, n);
         });
         std::ostream outputStream(&streamBuffer);
 
         logInfo("mnn_prefill_started maxNewTokens=" + std::to_string(session->maxNewTokens));
-        MNN::Transformer::ChatMessages messages = {{"user", input}};
+        MNN::Transformer::ChatMessages messages;
+        if (!system.empty()) {
+            messages.emplace_back("system", system);
+        }
+        messages.emplace_back("user", user);
         session->llm->response(messages, &outputStream, "<eop>", 0);
         steppingState.resolve(session->llm.get(), 0, session->maxNewTokens);
         const auto* prefillContext = session->llm->getContext();
@@ -405,6 +431,21 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_submitNative(
         }
         if (env->ExceptionCheck()) {
             return hashMap;
+        }
+        while (true) {
+            const auto eopPos = responseText.find("<eop>");
+            if (eopPos == std::string::npos) {
+                break;
+            }
+            responseText.erase(eopPos, std::string("<eop>").size());
+        }
+        if (!steppingState.stopRequested && !responseText.empty()) {
+            auto syncMessages = messages;
+            syncMessages.emplace_back("assistant", responseText);
+            session->llm->syncPromptCache(syncMessages);
+            logInfo(
+                    "mnn_prompt_cache_synced responseLength=" + std::to_string(responseText.size()) +
+                    " messageCount=" + std::to_string(syncMessages.size()));
         }
 
         const auto* context = session->llm->getContext();

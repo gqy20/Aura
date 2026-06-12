@@ -33,7 +33,8 @@ class MnnLocalQwenEngineTest {
         }
 
         assertEquals(File(modelDir, "config.json").absolutePath, bridge.loadedConfigPath)
-        assertEquals("system\n\nhi", bridge.prompt)
+        assertEquals("system", bridge.systemPrompt)
+        assertEquals("hi", bridge.userMessage)
         assertTrue(bridge.loaded)
         assertFalse(bridge.released)
     }
@@ -58,7 +59,7 @@ class MnnLocalQwenEngineTest {
         }
 
         assertEquals(1, bridge.loadCount)
-        assertEquals(listOf("system\n\nfirst", "system\n\nsecond"), bridge.prompts)
+        assertEquals(listOf("system" to "first", "system" to "second"), bridge.prompts)
         assertFalse(bridge.released)
     }
 
@@ -93,8 +94,9 @@ class MnnLocalQwenEngineTest {
         var released = false
         var loadCount = 0
         var loadedConfigPath: String? = null
-        var prompt: String? = null
-        val prompts = mutableListOf<String>()
+        var systemPrompt: String? = null
+        var userMessage: String? = null
+        val prompts = mutableListOf<Pair<String, String>>()
 
         override suspend fun load(configPath: String) {
             loaded = true
@@ -102,9 +104,14 @@ class MnnLocalQwenEngineTest {
             loadedConfigPath = configPath
         }
 
-        override fun generate(prompt: String, onToken: (String) -> Boolean): Map<String, Any> {
-            this.prompt = prompt
-            prompts += prompt
+        override fun generate(
+            systemPrompt: String,
+            userMessage: String,
+            onToken: (String) -> Boolean,
+        ): Map<String, Any> {
+            this.systemPrompt = systemPrompt
+            this.userMessage = userMessage
+            prompts += systemPrompt to userMessage
             chunks.forEach { chunk ->
                 if (onToken(chunk)) return mapOf("stopped" to true)
             }

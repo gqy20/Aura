@@ -47,11 +47,13 @@ class MnnLocalQwenEngine @Inject constructor(
                     "configBytes" to configFile.length(),
                 )
 
-                val prompt = request.toMnnPrompt()
                 bridgeMutex.withLock {
                     val activeBridge = ensureBridgeLoaded(configFile.absolutePath)
                     withContext(Dispatchers.Default) {
-                        activeBridge.generate(prompt) { token ->
+                        activeBridge.generate(
+                            systemPrompt = request.systemPrompt,
+                            userMessage = request.userMessage,
+                        ) { token ->
                             if (token.isNotEmpty()) {
                                 trySend(token)
                             }
@@ -100,11 +102,6 @@ class MnnLocalQwenEngine @Inject constructor(
             loadedConfigPath = configPath
         }
     }
-
-    private fun LocalQwenRequest.toMnnPrompt(): String =
-        listOf(systemPrompt, userMessage)
-            .filter { it.isNotBlank() }
-            .joinToString("\n\n")
 
     private companion object {
         const val CONFIG_FILE_NAME = "config.json"
