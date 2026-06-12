@@ -30,6 +30,8 @@ object LocalQwenModelCatalog {
         "llm.mnn.json",
         "llm.mnn.weight",
         "tokenizer.txt",
+        "visual.mnn",
+        "visual.mnn.weight",
     )
 
     fun requireSpec(modelName: String): LocalQwenModelSpec =

@@ -17,6 +17,9 @@ class McpHttpClientTest {
     private lateinit var serverUrl: String
     private val requests = CopyOnWriteArrayList<String>()
     private val sessionHeaders = CopyOnWriteArrayList<String?>()
+    private val protocolHeaders = CopyOnWriteArrayList<String?>()
+    private var rejectFirstToolsCallWithInvalidSession = false
+    private var toolsListCalls = 0
 
     @Before
     fun setUp() {
@@ -25,22 +28,38 @@ class McpHttpClientTest {
             val body = exchange.requestBody.bufferedReader().readText()
             requests += body
             sessionHeaders += exchange.requestHeaders.getFirst("Mcp-Session-Id")
+            protocolHeaders += exchange.requestHeaders.getFirst("MCP-Protocol-Version")
 
-            val response = when {
+            when {
                 body.contains("\"method\":\"initialize\"") -> {
                     exchange.responseHeaders.add("Mcp-Session-Id", "session-1")
-                    """{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"test","version":"1"}}}"""
+                    exchange.respondJson(
+                        """{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{},"serverInfo":{"name":"test","version":"1"}}}"""
+                    )
                 }
                 body.contains("\"method\":\"notifications/initialized\"") ->
-                    """{"jsonrpc":"2.0","result":{}}"""
-                body.contains("\"method\":\"tools/list\"") ->
-                    """{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"echo","description":"Echo remote text","inputSchema":{"type":"object","properties":{"text":{"type":"string","description":"Text to echo"}},"required":["text"]}}]}}"""
+                    exchange.respondEmpty(statusCode = 202)
+                body.contains("\"method\":\"tools/list\"") -> {
+                    toolsListCalls += 1
+                    if (rejectFirstToolsCallWithInvalidSession && toolsListCalls == 1) {
+                        exchange.respondJson("""{"error":{"message":"invalid session"}}""", statusCode = 404)
+                    } else {
+                        exchange.respondSse(
+                            """
+                            event: message
+                            data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":0.5}}
+
+                            event: message
+                            data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"echo","description":"Echo remote text","inputSchema":{"type":"object","properties":{"text":{"type":"string","description":"Text to echo"}},"required":["text"]}}]}}
+                            """.trimIndent()
+                        )
+                    }
+                }
                 body.contains("\"method\":\"tools/call\"") ->
-                    """{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"remote: hello"}]}}"""
+                    exchange.respondJson("""{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"remote: hello"}]}}""")
                 else ->
-                    """{"jsonrpc":"2.0","error":{"code":-32601,"message":"unknown method"}}"""
+                    exchange.respondJson("""{"jsonrpc":"2.0","error":{"code":-32601,"message":"unknown method"}}""")
             }
-            exchange.respondJson(response)
         }
         server.start()
         serverUrl = "http://127.0.0.1:${server.address.port}/mcp"
@@ -63,6 +82,7 @@ class McpHttpClientTest {
         assertTrue(requests.any { it.contains("\"method\":\"initialize\"") })
         assertTrue(requests.any { it.contains("\"method\":\"tools/list\"") })
         assertTrue(sessionHeaders.any { it == "session-1" })
+        assertTrue(protocolHeaders.all { it == "2025-11-25" })
     }
 
     @Test
@@ -82,10 +102,34 @@ class McpHttpClientTest {
         assertTrue(requests.any { it.contains("\"name\":\"echo\"") })
     }
 
-    private fun HttpExchange.respondJson(response: String) {
+    @Test
+    fun listTools_reinitializesWhenSessionIsInvalid() = runTest {
+        rejectFirstToolsCallWithInvalidSession = true
+        val client = McpHttpClient()
+
+        val tools = client.listTools(serverUrl)
+
+        assertEquals(1, tools.size)
+        assertEquals(2, toolsListCalls)
+        assertTrue(requests.count { it.contains("\"method\":\"initialize\"") } >= 2)
+    }
+
+    private fun HttpExchange.respondJson(response: String, statusCode: Int = 200) {
         val bytes = response.toByteArray()
         responseHeaders.add("content-type", "application/json")
+        sendResponseHeaders(statusCode, bytes.size.toLong())
+        responseBody.use { it.write(bytes) }
+    }
+
+    private fun HttpExchange.respondSse(response: String) {
+        val bytes = response.toByteArray()
+        responseHeaders.add("content-type", "text/event-stream")
         sendResponseHeaders(200, bytes.size.toLong())
         responseBody.use { it.write(bytes) }
+    }
+
+    private fun HttpExchange.respondEmpty(statusCode: Int) {
+        sendResponseHeaders(statusCode, -1)
+        responseBody.close()
     }
 }

@@ -1,9 +1,12 @@
 #include <jni.h>
 
+#include <algorithm>
 #include <android/log.h>
 #include <cstdint>
 #include <functional>
+#include <fstream>
 #include <memory>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <streambuf>
@@ -16,6 +19,8 @@
 namespace {
 
 constexpr const char* LOG_TAG = "Companion.LocalModel.Native";
+constexpr int DEFAULT_MAX_NEW_TOKENS = 512;
+constexpr int MOBILE_MAX_NEW_TOKENS_CAP = 512;
 
 void logInfo(const std::string& message) {
     __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "%s", message.c_str());
@@ -152,6 +157,21 @@ protected:
         return n;
     }
 
+    int overflow(int ch) override {
+        if (ch == traits_type::eof()) {
+            return traits_type::not_eof(ch);
+        }
+        const char c = static_cast<char>(ch);
+        if (callback_ != nullptr) {
+            callback_(&c, 1);
+        }
+        return traits_type::not_eof(ch);
+    }
+
+    int sync() override {
+        return 0;
+    }
+
 private:
     std::function<bool(const char*, size_t)> callback_;
 };
@@ -161,11 +181,103 @@ struct AuraMnnSession {
             : llm(std::move(llm)) {}
 
     std::unique_ptr<MNN::Transformer::Llm, void (*)(MNN::Transformer::Llm*)> llm;
+    int maxNewTokens = DEFAULT_MAX_NEW_TOKENS;
 };
 
 void destroyLlm(MNN::Transformer::Llm* llm) {
     MNN::Transformer::Llm::destroy(llm);
 }
+
+int readMaxNewTokens(const std::string& configPath) {
+    std::ifstream input(configPath);
+    if (!input) {
+        return DEFAULT_MAX_NEW_TOKENS;
+    }
+    const std::string content((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    std::smatch match;
+    static const std::regex pattern(R"("max_new_tokens"\s*:\s*([0-9]+))");
+    if (std::regex_search(content, match, pattern) && match.size() > 1) {
+        return std::min(MOBILE_MAX_NEW_TOKENS_CAP, std::max(1, std::stoi(match[1].str())));
+    }
+    return DEFAULT_MAX_NEW_TOKENS;
+}
+
+std::string statusName(MNN::Transformer::LlmStatus status) {
+    switch (status) {
+        case MNN::Transformer::LlmStatus::NOT_LOADED:
+            return "NOT_LOADED";
+        case MNN::Transformer::LlmStatus::RUNNING:
+            return "RUNNING";
+        case MNN::Transformer::LlmStatus::NORMAL_FINISHED:
+            return "NORMAL_FINISHED";
+        case MNN::Transformer::LlmStatus::MAX_TOKENS_FINISHED:
+            return "MAX_TOKENS_FINISHED";
+        case MNN::Transformer::LlmStatus::USER_CANCEL:
+            return "USER_CANCEL";
+        case MNN::Transformer::LlmStatus::INTERNAL_ERROR:
+            return "INTERNAL_ERROR";
+        case MNN::Transformer::LlmStatus::TIMEOUT:
+            return "TIMEOUT";
+    }
+    return "UNKNOWN";
+}
+
+void restoreAndroidSteppingStatusIfNeeded(MNN::Transformer::Llm* llm) {
+    if (llm == nullptr) {
+        return;
+    }
+    auto* context = llm->getContext();
+    if (context == nullptr) {
+        return;
+    }
+    if (context->status == MNN::Transformer::LlmStatus::MAX_TOKENS_FINISHED ||
+        context->status == MNN::Transformer::LlmStatus::NORMAL_FINISHED) {
+        auto* mutableContext = const_cast<MNN::Transformer::LlmContext*>(context);
+        mutableContext->status = MNN::Transformer::LlmStatus::RUNNING;
+    }
+}
+
+struct AndroidSteppingState {
+    bool pendingEop = false;
+    bool generateTextEnd = false;
+    bool stopRequested = false;
+
+    bool processToken(const std::string& token, const std::function<bool(const std::string&)>& emit) {
+        if (token.find("<eop>") != std::string::npos) {
+            pendingEop = true;
+            return false;
+        }
+        stopRequested = stopRequested || emit(token);
+        return stopRequested;
+    }
+
+    void resolve(MNN::Transformer::Llm* llm, int currentSize, int maxNewTokens) {
+        auto* context = llm != nullptr ? llm->getContext() : nullptr;
+        if (context != nullptr &&
+            context->status == MNN::Transformer::LlmStatus::MAX_TOKENS_FINISHED &&
+            !stopRequested &&
+            currentSize < maxNewTokens) {
+            restoreAndroidSteppingStatusIfNeeded(llm);
+            if (pendingEop) {
+                generateTextEnd = false;
+                pendingEop = false;
+            }
+            return;
+        }
+        if (context != nullptr &&
+            context->status == MNN::Transformer::LlmStatus::NORMAL_FINISHED &&
+            !pendingEop &&
+            !stopRequested &&
+            currentSize < maxNewTokens) {
+            restoreAndroidSteppingStatusIfNeeded(llm);
+            return;
+        }
+        if (pendingEop) {
+            generateTextEnd = true;
+            pendingEop = false;
+        }
+    }
+};
 #endif
 
 } // namespace
@@ -198,7 +310,14 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
         const std::string modelDir = parentDir(path);
         const std::string tmpDir = modelDir + "/tmp";
         mkdir(tmpDir.c_str(), 0700);
-        llm->set_config("{\"tmp_path\":\"" + tmpDir + "\",\"use_mmap\":true}");
+        const int effectiveMaxNewTokens = readMaxNewTokens(path);
+        llm->set_config(
+                "{\"tmp_path\":\"" + tmpDir +
+                "\",\"use_mmap\":true,\"kvcache_mmap\":true,"
+                "\"reuse_kv\":true,"
+                "\"prompt_cache\":true,"
+                "\"max_new_tokens\":" + std::to_string(effectiveMaxNewTokens) + ","
+                "\"jinja\":{\"context\":{\"enable_thinking\":false}}}");
 
         if (!llm->load()) {
             throwIllegalState(env, "MNN model load failed: " + path);
@@ -206,7 +325,10 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
         }
 
         auto* session = new AuraMnnSession(std::move(llm));
-        logInfo("mnn_init_completed configPath=" + path);
+        session->maxNewTokens = effectiveMaxNewTokens;
+        logInfo(
+                "mnn_init_completed configPath=" + path +
+                " maxNewTokens=" + std::to_string(session->maxNewTokens));
         return reinterpret_cast<jlong>(session);
     } catch (const std::exception& ex) {
         throwIllegalState(env, std::string("MNN native load failed: ") + ex.what());
@@ -240,15 +362,47 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_submitNative(
         const std::string input = toString(env, prompt);
         logInfo("mnn_submit_started promptLength=" + std::to_string(input.size()));
         JniTokenCallback tokenCallback(env, listener);
-        Utf8StreamProcessor utf8([&tokenCallback](const std::string& token) {
-            return tokenCallback.emit(token);
+        AndroidSteppingState steppingState;
+        Utf8StreamProcessor utf8([&tokenCallback, &steppingState](const std::string& token) {
+            return steppingState.processToken(token, [&tokenCallback](const std::string& value) {
+                return tokenCallback.emit(value);
+            });
         });
         CallbackStreamBuffer streamBuffer([&utf8](const char* s, size_t n) {
             return utf8.process(s, n);
         });
         std::ostream outputStream(&streamBuffer);
 
-        session->llm->response(input, &outputStream, "<eop>");
+        logInfo("mnn_prefill_started maxNewTokens=" + std::to_string(session->maxNewTokens));
+        MNN::Transformer::ChatMessages messages = {{"user", input}};
+        session->llm->response(messages, &outputStream, "<eop>", 0);
+        steppingState.resolve(session->llm.get(), 0, session->maxNewTokens);
+        const auto* prefillContext = session->llm->getContext();
+        if (prefillContext != nullptr) {
+            logInfo(
+                    "mnn_prefill_completed promptTokens=" + std::to_string(prefillContext->prompt_len) +
+                    " prefillUs=" + std::to_string(prefillContext->prefill_us) +
+                    " status=" + statusName(prefillContext->status));
+        }
+
+        int generated = 0;
+        while (!steppingState.stopRequested &&
+               !steppingState.generateTextEnd &&
+               generated < session->maxNewTokens) {
+            session->llm->generate(1);
+            generated++;
+            steppingState.resolve(session->llm.get(), generated, session->maxNewTokens);
+            if (generated == 1 || generated % 16 == 0) {
+                const auto* progressContext = session->llm->getContext();
+                if (progressContext != nullptr) {
+                    logInfo(
+                            "mnn_decode_progress generated=" + std::to_string(generated) +
+                            " contextGenSeqLen=" + std::to_string(progressContext->gen_seq_len) +
+                            " decodeUs=" + std::to_string(progressContext->decode_us) +
+                            " status=" + statusName(progressContext->status));
+                }
+            }
+        }
         if (env->ExceptionCheck()) {
             return hashMap;
         }

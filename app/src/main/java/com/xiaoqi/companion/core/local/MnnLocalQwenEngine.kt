@@ -10,6 +10,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 @Singleton
@@ -17,9 +19,11 @@ class MnnLocalQwenEngine @Inject constructor(
     private val modelLocator: LocalQwenModelLocator,
     private val bridgeFactory: MnnLlmBridgeFactory,
 ) : LocalQwenEngine {
+    private val bridgeMutex = Mutex()
+    private var bridge: MnnLlmBridge? = null
+    private var loadedConfigPath: String? = null
 
     override fun stream(request: LocalQwenRequest): Flow<String> = callbackFlow {
-        val bridge = bridgeFactory.create()
         val job = launch(Dispatchers.IO) {
             try {
                 AppLogger.info(
@@ -43,14 +47,16 @@ class MnnLocalQwenEngine @Inject constructor(
                     "configBytes" to configFile.length(),
                 )
 
-                bridge.load(configFile.absolutePath)
                 val prompt = request.toMnnPrompt()
-                withContext(Dispatchers.Default) {
-                    bridge.generate(prompt) { token ->
-                        if (token.isNotEmpty()) {
-                            trySend(token)
+                bridgeMutex.withLock {
+                    val activeBridge = ensureBridgeLoaded(configFile.absolutePath)
+                    withContext(Dispatchers.Default) {
+                        activeBridge.generate(prompt) { token ->
+                            if (token.isNotEmpty()) {
+                                trySend(token)
+                            }
+                            false
                         }
-                        false
                     }
                 }
                 AppLogger.info(
@@ -72,7 +78,26 @@ class MnnLocalQwenEngine @Inject constructor(
 
         awaitClose {
             job.cancel()
-            bridge.release()
+        }
+    }
+
+    private suspend fun ensureBridgeLoaded(configPath: String): MnnLlmBridge {
+        val currentBridge = bridge
+        if (currentBridge != null && loadedConfigPath == configPath) {
+            AppLogger.debug(
+                LogTags.LocalModel,
+                "mnn_bridge_reused",
+                "configPath" to configPath,
+            )
+            return currentBridge
+        }
+        currentBridge?.release()
+        bridge = null
+        loadedConfigPath = null
+        return bridgeFactory.create().also { newBridge ->
+            newBridge.load(configPath)
+            bridge = newBridge
+            loadedConfigPath = configPath
         }
     }
 

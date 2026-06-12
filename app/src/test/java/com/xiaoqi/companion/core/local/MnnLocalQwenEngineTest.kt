@@ -35,7 +35,31 @@ class MnnLocalQwenEngineTest {
         assertEquals(File(modelDir, "config.json").absolutePath, bridge.loadedConfigPath)
         assertEquals("system\n\nhi", bridge.prompt)
         assertTrue(bridge.loaded)
-        assertTrue(bridge.released)
+        assertFalse(bridge.released)
+    }
+
+    @Test
+    fun stream_reusesLoadedBridgeForSameModelConfig() = runTest {
+        val modelDir = temp.newFolder("Qwen3.5-2B-MNN")
+        File(modelDir, "config.json").writeText("{}")
+        val bridge = FakeMnnLlmBridge(listOf("ok"))
+        val engine = MnnLocalQwenEngine(
+            modelLocator = StaticModelLocator(modelDir),
+            bridgeFactory = StaticBridgeFactory(bridge),
+        )
+
+        engine.stream(LocalQwenRequest(systemPrompt = "system", userMessage = "first")).test {
+            assertEquals("ok", awaitItem())
+            awaitComplete()
+        }
+        engine.stream(LocalQwenRequest(systemPrompt = "system", userMessage = "second")).test {
+            assertEquals("ok", awaitItem())
+            awaitComplete()
+        }
+
+        assertEquals(1, bridge.loadCount)
+        assertEquals(listOf("system\n\nfirst", "system\n\nsecond"), bridge.prompts)
+        assertFalse(bridge.released)
     }
 
     @Test
@@ -67,16 +91,20 @@ class MnnLocalQwenEngineTest {
     ) : MnnLlmBridge {
         var loaded = false
         var released = false
+        var loadCount = 0
         var loadedConfigPath: String? = null
         var prompt: String? = null
+        val prompts = mutableListOf<String>()
 
         override suspend fun load(configPath: String) {
             loaded = true
+            loadCount++
             loadedConfigPath = configPath
         }
 
         override fun generate(prompt: String, onToken: (String) -> Boolean): Map<String, Any> {
             this.prompt = prompt
+            prompts += prompt
             chunks.forEach { chunk ->
                 if (onToken(chunk)) return mapOf("stopped" to true)
             }

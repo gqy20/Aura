@@ -37,6 +37,8 @@ class LocalQwenModelCatalogTest {
                 "llm.mnn.json",
                 "llm.mnn.weight",
                 "tokenizer.txt",
+                "visual.mnn",
+                "visual.mnn.weight",
             ),
             LocalQwenModelCatalog.requiredFiles,
         )
