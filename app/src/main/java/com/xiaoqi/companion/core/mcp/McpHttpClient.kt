@@ -23,6 +23,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
@@ -45,6 +46,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             .callTimeout(45, TimeUnit.SECONDS)
             .build()
     private val sessions = mutableMapOf<String, String>()
+    private val protocolVersions = mutableMapOf<String, String>()
     private val toolCache = mutableMapOf<String, List<McpToolSpec>>()
     private val ids = AtomicLong(1)
 
@@ -59,8 +61,10 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             AppLogger.info(LogTags.Tools, "mcp_list_tools_started", "serverHost" to serverUrl.hostForLog())
             try {
                 ensureInitialized(serverUrl)
+                val requestId = ids.getAndIncrement()
                 val response = rpc(
                     serverUrl = serverUrl,
+                    requestId = requestId,
                     method = "tools/list",
                     params = buildJsonObject {},
                 )
@@ -101,8 +105,10 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             )
             try {
                 ensureInitialized(serverUrl)
+                val requestId = ids.getAndIncrement()
                 val response = rpc(
                     serverUrl = serverUrl,
+                    requestId = requestId,
                     method = "tools/call",
                     params = buildJsonObject {
                         put("name", toolName)
@@ -140,6 +146,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         val response = postJson(
             serverUrl = serverUrl,
             payload = buildRequest(
+                requestId = ids.getAndIncrement(),
                 method = "initialize",
                 params = buildJsonObject {
                     put("protocolVersion", MCP_PROTOCOL_VERSION)
@@ -154,14 +161,17 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                 },
             ),
             includeSession = false,
+            retryOnInvalidSession = false,
         )
         response.sessionId?.let { sessions[serverUrl] = it }
-        response.json.throwIfJsonRpcError()
+        response.json?.throwIfJsonRpcError()
+        response.json?.negotiatedProtocolVersion()?.let { protocolVersions[serverUrl] = it }
         AppLogger.info(
             LogTags.Tools,
             "mcp_initialize_completed",
             "serverHost" to serverUrl.hostForLog(),
             "hasSession" to (response.sessionId != null),
+            "protocolVersion" to (protocolVersions[serverUrl] ?: MCP_PROTOCOL_VERSION),
             "durationMs" to (System.currentTimeMillis() - startedAt),
         )
 
@@ -173,6 +183,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                     put("method", "notifications/initialized")
                 },
                 includeSession = true,
+                retryOnInvalidSession = false,
             )
         }.onFailure {
             AppLogger.debug(
@@ -183,18 +194,28 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         }
     }
 
-    private fun rpc(serverUrl: String, method: String, params: JsonObject): JsonObject {
+    private fun rpc(serverUrl: String, requestId: Long, method: String, params: JsonObject): JsonObject {
         val response = postJson(
             serverUrl = serverUrl,
-            payload = buildRequest(method = method, params = params),
+            payload = buildRequest(requestId = requestId, method = method, params = params),
             includeSession = true,
+            retryOnInvalidSession = true,
+            expectedResponseId = requestId,
         )
         response.sessionId?.let { sessions[serverUrl] = it }
-        response.json.throwIfJsonRpcError()
-        return response.json
+        val jsonResponse = response.json
+            ?: throw RuntimeException("MCP empty response for $method")
+        jsonResponse.throwIfJsonRpcError()
+        return jsonResponse
     }
 
-    private fun postJson(serverUrl: String, payload: JsonObject, includeSession: Boolean): McpHttpResponse {
+    private fun postJson(
+        serverUrl: String,
+        payload: JsonObject,
+        includeSession: Boolean,
+        retryOnInvalidSession: Boolean,
+        expectedResponseId: Long? = payload["id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull(),
+    ): McpHttpResponse {
         val startedAt = System.currentTimeMillis()
         val method = payload["method"]?.jsonPrimitive?.contentOrNull.orEmpty()
         val body = payload.toString().toRequestBody("application/json".toMediaType())
@@ -202,14 +223,40 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             .url(serverUrl)
             .header("content-type", "application/json")
             .header("accept", "application/json, text/event-stream")
-            .header("MCP-Protocol-Version", MCP_PROTOCOL_VERSION)
             .post(body)
         if (includeSession) {
             sessions[serverUrl]?.let { requestBuilder.header("Mcp-Session-Id", it) }
+            requestBuilder.header("MCP-Protocol-Version", protocolVersions[serverUrl] ?: MCP_PROTOCOL_VERSION)
         }
 
         httpClient.newCall(requestBuilder.build()).execute().use { response ->
+            if (response.code == 404 && includeSession && retryOnInvalidSession) {
+                AppLogger.warn(
+                    LogTags.Tools,
+                    "mcp_session_invalid_reinitializing",
+                    "serverHost" to serverUrl.hostForLog(),
+                    "method" to method,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+                sessions.remove(serverUrl)
+                protocolVersions.remove(serverUrl)
+                ensureInitialized(serverUrl)
+                return postJson(
+                    serverUrl = serverUrl,
+                    payload = payload,
+                    includeSession = true,
+                    retryOnInvalidSession = false,
+                    expectedResponseId = expectedResponseId,
+                )
+            }
+
             val rawBody = response.body?.string().orEmpty()
+            if (response.code == 202 || response.code == 204) {
+                return McpHttpResponse(
+                    json = null,
+                    sessionId = response.header("Mcp-Session-Id"),
+                )
+            }
             if (!response.isSuccessful) {
                 AppLogger.warn(
                     LogTags.Tools,
@@ -223,33 +270,61 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                 throw RuntimeException("MCP HTTP ${response.code}: ${rawBody.take(300)}")
             }
             return McpHttpResponse(
-                json = parseHttpBody(rawBody),
+                json = parseHttpBody(rawBody, response, expectedResponseId),
                 sessionId = response.header("Mcp-Session-Id"),
             )
         }
     }
 
-    private fun buildRequest(method: String, params: JsonObject): JsonObject =
+    private fun buildRequest(requestId: Long, method: String, params: JsonObject): JsonObject =
         buildJsonObject {
             put("jsonrpc", "2.0")
-            put("id", ids.getAndIncrement())
+            put("id", requestId)
             put("method", method)
             put("params", params)
         }
 
-    private fun parseHttpBody(body: String): JsonObject {
+    private fun parseHttpBody(body: String, response: Response, expectedResponseId: Long?): JsonObject {
         val trimmed = body.trim()
-        val jsonText = if (trimmed.startsWith("data:")) {
-            trimmed.lineSequence()
-                .map { it.trim() }
-                .firstOrNull { it.startsWith("data:") }
-                ?.removePrefix("data:")
-                ?.trim()
-                .orEmpty()
+        if (trimmed.isBlank()) {
+            throw RuntimeException("MCP HTTP ${response.code}: empty body")
+        }
+        val contentType = response.header("content-type").orEmpty()
+        val jsonText = if (contentType.contains("text/event-stream", ignoreCase = true) || trimmed.startsWith("data:")) {
+            parseSseDataPayloads(trimmed)
+                .firstNotNullOfOrNull { payload ->
+                    runCatching { json.parseToJsonElement(payload).jsonObject }
+                        .getOrNull()
+                        ?.takeIf { expectedResponseId == null || it.matchesId(expectedResponseId) || it.containsKey("error") }
+                }
+                ?.toString()
+                ?: throw RuntimeException("MCP SSE response did not include JSON-RPC response id=$expectedResponseId")
         } else {
             trimmed
         }
         return json.parseToJsonElement(jsonText).jsonObject
+    }
+
+    private fun parseSseDataPayloads(body: String): List<String> {
+        val payloads = mutableListOf<String>()
+        val dataLines = mutableListOf<String>()
+
+        fun flushEvent() {
+            if (dataLines.isNotEmpty()) {
+                payloads += dataLines.joinToString("\n").trim()
+                dataLines.clear()
+            }
+        }
+
+        body.lineSequence().forEach { line ->
+            when {
+                line.isBlank() -> flushEvent()
+                line.startsWith(":") -> Unit
+                line.startsWith("data:") -> dataLines += line.removePrefix("data:").trimStart()
+            }
+        }
+        flushEvent()
+        return payloads
     }
 
     private fun JsonObject.resultObject(): JsonObject =
@@ -260,6 +335,15 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         val message = error["message"]?.jsonPrimitive?.contentOrNull ?: error.toString()
         throw RuntimeException("MCP error: $message")
     }
+
+    private fun JsonObject.negotiatedProtocolVersion(): String? =
+        (this["result"] as? JsonObject)
+            ?.get("protocolVersion")
+            ?.jsonPrimitive
+            ?.contentOrNull
+
+    private fun JsonObject.matchesId(expectedResponseId: Long): Boolean =
+        this["id"]?.jsonPrimitive?.contentOrNull == expectedResponseId.toString()
 
     private fun JsonObject.toToolSpecOrNull(): McpToolSpec? {
         val name = this["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return null
@@ -289,12 +373,12 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     }
 
     private data class McpHttpResponse(
-        val json: JsonObject,
+        val json: JsonObject?,
         val sessionId: String?,
     )
 
     private companion object {
-        const val MCP_PROTOCOL_VERSION = "2025-06-18"
+        const val MCP_PROTOCOL_VERSION = "2025-11-25"
         val json = Json { ignoreUnknownKeys = true }
     }
 }

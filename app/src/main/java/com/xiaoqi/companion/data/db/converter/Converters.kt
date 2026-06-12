@@ -11,7 +11,7 @@ enum class MessageRole { USER, ASSISTANT, SYSTEM }
 enum class MemoryType { FACT, EPISODE, PROCEDURAL }
 enum class SummaryType { DAILY, SESSION, TOPIC, PROJECT, RELATIONSHIP }
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
-enum class LlmProvider { GLM, KIMI }
+enum class LlmProvider { GLM, KIMI, LOCAL_QWEN }
 
 // --- Metadata model ---
 

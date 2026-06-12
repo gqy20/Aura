@@ -14,6 +14,8 @@ import ai.koog.prompt.streaming.toStreamFrames
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
+import com.xiaoqi.companion.core.local.LocalQwenEngine
+import com.xiaoqi.companion.core.local.LocalQwenRequest
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
@@ -27,6 +29,7 @@ import io.mockk.mockk
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
@@ -47,6 +50,7 @@ class KoogAgentFactoryImplTest {
             executorFactory = object : KoogPromptExecutorFactory {
                 override fun create(config: LlmConfig): PromptExecutor = executor
             },
+            localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
@@ -89,6 +93,7 @@ class KoogAgentFactoryImplTest {
             executorFactory = object : KoogPromptExecutorFactory {
                 override fun create(config: LlmConfig): PromptExecutor = executor
             },
+            localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
@@ -145,6 +150,7 @@ class KoogAgentFactoryImplTest {
             executorFactory = object : KoogPromptExecutorFactory {
                 override fun create(config: LlmConfig): PromptExecutor = executor
             },
+            localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry = ToolRegistry.EMPTY
@@ -165,6 +171,7 @@ class KoogAgentFactoryImplTest {
             executorFactory = object : KoogPromptExecutorFactory {
                 override fun create(config: LlmConfig): PromptExecutor = executor
             },
+            localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
@@ -195,6 +202,7 @@ class KoogAgentFactoryImplTest {
             executorFactory = object : KoogPromptExecutorFactory {
                 override fun create(config: LlmConfig): PromptExecutor = executor
             },
+            localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
                 override fun create(): ToolRegistry =
@@ -214,6 +222,36 @@ class KoogAgentFactoryImplTest {
 
         assertEquals("这是一张图片。", response)
         assertEquals(listOf(emptyList<String>()), executor.toolNamesPerCall)
+    }
+
+    @Test
+    fun create_localQwenProvider_usesLocalEngine() = runTest {
+        val localEngine = FakeLocalQwenEngine(listOf("local", " reply"))
+        val factory = KoogAgentFactoryImpl(
+            executorFactory = object : KoogPromptExecutorFactory {
+                override fun create(config: LlmConfig): PromptExecutor = error("remote executor should not be used")
+            },
+            localQwenEngine = localEngine,
+            toolCallRecorder = toolCallRecorder,
+            toolRegistry = object : AgentToolRegistry {
+                override fun create(): ToolRegistry = ToolRegistry.EMPTY
+            },
+        )
+
+        val events = factory.create(testConfig.copy(provider = LlmProvider.LOCAL_QWEN)).runEvents(
+            BuiltPrompt(
+                systemPrompt = "system",
+                userMessage = "hello",
+            )
+        ).toList()
+
+        assertEquals(
+            listOf(KoogAgentEvent.TextDelta("local"), KoogAgentEvent.TextDelta(" reply")),
+            events,
+        )
+        assertEquals("system", localEngine.lastRequest?.systemPrompt)
+        assertEquals("hello", localEngine.lastRequest?.userMessage)
+        assertEquals(false, localEngine.lastRequest?.allowTools)
     }
 
     private class ToolCallingPromptExecutor : PromptExecutor() {
@@ -265,6 +303,23 @@ class KoogAgentFactoryImplTest {
             ModerationResult(isHarmful = false, categories = emptyMap())
 
         override fun close() = Unit
+    }
+
+    private class FakeLocalQwenEngine(
+        private val chunks: List<String>,
+    ) : LocalQwenEngine {
+        var lastRequest: LocalQwenRequest? = null
+
+        override fun stream(request: LocalQwenRequest): Flow<String> = flow {
+            lastRequest = request
+            chunks.forEach { emit(it) }
+        }
+    }
+
+    private object ErrorLocalQwenEngine : LocalQwenEngine {
+        override fun stream(request: LocalQwenRequest): Flow<String> = flow {
+            error("Local engine should not be used for remote providers")
+        }
     }
 
     private class CompleteOnlyPromptExecutor : PromptExecutor() {

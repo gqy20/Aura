@@ -15,6 +15,8 @@ import com.xiaoqi.companion.core.presence.PresenceEvent
 import com.xiaoqi.companion.core.presence.PresenceInputs
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloadState
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -58,6 +60,7 @@ class ChatViewModel @Inject constructor(
     private val presenceController: PresenceController,
     private val appPreferences: AppPreferences,
     private val reminderRepository: ReminderRepository,
+    private val localQwenModelDownloader: LocalQwenModelDownloader,
 ) : ViewModel() {
 
     companion object {
@@ -72,6 +75,8 @@ class ChatViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     private var presenceReactionJob: Job? = null
+    private var localQwenDownloadJob: Job? = null
+    private var localQwenStatusJob: Job? = null
 
     val uiState: StateFlow<ChatUiState> = _uiState
         .map { it.withPresence() }
@@ -86,6 +91,12 @@ class ChatViewModel @Inject constructor(
             configRepository.observeLlmConfigStatus().collect { status ->
                 _uiState.update { state ->
                     state.copy(configStatus = status.toChatConfigStatus()).withPresence()
+                }
+                if (status.provider == LlmProvider.LOCAL_QWEN) {
+                    refreshLocalQwenModelStatus(status.modelName)
+                } else {
+                    localQwenStatusJob?.cancel()
+                    localQwenStatusJob = null
                 }
             }
         }
@@ -554,15 +565,17 @@ class ChatViewModel @Inject constructor(
 
     fun openSettings() {
         val state = _uiState.value
+        val modelName = state.configStatus.modelName
         _uiState.update {
             it.copy(
                 isSettingsOpen = true,
                 settingsProvider = state.configStatus.provider,
-                settingsModelName = state.configStatus.modelName,
+                settingsModelName = modelName,
                 settingsBaseUrl = state.configStatus.baseUrl,
                 settingsMessage = null,
             )
         }
+        refreshLocalQwenModelStatus(modelName)
     }
 
     fun closeSettings() {
@@ -583,10 +596,16 @@ class ChatViewModel @Inject constructor(
                 settingsMessage = null,
             )
         }
+        if (value == LlmProvider.LOCAL_QWEN) {
+            refreshLocalQwenModelStatus(defaultModel)
+        }
     }
 
     fun updateSettingsModelName(value: String) {
         _uiState.update { it.copy(settingsModelName = value, settingsMessage = null) }
+        if (_uiState.value.settingsProvider == LlmProvider.LOCAL_QWEN) {
+            refreshLocalQwenModelStatus(value)
+        }
     }
 
     fun updateSettingsBaseUrl(value: String) {
@@ -624,7 +643,7 @@ class ChatViewModel @Inject constructor(
             _uiState.update { it.copy(settingsMessage = "模型名称不能为空") }
             return
         }
-        if (baseUrl.isBlank()) {
+        if (provider != LlmProvider.LOCAL_QWEN && baseUrl.isBlank()) {
             _uiState.update { it.copy(settingsMessage = "Base URL 不能为空") }
             return
         }
@@ -664,6 +683,60 @@ class ChatViewModel @Inject constructor(
                     "durationMs" to (System.currentTimeMillis() - startedAt),
                 )
                 _uiState.update { it.copy(settingsMessage = "Save settings failed. Please try again.") }
+            }
+        }
+    }
+
+    fun downloadSelectedLocalQwenModel() {
+        val state = _uiState.value
+        if (state.settingsProvider != LlmProvider.LOCAL_QWEN) return
+        val modelName = state.settingsModelName
+            .takeIf { it in DefaultLlmValues.modelOptions(LlmProvider.LOCAL_QWEN) }
+            ?: DefaultLlmValues.LOCAL_QWEN_MODEL
+        localQwenDownloadJob?.cancel()
+        localQwenDownloadJob = viewModelScope.launch {
+            try {
+                localQwenModelDownloader.download(modelName).collect { downloadState ->
+                    _uiState.update {
+                        it.copy(
+                            configStatus = it.configStatus.withLocalQwenDownloadState(downloadState),
+                            localQwenDownload = downloadState.toUiState(),
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.error(
+                    LogTags.Config,
+                    e,
+                    "local_qwen_download_failed",
+                    "model" to modelName,
+                )
+                _uiState.update {
+                    it.copy(
+                        localQwenDownload = it.localQwenDownload.copy(
+                            modelName = modelName,
+                            isDownloading = false,
+                            error = e.message ?: "Download failed",
+                        ),
+                        settingsMessage = "Local Qwen download failed: ${e.message ?: "unknown error"}",
+                    )
+                }
+            }
+        }
+    }
+
+    private fun refreshLocalQwenModelStatus(modelName: String) {
+        if (modelName !in DefaultLlmValues.modelOptions(LlmProvider.LOCAL_QWEN)) return
+        if (localQwenDownloadJob?.isActive == true) return
+        localQwenStatusJob?.cancel()
+        localQwenStatusJob = viewModelScope.launch {
+            localQwenModelDownloader.observeStatus(modelName).collect { downloadState ->
+                _uiState.update {
+                    it.copy(
+                        configStatus = it.configStatus.withLocalQwenDownloadState(downloadState),
+                        localQwenDownload = downloadState.toUiState(),
+                    )
+                }
             }
         }
     }
@@ -857,7 +930,16 @@ class ChatViewModel @Inject constructor(
         )
 
     private fun LlmConfigStatus.toChatConfigStatus(): ChatConfigStatus =
-        if (isReady) {
+        if (provider == LlmProvider.LOCAL_QWEN && isReady) {
+            ChatConfigStatus(
+                label = "${provider.name} · $modelName",
+                isReady = false,
+                detail = "正在检查本地模型",
+                provider = provider,
+                modelName = modelName,
+                baseUrl = baseUrl,
+            )
+        } else if (isReady) {
             ChatConfigStatus(
                 label = "${provider.name} · $modelName",
                 isReady = true,
@@ -876,6 +958,40 @@ class ChatViewModel @Inject constructor(
                 baseUrl = baseUrl,
             )
         }
+
+    private fun ChatConfigStatus.withLocalQwenDownloadState(
+        downloadState: LocalQwenModelDownloadState,
+    ): ChatConfigStatus {
+        if (provider != LlmProvider.LOCAL_QWEN || modelName != downloadState.modelName) {
+            return this
+        }
+        return when {
+            downloadState.isInstalled -> copy(
+                isReady = true,
+                detail = "本地模型已安装",
+            )
+            downloadState.isDownloading -> copy(
+                isReady = false,
+                detail = "本地模型下载中",
+            )
+            else -> copy(
+                isReady = false,
+                detail = downloadState.error ?: "请先下载本地模型",
+            )
+        }
+    }
+
+    private fun LocalQwenModelDownloadState.toUiState(): LocalQwenDownloadUiState =
+        LocalQwenDownloadUiState(
+            modelName = modelName,
+            isInstalled = isInstalled,
+            isDownloading = isDownloading,
+            progress = progress,
+            downloadedBytes = downloadedBytes,
+            totalBytes = totalBytes,
+            message = message,
+            error = error,
+        )
 
     private fun defaultBaseUrl(provider: LlmProvider): String =
         DefaultLlmValues.defaultBaseUrl(provider)

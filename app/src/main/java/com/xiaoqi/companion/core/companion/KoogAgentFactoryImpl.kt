@@ -24,6 +24,8 @@ import ai.koog.prompt.message.Message
 import ai.koog.prompt.streaming.StreamFrame
 import ai.koog.prompt.streaming.toMessageResponses
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
+import com.xiaoqi.companion.core.local.LocalQwenAgentWrapper
+import com.xiaoqi.companion.core.local.LocalQwenEngine
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
@@ -31,6 +33,7 @@ import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
+import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.LlmConfig
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -45,6 +48,7 @@ import kotlinx.serialization.KSerializer
 @Singleton
 class KoogAgentFactoryImpl @Inject constructor(
     private val executorFactory: KoogPromptExecutorFactory,
+    private val localQwenEngine: LocalQwenEngine,
     private val toolRegistry: AgentToolRegistry,
     private val toolCallRecorder: ToolCallRecorder,
 ) : KoogAgentFactory {
@@ -57,6 +61,12 @@ class KoogAgentFactoryImpl @Inject constructor(
             "model" to config.modelName,
             "hasApiKey" to config.apiKey.isNotBlank(),
         )
+        if (config.provider == LlmProvider.LOCAL_QWEN) {
+            return LocalQwenAgentWrapper(
+                engine = localQwenEngine,
+                modelName = config.modelName,
+            )
+        }
         return KoogPromptExecutorWrapper(
             config = config,
             executor = executorFactory.create(config),

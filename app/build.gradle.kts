@@ -1,3 +1,4 @@
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -9,8 +10,46 @@ plugins {
     alias(libs.plugins.room)
 }
 
+val auraMnnHomeProvider = providers
+    .gradleProperty("auraMnnHome")
+    .orElse(providers.environmentVariable("AURA_MNN_HOME"))
+
+val auraMnnHomePath = auraMnnHomeProvider.orNull
+val auraMnnHomeDir = auraMnnHomePath
+    ?.takeIf { it.isNotBlank() }
+    ?.let(::File)
+
+val generatedMnnJniLibsDir = layout.buildDirectory.dir("generated/mnnJniLibs")
+val generatedMnnJniLibsPath = File(layout.buildDirectory.asFile.get(), "generated/mnnJniLibs")
+val auraMnnLibDir = auraMnnHomeDir?.let { mnnHome ->
+    listOf(
+        File(mnnHome, "project/android/build_64/lib"),
+        File(mnnHome, "project/android/build_64"),
+        File(mnnHome, "build_64/lib"),
+        File(mnnHome, "build_64"),
+    ).firstOrNull { File(it, "libMNN.so").isFile }
+}
+
+when {
+    auraMnnHomeDir == null -> logger.lifecycle("AURA_MNN_HOME/auraMnnHome is not set; packaging Aura MNN stub only.")
+    auraMnnLibDir == null -> logger.warn(
+        "AURA_MNN_HOME/auraMnnHome points to ${auraMnnHomeDir.absolutePath}, " +
+            "but no libMNN.so was found under project/android/build_64."
+    )
+    else -> logger.lifecycle("Packaging Aura MNN native libs from ${auraMnnLibDir.absolutePath}")
+}
+
 room {
     schemaDirectory("$projectDir/schemas")
+}
+
+val syncAuraMnnNativeLibs by tasks.registering(Sync::class) {
+    auraMnnLibDir?.let { libDir ->
+        from(libDir.absolutePath) {
+            include("*.so")
+        }
+    }
+    into(generatedMnnJniLibsDir.map { it.dir("arm64-v8a") })
 }
 
 android {
@@ -31,6 +70,18 @@ android {
         }
 
         // LLM secrets are user-configured at runtime and must not be embedded in BuildConfig.
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                auraMnnHomePath?.let { mnnHome ->
+                    arguments += "-DAURA_MNN_HOME=$mnnHome"
+                }
+            }
+        }
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     // Signing: use release keystore if keystore.properties exists, otherwise fallback to debug
@@ -74,12 +125,22 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
     }
 
     packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",
@@ -89,9 +150,29 @@ android {
             )
         }
     }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.setSrcDirs(listOf("src/main/jniLibs", generatedMnnJniLibsPath))
+        }
+    }
 }
 
+tasks.matching {
+    it.name in setOf(
+        "mergeDebugJniLibFolders",
+        "mergeReleaseJniLibFolders",
+        "mergeDebugNativeLibs",
+        "mergeReleaseNativeLibs",
+    )
+}
+    .configureEach {
+        dependsOn(syncAuraMnnNativeLibs)
+    }
+
 dependencies {
+    implementation(libs.androidx.core.ktx)
+
     // Compose UI
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

@@ -21,23 +21,34 @@ object DefaultLlmValues {
     const val GLM_MODEL = "glm-5v-turbo"
     const val KIMI_BASE_URL = "https://api.kimi.com/coding"
     const val KIMI_MODEL = "kimi-for-coding"
+    const val LOCAL_QWEN_BASE_URL = ""
+    const val LOCAL_QWEN_MODEL = "Qwen3.5-0.8B-MNN"
+    const val LOCAL_QWEN_2B_MODEL = "Qwen3.5-2B-MNN"
+    const val LOCAL_QWEN_4B_MODEL = "Qwen3.5-4B-MNN"
 
     fun defaultBaseUrl(provider: LlmProvider): String =
         when (provider) {
             LlmProvider.GLM -> GLM_BASE_URL
             LlmProvider.KIMI -> KIMI_BASE_URL
+            LlmProvider.LOCAL_QWEN -> LOCAL_QWEN_BASE_URL
         }
 
     fun defaultModel(provider: LlmProvider): String =
         when (provider) {
             LlmProvider.GLM -> GLM_MODEL
             LlmProvider.KIMI -> KIMI_MODEL
+            LlmProvider.LOCAL_QWEN -> LOCAL_QWEN_MODEL
         }
 
     fun modelOptions(provider: LlmProvider): List<String> =
         when (provider) {
             LlmProvider.GLM -> listOf(GLM_MODEL)
             LlmProvider.KIMI -> listOf(KIMI_MODEL)
+            LlmProvider.LOCAL_QWEN -> listOf(
+                LOCAL_QWEN_MODEL,
+                LOCAL_QWEN_2B_MODEL,
+                LOCAL_QWEN_4B_MODEL,
+            )
         }
 }
 
@@ -47,15 +58,36 @@ data class LlmConfigStatus(
     val baseUrl: String,
     val hasApiKey: Boolean,
 ) {
-    val isReady: Boolean = hasApiKey && baseUrl.isNotBlank() && modelName.isNotBlank()
+    val isReady: Boolean =
+        if (provider == LlmProvider.LOCAL_QWEN) {
+            modelName.isNotBlank()
+        } else {
+            hasApiKey && baseUrl.isNotBlank() && modelName.isNotBlank()
+        }
+
     val missingReason: String?
         get() = when {
-            !hasApiKey -> "缺少 API Key"
-            baseUrl.isBlank() -> "缺少 Base URL"
-            modelName.isBlank() -> "缺少模型名称"
+            provider == LlmProvider.LOCAL_QWEN && modelName.isBlank() -> "Missing model name"
+            provider == LlmProvider.LOCAL_QWEN -> null
+            !hasApiKey -> missingText("API Key")
+            baseUrl.isBlank() -> missingText("Base URL")
+            modelName.isBlank() -> missingText(modelNameText())
             else -> null
         }
 }
+
+private fun missingText(subject: String): String =
+    String(charArrayOf(0x7f3a.toChar(), 0x5c11.toChar())) + " " + subject
+
+private fun modelNameText(): String =
+    String(
+        charArrayOf(
+            0x6a21.toChar(),
+            0x578b.toChar(),
+            0x540d.toChar(),
+            0x79f0.toChar(),
+        )
+    )
 
 interface ConfigRepository {
     val apiKey: Flow<String?>
@@ -86,7 +118,7 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
                 ?: DefaultLlmValues.defaultModel(provider)
             val resolvedKey = key?.takeIf { it.isNotBlank() }.orEmpty()
             val resolvedBaseUrl = DefaultLlmValues.defaultBaseUrl(provider)
-            if (resolvedKey.isEmpty()) {
+            if (resolvedKey.isEmpty() && provider != LlmProvider.LOCAL_QWEN) {
                 AppLogger.warn(
                     LogTags.Config,
                     "api_key_missing",
@@ -127,5 +159,4 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
     override suspend fun setModelName(name: String) {
         prefs.setModelName(name)
     }
-
 }

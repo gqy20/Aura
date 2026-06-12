@@ -10,11 +10,14 @@ import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloadState
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
@@ -66,6 +69,7 @@ class ChatViewModelTest {
     private lateinit var memoryDao: MemoryDao
     private lateinit var agentStateDao: AgentStateDao
     private lateinit var appPreferences: AppPreferences
+    private lateinit var localQwenDownloader: FakeLocalQwenModelDownloader
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val configRepo: ConfigRepository = mockk(relaxed = true) {
@@ -124,6 +128,42 @@ class ChatViewModelTest {
 
         override suspend fun cancelReminder(reminderId: String) {
             canceledIds += reminderId
+        }
+    }
+
+    private class FakeLocalQwenModelDownloader : LocalQwenModelDownloader {
+        val requestedDownloads = mutableListOf<String>()
+        var installed = false
+
+        override fun observeStatus(modelName: String): Flow<LocalQwenModelDownloadState> =
+            flowOf(
+                LocalQwenModelDownloadState(
+                    modelName = modelName,
+                    isInstalled = installed,
+                    message = if (installed) "Installed" else "Not installed",
+                )
+            )
+
+        override fun download(modelName: String): Flow<LocalQwenModelDownloadState> = flow {
+            requestedDownloads += modelName
+            emit(
+                LocalQwenModelDownloadState(
+                    modelName = modelName,
+                    isInstalled = false,
+                    isDownloading = true,
+                    progress = 0.5f,
+                    message = "Downloading",
+                )
+            )
+            installed = true
+            emit(
+                LocalQwenModelDownloadState(
+                    modelName = modelName,
+                    isInstalled = true,
+                    progress = 1f,
+                    message = "Download complete",
+                )
+            )
         }
     }
 
@@ -225,6 +265,7 @@ class ChatViewModelTest {
             every { observeByCompanionId("default") } returns flowOf(null)
         }
         appPreferences = mockAppPreferences()
+        localQwenDownloader = FakeLocalQwenModelDownloader()
         viewModel = ChatViewModel(
             fakeRuntime,
             ToolDisplayRegistry(),
@@ -237,6 +278,7 @@ class ChatViewModelTest {
             PresenceController(),
             appPreferences,
             reminderRepository,
+            localQwenDownloader,
         )
     }
 
@@ -343,6 +385,7 @@ class ChatViewModelTest {
             PresenceController(),
             appPreferences,
             reminderRepository,
+            localQwenDownloader,
         )
 
         advanceUntilIdle()
@@ -404,12 +447,68 @@ class ChatViewModelTest {
             PresenceController(),
             appPreferences,
             reminderRepository,
+            localQwenDownloader,
         )
 
         blockedViewModel.sendMessage("hello")
 
         assertFalse(blockedRuntime.sendCalled)
         assertEquals("缺少 API Key", blockedViewModel.uiState.value.error)
+    }
+
+    @Test
+    fun sendMessage_blocksLocalQwenWhenModelIsNotInstalled() = runTest {
+        val localConfigRepo = localQwenConfigRepository()
+        val localRuntime = FakeCompanionRuntime(localConfigRepo, messageRepo)
+        localQwenDownloader.installed = false
+        val localViewModel = ChatViewModel(
+            localRuntime,
+            ToolDisplayRegistry(),
+            toolCallRepository,
+            localConfigRepo,
+            imageProcessor,
+            messageRepo,
+            memoryDao,
+            agentStateDao,
+            PresenceController(),
+            appPreferences,
+            reminderRepository,
+            localQwenDownloader,
+        )
+        advanceUntilIdle()
+
+        localViewModel.sendMessage("hello")
+
+        assertFalse(localRuntime.sendCalled)
+        assertFalse(localViewModel.uiState.value.configStatus.isReady)
+        assertEquals("请先下载本地模型", localViewModel.uiState.value.error)
+    }
+
+    @Test
+    fun sendMessage_allowsLocalQwenWhenModelIsInstalled() = runTest {
+        val localConfigRepo = localQwenConfigRepository()
+        val localRuntime = FakeCompanionRuntime(localConfigRepo, messageRepo)
+        localQwenDownloader.installed = true
+        val localViewModel = ChatViewModel(
+            localRuntime,
+            ToolDisplayRegistry(),
+            toolCallRepository,
+            localConfigRepo,
+            imageProcessor,
+            messageRepo,
+            memoryDao,
+            agentStateDao,
+            PresenceController(),
+            appPreferences,
+            reminderRepository,
+            localQwenDownloader,
+        )
+        advanceUntilIdle()
+
+        localViewModel.sendMessage("hello")
+
+        assertTrue(localRuntime.sendCalled)
+        assertTrue(localViewModel.uiState.value.configStatus.isReady)
     }
 
     @Test
@@ -439,6 +538,35 @@ class ChatViewModelTest {
 
         coVerify { configRepo.setModelName(DefaultLlmValues.GLM_MODEL) }
         assertFalse(viewModel.uiState.value.isSettingsOpen)
+    }
+
+    @Test
+    fun saveSettings_localQwenDoesNotRequireBaseUrlOrApiKey() = runTest {
+        viewModel.openSettings()
+        viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN)
+        viewModel.updateSettingsModelName(DefaultLlmValues.LOCAL_QWEN_MODEL)
+
+        viewModel.saveSettings()
+        advanceUntilIdle()
+
+        coVerify { configRepo.setLlmProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN) }
+        coVerify { configRepo.setModelName(DefaultLlmValues.LOCAL_QWEN_MODEL) }
+        coVerify { configRepo.setBaseUrl(DefaultLlmValues.LOCAL_QWEN_BASE_URL) }
+        assertFalse(viewModel.uiState.value.isSettingsOpen)
+    }
+
+    @Test
+    fun downloadSelectedLocalQwenModel_updatesModelDownloadState() = runTest {
+        viewModel.openSettings()
+        viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN)
+        viewModel.updateSettingsModelName(DefaultLlmValues.LOCAL_QWEN_MODEL)
+
+        viewModel.downloadSelectedLocalQwenModel()
+        advanceUntilIdle()
+
+        assertEquals(listOf(DefaultLlmValues.LOCAL_QWEN_MODEL), localQwenDownloader.requestedDownloads)
+        assertTrue(viewModel.uiState.value.localQwenDownload.isInstalled)
+        assertEquals(1f, viewModel.uiState.value.localQwenDownload.progress, 0.001f)
     }
 
     @Test
@@ -725,4 +853,24 @@ class ChatViewModelTest {
         createdAt = 1_000L,
         updatedAt = 1_000L,
     )
+
+    private fun localQwenConfigRepository(): ConfigRepository =
+        mockk(relaxed = true) {
+            every { observeLlmConfigStatus() } returns flowOf(
+                LlmConfigStatus(
+                    provider = LlmProvider.LOCAL_QWEN,
+                    baseUrl = DefaultLlmValues.LOCAL_QWEN_BASE_URL,
+                    hasApiKey = false,
+                    modelName = DefaultLlmValues.LOCAL_QWEN_MODEL,
+                )
+            )
+            every { getCurrentLlmConfig() } returns flowOf(
+                LlmConfig(
+                    provider = LlmProvider.LOCAL_QWEN,
+                    baseUrl = DefaultLlmValues.LOCAL_QWEN_BASE_URL,
+                    apiKey = "",
+                    modelName = DefaultLlmValues.LOCAL_QWEN_MODEL,
+                )
+            )
+        }
 }
