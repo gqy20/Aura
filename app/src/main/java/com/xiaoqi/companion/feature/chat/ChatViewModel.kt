@@ -76,6 +76,7 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     private var presenceReactionJob: Job? = null
     private var localQwenDownloadJob: Job? = null
+    private var localQwenStatusJob: Job? = null
 
     val uiState: StateFlow<ChatUiState> = _uiState
         .map { it.withPresence() }
@@ -90,6 +91,12 @@ class ChatViewModel @Inject constructor(
             configRepository.observeLlmConfigStatus().collect { status ->
                 _uiState.update { state ->
                     state.copy(configStatus = status.toChatConfigStatus()).withPresence()
+                }
+                if (status.provider == LlmProvider.LOCAL_QWEN) {
+                    refreshLocalQwenModelStatus(status.modelName)
+                } else {
+                    localQwenStatusJob?.cancel()
+                    localQwenStatusJob = null
                 }
             }
         }
@@ -690,7 +697,12 @@ class ChatViewModel @Inject constructor(
         localQwenDownloadJob = viewModelScope.launch {
             try {
                 localQwenModelDownloader.download(modelName).collect { downloadState ->
-                    _uiState.update { it.copy(localQwenDownload = downloadState.toUiState()) }
+                    _uiState.update {
+                        it.copy(
+                            configStatus = it.configStatus.withLocalQwenDownloadState(downloadState),
+                            localQwenDownload = downloadState.toUiState(),
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 AppLogger.error(
@@ -716,9 +728,15 @@ class ChatViewModel @Inject constructor(
     private fun refreshLocalQwenModelStatus(modelName: String) {
         if (modelName !in DefaultLlmValues.modelOptions(LlmProvider.LOCAL_QWEN)) return
         if (localQwenDownloadJob?.isActive == true) return
-        viewModelScope.launch {
+        localQwenStatusJob?.cancel()
+        localQwenStatusJob = viewModelScope.launch {
             localQwenModelDownloader.observeStatus(modelName).collect { downloadState ->
-                _uiState.update { it.copy(localQwenDownload = downloadState.toUiState()) }
+                _uiState.update {
+                    it.copy(
+                        configStatus = it.configStatus.withLocalQwenDownloadState(downloadState),
+                        localQwenDownload = downloadState.toUiState(),
+                    )
+                }
             }
         }
     }
@@ -912,7 +930,16 @@ class ChatViewModel @Inject constructor(
         )
 
     private fun LlmConfigStatus.toChatConfigStatus(): ChatConfigStatus =
-        if (isReady) {
+        if (provider == LlmProvider.LOCAL_QWEN && isReady) {
+            ChatConfigStatus(
+                label = "${provider.name} · $modelName",
+                isReady = false,
+                detail = "正在检查本地模型",
+                provider = provider,
+                modelName = modelName,
+                baseUrl = baseUrl,
+            )
+        } else if (isReady) {
             ChatConfigStatus(
                 label = "${provider.name} · $modelName",
                 isReady = true,
@@ -931,6 +958,28 @@ class ChatViewModel @Inject constructor(
                 baseUrl = baseUrl,
             )
         }
+
+    private fun ChatConfigStatus.withLocalQwenDownloadState(
+        downloadState: LocalQwenModelDownloadState,
+    ): ChatConfigStatus {
+        if (provider != LlmProvider.LOCAL_QWEN || modelName != downloadState.modelName) {
+            return this
+        }
+        return when {
+            downloadState.isInstalled -> copy(
+                isReady = true,
+                detail = "本地模型已安装",
+            )
+            downloadState.isDownloading -> copy(
+                isReady = false,
+                detail = "本地模型下载中",
+            )
+            else -> copy(
+                isReady = false,
+                detail = downloadState.error ?: "请先下载本地模型",
+            )
+        }
+    }
 
     private fun LocalQwenModelDownloadState.toUiState(): LocalQwenDownloadUiState =
         LocalQwenDownloadUiState(

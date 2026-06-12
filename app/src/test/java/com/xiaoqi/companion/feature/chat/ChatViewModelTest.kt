@@ -17,6 +17,7 @@ import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
+import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
@@ -456,6 +457,61 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun sendMessage_blocksLocalQwenWhenModelIsNotInstalled() = runTest {
+        val localConfigRepo = localQwenConfigRepository()
+        val localRuntime = FakeCompanionRuntime(localConfigRepo, messageRepo)
+        localQwenDownloader.installed = false
+        val localViewModel = ChatViewModel(
+            localRuntime,
+            ToolDisplayRegistry(),
+            toolCallRepository,
+            localConfigRepo,
+            imageProcessor,
+            messageRepo,
+            memoryDao,
+            agentStateDao,
+            PresenceController(),
+            appPreferences,
+            reminderRepository,
+            localQwenDownloader,
+        )
+        advanceUntilIdle()
+
+        localViewModel.sendMessage("hello")
+
+        assertFalse(localRuntime.sendCalled)
+        assertFalse(localViewModel.uiState.value.configStatus.isReady)
+        assertEquals("请先下载本地模型", localViewModel.uiState.value.error)
+    }
+
+    @Test
+    fun sendMessage_allowsLocalQwenWhenModelIsInstalled() = runTest {
+        val localConfigRepo = localQwenConfigRepository()
+        val localRuntime = FakeCompanionRuntime(localConfigRepo, messageRepo)
+        localQwenDownloader.installed = true
+        val localViewModel = ChatViewModel(
+            localRuntime,
+            ToolDisplayRegistry(),
+            toolCallRepository,
+            localConfigRepo,
+            imageProcessor,
+            messageRepo,
+            memoryDao,
+            agentStateDao,
+            PresenceController(),
+            appPreferences,
+            reminderRepository,
+            localQwenDownloader,
+        )
+        advanceUntilIdle()
+
+        localViewModel.sendMessage("hello")
+
+        assertTrue(localRuntime.sendCalled)
+        assertTrue(localViewModel.uiState.value.configStatus.isReady)
+    }
+
+    @Test
     fun saveSettings_persistsProviderModelAndApiKey() = runTest {
         viewModel.openSettings()
         viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.KIMI)
@@ -797,4 +853,24 @@ class ChatViewModelTest {
         createdAt = 1_000L,
         updatedAt = 1_000L,
     )
+
+    private fun localQwenConfigRepository(): ConfigRepository =
+        mockk(relaxed = true) {
+            every { observeLlmConfigStatus() } returns flowOf(
+                LlmConfigStatus(
+                    provider = LlmProvider.LOCAL_QWEN,
+                    baseUrl = DefaultLlmValues.LOCAL_QWEN_BASE_URL,
+                    hasApiKey = false,
+                    modelName = DefaultLlmValues.LOCAL_QWEN_MODEL,
+                )
+            )
+            every { getCurrentLlmConfig() } returns flowOf(
+                LlmConfig(
+                    provider = LlmProvider.LOCAL_QWEN,
+                    baseUrl = DefaultLlmValues.LOCAL_QWEN_BASE_URL,
+                    apiKey = "",
+                    modelName = DefaultLlmValues.LOCAL_QWEN_MODEL,
+                )
+            )
+        }
 }
