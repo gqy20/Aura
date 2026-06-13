@@ -30,7 +30,8 @@ fun MarkdownMessageText(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyLarge,
 ) {
-    val blocks = remember(text) { parseMarkdownBlocks(text) }
+    val displayText = remember(text) { text.sanitizeDisplayMarkdown() }
+    val blocks = remember(displayText) { parseMarkdownBlocks(displayText) }
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -40,13 +41,13 @@ fun MarkdownMessageText(
                 is MarkdownBlock.Code -> MarkdownCodeBlock(text = block.text)
                 MarkdownBlock.Divider -> MarkdownDivider()
                 is MarkdownBlock.Heading -> Text(
-                    text = remember(block.text) { parseInlineMarkdown(block.text) },
+                    text = remember(block.text) { parseInlineMarkdown(block.text.removeControlFragments()) },
                     color = color,
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 is MarkdownBlock.Text -> Text(
-                    text = remember(block.text) { parseInlineMarkdown(block.text) },
+                    text = remember(block.text) { parseInlineMarkdown(block.text.removeControlFragments()) },
                     color = color,
                     style = style,
                 )
@@ -54,6 +55,26 @@ fun MarkdownMessageText(
         }
     }
 }
+
+private fun String.sanitizeDisplayMarkdown(): String =
+    lineSequence()
+        .mapNotNull { line ->
+            val trimmed = line.trim().trimStart('\uFEFF', '\u200B', '\u200C', '\u200D')
+            when {
+                trimmed.startsWith(":") -> null
+                trimmed == ">" -> null
+                trimmed.startsWith("> ") -> trimmed.removePrefix("> ").trimStart()
+                else -> line
+            }
+        }
+        .joinToString("\n")
+
+private fun String.removeControlFragments(): String =
+    replace(Regex(""":[A-Za-z_]+\}"""), "")
+        .replace(Regex(""":[A-Za-z_]+\]\(async:\d+\)`?"""), "")
+        .lines()
+        .filterNot { it.trim().isEmpty() }
+        .joinToString("\n")
 
 @Composable
 fun MessageRenderBlockText(
@@ -125,7 +146,9 @@ private fun parseMarkdownBlocks(raw: String): List<MarkdownBlock> {
         code.clear()
     }
 
-    raw.lines().forEach { line ->
+    raw.lines().forEach { rawLine ->
+        val line = rawLine.displayMarkdownLine() ?: return@forEach
+
         if (line.trimStart().startsWith("```")) {
             if (inCode) {
                 flushCode()
@@ -166,6 +189,20 @@ private fun normalizeListMarker(line: String): String =
         line.startsWith("* ") -> "• ${line.removePrefix("* ")}"
         else -> line
     }
+
+private fun String.displayMarkdownLine(): String? {
+    val trimmed = trim()
+    if (trimmed.isEmpty()) return this
+    if (trimmed == ">") return null
+    if (trimmed.startsWith(":") && (trimmed.endsWith("}") || trimmed.contains("](async:"))) {
+        return null
+    }
+    return if (trimmed.startsWith("> ")) {
+        trimmed.removePrefix("> ").trimStart()
+    } else {
+        this
+    }
+}
 
 private fun parseInlineMarkdown(raw: String): AnnotatedString =
     buildAnnotatedString {

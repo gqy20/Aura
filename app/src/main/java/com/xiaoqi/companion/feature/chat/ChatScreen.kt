@@ -17,6 +17,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -202,10 +205,25 @@ fun ChatScreenContent(
     ) { }
     val messages = uiState.messages
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
+    var hasCompletedInitialScroll by remember { mutableStateOf(false) }
 
     LaunchedEffect(messages.size, lastContentLength) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            val latestIndex = messages.lastIndex
+            if (!hasCompletedInitialScroll) {
+                listState.scrollToItem(latestIndex)
+                hasCompletedInitialScroll = true
+            } else {
+                val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: latestIndex
+                val isNearLatest = lastVisibleIndex >= latestIndex - 1
+                if (isNearLatest) {
+                    if (messages.lastOrNull()?.isStreaming == true) {
+                        listState.scrollToItem(latestIndex)
+                    } else {
+                        listState.animateScrollToItem(latestIndex)
+                    }
+                }
+            }
         }
     }
 
@@ -402,97 +420,86 @@ private fun CompanionHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 18.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Surface(
-            color = Color(0xFFFFF8EA).copy(alpha = 0.92f),
-            tonalElevation = 0.dp,
-            shadowElevation = 1.dp,
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            AuraPetAvatar(
+                presence = presence,
+                size = 42.dp,
+                onClick = onPresenceTapped,
+            )
             Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AuraPetAvatar(
-                        presence = presence,
-                        onClick = onPresenceTapped,
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(1.dp),
-                    ) {
-                        Text(
-                            text = "Aura",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF496B5E),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = "奥拉在听 · ${status.moodLabel()} · ${status.relationshipLabel}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier.semantics { contentDescription = "打开设置" },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    HeaderActionText(
-                        text = "记忆 ${memories.size}",
-                        onClick = onOpenMemoryRoom,
-                        contentDescription = "打开记忆房间",
-                    )
-                    Text(
-                        text = "·",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    HeaderActionText(
-                        text = "提醒 $scheduledReminderCount",
-                        onClick = onOpenReminders,
-                        contentDescription = "打开提醒",
-                    )
-                    Text(
-                        text = "·",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    HeaderActionText(
-                        text = mcpLabel,
-                        onClick = onOpenMcpSettings,
-                        contentDescription = "打开 MCP 设置",
-                    )
-                }
+                Text(
+                    text = "Aura",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF496B5E),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "奥拉在听 · ${status.moodLabel()} · ${status.relationshipLabel}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.semantics { contentDescription = "打开设置" },
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+                )
+            }
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 51.dp),
+        ) {
+            HeaderActionText(
+                text = "记忆 ${memories.size}",
+                onClick = onOpenMemoryRoom,
+                contentDescription = "打开记忆房间",
+            )
+            HeaderDot()
+            HeaderActionText(
+                text = "提醒 $scheduledReminderCount",
+                onClick = onOpenReminders,
+                contentDescription = "打开提醒",
+            )
+            HeaderDot()
+            HeaderActionText(
+                text = mcpLabel,
+                onClick = onOpenMcpSettings,
+                contentDescription = "打开 MCP 设置",
+            )
         }
 
         if (!configStatus.isReady) {
             ConfigStatusCard(status = configStatus, onOpenSettings = onOpenSettings)
         }
     }
+}
+
+@Composable
+private fun HeaderDot() {
+    Text(
+        text = "·",
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.34f),
+        style = MaterialTheme.typography.labelSmall,
+    )
 }
 
 @Composable
@@ -536,6 +543,128 @@ private fun contextPermissions(): Array<String> =
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
     }.toTypedArray()
+
+@Composable
+private fun AuraDialogPanel(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentModifier: Modifier = Modifier,
+    fillHeight: Float? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        val panelModifier = fillHeight?.let {
+            modifier
+                .fillMaxWidth()
+                .fillMaxHeight(it)
+        } ?: modifier.fillMaxWidth()
+
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = Color(0xFFFFFCF6),
+            tonalElevation = 0.dp,
+            shadowElevation = 8.dp,
+            modifier = panelModifier,
+        ) {
+            Column(
+                modifier = contentModifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                content = content,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AuraDialogHeader(
+    title: String,
+    subtitle: String? = null,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = Color(0xFFF1EADB),
+        ) {
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .size(38.dp)
+                    .semantics { contentDescription = "关闭" },
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuraEmptyState(
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = Color(0xFFFFF8EA),
+            modifier = Modifier.size(52.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "A",
+                    color = Color(0xFF496B5E),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
 
 @Composable
 private fun ConfigStatusCard(
@@ -655,34 +784,21 @@ private fun SettingsDialog(
     onRequestContextPermissions: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.88f),
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(18.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "模型设置",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "API Key 只保存在本机。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+    AuraDialogPanel(
+        onDismiss = onDismiss,
+        fillHeight = 0.86f,
+        contentModifier = Modifier.verticalScroll(rememberScrollState()),
+    ) {
+        AuraDialogHeader(
+            title = "奥拉设置",
+            subtitle = "模型和感知能力都只保存在本机。",
+            onDismiss = onDismiss,
+        )
 
+        SettingsSectionTitle(
+            title = "模型",
+            subtitle = "选择奥拉这次使用的回复引擎。",
+        )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = provider == LlmProvider.GLM,
@@ -697,16 +813,26 @@ private fun SettingsDialog(
                     FilterChip(
                         selected = provider == LlmProvider.LOCAL_QWEN,
                         onClick = { onProviderChanged(LlmProvider.LOCAL_QWEN) },
-                        label = { Text("Local Qwen") },
+                        label = { Text("本地 Qwen") },
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     DefaultLlmValues.modelOptions(provider).forEach { option ->
                         FilterChip(
                             selected = modelName == option,
                             onClick = { onModelNameChanged(option) },
-                            label = { Text(option) },
+                            label = {
+                                Text(
+                                    text = option.modelOptionLabel(provider),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
                         )
                     }
                 }
@@ -721,6 +847,10 @@ private fun SettingsDialog(
                 )
 
                 if (provider == LlmProvider.LOCAL_QWEN) {
+                    SettingsSectionTitle(
+                        title = "本地模型",
+                        subtitle = "离线回复使用本机模型文件。",
+                    )
                     LocalQwenDownloadSection(
                         state = localQwenDownload,
                         onDownload = onDownloadLocalQwenModel,
@@ -731,7 +861,7 @@ private fun SettingsDialog(
                     text = when (provider) {
                         LlmProvider.GLM -> "默认模型：${DefaultLlmValues.GLM_MODEL}"
                         LlmProvider.KIMI -> "默认模型：${DefaultLlmValues.KIMI_MODEL}"
-                        else -> "Default model: ${DefaultLlmValues.defaultModel(provider)}"
+                        else -> "默认模型：${DefaultLlmValues.defaultModel(provider)}"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -786,6 +916,7 @@ private fun SettingsDialog(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onDismiss) {
                         Text("取消")
@@ -795,8 +926,26 @@ private fun SettingsDialog(
                         Text("保存")
                     }
                 }
-            }
-        }
+    }
+}
+
+@Composable
+private fun SettingsSectionTitle(
+    title: String,
+    subtitle: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -805,15 +954,23 @@ private fun LocalQwenDownloadSection(
     state: LocalQwenDownloadUiState,
     onDownload: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFF7F2EA),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+    Column(
+        modifier = Modifier.padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         val status = when {
-            state.isDownloading -> "Downloading ${formatPercent(state.progress)}"
-            state.isInstalled -> "Installed"
-            state.error != null -> "Download failed"
-            else -> "Not installed"
+            state.isDownloading -> "下载中 ${formatPercent(state.progress)}"
+            state.isInstalled -> "已安装"
+            state.error != null -> "下载失败"
+            else -> "未安装"
         }
         Text(
-            text = "ModelScope: $status",
+            text = "ModelScope · $status",
             style = MaterialTheme.typography.bodySmall,
             color = if (state.error != null) {
                 MaterialTheme.colorScheme.error
@@ -850,10 +1007,18 @@ private fun LocalQwenDownloadSection(
             onClick = onDownload,
             enabled = !state.isDownloading,
         ) {
-            Text(if (state.isInstalled) "Re-download from ModelScope" else "Download from ModelScope")
+            Text(if (state.isInstalled) "重新下载" else "下载模型")
         }
     }
+    }
 }
+
+private fun String.modelOptionLabel(provider: LlmProvider): String =
+    if (provider == LlmProvider.LOCAL_QWEN) {
+        removePrefix("Qwen3.5-").removeSuffix("-MNN")
+    } else {
+        this
+    }
 
 private fun formatPercent(value: Float): String =
     "${(value.coerceIn(0f, 1f) * 100f).toInt()}%"
@@ -875,36 +1040,19 @@ private fun McpSettingsDialog(
     onSave: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "Remote MCP",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "Connect Aura to one HTTP MCP endpoint. Tools are loaded when a new agent run starts.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+    AuraDialogPanel(onDismiss = onDismiss) {
+        AuraDialogHeader(
+            title = "外部工具连接",
+            subtitle = "连接一个远程工具服务，奥拉可以在对话里调用它。",
+            onDismiss = onDismiss,
+        )
 
                 OutlinedTextField(
                     value = mcpServerName,
                     onValueChange = onMcpServerNameChanged,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Server name") },
-                    placeholder = { Text("e.g. Notes, Browser, Research") },
+                    label = { Text("连接名称") },
+                    placeholder = { Text("例如：笔记、浏览器、研究工具") },
                     singleLine = true,
                 )
 
@@ -912,14 +1060,14 @@ private fun McpSettingsDialog(
                     value = mcpHttpUrl,
                     onValueChange = onMcpHttpUrlChanged,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("MCP HTTP URL") },
+                    label = { Text("服务地址") },
                     placeholder = { Text("https://example.com/mcp") },
                     singleLine = true,
                 )
 
                 Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFF7F2EA),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
@@ -928,20 +1076,20 @@ private fun McpSettingsDialog(
                     ) {
                         Text(
                             text = if (currentMcpHttpUrl.isBlank()) {
-                                "No MCP server configured"
+                                "还没有连接远程工具"
                             } else {
-                                currentMcpServerName.ifBlank { "Active MCP server" }
+                                currentMcpServerName.ifBlank { "远程工具已连接" }
                             },
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = currentMcpHttpUrl.ifBlank { "Save a URL to register remote MCP tools." },
+                            text = currentMcpHttpUrl.ifBlank { "保存地址后，奥拉会在下一次回复时加载这些工具。" },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = "Remote tool names appear as mcp__host__tool_name.",
+                            text = "高级信息：工具名会以 mcp__host__tool_name 形式出现。",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                         )
@@ -961,15 +1109,13 @@ private fun McpSettingsDialog(
                     horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancel")
+                        Text("取消")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = onSave) {
-                        Text("Save MCP")
+                        Text("保存连接")
                     }
                 }
-            }
-        }
     }
 }
 
@@ -991,18 +1137,18 @@ private fun ToolCapabilitiesSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "上下文与工具",
+                    text = "奥拉可以感知",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "控制 Aura 能感知和执行什么",
+                    text = "控制她能读取哪些本地上下文和提醒能力。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             TextButton(onClick = onRequestContextPermissions) {
-                Text("授权定位/通知")
+                Text("系统授权")
             }
         }
 
@@ -1048,9 +1194,9 @@ private fun ToolCapabilitiesSection(
             onEnabledChanged = onReminderToolEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Remote MCP",
-            detail = settings.mcpHttpUrl.ifBlank { "No remote MCP server configured" },
-            meta = "HTTP",
+            title = "外部工具",
+            detail = settings.mcpHttpUrl.ifBlank { "还没有连接远程工具服务" },
+            meta = "高级",
             tools = "mcp__*",
             enabled = settings.mcpHttpUrl.isNotBlank(),
             locked = true,
@@ -1068,7 +1214,7 @@ private fun ToolCapabilitiesSection(
             title = "记忆、情绪与关系",
             detail = "回复完成后整理记忆与陪伴状态",
             meta = "本地 · 始终可用",
-            tools = "search_memory · search_records · search_summaries · post-response reflection",
+            tools = "memory and reflection",
             enabled = true,
             locked = true,
             onEnabledChanged = {},
@@ -1087,8 +1233,8 @@ private fun ToolCapabilityRow(
     onEnabledChanged: (Boolean) -> Unit,
 ) {
     Surface(
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFF7F2EA),
     ) {
         Row(
             modifier = Modifier
@@ -1113,14 +1259,16 @@ private fun ToolCapabilityRow(
                     text = detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                 )
-                Text(
-                    text = "工具：$tools",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                    maxLines = 1,
-                )
+                if (tools.isNotBlank()) {
+                    Text(
+                        text = "开发信息：$tools",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f),
+                        maxLines = 1,
+                    )
+                }
             }
             if (locked) {
                 CapabilityMetaPill(text = "开启")
@@ -1156,50 +1304,15 @@ private fun MemoryRoomDialog(
     onDismiss: () -> Unit,
     onDeleteMemory: (String) -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.72f),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text(
-                            text = "记忆房间",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-                    ) {
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .semantics { contentDescription = "Close memory room" },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                }
+    AuraDialogPanel(
+        onDismiss = onDismiss,
+        fillHeight = 0.72f,
+    ) {
+                AuraDialogHeader(
+                    title = "奥拉记得这些",
+                    subtitle = "${memories.size} 条记忆，来自你们的聊天整理。",
+                    onDismiss = onDismiss,
+                )
 
                 MemoryRoomStats(memories = memories)
 
@@ -1208,10 +1321,9 @@ private fun MemoryRoomDialog(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = "No long-term memories yet",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        AuraEmptyState(
+                            title = "还没有长期记忆",
+                            message = "多聊几次后，奥拉会把重要偏好和小瞬间整理在这里。",
                         )
                     }
                 } else {
@@ -1227,8 +1339,6 @@ private fun MemoryRoomDialog(
                         }
                     }
                 }
-            }
-        }
     }
 }
 
@@ -1239,10 +1349,10 @@ private fun MemoryRoomStats(memories: List<ChatMemory>) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MemoryStatPill(label = "All", value = memories.size.toString())
-        MemoryStatPill(label = "Facts", value = memories.count { it.type == "FACT" }.toString())
-        MemoryStatPill(label = "Moments", value = memories.count { it.type == "EPISODE" }.toString())
-        MemoryStatPill(label = "Habits", value = memories.count { it.type == "PROCEDURAL" }.toString())
+        MemoryStatPill(label = "全部", value = memories.size.toString())
+        MemoryStatPill(label = "事实", value = memories.count { it.type == "FACT" }.toString())
+        MemoryStatPill(label = "瞬间", value = memories.count { it.type == "EPISODE" }.toString())
+        MemoryStatPill(label = "习惯", value = memories.count { it.type == "PROCEDURAL" }.toString())
     }
 }
 
@@ -1282,50 +1392,24 @@ private fun RemindersDialog(
 ) {
     val scheduledReminderCount = reminders.count { it.status == "SCHEDULED" }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.72f),
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text(
-                            text = "提醒",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = "$scheduledReminderCount scheduled · ${reminders.size} total",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    TextButton(onClick = onDismiss) {
-                        Text("关闭")
-                    }
-                }
+    AuraDialogPanel(
+        onDismiss = onDismiss,
+        fillHeight = 0.72f,
+    ) {
+                AuraDialogHeader(
+                    title = "奥拉帮你记着",
+                    subtitle = "$scheduledReminderCount 个待提醒 · ${reminders.size} 条记录",
+                    onDismiss = onDismiss,
+                )
 
                 if (reminders.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = "No reminders yet",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        AuraEmptyState(
+                            title = "还没有提醒",
+                            message = "你可以直接说：三分钟后提醒我喝咖啡。奥拉会把它记下来。",
                         )
                     }
                 } else {
@@ -1341,8 +1425,6 @@ private fun RemindersDialog(
                         }
                     }
                 }
-            }
-        }
     }
 }
 
@@ -1352,8 +1434,8 @@ private fun ReminderItemCard(
     onCancel: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFF7F2EA),
     ) {
         Row(
             modifier = Modifier
@@ -1370,8 +1452,8 @@ private fun ReminderItemCard(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CapabilityMetaPill(text = if (reminder.exact) "Exact" else "Flexible")
-                    CapabilityMetaPill(text = reminder.status.lowercase())
+                    CapabilityMetaPill(text = if (reminder.exact) "准时提醒" else "灵活提醒")
+                    CapabilityMetaPill(text = reminder.status.reminderStatusLabel())
                 }
                 Text(
                     text = reminder.title,
@@ -1385,7 +1467,7 @@ private fun ReminderItemCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "At ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(reminder.triggerAtMillis))}",
+                    text = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(reminder.triggerAtMillis)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 )
@@ -1431,9 +1513,9 @@ private fun MemoryRoomItemCard(
     onDelete: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFF7F2EA),
+        tonalElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
@@ -1454,7 +1536,7 @@ private fun MemoryRoomItemCard(
                     Text(
                         text = memory.source.memorySourceLabel(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1467,14 +1549,14 @@ private fun MemoryRoomItemCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Importance ${(memory.importance * 100).toInt().coerceIn(0, 100)}%",
+                    text = memory.importance.memoryImportanceLabel(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 )
             }
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+                color = Color.Transparent,
             ) {
                 IconButton(
                     onClick = onDelete,
@@ -1496,17 +1578,33 @@ private fun MemoryRoomItemCard(
 
 private fun String.memoryTypeLabel(): String =
     when (this) {
-        "FACT" -> "About you"
-        "EPISODE" -> "Moment"
-        "PROCEDURAL" -> "Habit"
+        "FACT" -> "关于你"
+        "EPISODE" -> "小瞬间"
+        "PROCEDURAL" -> "习惯"
         else -> lowercase()
     }
 
 private fun String.memorySourceLabel(): String =
     when {
-        isBlank() -> "Saved by Aura"
-        startsWith("tool:") -> "Saved by Aura"
+        isBlank() -> "奥拉整理"
+        startsWith("tool:") -> "奥拉整理"
+        startsWith("reflection:") -> "来自聊天整理"
         else -> this
+    }
+
+private fun Float.memoryImportanceLabel(): String =
+    when {
+        this >= 0.82f -> "重要记忆"
+        this >= 0.58f -> "常会用到"
+        else -> "轻量记录"
+    }
+
+private fun String.reminderStatusLabel(): String =
+    when (uppercase(Locale.US)) {
+        "SCHEDULED" -> "待提醒"
+        "CANCELLED" -> "已取消"
+        "FIRED" -> "已提醒"
+        else -> lowercase(Locale.US)
     }
 
 private fun ChatToolCapabilitySettings.mcpDisplayLabel(): String =
