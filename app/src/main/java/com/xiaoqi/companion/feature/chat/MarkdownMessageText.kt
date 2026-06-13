@@ -2,7 +2,10 @@ package com.xiaoqi.companion.feature.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +38,13 @@ fun MarkdownMessageText(
         blocks.forEach { block ->
             when (block) {
                 is MarkdownBlock.Code -> MarkdownCodeBlock(text = block.text)
+                MarkdownBlock.Divider -> MarkdownDivider()
+                is MarkdownBlock.Heading -> Text(
+                    text = remember(block.text) { parseInlineMarkdown(block.text) },
+                    color = color,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
                 is MarkdownBlock.Text -> Text(
                     text = remember(block.text) { parseInlineMarkdown(block.text) },
                     color = color,
@@ -81,9 +91,21 @@ fun MarkdownCodeBlock(
     )
 }
 
+@Composable
+private fun MarkdownDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.42f)
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
+    )
+}
+
 private sealed interface MarkdownBlock {
     data class Text(val text: String) : MarkdownBlock
+    data class Heading(val text: String) : MarkdownBlock
     data class Code(val text: String) : MarkdownBlock
+    data object Divider : MarkdownBlock
 }
 
 private fun parseMarkdownBlocks(raw: String): List<MarkdownBlock> {
@@ -117,6 +139,15 @@ private fun parseMarkdownBlocks(raw: String): List<MarkdownBlock> {
 
         if (inCode) {
             code.appendLine(line)
+        } else if (line.trim() == "---") {
+            flushParagraph()
+            blocks += MarkdownBlock.Divider
+        } else if (line.trimStart().startsWith("### ")) {
+            flushParagraph()
+            blocks += MarkdownBlock.Heading(line.trimStart().removePrefix("### ").trim())
+        } else if (line.trimStart().startsWith("## ")) {
+            flushParagraph()
+            blocks += MarkdownBlock.Heading(line.trimStart().removePrefix("## ").trim())
         } else if (line.isBlank()) {
             flushParagraph()
         } else {

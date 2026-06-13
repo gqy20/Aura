@@ -13,6 +13,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -74,22 +76,27 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.PresenceUiState
+import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
+import com.xiaoqi.companion.ui.theme.CompanionTheme
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -399,93 +406,84 @@ private fun CompanionHeader(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-            tonalElevation = 1.dp,
-            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFFFFF8EA).copy(alpha = 0.92f),
+            tonalElevation = 0.dp,
+            shadowElevation = 1.dp,
+            shape = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                AuraPetAvatar(
-                    presence = presence,
-                    onClick = onPresenceTapped,
-                )
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "Aura",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    AuraPetAvatar(
+                        presence = presence,
+                        onClick = onPresenceTapped,
                     )
-                    Text(
-                        text = "在线 · ${status.moodLabel()} · ${status.relationshipLabel}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(1.dp),
+                    ) {
+                        Text(
+                            text = "Aura",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF496B5E),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "奥拉在听 · ${status.moodLabel()} · ${status.relationshipLabel}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.semantics { contentDescription = "打开设置" },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                TextButton(
-                    onClick = onOpenMemoryRoom,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                    modifier = Modifier
-                        .widthIn(max = 72.dp)
-                        .semantics { contentDescription = "打开记忆房间" },
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(
+                    HeaderActionText(
                         text = "记忆 ${memories.size}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        onClick = onOpenMemoryRoom,
+                        contentDescription = "打开记忆房间",
                     )
-                }
-                TextButton(
-                    onClick = onOpenReminders,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                    modifier = Modifier
-                        .widthIn(max = 72.dp)
-                        .semantics { contentDescription = "Open reminders" },
-                ) {
                     Text(
+                        text = "·",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    HeaderActionText(
                         text = "提醒 $scheduledReminderCount",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        onClick = onOpenReminders,
+                        contentDescription = "打开提醒",
                     )
-                }
-                TextButton(
-                    onClick = onOpenMcpSettings,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                    modifier = Modifier
-                        .widthIn(max = 72.dp)
-                        .semantics { contentDescription = "Open MCP settings" },
-                ) {
                     Text(
-                        text = mcpLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        text = "·",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f),
+                        style = MaterialTheme.typography.labelSmall,
                     )
-                }
-                IconButton(
-                    onClick = onOpenSettings,
-                    modifier = Modifier.semantics { contentDescription = "打开设置" },
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    HeaderActionText(
+                        text = mcpLabel,
+                        onClick = onOpenMcpSettings,
+                        contentDescription = "打开 MCP 设置",
                     )
                 }
             }
@@ -495,6 +493,27 @@ private fun CompanionHeader(
             ConfigStatusCard(status = configStatus, onOpenSettings = onOpenSettings)
         }
     }
+}
+
+@Composable
+private fun HeaderActionText(
+    text: String,
+    onClick: () -> Unit,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = Color(0xFF496B5E).copy(alpha = 0.82f),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .semantics { this.contentDescription = contentDescription }
+            .padding(horizontal = 2.dp, vertical = 3.dp),
+    )
 }
 
 private fun CompanionStatus.moodLabel(): String =
@@ -1520,12 +1539,12 @@ private fun InputBar(
     var imeStuck by remember { mutableStateOf(false) }
 
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        color = Color(0xFFF7F2EA).copy(alpha = 0.96f),
+        tonalElevation = 0.dp,
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             pendingImage?.let {
@@ -1538,22 +1557,36 @@ private fun InputBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedIconButton(
-                    onClick = onPickImage,
-                    enabled = !isLoading && !isPreparingImage,
-                    modifier = Modifier.semantics { contentDescription = "Attach image" },
+                Surface(
+                    color = Color(0xFFFFF8EA),
+                    shape = CircleShape,
+                    shadowElevation = 1.dp,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Image,
-                        contentDescription = null,
-                    )
+                    IconButton(
+                        onClick = onPickImage,
+                        enabled = !isLoading && !isPreparingImage,
+                        modifier = Modifier.semantics { contentDescription = "添加图片" },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = null,
+                            tint = Color(0xFF496B5E),
+                        )
+                    }
                 }
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = onInputTextChanged,
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Talk to Aura") },
-                    maxLines = 4,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 52.dp),
+                    placeholder = {
+                        Text(
+                            text = "想和奥拉说什么？",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    },
+                    maxLines = 3,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Send,
@@ -1563,23 +1596,39 @@ private fun InputBar(
                             if (canSend) onSendMessage()
                         },
                     ),
-                    shape = RoundedCornerShape(22.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFFFFCF6),
+                        unfocusedContainerColor = Color(0xFFFFF8EA),
+                        disabledContainerColor = Color(0xFFEDE4D3),
+                        focusedIndicatorColor = Color(0xFF7EB8AF),
+                        unfocusedIndicatorColor = Color(0xFFD8CEBE),
+                        cursorColor = Color(0xFF496B5E),
+                    ),
                 )
                 if (isLoading || isPreparingImage) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp).padding(4.dp),
                         strokeWidth = 2.dp,
+                        color = Color(0xFF496B5E),
                     )
                 } else {
-                    IconButton(
-                        onClick = onSendMessage,
-                        enabled = canSend,
-                        modifier = Modifier.semantics { contentDescription = "Send" },
+                    Surface(
+                        color = if (canSend) Color(0xFFDDE8D9) else Color(0xFFE4DBC9),
+                        shape = CircleShape,
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = null,
-                        )
+                        IconButton(
+                            onClick = onSendMessage,
+                            enabled = canSend,
+                            modifier = Modifier.semantics { contentDescription = "发送" },
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = null,
+                                tint = if (canSend) Color(0xFF496B5E) else Color(0xFF918B82),
+                            )
+                        }
                     }
                 }
             }
@@ -1650,6 +1699,178 @@ private fun Context.showInputMethodPicker() {
     val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
     imm?.showInputMethodPicker()
 }
+
+@Preview(
+    name = "Chat / Conversation",
+    showBackground = true,
+    widthDp = 393,
+    heightDp = 852,
+)
+@Composable
+private fun ChatConversationPreview() {
+    ChatPreviewContent(
+        state = previewChatState(
+            messages = listOf(
+                ChatMessage(
+                    id = "a1",
+                    role = "ASSISTANT",
+                    content = "宇哥，今天想从哪儿开始？可以是一个小想法，也可以是一张图。",
+                ),
+                ChatMessage(
+                    id = "u1",
+                    role = "USER",
+                    content = "帮我想一下这个聊天页怎么优化。",
+                ),
+                ChatMessage(
+                    id = "a2",
+                    role = "ASSISTANT",
+                    content = "我会先把它变得更像奥拉的房间，而不是一个普通工具页：\n\n- 顶部保留状态，但降低工具感\n- 消息正文更适合长时间阅读\n- 输入区改成中文和暖色\n\n然后我们再细调工具调用和记忆展示。",
+                ),
+            ),
+        ),
+    )
+}
+
+@Preview(
+    name = "Chat / Long Reply",
+    showBackground = true,
+    widthDp = 393,
+    heightDp = 852,
+)
+@Composable
+private fun ChatLongReplyPreview() {
+    ChatPreviewContent(
+        state = previewChatState(
+            messages = listOf(
+                ChatMessage(
+                    id = "u1",
+                    role = "USER",
+                    content = "给我一个旅行计划。",
+                ),
+                ChatMessage(
+                    id = "a1",
+                    role = "ASSISTANT",
+                    content = "可以，宇哥。我建议先按节奏来，不要把一天塞太满。\n\n**上午**\n- 慢一点出发，先去一个开阔的地方走走\n- 途中找一家安静的小店吃早餐\n\n**下午**\n- 安排一个需要认真看的景点\n- 留一点空白时间给临时发现\n\n**晚上**\n- 找舒服的餐厅，不赶路\n- 回来前买点第二天的小零食",
+                ),
+            ),
+        ),
+    )
+}
+
+@Preview(
+    name = "Chat / Empty",
+    showBackground = true,
+    widthDp = 393,
+    heightDp = 852,
+)
+@Composable
+private fun ChatEmptyPreview() {
+    ChatPreviewContent(state = previewChatState(messages = emptyList()))
+}
+
+@Preview(
+    name = "Chat / Thinking",
+    showBackground = true,
+    widthDp = 393,
+    heightDp = 852,
+)
+@Composable
+private fun ChatThinkingPreview() {
+    ChatPreviewContent(
+        state = previewChatState(
+            messages = listOf(
+                ChatMessage(
+                    id = "u1",
+                    role = "USER",
+                    content = "奥拉，你怎么看？",
+                ),
+                ChatMessage(
+                    id = "a1",
+                    role = "ASSISTANT",
+                    content = "",
+                    isStreaming = true,
+                ),
+            ),
+            isLoading = true,
+            presence = PresenceUiState(mode = PresenceMode.THINKING),
+        ),
+    )
+}
+
+@Composable
+private fun ChatPreviewContent(state: ChatUiState) {
+    CompanionTheme {
+        ChatScreenContent(
+            uiState = state,
+            onSendMessage = {},
+            onInputTextChanged = {},
+            onClearError = {},
+            onOpenMemoryRoom = {},
+            onCloseMemoryRoom = {},
+            onDeleteMemory = {},
+            onOpenReminders = {},
+            onCloseReminders = {},
+            onCancelReminder = {},
+            onOpenSettings = {},
+            onCloseSettings = {},
+            onOpenMcpSettings = {},
+            onCloseMcpSettings = {},
+            onMcpNameChanged = {},
+            onMcpUrlChanged = {},
+            onSaveMcpSettings = {},
+            onSettingsApiKeyChanged = {},
+            onSettingsProviderChanged = {},
+            onSettingsModelNameChanged = {},
+            onSettingsBaseUrlChanged = {},
+            onSaveSettings = {},
+            onDownloadLocalQwenModel = {},
+            onDeviceStatusEnabledChanged = {},
+            onLocationContextEnabledChanged = {},
+            onWeatherContextEnabledChanged = {},
+            onReminderToolEnabledChanged = {},
+            onNotificationEnabledChanged = {},
+            onOpenPermissionSettings = {},
+            onDismissPermissionPrompt = {},
+            onAttachImage = {},
+            onRemoveImage = {},
+            onPresenceTapped = {},
+        )
+    }
+}
+
+private fun previewChatState(
+    messages: List<ChatMessage>,
+    isLoading: Boolean = false,
+    presence: PresenceUiState = PresenceUiState(mode = PresenceMode.IDLE),
+): ChatUiState =
+    ChatUiState(
+        messages = messages,
+        memories = listOf(
+            ChatMemory(
+                id = "memory-1",
+                content = "用户喜欢温暖、安静、不要太工具化的界面。",
+                type = "PREFERENCE",
+                importance = 0.8f,
+            ),
+        ),
+        reminders = listOf(
+            ChatReminder(
+                id = "reminder-1",
+                title = "喝咖啡",
+                message = "提醒宇哥喝咖啡",
+                triggerAtMillis = System.currentTimeMillis() + 180_000L,
+                exact = true,
+                status = "SCHEDULED",
+            ),
+        ),
+        configStatus = ChatConfigStatus(
+            label = "GLM 已就绪",
+            isReady = true,
+            detail = "Preview",
+        ),
+        presence = presence,
+        isLoading = isLoading,
+    )
 
 private data class ImeSnapshot(
     val defaultIme: String?,

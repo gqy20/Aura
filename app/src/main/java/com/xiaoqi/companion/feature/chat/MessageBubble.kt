@@ -32,8 +32,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -41,32 +43,65 @@ import coil.compose.AsyncImage
 fun MessageBubble(message: ChatMessage) {
     val context = LocalContext.current
     val isUser = message.role == "USER"
-    val bubbleColor = if (isUser) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val contentColor = if (isUser) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
+    val contentColor = if (isUser) Color(0xFF20362F) else MaterialTheme.colorScheme.onSurface
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Top,
     ) {
-        Surface(
-            color = bubbleColor,
-            tonalElevation = if (isUser) 0.dp else 1.dp,
-            shape = RoundedCornerShape(
-                topStart = 18.dp,
-                topEnd = 18.dp,
-                bottomEnd = if (isUser) 6.dp else 18.dp,
-                bottomStart = if (isUser) 18.dp else 6.dp,
-            ),
-            modifier = Modifier
-                .widthIn(max = 320.dp)
+        if (isUser) {
+            Surface(
+                color = Color(0xFFDDE8D9),
+                tonalElevation = 0.dp,
+                shape = RoundedCornerShape(
+                    topStart = 20.dp,
+                    topEnd = 20.dp,
+                    bottomEnd = 6.dp,
+                    bottomStart = 18.dp,
+                ),
+                modifier = Modifier
+                    .widthIn(max = 312.dp)
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            if (message.content.isNotBlank()) {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Aura message", message.content))
+                                Toast.makeText(context, "已复制消息", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                    ),
+            ) {
+                MessageBubbleContent(
+                    message = message,
+                    isUser = true,
+                    contentColor = contentColor,
+                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 11.dp),
+                )
+            }
+        } else {
+            Surface(
+                color = Color(0xFFFFF8EA),
+                shape = CircleShape,
+                tonalElevation = 0.dp,
+                modifier = Modifier.size(26.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "A",
+                        color = Color(0xFF496B5E),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            MessageBubbleContent(
+                message = message,
+                isUser = false,
+                contentColor = contentColor,
+                modifier = Modifier
+                    .widthIn(max = 344.dp)
                 .combinedClickable(
                     onClick = {},
                     onLongClick = {
@@ -76,48 +111,56 @@ fun MessageBubble(message: ChatMessage) {
                             Toast.makeText(context, "已复制消息", Toast.LENGTH_SHORT).show()
                         }
                     },
-                ),
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
-            ) {
-                message.imageUri?.let { imageUri ->
-                    AsyncImage(
-                        model = imageUri,
-                        contentDescription = "Message image",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .width(188.dp)
-                            .height(144.dp)
-                            .clip(RoundedCornerShape(10.dp)),
-                    )
-                    Spacer(modifier = Modifier.size(8.dp))
-                }
-                if (!isUser && message.isStreaming && message.content.isBlank()) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .semantics { contentDescription = "Assistant response loading" },
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                } else {
-                    if (message.isStreaming) {
-                        StreamingMessageText(message = message, color = contentColor)
-                    } else {
-                        MarkdownMessageText(
-                            text = message.content,
-                            color = contentColor,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
-                }
-                if (!isUser && message.toolStatus != null) {
-                    Spacer(modifier = Modifier.size(6.dp))
-                    ToolStatusPill(text = message.toolStatus)
-                }
-            }
+                )
+                    .padding(top = 1.dp, bottom = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageBubbleContent(
+    message: ChatMessage,
+    isUser: Boolean,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+    ) {
+        message.imageUri?.let { imageUri ->
+            AsyncImage(
+                model = imageUri,
+                contentDescription = "Message image",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(188.dp)
+                    .height(144.dp)
+                    .clip(RoundedCornerShape(10.dp)),
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+        }
+        if (!isUser && message.isStreaming && message.content.isBlank()) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .size(18.dp)
+                    .semantics { contentDescription = "Assistant response loading" },
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        } else if (message.isStreaming) {
+            StreamingMessageText(message = message, color = contentColor)
+        } else {
+            MarkdownMessageText(
+                text = message.content,
+                color = contentColor,
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp),
+            )
+        }
+        if (!isUser && message.toolStatus != null) {
+            Spacer(modifier = Modifier.size(6.dp))
+            ToolStatusPill(text = message.toolStatus)
         }
     }
 }
@@ -134,7 +177,7 @@ private fun StreamingMessageText(message: ChatMessage, color: androidx.compose.u
             MessageRenderBlockText(
                 block = block,
                 color = color,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp),
             )
         }
         if (draftText.isNotBlank()) {
@@ -144,7 +187,7 @@ private fun StreamingMessageText(message: ChatMessage, color: androidx.compose.u
                 style = if (message.isRenderDraftCode) {
                     MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
                 } else {
-                    MaterialTheme.typography.bodyLarge
+                    MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp)
                 },
             )
         }
