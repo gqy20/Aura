@@ -521,22 +521,6 @@ class ChatViewModel @Inject constructor(
         triggerPresenceReaction(presenceController.reactionFor(PresenceEvent.UserTapped))
     }
 
-    fun openMemoryRoom() {
-        _uiState.update { it.copy(isMemoryRoomOpen = true) }
-    }
-
-    fun closeMemoryRoom() {
-        _uiState.update { it.copy(isMemoryRoomOpen = false) }
-    }
-
-    fun openReminders() {
-        _uiState.update { it.copy(isRemindersOpen = true) }
-    }
-
-    fun closeReminders() {
-        _uiState.update { it.copy(isRemindersOpen = false) }
-    }
-
     fun cancelReminder(reminderId: String) {
         viewModelScope.launch {
             try {
@@ -563,12 +547,11 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun openSettings() {
+    fun prepareSettings() {
         val state = _uiState.value
         val modelName = state.configStatus.modelName
         _uiState.update {
             it.copy(
-                isSettingsOpen = true,
                 settingsProvider = state.configStatus.provider,
                 settingsModelName = modelName,
                 settingsBaseUrl = state.configStatus.baseUrl,
@@ -576,10 +559,6 @@ class ChatViewModel @Inject constructor(
             )
         }
         refreshLocalQwenModelStatus(modelName)
-    }
-
-    fun closeSettings() {
-        _uiState.update { it.copy(isSettingsOpen = false, settingsMessage = null) }
     }
 
     fun updateSettingsApiKey(value: String) {
@@ -659,7 +638,6 @@ class ChatViewModel @Inject constructor(
                 }
                 _uiState.update {
                     it.copy(
-                        isSettingsOpen = false,
                         settingsApiKey = "",
                         settingsModelName = model,
                         settingsBaseUrl = baseUrl,
@@ -741,21 +719,16 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun openMcpSettings() {
+    fun prepareMcpSettings() {
         val currentName = _uiState.value.toolCapabilitySettings.mcpServerName
         val currentUrl = _uiState.value.toolCapabilitySettings.mcpHttpUrl
         _uiState.update {
             it.copy(
-                isMcpSettingsOpen = true,
                 mcpSettingsName = currentName,
                 mcpSettingsUrl = currentUrl,
                 mcpSettingsMessage = null,
             )
         }
-    }
-
-    fun closeMcpSettings() {
-        _uiState.update { it.copy(isMcpSettingsOpen = false, mcpSettingsMessage = null) }
     }
 
     fun updateMcpSettingsUrl(value: String) {
@@ -785,7 +758,6 @@ class ChatViewModel @Inject constructor(
                 appPreferences.setMcpHttpUrl(url)
                 _uiState.update {
                     it.copy(
-                        isMcpSettingsOpen = false,
                         mcpSettingsName = name,
                         mcpSettingsUrl = url,
                         mcpSettingsMessage = null,

@@ -513,7 +513,7 @@ class ChatViewModelTest {
 
     @Test
     fun saveSettings_persistsProviderModelAndApiKey() = runTest {
-        viewModel.openSettings()
+        viewModel.prepareSettings()
         viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.KIMI)
         viewModel.updateSettingsModelName(DefaultLlmValues.KIMI_MODEL)
         viewModel.updateSettingsApiKey("new-key")
@@ -525,24 +525,22 @@ class ChatViewModelTest {
         coVerify { configRepo.setModelName(DefaultLlmValues.KIMI_MODEL) }
         coVerify { configRepo.setBaseUrl(DefaultLlmValues.KIMI_BASE_URL) }
         coVerify { configRepo.setApiKey("new-key") }
-        assertFalse(viewModel.uiState.value.isSettingsOpen)
     }
 
     @Test
     fun saveSettings_blankModelNameFallsBackToProviderDefault() = runTest {
-        viewModel.openSettings()
+        viewModel.prepareSettings()
         viewModel.updateSettingsModelName("   ")
 
         viewModel.saveSettings()
         advanceUntilIdle()
 
         coVerify { configRepo.setModelName(DefaultLlmValues.GLM_MODEL) }
-        assertFalse(viewModel.uiState.value.isSettingsOpen)
     }
 
     @Test
     fun saveSettings_localQwenDoesNotRequireBaseUrlOrApiKey() = runTest {
-        viewModel.openSettings()
+        viewModel.prepareSettings()
         viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN)
         viewModel.updateSettingsModelName(DefaultLlmValues.LOCAL_QWEN_MODEL)
 
@@ -552,12 +550,11 @@ class ChatViewModelTest {
         coVerify { configRepo.setLlmProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN) }
         coVerify { configRepo.setModelName(DefaultLlmValues.LOCAL_QWEN_MODEL) }
         coVerify { configRepo.setBaseUrl(DefaultLlmValues.LOCAL_QWEN_BASE_URL) }
-        assertFalse(viewModel.uiState.value.isSettingsOpen)
     }
 
     @Test
     fun downloadSelectedLocalQwenModel_updatesModelDownloadState() = runTest {
-        viewModel.openSettings()
+        viewModel.prepareSettings()
         viewModel.updateSettingsProvider(com.xiaoqi.companion.data.db.converter.LlmProvider.LOCAL_QWEN)
         viewModel.updateSettingsModelName(DefaultLlmValues.LOCAL_QWEN_MODEL)
 
@@ -573,33 +570,30 @@ class ChatViewModelTest {
     fun openMcpSettings_loadsCurrentMcpUrl() = runTest {
         advanceUntilIdle()
 
-        viewModel.openMcpSettings()
+        viewModel.prepareMcpSettings()
 
-        assertTrue(viewModel.uiState.value.isMcpSettingsOpen)
         assertEquals("https://old.example/mcp", viewModel.uiState.value.mcpSettingsUrl)
     }
 
     @Test
     fun saveMcpSettings_persistsMcpUrl() = runTest {
-        viewModel.openMcpSettings()
+        viewModel.prepareMcpSettings()
         viewModel.updateMcpSettingsUrl("https://new.example/mcp")
 
         viewModel.saveMcpSettings()
         advanceUntilIdle()
 
         coVerify { appPreferences.setMcpHttpUrl("https://new.example/mcp") }
-        assertFalse(viewModel.uiState.value.isMcpSettingsOpen)
     }
 
     @Test
     fun saveMcpSettings_rejectsInvalidUrl() = runTest {
-        viewModel.openMcpSettings()
+        viewModel.prepareMcpSettings()
         viewModel.updateMcpSettingsUrl("ftp://bad.example/mcp")
 
         viewModel.saveMcpSettings()
 
         assertEquals("MCP URL must start with http:// or https://", viewModel.uiState.value.mcpSettingsMessage)
-        assertTrue(viewModel.uiState.value.isMcpSettingsOpen)
     }
 
     @Test

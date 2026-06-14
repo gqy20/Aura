@@ -67,6 +67,7 @@ import kotlin.math.sin
 fun AuraHomeScreen(
     viewModel: ChatViewModel,
     onOpenChat: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -81,10 +82,7 @@ fun AuraHomeScreen(
         },
         onOpenChat = onOpenChat,
         onPresenceTapped = { viewModel.onPresenceTapped() },
-        onOpenSettings = {
-            viewModel.openSettings()
-            onOpenChat()
-        },
+        onOpenSettings = onOpenSettings,
     )
 }
 
