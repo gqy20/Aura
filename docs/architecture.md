@@ -102,6 +102,23 @@ app/
 
 **Koog 覆盖的部分：** LLM 客户端（Anthropic 兼容）、对话历史管理、流式输出、结构化 Tool Use、错误重试。
 
+### 双轨智能体架构（2026-06 新增设计）
+
+> 详细方案见 [`plan/dual-mind-architecture.md`](./plan/dual-mind-architecture.md)。
+
+Aura 的 LLM 使用拆成两个**职能不同**的子系统，不是"同一任务的两条路径"：
+
+- **云端 = 对话体（Conversational Mind）**：用户发消息时的主路径。Koog `AIAgent` + 工具 + Vision + 反思。永远走云端 LLM。
+- **本地 = 陪伴体（Continuous Presence）**：用户不在场时也在场。持续心跳（KV-cache 续写）、dream loop、mood drift、即时闲聊。永远走 MNN + 本地 Qwen。
+
+**关键不变量**：
+- `KoogAgentFactoryImpl` 的二选一逻辑将被移除（对话体不需要"选 provider"，陪伴体永远本地）
+- `core/presence/runtime/` 新增：LocalQwenExecutor、PresenceHeartbeat、DreamPipeline、ReactiveResponder、CompanionKVCacheStore
+- 对话体**永远不写** mood / relationship（敏感）
+- 陪伴体**永远不上云** inner_state / mood 数据
+
+Phase 0（重命名 + 注释）预计 2026-06 内完成；具体 PoC 入口和阶段计划见 plan 文档。
+
 ---
 
 ## 三、LLM 选型与多模态设计
