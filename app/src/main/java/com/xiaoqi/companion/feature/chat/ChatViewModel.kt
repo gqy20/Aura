@@ -14,6 +14,7 @@ import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.presence.PresenceEvent
 import com.xiaoqi.companion.core.presence.PresenceInputs
 import com.xiaoqi.companion.core.presence.PresenceReaction
+import com.xiaoqi.companion.core.presence.PresenceReactionPolicy
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloadState
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
@@ -58,6 +59,7 @@ class ChatViewModel @Inject constructor(
     private val memoryDao: MemoryDao,
     private val agentStateDao: AgentStateDao,
     private val presenceController: PresenceController,
+    private val presenceReactionPolicy: PresenceReactionPolicy,
     private val appPreferences: AppPreferences,
     private val reminderRepository: ReminderRepository,
     private val localQwenModelDownloader: LocalQwenModelDownloader,
@@ -75,6 +77,7 @@ class ChatViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     private var presenceReactionJob: Job? = null
+    private val lastPresenceReactionAtMillis = mutableMapOf<PresenceReaction, Long>()
     private var localQwenDownloadJob: Job? = null
     private var localQwenStatusJob: Job? = null
 
@@ -205,10 +208,13 @@ class ChatViewModel @Inject constructor(
                                 )
                             )
                         }
-                    shouldClearReaction = reaction != null
+                    val acceptedReaction = reaction?.takeIf { candidate ->
+                        shouldShowPresenceReaction(candidate, state)
+                    }
+                    shouldClearReaction = acceptedReaction != null
                     state.copy(
                         toolCalls = visibleCalls,
-                        presenceReaction = reaction ?: state.presenceReaction,
+                        presenceReaction = acceptedReaction ?: state.presenceReaction,
                     ).withPresence()
                 }
                 if (shouldClearReaction) {
@@ -1024,14 +1030,42 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun triggerPresenceReaction(reaction: PresenceReaction) {
-        _uiState.update { it.copy(presenceReaction = reaction).withPresence() }
-        clearPresenceReactionLater()
+        var accepted = false
+        _uiState.update { state ->
+            if (shouldShowPresenceReaction(reaction, state)) {
+                accepted = true
+                state.copy(presenceReaction = reaction).withPresence()
+            } else {
+                state
+            }
+        }
+        if (accepted) {
+            clearPresenceReactionLater(reaction)
+        }
     }
 
-    private fun clearPresenceReactionLater() {
+    private fun shouldShowPresenceReaction(
+        reaction: PresenceReaction,
+        state: ChatUiState,
+    ): Boolean {
+        val now = System.currentTimeMillis()
+        val canShow = presenceReactionPolicy.shouldShow(
+            candidate = reaction,
+            currentState = state.withPresence().presence,
+            nowMillis = now,
+            lastShownAtMillis = lastPresenceReactionAtMillis[reaction],
+        )
+        if (canShow) {
+            lastPresenceReactionAtMillis[reaction] = now
+        }
+        return canShow
+    }
+
+    private fun clearPresenceReactionLater(reaction: PresenceReaction? = _uiState.value.presenceReaction) {
+        val targetReaction = reaction ?: return
         presenceReactionJob?.cancel()
         presenceReactionJob = viewModelScope.launch {
-            delay(PRESENCE_REACTION_DURATION_MS)
+            delay(presenceReactionPolicy.displayDurationMillis(targetReaction))
             _uiState.update { it.copy(presenceReaction = null).withPresence() }
         }
     }

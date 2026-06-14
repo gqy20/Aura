@@ -13,6 +13,7 @@ import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloadState
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.core.presence.PresenceController
+import com.xiaoqi.companion.core.presence.PresenceReactionPolicy
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
@@ -276,6 +277,7 @@ class ChatViewModelTest {
             memoryDao,
             agentStateDao,
             PresenceController(),
+            PresenceReactionPolicy(),
             appPreferences,
             reminderRepository,
             localQwenDownloader,
@@ -383,6 +385,7 @@ class ChatViewModelTest {
             memoryDao,
             agentStateDao,
             PresenceController(),
+            PresenceReactionPolicy(),
             appPreferences,
             reminderRepository,
             localQwenDownloader,
@@ -445,6 +448,7 @@ class ChatViewModelTest {
             memoryDao,
             agentStateDao,
             PresenceController(),
+            PresenceReactionPolicy(),
             appPreferences,
             reminderRepository,
             localQwenDownloader,
@@ -471,6 +475,7 @@ class ChatViewModelTest {
             memoryDao,
             agentStateDao,
             PresenceController(),
+            PresenceReactionPolicy(),
             appPreferences,
             reminderRepository,
             localQwenDownloader,
@@ -499,6 +504,7 @@ class ChatViewModelTest {
             memoryDao,
             agentStateDao,
             PresenceController(),
+            PresenceReactionPolicy(),
             appPreferences,
             reminderRepository,
             localQwenDownloader,

@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.core.presence.PresenceMode
+import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.ui.theme.CompanionTheme
 import kotlin.math.PI
@@ -231,6 +232,7 @@ private fun PresenceStage(
                 PresenceHalo(
                     palette = palette,
                     mode = uiState.presence.mode,
+                    reaction = uiState.presence.reaction,
                     modifier = Modifier.fillMaxSize(),
                 )
                 LuminousAuraAvatar(
@@ -333,6 +335,7 @@ private fun SoftPresenceBackdrop(
 private fun PresenceHalo(
     palette: HomePresencePalette,
     mode: PresenceMode,
+    reaction: PresenceReaction?,
     modifier: Modifier = Modifier,
 ) {
     val transition = rememberInfiniteTransition(label = "home-halo")
@@ -350,13 +353,14 @@ private fun PresenceHalo(
         val w = size.width
         val h = size.height
         val center = Offset(w / 2f, h * 0.56f)
-        val baseRadius = w * (0.29f + pulse * 0.015f)
+        val reactionBoost = reaction.haloBoost()
+        val baseRadius = w * (0.29f + pulse * (0.015f + reactionBoost * 0.012f))
 
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    palette.glow.copy(alpha = 0.34f),
-                    palette.glow.copy(alpha = 0.10f),
+                    palette.glow.copy(alpha = 0.34f + reactionBoost * 0.16f),
+                    palette.glow.copy(alpha = 0.10f + reactionBoost * 0.06f),
                     Color.Transparent,
                 ),
                 center = center,
@@ -367,10 +371,20 @@ private fun PresenceHalo(
         )
         repeat(3) { index ->
             drawCircle(
-                color = palette.ring.copy(alpha = 0.20f - index * 0.045f),
+                color = palette.ring.copy(alpha = 0.20f - index * 0.045f + reactionBoost * 0.06f),
                 radius = baseRadius + index * w * 0.064f,
                 center = center.copy(y = center.y + h * 0.22f),
                 style = Stroke(width = 1.1.dp.toPx(), cap = StrokeCap.Round),
+            )
+        }
+        reaction?.let {
+            drawReactionHalo(
+                reaction = it,
+                palette = palette,
+                pulse = pulse,
+                width = w,
+                height = h,
+                center = center,
             )
         }
         if (mode == PresenceMode.THINKING || mode == PresenceMode.SEARCHING || mode == PresenceMode.REMEMBERING) {
@@ -484,6 +498,7 @@ private fun LuminousAuraAvatar(
         )
         drawAuraFace(
             mode = presence.mode,
+            reaction = presence.reaction,
             shimmer = shimmer,
             width = w,
             height = h,
@@ -503,7 +518,9 @@ private fun LuminousAuraAvatar(
 
         if (presence.mode == PresenceMode.THINKING ||
             presence.mode == PresenceMode.SEARCHING ||
-            presence.mode == PresenceMode.REMEMBERING
+            presence.mode == PresenceMode.REMEMBERING ||
+            presence.reaction == PresenceReaction.MEMORY_SPARK ||
+            presence.reaction == PresenceReaction.SEARCH_SWEEP
         ) {
             repeat(5) { index ->
                 val angle = (shimmer * 2f * PI + index * 1.26f).toFloat()
@@ -516,6 +533,65 @@ private fun LuminousAuraAvatar(
                     ),
                 )
             }
+        }
+    }
+}
+
+private fun DrawScope.drawReactionHalo(
+    reaction: PresenceReaction,
+    palette: HomePresencePalette,
+    pulse: Float,
+    width: Float,
+    height: Float,
+    center: Offset,
+) {
+    when (reaction) {
+        PresenceReaction.RETURN_BLINK -> {
+            drawCircle(
+                color = palette.ring.copy(alpha = 0.18f * (1f - pulse)),
+                radius = width * (0.24f + pulse * 0.22f),
+                center = center.copy(y = center.y + height * 0.21f),
+                style = Stroke(width = 1.2.dp.toPx(), cap = StrokeCap.Round),
+            )
+        }
+        PresenceReaction.MEMORY_SPARK -> {
+            repeat(4) { index ->
+                val angle = (pulse * 2f * PI + index * 1.57f).toFloat()
+                drawCircle(
+                    color = palette.spark.copy(alpha = 0.34f * (1f - pulse * 0.35f)),
+                    radius = 3.2f + index,
+                    center = Offset(
+                        x = center.x + cos(angle) * width * (0.14f + index * 0.025f),
+                        y = center.y + sin(angle) * height * 0.12f,
+                    ),
+                )
+            }
+        }
+        PresenceReaction.SEARCH_SWEEP -> {
+            drawArc(
+                color = palette.spark.copy(alpha = 0.32f),
+                startAngle = -28f + pulse * 240f,
+                sweepAngle = 58f,
+                useCenter = false,
+                topLeft = Offset(width * 0.23f, height * 0.24f),
+                size = Size(width * 0.54f, height * 0.46f),
+                style = Stroke(width = 1.4.dp.toPx(), cap = StrokeCap.Round),
+            )
+        }
+        PresenceReaction.ERROR_RECOVER -> {
+            drawCircle(
+                color = palette.ring.copy(alpha = 0.16f * (1f - pulse)),
+                radius = width * (0.30f + pulse * 0.08f),
+                center = center.copy(y = center.y + height * 0.21f),
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+            )
+        }
+        PresenceReaction.TOUCH_NUZZLE -> {
+            drawCircle(
+                color = Color.White.copy(alpha = 0.34f * (1f - pulse)),
+                radius = width * (0.12f + pulse * 0.05f),
+                center = Offset(center.x, center.y - height * 0.02f),
+            )
         }
     }
 }
@@ -770,6 +846,16 @@ private fun PresenceUiState.homePalette(): HomePresencePalette =
         )
     }
 
+private fun PresenceReaction?.haloBoost(): Float =
+    when (this) {
+        PresenceReaction.ERROR_RECOVER -> 0.9f
+        PresenceReaction.MEMORY_SPARK -> 0.7f
+        PresenceReaction.SEARCH_SWEEP -> 0.55f
+        PresenceReaction.RETURN_BLINK -> 0.38f
+        PresenceReaction.TOUCH_NUZZLE -> 0.28f
+        null -> 0f
+    }
+
 private fun ChatUiState.homePresenceLine(): String =
     when {
         isPreparingImage -> "奥拉在整理这张图片。"
@@ -986,6 +1072,7 @@ private fun DrawScope.drawAuraBody(
 
 private fun DrawScope.drawAuraFace(
     mode: PresenceMode,
+    reaction: PresenceReaction?,
     shimmer: Float,
     width: Float,
     height: Float,
@@ -995,7 +1082,12 @@ private fun DrawScope.drawAuraFace(
     val rightEye = Offset(width * 0.61f, eyeY)
     val eyeColor = Color(0xFF3A342D)
 
-    if (mode == PresenceMode.SLEEPING || mode == PresenceMode.TIRED) {
+    val shouldBlink = reaction == PresenceReaction.RETURN_BLINK ||
+        reaction == PresenceReaction.TOUCH_NUZZLE ||
+        mode == PresenceMode.SLEEPING ||
+        mode == PresenceMode.TIRED
+
+    if (shouldBlink) {
         drawLine(
             color = eyeColor.copy(alpha = 0.78f),
             start = Offset(leftEye.x - width * 0.045f, eyeY),
@@ -1070,6 +1162,13 @@ private fun DrawScope.drawAuraFace(
                 topLeft = Offset(width * 0.445f, height * 0.55f),
                 size = Size(width * 0.11f, height * 0.07f),
                 style = Stroke(width = width * 0.01f, cap = StrokeCap.Round),
+            )
+        }
+        PresenceMode.REMEMBERING -> {
+            drawCircle(
+                color = Color(0xFFFFD17C).copy(alpha = 0.44f),
+                radius = width * 0.018f,
+                center = Offset(width * 0.5f, height * 0.59f),
             )
         }
         else -> {
