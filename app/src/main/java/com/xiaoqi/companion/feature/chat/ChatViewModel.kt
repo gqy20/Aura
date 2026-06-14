@@ -1015,6 +1015,9 @@ class ChatViewModel @Inject constructor(
                     hasError = error != null,
                     hasInputText = inputText.isNotBlank(),
                     hasPendingImage = pendingImage != null,
+                    isConfigReady = configStatus.isReady,
+                    configDetail = configStatus.detail,
+                    recentMemoryCount = memories.size,
                 )
             )
         )

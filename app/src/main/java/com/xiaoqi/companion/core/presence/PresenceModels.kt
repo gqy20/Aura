@@ -42,6 +42,8 @@ data class PresenceUiState(
     val intensity: Float = 0.5f,
     val relationshipLevel: Float = 0f,
     val label: String = "Aura is here",
+    val detail: String = "Quietly present",
+    val accent: String = "present",
 )
 
 data class PresenceInputs(
@@ -56,4 +58,7 @@ data class PresenceInputs(
     val hasError: Boolean = false,
     val hasInputText: Boolean = false,
     val hasPendingImage: Boolean = false,
+    val isConfigReady: Boolean = true,
+    val configDetail: String = "",
+    val recentMemoryCount: Int = 0,
 )

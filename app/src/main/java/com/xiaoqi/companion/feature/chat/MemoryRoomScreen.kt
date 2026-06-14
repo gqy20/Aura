@@ -12,9 +12,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,9 +26,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,6 +64,13 @@ private fun MemoryRoomScreenContent(
     onDeleteMemory: (String) -> Unit,
     onBack: () -> Unit,
 ) {
+    var selectedType by remember { mutableStateOf<String?>(null) }
+    var selectedMemory by remember { mutableStateOf<ChatMemory?>(null) }
+    var pendingDelete by remember { mutableStateOf<ChatMemory?>(null) }
+    val visibleMemories = remember(memories, selectedType) {
+        selectedType?.let { type -> memories.filter { it.type == type } } ?: memories
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -77,12 +92,16 @@ private fun MemoryRoomScreenContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "${memories.size} memories arranged from your conversations.",
+                text = "${visibleMemories.size} of ${memories.size} memories arranged from your conversations.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             MemoryRoomStats(memories = memories)
-            if (memories.isEmpty()) {
+            MemoryTypeFilters(
+                selectedType = selectedType,
+                onSelectedTypeChanged = { selectedType = it },
+            )
+            if (visibleMemories.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
@@ -93,12 +112,16 @@ private fun MemoryRoomScreenContent(
                         modifier = Modifier.padding(28.dp),
                     ) {
                         Text(
-                            text = "No long-term memories yet",
+                            text = if (memories.isEmpty()) "No long-term memories yet" else "No memories in this filter",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "After more conversations, Aura will keep useful preferences, moments, and habits here.",
+                            text = if (memories.isEmpty()) {
+                                "After more conversations, Aura will keep useful preferences, moments, and habits here."
+                            } else {
+                                "Try another type, or clear the filter."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -110,15 +133,56 @@ private fun MemoryRoomScreenContent(
                     contentPadding = PaddingValues(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(memories, key = { it.id }) { memory ->
+                    items(visibleMemories, key = { it.id }) { memory ->
                         MemoryRoomItemCard(
                             memory = memory,
-                            onDelete = { onDeleteMemory(memory.id) },
+                            onOpen = { selectedMemory = memory },
+                            onDelete = { pendingDelete = memory },
                         )
                     }
                 }
             }
         }
+    }
+
+    selectedMemory?.let { memory ->
+        MemoryDetailDialog(
+            memory = memory,
+            onDismiss = { selectedMemory = null },
+            onDelete = {
+                selectedMemory = null
+                pendingDelete = memory
+            },
+        )
+    }
+
+    pendingDelete?.let { memory ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete memory?") },
+            text = {
+                Text(
+                    text = memory.content,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteMemory(memory.id)
+                        pendingDelete = null
+                    },
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
@@ -165,8 +229,33 @@ private fun MemoryStatPill(label: String, value: String) {
 }
 
 @Composable
+private fun MemoryTypeFilters(
+    selectedType: String?,
+    onSelectedTypeChanged: (String?) -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilterChip(
+            selected = selectedType == null,
+            onClick = { onSelectedTypeChanged(null) },
+            label = { Text("All") },
+        )
+        listOf("FACT", "EPISODE", "PROCEDURAL").forEach { type ->
+            FilterChip(
+                selected = selectedType == type,
+                onClick = { onSelectedTypeChanged(type) },
+                label = { Text(type.memoryTypeLabel()) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun MemoryRoomItemCard(
     memory: ChatMemory,
+    onOpen: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Surface(
@@ -211,6 +300,9 @@ private fun MemoryRoomItemCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 )
             }
+            TextButton(onClick = onOpen) {
+                Text("Open")
+            }
             Surface(
                 shape = CircleShape,
                 color = Color.Transparent,
@@ -231,6 +323,59 @@ private fun MemoryRoomItemCard(
             }
         }
     }
+}
+
+@Composable
+private fun MemoryDetailDialog(
+    memory: ChatMemory,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(memory.type.memoryTypeLabel())
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close")
+                }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    CapabilityMetaPill(text = memory.source.memorySourceLabel())
+                    CapabilityMetaPill(text = memory.importance.memoryImportanceLabel())
+                }
+                Text(
+                    text = memory.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (memory.timestamp > 0L) {
+                    Text(
+                        text = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(memory.timestamp)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDelete) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        },
+    )
 }
 
 private fun String.memoryTypeLabel(): String =

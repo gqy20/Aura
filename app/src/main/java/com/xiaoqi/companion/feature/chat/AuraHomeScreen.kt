@@ -26,15 +26,19 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -50,6 +54,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -143,7 +148,13 @@ private fun AuraHomeContent(
                 )
 
                 HomeInputDock(
+                    inputText = uiState.inputText,
                     placeholder = uiState.homeInputPlaceholder(),
+                    canSend = uiState.canSendFromHome(),
+                    isBusy = uiState.isLoading || uiState.isPreparingImage,
+                    status = uiState.homeDockStatus(),
+                    onInputTextChanged = onInputTextChanged,
+                    onSendMessage = onSendMessage,
                     onOpenChat = onOpenChat,
                 )
             }
@@ -239,7 +250,19 @@ private fun PresenceStage(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = uiState.presence.detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 28.dp),
+            )
             Spacer(modifier = Modifier.height(22.dp))
+            HomeContextStrip(uiState = uiState)
+            Spacer(modifier = Modifier.height(18.dp))
             PresenceWave(
                 palette = palette,
                 active = uiState.isLoading || uiState.inputText.isNotBlank(),
@@ -550,7 +573,13 @@ private fun PresenceWave(
 
 @Composable
 private fun HomeInputDock(
+    inputText: String,
     placeholder: String,
+    canSend: Boolean,
+    isBusy: Boolean,
+    status: String,
+    onInputTextChanged: (String) -> Unit,
+    onSendMessage: () -> Unit,
     onOpenChat: () -> Unit,
 ) {
     Surface(
@@ -583,35 +612,113 @@ private fun HomeInputDock(
                     )
                 }
             }
-            Box(
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = onInputTextChanged,
                 modifier = Modifier
                     .weight(1f)
                     .height(44.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Text(
-                    text = placeholder,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+                placeholder = {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { if (canSend) onSendMessage() }),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                shape = RoundedCornerShape(24.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFFFFFCF6),
+                    unfocusedContainerColor = Color(0xFFFFF8EA),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    cursorColor = Color(0xFF496B5E),
+                ),
+            )
             Surface(
                 shape = CircleShape,
-                color = Color(0xFFE4DBC9),
+                color = if (canSend) Color(0xFFDDE8D9) else Color(0xFFE4DBC9),
                 modifier = Modifier.size(54.dp),
             ) {
                 IconButton(
-                    onClick = onOpenChat,
+                    onClick = if (canSend) onSendMessage else onOpenChat,
+                    enabled = !isBusy,
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = Color(0xFF746F67),
+                        contentDescription = status,
+                        tint = if (canSend) Color(0xFF496B5E) else Color(0xFF746F67),
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeContextStrip(uiState: ChatUiState) {
+    val latestAssistant = uiState.messages.lastOrNull { it.role == "ASSISTANT" && it.content.isNotBlank() }
+    val memory = uiState.memories.firstOrNull()
+    Row(
+        modifier = Modifier.fillMaxWidth(0.86f),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HomeSignalPill(
+            label = when {
+                !uiState.configStatus.isReady -> "Setup"
+                uiState.isLoading -> "Replying"
+                else -> uiState.presence.accent.replaceFirstChar { it.uppercase() }
+            },
+            detail = when {
+                !uiState.configStatus.isReady -> uiState.configStatus.detail
+                latestAssistant != null -> latestAssistant.content
+                else -> "Ready when you are"
+            },
+            modifier = Modifier.weight(1f),
+        )
+        HomeSignalPill(
+            label = "Memory",
+            detail = memory?.content ?: "Nothing saved yet",
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun HomeSignalPill(
+    label: String,
+    detail: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.58f),
+        tonalElevation = 0.dp,
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF496B5E),
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -683,6 +790,14 @@ private fun ChatUiState.homeInputPlaceholder(): String =
         !configStatus.isReady -> "先完成模型配置..."
         isLoading -> "奥拉正在回应..."
         else -> "和奥拉聊一聊..."
+    }
+
+private fun ChatUiState.homeDockStatus(): String =
+    when {
+        isLoading || isPreparingImage -> "Aura is busy"
+        canSendFromHome() -> "Send from home"
+        !configStatus.isReady -> "Open chat setup"
+        else -> "Open chat"
     }
 
 private fun ChatUiState.canSendFromHome(): Boolean =
