@@ -61,6 +61,11 @@ private fun AuraAppNavHost(
                     viewModel.prepareSettings()
                     navController.navigate(AuraRoutes.Settings)
                 },
+                onOpenMemoryRoom = { navController.navigate(AuraRoutes.MemoryRoom) },
+                onOpenMcpSettings = {
+                    viewModel.prepareMcpSettings()
+                    navController.navigate(AuraRoutes.McpSettings)
+                },
             )
         }
         composable(AuraRoutes.Chat) {

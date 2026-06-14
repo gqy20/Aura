@@ -35,8 +35,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
@@ -77,6 +80,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -187,7 +191,6 @@ fun ChatScreenContent(
                 .padding(padding),
         ) {
             CompanionHeader(
-                status = uiState.status,
                 presence = uiState.presence,
                 configStatus = uiState.configStatus,
                 memories = uiState.memories,
@@ -304,7 +307,6 @@ private fun EmptyChatState() {
 
 @Composable
 private fun CompanionHeader(
-    status: CompanionStatus,
     presence: PresenceUiState,
     configStatus: ChatConfigStatus,
     memories: List<ChatMemory>,
@@ -346,16 +348,36 @@ private fun CompanionHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "奥拉在听 · ${status.moodLabel()} · ${status.relationshipLabel}",
+                    text = presence.chatHeaderStatus(configStatus),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            HeaderActionIcon(
+                imageVector = Icons.Default.Favorite,
+                onClick = onOpenMemoryRoom,
+                contentDescription = "Open memory",
+                badge = memories.size.takeIf { it > 0 }?.toString(),
+            )
+            if (scheduledReminderCount > 0) {
+                HeaderActionIcon(
+                    imageVector = Icons.Default.Notifications,
+                    onClick = onOpenReminders,
+                    contentDescription = "Open reminders",
+                    badge = scheduledReminderCount.toString(),
+                )
+            }
+            HeaderActionIcon(
+                imageVector = Icons.Default.Build,
+                onClick = onOpenMcpSettings,
+                contentDescription = "Open MCP",
+                active = mcpLabel != "MCP",
+            )
             IconButton(
                 onClick = onOpenSettings,
-                modifier = Modifier.semantics { contentDescription = "打开设置" },
+                modifier = Modifier.semantics { contentDescription = "Open settings" },
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -363,29 +385,6 @@ private fun CompanionHeader(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
                 )
             }
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 51.dp),
-        ) {
-            HeaderActionText(
-                text = "记忆 ${memories.size}",
-                onClick = onOpenMemoryRoom,
-                contentDescription = "打开记忆房间",
-            )
-            HeaderDot()
-            HeaderActionText(
-                text = "提醒 $scheduledReminderCount",
-                onClick = onOpenReminders,
-                contentDescription = "打开提醒",
-            )
-            HeaderDot()
-            HeaderActionText(
-                text = mcpLabel,
-                onClick = onOpenMcpSettings,
-                contentDescription = "打开 MCP 设置",
-            )
         }
 
         if (!configStatus.isReady) {
@@ -395,45 +394,57 @@ private fun CompanionHeader(
 }
 
 @Composable
-private fun HeaderDot() {
-    Text(
-        text = "·",
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.34f),
-        style = MaterialTheme.typography.labelSmall,
-    )
-}
-
-@Composable
-private fun HeaderActionText(
-    text: String,
+private fun HeaderActionIcon(
+    imageVector: ImageVector,
     onClick: () -> Unit,
     contentDescription: String,
+    badge: String? = null,
+    active: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = Color(0xFF496B5E).copy(alpha = 0.82f),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
-            .semantics { this.contentDescription = contentDescription }
-            .padding(horizontal = 2.dp, vertical = 3.dp),
-    )
+    Box(modifier = modifier.size(34.dp)) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(34.dp)
+                .semantics { this.contentDescription = contentDescription },
+        ) {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = null,
+                tint = if (active) {
+                    Color(0xFF496B5E)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f)
+                },
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        badge?.let {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFDDE8D9),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(16.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF496B5E),
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
 }
 
-private fun CompanionStatus.moodLabel(): String =
-    when (mood.lowercase()) {
-        "happy" -> "开心"
-        "sad" -> "低落"
-        "angry" -> "生气"
-        "excited", "exited" -> "兴奋"
-        "calm" -> "平静"
-        "tired" -> "疲惫"
-        "neutral" -> "平常"
-        else -> mood
+private fun PresenceUiState.chatHeaderStatus(configStatus: ChatConfigStatus): String =
+    when {
+        !configStatus.isReady -> "Setup"
+        else -> label
     }
 
 @Composable
@@ -504,7 +515,7 @@ private fun AuraDialogHeader(
                 onClick = onDismiss,
                 modifier = Modifier
                     .size(38.dp)
-                    .semantics { contentDescription = "关闭" },
+                    .semantics { contentDescription = "Close" },
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -578,7 +589,7 @@ private fun ConfigStatusCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "需要配置模型",
+                    text = "Model",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -600,7 +611,7 @@ private fun ConfigStatusCard(
                     color = MaterialTheme.colorScheme.error,
                 )
                 TextButton(onClick = onOpenSettings) {
-                    Text("设置")
+                    Text("Set")
                 }
             }
         }
@@ -666,8 +677,8 @@ private fun RemindersDialog(
         fillHeight = 0.72f,
     ) {
                 AuraDialogHeader(
-                    title = "奥拉帮你记着",
-                    subtitle = "$scheduledReminderCount 个待提醒 · ${reminders.size} 条记录",
+                    title = "Reminders",
+                    subtitle = "$scheduledReminderCount active",
                     onDismiss = onDismiss,
                 )
 
@@ -677,8 +688,8 @@ private fun RemindersDialog(
                         contentAlignment = Alignment.Center,
                     ) {
                         AuraEmptyState(
-                            title = "还没有提醒",
-                            message = "你可以直接说：三分钟后提醒我喝咖啡。奥拉会把它记下来。",
+                            title = "No reminders",
+                            message = "Try: remind me in 3 minutes.",
                         )
                     }
                 } else {
@@ -721,7 +732,7 @@ private fun ReminderItemCard(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CapabilityMetaPill(text = if (reminder.exact) "准时提醒" else "灵活提醒")
+                    CapabilityMetaPill(text = if (reminder.exact) "Exact" else "Flex")
                     CapabilityMetaPill(text = reminder.status.reminderStatusLabel())
                 }
                 Text(
@@ -743,7 +754,7 @@ private fun ReminderItemCard(
             }
             if (reminder.status == "SCHEDULED") {
                 TextButton(onClick = onCancel) {
-                    Text("取消")
+                    Text("Cancel")
                 }
             }
         }
@@ -752,9 +763,9 @@ private fun ReminderItemCard(
 
 private fun String.reminderStatusLabel(): String =
     when (uppercase(Locale.US)) {
-        "SCHEDULED" -> "待提醒"
-        "CANCELLED" -> "已取消"
-        "FIRED" -> "已提醒"
+        "SCHEDULED" -> "Due"
+        "CANCELLED" -> "Off"
+        "FIRED" -> "Done"
         else -> lowercase(Locale.US)
     }
 
@@ -814,7 +825,7 @@ private fun InputBar(
                     IconButton(
                         onClick = onPickImage,
                         enabled = !isLoading && !isPreparingImage,
-                        modifier = Modifier.semantics { contentDescription = "添加图片" },
+                        modifier = Modifier.semantics { contentDescription = "Add image" },
                     ) {
                         Icon(
                             imageVector = Icons.Default.Image,
@@ -831,7 +842,7 @@ private fun InputBar(
                         .heightIn(min = 52.dp),
                     placeholder = {
                         Text(
-                            text = "想和奥拉说什么？",
+                            text = "Say something",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     },
@@ -870,7 +881,7 @@ private fun InputBar(
                         IconButton(
                             onClick = onSendMessage,
                             enabled = canSend,
-                            modifier = Modifier.semantics { contentDescription = "发送" },
+                            modifier = Modifier.semantics { contentDescription = "Send" },
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
@@ -926,7 +937,7 @@ private fun ImeRecoveryHint(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextButton(onClick = onSwitchInputMethod) {
-            Text("切换输入法")
+            Text("Switch input")
         }
     }
 }
@@ -963,17 +974,17 @@ private fun ChatConversationPreview() {
                 ChatMessage(
                     id = "a1",
                     role = "ASSISTANT",
-                    content = "宇哥，今天想从哪儿开始？可以是一个小想法，也可以是一张图。",
+                    content = "Where should we start today?",
                 ),
                 ChatMessage(
                     id = "u1",
                     role = "USER",
-                    content = "帮我想一下这个聊天页怎么优化。",
+                    content = "Help me think through this chat page.",
                 ),
                 ChatMessage(
                     id = "a2",
                     role = "ASSISTANT",
-                    content = "我会先把它变得更像奥拉的房间，而不是一个普通工具页：\n\n- 顶部保留状态，但降低工具感\n- 消息正文更适合长时间阅读\n- 输入区改成中文和暖色\n\n然后我们再细调工具调用和记忆展示。",
+                    content = "I would simplify the top state, make long replies easier to read, and keep the input calm.",
                 ),
             ),
         ),
@@ -994,12 +1005,12 @@ private fun ChatLongReplyPreview() {
                 ChatMessage(
                     id = "u1",
                     role = "USER",
-                    content = "给我一个旅行计划。",
+                    content = "Give me a travel plan.",
                 ),
                 ChatMessage(
                     id = "a1",
                     role = "ASSISTANT",
-                    content = "可以，宇哥。我建议先按节奏来，不要把一天塞太满。\n\n**上午**\n- 慢一点出发，先去一个开阔的地方走走\n- 途中找一家安静的小店吃早餐\n\n**下午**\n- 安排一个需要认真看的景点\n- 留一点空白时间给临时发现\n\n**晚上**\n- 找舒服的餐厅，不赶路\n- 回来前买点第二天的小零食",
+                    content = "Sure. Keep the day light.\n\n**Morning**\n- Start slowly\n- Pick one quiet cafe\n\n**Afternoon**\n- Choose one main stop\n- Leave space for changes\n\n**Evening**\n- Eat nearby\n- Prepare for tomorrow",
                 ),
             ),
         ),
@@ -1031,7 +1042,7 @@ private fun ChatThinkingPreview() {
                 ChatMessage(
                     id = "u1",
                     role = "USER",
-                    content = "奥拉，你怎么看？",
+                    content = "Aura, what do you think?",
                 ),
                 ChatMessage(
                     id = "a1",
@@ -1077,7 +1088,7 @@ private fun previewChatState(
         memories = listOf(
             ChatMemory(
                 id = "memory-1",
-                content = "用户喜欢温暖、安静、不要太工具化的界面。",
+                content = "Prefers warm, quiet interfaces.",
                 type = "PREFERENCE",
                 importance = 0.8f,
             ),
@@ -1085,15 +1096,15 @@ private fun previewChatState(
         reminders = listOf(
             ChatReminder(
                 id = "reminder-1",
-                title = "喝咖啡",
-                message = "提醒宇哥喝咖啡",
+                title = "Coffee",
+                message = "Remind me to drink coffee.",
                 triggerAtMillis = System.currentTimeMillis() + 180_000L,
                 exact = true,
                 status = "SCHEDULED",
             ),
         ),
         configStatus = ChatConfigStatus(
-            label = "GLM 已就绪",
+            label = "GLM ready",
             isReady = true,
             detail = "Preview",
         ),

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -75,7 +76,7 @@ private fun MemoryRoomScreenContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Memory room") },
+                title = { Text("Memory") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -91,11 +92,6 @@ private fun MemoryRoomScreenContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = "${visibleMemories.size} of ${memories.size} memories arranged from your conversations.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             MemoryRoomStats(memories = memories)
             MemoryTypeFilters(
                 selectedType = selectedType,
@@ -112,15 +108,15 @@ private fun MemoryRoomScreenContent(
                         modifier = Modifier.padding(28.dp),
                     ) {
                         Text(
-                            text = if (memories.isEmpty()) "No long-term memories yet" else "No memories in this filter",
+                            text = if (memories.isEmpty()) "No memories" else "Empty",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = if (memories.isEmpty()) {
-                                "After more conversations, Aura will keep useful preferences, moments, and habits here."
+                                "Memories will appear here."
                             } else {
-                                "Try another type, or clear the filter."
+                                "Try another filter."
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -159,11 +155,11 @@ private fun MemoryRoomScreenContent(
     pendingDelete?.let { memory ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete memory?") },
+            title = { Text("Delete?") },
             text = {
                 Text(
                     text = memory.content,
-                    maxLines = 4,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             },
@@ -193,7 +189,6 @@ private fun MemoryRoomStats(memories: List<ChatMemory>) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MemoryStatPill(label = "All", value = memories.size.toString())
         MemoryStatPill(label = "Facts", value = memories.count { it.type == "FACT" }.toString())
         MemoryStatPill(label = "Moments", value = memories.count { it.type == "EPISODE" }.toString())
         MemoryStatPill(label = "Habits", value = memories.count { it.type == "PROCEDURAL" }.toString())
@@ -262,6 +257,7 @@ private fun MemoryRoomItemCard(
         shape = MaterialTheme.shapes.medium,
         color = Color(0xFFF7F2EA),
         tonalElevation = 0.dp,
+        modifier = Modifier.clickable(onClick = onOpen),
     ) {
         Row(
             modifier = Modifier
@@ -299,9 +295,6 @@ private fun MemoryRoomItemCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 )
-            }
-            TextButton(onClick = onOpen) {
-                Text("Open")
             }
             Surface(
                 shape = CircleShape,
@@ -388,15 +381,15 @@ private fun String.memoryTypeLabel(): String =
 
 private fun String.memorySourceLabel(): String =
     when {
-        isBlank() -> "Aura reflection"
-        startsWith("tool:") -> "Aura reflection"
-        startsWith("reflection:") -> "From chat"
+        isBlank() -> "Aura"
+        startsWith("tool:") -> "Aura"
+        startsWith("reflection:") -> "Chat"
         else -> this
     }
 
 private fun Float.memoryImportanceLabel(): String =
     when {
-        this >= 0.82f -> "Important memory"
-        this >= 0.58f -> "Likely useful"
-        else -> "Light note"
+        this >= 0.82f -> "Important"
+        this >= 0.58f -> "Useful"
+        else -> "Note"
     }

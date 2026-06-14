@@ -69,7 +69,7 @@ private fun McpSettingsScreenContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("MCP tools") },
+                title = { Text("MCP") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -88,12 +88,12 @@ private fun McpSettingsScreenContent(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
-                        text = "Remote tool connection",
+                        text = "Connection",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "Connect one streamable HTTP MCP endpoint. Aura loads it on the next reply.",
+                        text = "Remote tools endpoint.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -104,7 +104,7 @@ private fun McpSettingsScreenContent(
                     value = mcpServerName,
                     onValueChange = onMcpServerNameChanged,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Connection name") },
+                    label = { Text("Name") },
                     placeholder = { Text("browser, notes, research") },
                     singleLine = true,
                 )
@@ -114,7 +114,7 @@ private fun McpSettingsScreenContent(
                     value = mcpHttpUrl,
                     onValueChange = onMcpHttpUrlChanged,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Endpoint URL") },
+                    label = { Text("URL") },
                     placeholder = { Text("https://example.com/mcp") },
                     singleLine = true,
                 )
@@ -131,24 +131,19 @@ private fun McpSettingsScreenContent(
                     ) {
                         Text(
                             text = if (currentMcpHttpUrl.isBlank()) {
-                                "No MCP server connected"
+                                "Not connected"
                             } else {
-                                currentMcpServerName.ifBlank { "Remote tools connected" }
+                                currentMcpServerName.ifBlank { "Connected" }
                             },
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = currentMcpHttpUrl.ifBlank {
-                                "Save a URL to let Aura discover remote tools during chat."
+                                "Used in chat."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = "Tool names appear as mcp__host__tool_name.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                         )
                     }
                 }
@@ -171,7 +166,7 @@ private fun McpSettingsScreenContent(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = onSave) {
-                        Text("Save connection")
+                        Text("Save")
                     }
                 }
             }

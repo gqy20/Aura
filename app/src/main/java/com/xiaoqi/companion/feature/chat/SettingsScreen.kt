@@ -115,7 +115,7 @@ private fun SettingsScreenContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Aura settings") },
+                title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -139,7 +139,7 @@ private fun SettingsScreenContent(
             item {
                 SettingsSectionTitle(
                     title = "Model",
-                    subtitle = "Choose the reply engine Aura uses for chat.",
+                    subtitle = "Reply engine",
                 )
             }
             item {
@@ -159,7 +159,7 @@ private fun SettingsScreenContent(
                 item {
                     SettingsSectionTitle(
                         title = "Local model",
-                        subtitle = "Download the MNN model before using local Qwen.",
+                        subtitle = "Offline replies",
                     )
                 }
                 item {
@@ -174,7 +174,7 @@ private fun SettingsScreenContent(
                         value = baseUrl,
                         onValueChange = onBaseUrlChanged,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Base URL") },
+                        label = { Text("Endpoint") },
                         readOnly = true,
                         singleLine = true,
                     )
@@ -185,7 +185,7 @@ private fun SettingsScreenContent(
                         onValueChange = onApiKeyChanged,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("API Key") },
-                        placeholder = { Text("Leave blank to keep current key") },
+                        placeholder = { Text("Keep current key") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -279,26 +279,13 @@ private fun ModelPicker(
                 )
             }
         }
-        OutlinedTextField(
-            value = modelName,
-            onValueChange = onModelNameChanged,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Model name") },
-            readOnly = true,
-            singleLine = true,
-        )
-        Text(
-            text = "Default: ${DefaultLlmValues.defaultModel(provider)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
 @Composable
 private fun SettingsSectionTitle(
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
@@ -307,11 +294,13 @@ private fun SettingsSectionTitle(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        subtitle?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -336,7 +325,7 @@ private fun LocalQwenDownloadSection(
                 else -> "Not installed"
             }
             Text(
-                text = "${state.modelName} - $status",
+                text = status,
                 style = MaterialTheme.typography.bodySmall,
                 color = if (state.error != null) {
                     MaterialTheme.colorScheme.error
@@ -373,7 +362,7 @@ private fun LocalQwenDownloadSection(
                 onClick = onDownload,
                 enabled = !state.isDownloading,
             ) {
-                Text(if (state.isInstalled) "Download again" else "Download model")
+                Text(if (state.isInstalled) "Retry" else "Download")
             }
         }
     }
@@ -397,83 +386,83 @@ private fun ToolCapabilitiesSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Tool capabilities",
+                    text = "Tools",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Control the local context and device actions Aura can use.",
+                    text = "Context and actions",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             TextButton(onClick = onRequestContextPermissions) {
-                Text("Permissions")
+                Text("Allow")
             }
         }
         ToolCapabilityRow(
-            title = "Time and recent context",
-            detail = "Current time, date, and recent conversation summary.",
-            meta = "Always on",
-            tools = "get_current_time - get_recent_interaction_context",
+            title = "Context",
+            detail = "Time and recent chat.",
+            meta = "On",
+            tools = "",
             enabled = true,
             locked = true,
             onEnabledChanged = {},
         )
         ToolCapabilityRow(
-            title = "Device status",
-            detail = "Battery, charging, network, and power saving state.",
+            title = "Device",
+            detail = "Battery and network.",
             meta = "Local",
-            tools = "get_device_status",
+            tools = "",
             enabled = settings.deviceStatusEnabled,
             onEnabledChanged = onDeviceStatusEnabledChanged,
         )
         ToolCapabilityRow(
             title = "Location",
-            detail = "Use the last granted location as local context.",
+            detail = "Last granted location.",
             meta = "Permission",
-            tools = "get_user_context_settings",
+            tools = "",
             enabled = settings.locationContextEnabled,
             onEnabledChanged = onLocationContextEnabledChanged,
         )
         ToolCapabilityRow(
             title = "Weather",
-            detail = "Query weather by city or granted location.",
+            detail = "Current weather.",
             meta = "Network",
-            tools = "get_weather",
+            tools = "",
             enabled = settings.weatherContextEnabled,
             onEnabledChanged = onWeatherContextEnabledChanged,
         )
         ToolCapabilityRow(
             title = "Reminders",
-            detail = "Create local reminder notifications.",
-            meta = "Notification",
-            tools = "create_local_reminder",
+            detail = "Local reminders.",
+            meta = "Notify",
+            tools = "",
             enabled = settings.reminderToolEnabled,
             onEnabledChanged = onReminderToolEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Remote MCP tools",
-            detail = settings.mcpHttpUrl.ifBlank { "No remote tool server connected." },
+            title = "MCP",
+            detail = settings.mcpHttpUrl.ifBlank { "Not connected." },
             meta = "Advanced",
-            tools = "mcp__*",
+            tools = "",
             enabled = settings.mcpHttpUrl.isNotBlank(),
             locked = true,
             onEnabledChanged = {},
         )
         ToolCapabilityRow(
             title = "Notifications",
-            detail = "Allow Aura to send local reminder notifications.",
-            meta = "App switch",
-            tools = "Android notification permission",
+            detail = "Reminder alerts.",
+            meta = "App",
+            tools = "",
             enabled = settings.notificationEnabled,
             onEnabledChanged = onNotificationEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Memory and relationship",
-            detail = "Reflection, mood, and relationship updates after replies.",
-            meta = "Always on",
-            tools = "memory and reflection",
+            title = "Memory",
+            detail = "Reflection after replies.",
+            meta = "On",
+            tools = "",
             enabled = true,
             locked = true,
             onEnabledChanged = {},

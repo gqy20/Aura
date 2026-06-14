@@ -63,44 +63,44 @@ class PresenceController @Inject constructor() {
 
     private fun PresenceMode.labelFor(mood: String, inputs: PresenceInputs): String =
         when (this) {
-            PresenceMode.ERROR -> if (!inputs.isConfigReady) "Waiting for setup" else "Needs a moment"
-            PresenceMode.IDLE -> "Aura is with you"
-            PresenceMode.LISTENING -> "Listening closely"
+            PresenceMode.ERROR -> if (!inputs.isConfigReady) "Setup" else "Recovering"
+            PresenceMode.IDLE -> "Here"
+            PresenceMode.LISTENING -> "Listening"
             PresenceMode.THINKING -> "Thinking"
-            PresenceMode.SPEAKING -> "Speaking"
-            PresenceMode.SEARCHING -> "Looking through memories"
-            PresenceMode.REMEMBERING -> "Saving this gently"
-            PresenceMode.HAPPY -> "Feeling $mood"
-            PresenceMode.SAD -> "Feeling $mood"
-            PresenceMode.TIRED -> "A little tired"
+            PresenceMode.SPEAKING -> "Replying"
+            PresenceMode.SEARCHING -> "Searching"
+            PresenceMode.REMEMBERING -> "Saved"
+            PresenceMode.HAPPY -> "Bright"
+            PresenceMode.SAD -> "Soft"
+            PresenceMode.TIRED -> "Resting"
             PresenceMode.SLEEPING -> "Resting"
         }
 
     private fun PresenceMode.detailFor(inputs: PresenceInputs): String =
         when (this) {
             PresenceMode.ERROR -> if (!inputs.isConfigReady) {
-                inputs.configDetail.ifBlank { "Model settings are incomplete." }
+                inputs.configDetail.ifBlank { "Model needed" }
             } else {
-                "Something interrupted the reply, but Aura can recover."
+                "Try again"
             }
             PresenceMode.IDLE -> if (inputs.recentMemoryCount > 0) {
-                "${inputs.recentMemoryCount} memories are close at hand."
+                "${inputs.recentMemoryCount} memories"
             } else {
-                "Quietly present."
+                ""
             }
             PresenceMode.LISTENING -> if (inputs.hasPendingImage) {
-                "A picture is ready for Aura to look at."
+                "Image ready"
             } else {
-                "Your words are in focus."
+                ""
             }
-            PresenceMode.THINKING -> "Composing a response."
-            PresenceMode.SPEAKING -> "Replying in the conversation."
-            PresenceMode.SEARCHING -> "Checking what she already knows."
-            PresenceMode.REMEMBERING -> "A small piece of context is being kept."
-            PresenceMode.HAPPY -> "The room feels lighter."
-            PresenceMode.SAD -> "Staying soft and close."
-            PresenceMode.TIRED -> "Keeping the pace gentle."
-            PresenceMode.SLEEPING -> "Resting until you return."
+            PresenceMode.THINKING -> ""
+            PresenceMode.SPEAKING -> ""
+            PresenceMode.SEARCHING -> "Memory"
+            PresenceMode.REMEMBERING -> "Memory"
+            PresenceMode.HAPPY -> ""
+            PresenceMode.SAD -> ""
+            PresenceMode.TIRED -> ""
+            PresenceMode.SLEEPING -> ""
         }
 
     private fun PresenceMode.accent(): String =

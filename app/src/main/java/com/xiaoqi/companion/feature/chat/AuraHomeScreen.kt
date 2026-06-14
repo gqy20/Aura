@@ -13,32 +13,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -52,19 +45,16 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
-import com.xiaoqi.companion.ui.theme.CompanionTheme
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -74,32 +64,29 @@ fun AuraHomeScreen(
     viewModel: ChatViewModel,
     onOpenChat: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenMemoryRoom: () -> Unit,
+    onOpenMcpSettings: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     AuraHomeContent(
         uiState = uiState,
-        onInputTextChanged = { viewModel.updateInputText(it) },
-        onSendMessage = {
-            viewModel.sendMessage(uiState.inputText)
-            if (uiState.inputText.isNotBlank() && uiState.configStatus.isReady) {
-                onOpenChat()
-            }
-        },
         onOpenChat = onOpenChat,
         onPresenceTapped = { viewModel.onPresenceTapped() },
         onOpenSettings = onOpenSettings,
+        onOpenMemoryRoom = onOpenMemoryRoom,
+        onOpenMcpSettings = onOpenMcpSettings,
     )
 }
 
 @Composable
 private fun AuraHomeContent(
     uiState: ChatUiState,
-    onInputTextChanged: (String) -> Unit,
-    onSendMessage: () -> Unit,
     onOpenChat: () -> Unit,
     onPresenceTapped: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenMemoryRoom: () -> Unit,
+    onOpenMcpSettings: () -> Unit,
 ) {
     val presenceColors = uiState.presence.homePalette()
 
@@ -130,12 +117,12 @@ private fun AuraHomeContent(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .imePadding()
                     .padding(horizontal = 24.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 HomeTopBar(
-                    presence = uiState.presence,
+                    onOpenMemoryRoom = onOpenMemoryRoom,
+                    onOpenMcpSettings = onOpenMcpSettings,
                     onOpenSettings = onOpenSettings,
                 )
 
@@ -143,20 +130,10 @@ private fun AuraHomeContent(
                     uiState = uiState,
                     palette = presenceColors,
                     onPresenceTapped = onPresenceTapped,
+                    onOpenChat = onOpenChat,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                )
-
-                HomeInputDock(
-                    inputText = uiState.inputText,
-                    placeholder = uiState.homeInputPlaceholder(),
-                    canSend = uiState.canSendFromHome(),
-                    isBusy = uiState.isLoading || uiState.isPreparingImage,
-                    status = uiState.homeDockStatus(),
-                    onInputTextChanged = onInputTextChanged,
-                    onSendMessage = onSendMessage,
-                    onOpenChat = onOpenChat,
                 )
             }
         }
@@ -165,7 +142,8 @@ private fun AuraHomeContent(
 
 @Composable
 private fun HomeTopBar(
-    presence: PresenceUiState,
+    onOpenMemoryRoom: () -> Unit,
+    onOpenMcpSettings: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Row(
@@ -183,27 +161,57 @@ private fun HomeTopBar(
                 ),
                 color = Color(0xFF496B5E),
             )
-            Text(
-                text = presence.label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
-        Surface(
-            shape = CircleShape,
-            color = Color.White.copy(alpha = 0.72f),
-            shadowElevation = 4.dp,
-            tonalElevation = 1.dp,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onOpenSettings) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = Color(0xFF496B5E),
-                )
+            HomeTopActionIcon(
+                imageVector = Icons.Default.Favorite,
+                contentDescription = "Memory",
+                onClick = onOpenMemoryRoom,
+            )
+            HomeTopActionIcon(
+                imageVector = Icons.Default.Build,
+                contentDescription = "MCP",
+                onClick = onOpenMcpSettings,
+            )
+            Surface(
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.72f),
+                shadowElevation = 4.dp,
+                tonalElevation = 1.dp,
+            ) {
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = Color(0xFF496B5E),
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeTopActionIcon(
+    imageVector: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.52f),
+        shadowElevation = 2.dp,
+        tonalElevation = 0.dp,
+    ) {
+        IconButton(onClick = onClick) {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = contentDescription,
+                tint = Color(0xFF496B5E).copy(alpha = 0.78f),
+            )
         }
     }
 }
@@ -213,6 +221,7 @@ private fun PresenceStage(
     uiState: ChatUiState,
     palette: HomePresencePalette,
     onPresenceTapped: () -> Unit,
+    onOpenChat: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier) {
@@ -238,7 +247,10 @@ private fun PresenceStage(
                 LuminousAuraAvatar(
                     presence = uiState.presence,
                     size = avatarSize,
-                    onClick = onPresenceTapped,
+                    onClick = {
+                        onPresenceTapped()
+                        onOpenChat()
+                    },
                 )
             }
             Text(
@@ -250,27 +262,9 @@ private fun PresenceStage(
                 ),
                 color = Color(0xFF496B5E),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = uiState.presence.detail,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 28.dp),
-            )
-            Spacer(modifier = Modifier.height(22.dp))
-            HomeContextStrip(uiState = uiState)
-            Spacer(modifier = Modifier.height(18.dp))
-            PresenceWave(
-                palette = palette,
-                active = uiState.isLoading || uiState.inputText.isNotBlank(),
                 modifier = Modifier
-                    .fillMaxWidth(0.64f)
-                    .height(32.dp),
+                    .padding(horizontal = 24.dp)
+                    .clickable(onClick = onOpenChat),
             )
         }
     }
@@ -596,209 +590,6 @@ private fun DrawScope.drawReactionHalo(
     }
 }
 
-@Composable
-private fun PresenceWave(
-    palette: HomePresencePalette,
-    active: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val transition = rememberInfiniteTransition(label = "home-wave")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1400),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "phase",
-    )
-
-    Canvas(modifier = modifier) {
-        val centerY = size.height / 2f
-        val dotCount = 31
-        val gap = size.width / (dotCount - 1)
-        repeat(dotCount) { index ->
-            val distance = kotlin.math.abs(index - dotCount / 2f) / (dotCount / 2f)
-            val wave = if (active) {
-                (sin((phase * 2f * PI + index * 0.58f).toFloat()) + 1f) * 0.5f
-            } else {
-                0.22f
-            }
-            val barHeight = (5f + (1f - distance) * 24f * wave).coerceAtLeast(3f)
-            val x = index * gap
-            drawLine(
-                color = palette.ring.copy(alpha = 0.18f + (1f - distance) * 0.2f),
-                start = Offset(x, centerY - barHeight / 2f),
-                end = Offset(x, centerY + barHeight / 2f),
-                strokeWidth = 3.2f,
-                cap = StrokeCap.Round,
-            )
-        }
-        drawCircle(
-            color = Color.White.copy(alpha = 0.68f),
-            radius = 15.dp.toPx(),
-            center = Offset(size.width / 2f, centerY),
-        )
-        drawCircle(
-            color = palette.spark.copy(alpha = 0.54f),
-            radius = 5.dp.toPx(),
-            center = Offset(size.width / 2f, centerY),
-        )
-    }
-}
-
-@Composable
-private fun HomeInputDock(
-    inputText: String,
-    placeholder: String,
-    canSend: Boolean,
-    isBusy: Boolean,
-    status: String,
-    onInputTextChanged: (String) -> Unit,
-    onSendMessage: () -> Unit,
-    onOpenChat: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(34.dp),
-        color = Color(0xFFF4EDDE),
-        shadowElevation = 8.dp,
-        tonalElevation = 0.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpenChat),
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 14.dp, top = 10.dp, end = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFFEDE4D3),
-                modifier = Modifier.size(42.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "A",
-                        color = Color(0xFF496B5E),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = FontFamily.Serif,
-                            fontWeight = FontWeight.Normal,
-                        ),
-                    )
-                }
-            }
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = onInputTextChanged,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp),
-                placeholder = {
-                    Text(
-                        text = placeholder,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { if (canSend) onSendMessage() }),
-                textStyle = MaterialTheme.typography.bodyMedium,
-                shape = RoundedCornerShape(24.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFFFFCF6),
-                    unfocusedContainerColor = Color(0xFFFFF8EA),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = Color(0xFF496B5E),
-                ),
-            )
-            Surface(
-                shape = CircleShape,
-                color = if (canSend) Color(0xFFDDE8D9) else Color(0xFFE4DBC9),
-                modifier = Modifier.size(54.dp),
-            ) {
-                IconButton(
-                    onClick = if (canSend) onSendMessage else onOpenChat,
-                    enabled = !isBusy,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = status,
-                        tint = if (canSend) Color(0xFF496B5E) else Color(0xFF746F67),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeContextStrip(uiState: ChatUiState) {
-    val latestAssistant = uiState.messages.lastOrNull { it.role == "ASSISTANT" && it.content.isNotBlank() }
-    val memory = uiState.memories.firstOrNull()
-    Row(
-        modifier = Modifier.fillMaxWidth(0.86f),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HomeSignalPill(
-            label = when {
-                !uiState.configStatus.isReady -> "Setup"
-                uiState.isLoading -> "Replying"
-                else -> uiState.presence.accent.replaceFirstChar { it.uppercase() }
-            },
-            detail = when {
-                !uiState.configStatus.isReady -> uiState.configStatus.detail
-                latestAssistant != null -> latestAssistant.content
-                else -> "Ready when you are"
-            },
-            modifier = Modifier.weight(1f),
-        )
-        HomeSignalPill(
-            label = "Memory",
-            detail = memory?.content ?: "Nothing saved yet",
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun HomeSignalPill(
-    label: String,
-    detail: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White.copy(alpha = 0.58f),
-        tonalElevation = 0.dp,
-        modifier = modifier,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF496B5E),
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
 private data class HomePresencePalette(
     val backgroundTint: Color,
     val glow: Color,
@@ -858,150 +649,18 @@ private fun PresenceReaction?.haloBoost(): Float =
 
 private fun ChatUiState.homePresenceLine(): String =
     when {
-        isPreparingImage -> "奥拉在整理这张图片。"
-        pendingImage != null -> "这张图片正在等她看。"
-        isLoading -> "奥拉正在想。"
-        inputText.isNotBlank() -> "奥拉在听。"
-        presence.mode == PresenceMode.REMEMBERING -> "她刚刚记住了一件小事。"
-        presence.mode == PresenceMode.SEARCHING -> "她在翻找线索。"
-        presence.mode == PresenceMode.HAPPY -> "奥拉今天很亮。"
-        presence.mode == PresenceMode.SAD -> "奥拉安静地陪着你。"
-        presence.mode == PresenceMode.TIRED || presence.mode == PresenceMode.SLEEPING -> "奥拉在轻轻休息。"
-        messages.isEmpty() -> "奥拉在听。"
-        else -> "上一次聊天还留着余温。"
+        isPreparingImage -> "Reading image"
+        pendingImage != null -> "Image ready"
+        isLoading -> "Thinking"
+        inputText.isNotBlank() -> "Listening"
+        presence.mode == PresenceMode.REMEMBERING -> "Saved"
+        presence.mode == PresenceMode.SEARCHING -> "Searching"
+        presence.mode == PresenceMode.HAPPY -> "Bright"
+        presence.mode == PresenceMode.SAD -> "Here"
+        presence.mode == PresenceMode.TIRED || presence.mode == PresenceMode.SLEEPING -> "Resting"
+        messages.isEmpty() -> "Here"
+        else -> "Here"
     }
-
-private fun ChatUiState.homeInputPlaceholder(): String =
-    when {
-        !configStatus.isReady -> "先完成模型配置..."
-        isLoading -> "奥拉正在回应..."
-        else -> "和奥拉聊一聊..."
-    }
-
-private fun ChatUiState.homeDockStatus(): String =
-    when {
-        isLoading || isPreparingImage -> "Aura is busy"
-        canSendFromHome() -> "Send from home"
-        !configStatus.isReady -> "Open chat setup"
-        else -> "Open chat"
-    }
-
-private fun ChatUiState.canSendFromHome(): Boolean =
-    inputText.isNotBlank() && configStatus.isReady && !isLoading && !isPreparingImage
-
-@Preview(
-    name = "Home / Ready",
-    showBackground = true,
-    widthDp = 393,
-    heightDp = 852,
-)
-@Composable
-private fun AuraHomeReadyPreview() {
-    AuraHomePreviewContent(
-        state = previewHomeState(
-            presence = PresenceUiState(mode = PresenceMode.IDLE),
-            messages = listOf(
-                ChatMessage(
-                    id = "assistant-1",
-                    role = "ASSISTANT",
-                    content = "上一次聊天还留着余温。",
-                ),
-            ),
-        ),
-    )
-}
-
-@Preview(
-    name = "Home / Thinking",
-    showBackground = true,
-    widthDp = 393,
-    heightDp = 852,
-)
-@Composable
-private fun AuraHomeThinkingPreview() {
-    AuraHomePreviewContent(
-        state = previewHomeState(
-            isLoading = true,
-            presence = PresenceUiState(mode = PresenceMode.THINKING),
-        ),
-    )
-}
-
-@Preview(
-    name = "Home / Needs Config",
-    showBackground = true,
-    widthDp = 393,
-    heightDp = 852,
-)
-@Composable
-private fun AuraHomeNeedsConfigPreview() {
-    AuraHomePreviewContent(
-        state = previewHomeState(
-            configStatus = ChatConfigStatus(
-                label = "模型未配置",
-                isReady = false,
-                detail = "需要填写 API Key",
-            ),
-            presence = PresenceUiState(mode = PresenceMode.ERROR),
-        ),
-    )
-}
-
-@Preview(
-    name = "Home / Narrow",
-    showBackground = true,
-    widthDp = 320,
-    heightDp = 720,
-)
-@Composable
-private fun AuraHomeNarrowPreview() {
-    AuraHomePreviewContent(
-        state = previewHomeState(
-            presence = PresenceUiState(mode = PresenceMode.REMEMBERING),
-            memories = listOf(
-                ChatMemory(
-                    id = "memory-1",
-                    content = "用户喜欢晚上喝咖啡。",
-                    type = "PREFERENCE",
-                    importance = 0.72f,
-                ),
-            ),
-        ),
-    )
-}
-
-@Composable
-private fun AuraHomePreviewContent(state: ChatUiState) {
-    CompanionTheme {
-        AuraHomeContent(
-            uiState = state,
-            onInputTextChanged = {},
-            onSendMessage = {},
-            onOpenChat = {},
-            onPresenceTapped = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-private fun previewHomeState(
-    configStatus: ChatConfigStatus = ChatConfigStatus(
-        label = "GLM 已就绪",
-        isReady = true,
-        detail = "Preview",
-    ),
-    presence: PresenceUiState = PresenceUiState(),
-    messages: List<ChatMessage> = emptyList(),
-    memories: List<ChatMemory> = emptyList(),
-    isLoading: Boolean = false,
-): ChatUiState =
-    ChatUiState(
-        configStatus = configStatus,
-        presence = presence,
-        messages = messages,
-        memories = memories,
-        isLoading = isLoading,
-    )
 
 private fun DrawScope.drawAuraEar(
     left: Boolean,
