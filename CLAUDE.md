@@ -11,11 +11,11 @@
 
 ## 当前项目状态
 
-- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**
-- 已实现：Compose 聊天页、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用、Room/DataStore/Hilt、Agent tools。
-- 部分实现：模型配置、Vision 底层输入结构、情绪与关系核心、记忆注入。
-- 尚未实现：设置页、CameraX UI、语音、WorkManager pulse、通知、角色主屏、记忆房间。
-- 已验证：`./gradlew.bat testDebugUnitTest` 和 `./gradlew.bat assembleDebug` 于 2026-05-15 通过。
+- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形。
+- 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools；NavHost 五条路由（Home/Chat/Settings/McpSettings/MemoryRoom）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（`AndroidReminderScheduler` + AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）。
+- 部分实现：模型配置（设置页已落地，连通性检查仍缺）、Vision（`UserInput.Vision` 与图片 content 支持已有，CameraX UI 仍缺）、情绪与关系（持久化与可视化已接入，头像/表情层由 Compose Canvas 临时替代）、记忆（完整页面与 prompt 注入已实现，删除/置顶/归档仍缺）、Presence Layer（状态控制器已落地，Rive/Lottie 动画资源仍缺）。
+- 尚未实现：CameraX 预览/拍照/选图流程、`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest，缺少离线衰减 / 回归反应 / 主动通知）、Rive/Lottie 状态机动画、Instrumented UI 测试、隐私/导出/删除控制、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`。
+- 已验证：`./gradlew.bat testDebugUnitTest` 于 2026-06-14 通过（41 个测试，0 失败）。
 
 ## Compose UI: Window Insets 速查
 

@@ -3,11 +3,12 @@
 ## 当前项目状态
 
 - 项目名称：Aura · 奥拉（Android AI 陪伴应用）
-- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**
-- 已实现：Compose 聊天页、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用、Room/DataStore/Hilt 基础设施、Agent tools（记忆/情绪/关系）
-- 部分实现：模型配置、Vision 底层输入结构、情绪与关系核心、记忆注入
-- 尚未实现：设置页、CameraX UI、语音、WorkManager pulse、通知、角色主屏、记忆房间
+- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形
+- 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系）；NavHost 五条路由（Home/Chat/Settings/McpSettings/MemoryRoom）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）
+- 部分实现：模型配置（设置页已落地，连通性检查仍缺）、Vision（输入结构已支持，CameraX UI 仍缺）、情绪与关系（持久化与可视化已接入，头像层由 Compose Canvas 临时替代）、记忆（完整页面与 prompt 注入已实现，编辑/归档动作仍缺）、Presence Layer（状态控制器已落地，Rive/Lottie 动画资源仍缺）
+- 尚未实现：CameraX 预览/拍照/选图流程、`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest，缺少离线衰减 / 回归反应 / 主动通知）、Rive/Lottie 状态机动画、Instrumented UI 测试、隐私/导出/删除控制、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-06-14 通过（41 个测试，0 失败）
 
 ## 常用验证命令
 
@@ -35,46 +36,23 @@ make check
 ./gradlew.bat build
 ```
 
-以上 Gradle 命令已在 2026-05-16 验证通过。
+以上 Gradle 命令已在 2026-06-14 验证通过（`testDebugUnitTest` 41 个测试全绿）。
 
-## 工具路径
+## 工具路径与运行时环境
 
-### ADB_Cli — Android 调试工具集
-- **路径**: `D:\tools\ADB_Cli`
-- **版本**: ADB 1.0.41
-- **用途**: 与 Android 设备/模拟器交互（调试、刷机、安装应用）
-
-### Android Studio — IDE
-- **路径**: `D:\tools\Android_Studio`
-- **入口**: `D:\tools\Android_Studio\bin\studio64.exe`
-
-### Android_Studio_Cli — 命令行工具
-- **路径**: `D:\tools\Android_Studio_Cli`
-- **核心内容**: `cmdline-tools/bin` — sdkmanager、avdmanager 等
-
-## 运行时环境
-
-| 项目 | 版本/路径 |
-|------|-----------|
-| JDK | **21.0.6** (Oracle LTS) |
-| Kotlin | **2.3.21**（由 Gradle plugin 管理） |
-| AGP | **9.2.0** |
-| SDK Root | `C:\Users\gqy17\AppData\Local\Android\Sdk` |
-| SDK Platform | android-36 / android-36.1 |
-| Build Tools | 37.0.0 / 36.1.0 |
-| Git | 2.50.0 |
-| Node.js | v22.14.0 |
-| Python | 3.12.8 |
-
-> **注意**: `ANDROID_HOME` 和 `ANDROID_SDK_ROOT` 需设置为 `C:\Users\gqy17\AppData\Local\Android\Sdk`
+> 此节内容与 [`CLAUDE.md`](CLAUDE.md) 同步。**只在一处更新，然后同步到另一处**；如有冲突，以 CLAUDE.md 为准。
+>
+> 包含：ADB_Cli / Android Studio / Android_Studio_Cli 路径，以及 JDK 21.0.6 / Kotlin 2.3.21 / AGP 9.2.0 / SDK Platform android-36 / Build Tools 37.0.0 / Git 2.50.0 / Node.js v22.14.0 / Python 3.12.8 等版本信息，`ANDROID_HOME` 需设为 `C:\Users\gqy17\AppData\Local\Android\Sdk`。
 
 ## 关键文档
 
 - `README.md` — 项目概览、当前能力、构建命令
 - `docs/roadmap.md` — 当前进度、里程碑、近期建议顺序
 - `docs/architecture.md` — 架构目标与当前实现状态
-- `docs/koog-android-integration.md` — Koog Android 集成状态与注意事项
+- `docs/koog-api-reference.md` — Koog v0.8.0 完整 API 签名（从 Gradle 缓存 JAR 提取），Agent/Builder/Strategy/Service/Tool/Pipeline/Prompt&LLM 等 15 个模块
+- `docs/koog-android-integration.md` — Koog Android 集成状态与注意事项（线程规则、生命周期模式、待补项）
 - `docs/engineering-standards.md` — 测试、CI、代码规范
+- `docs/reference-android-ai-projects.md` — 同类 Android AI 聊天/陪伴开源项目调研（Operit / skydoves-chatgpt-android / gpt_mobile 等）
 
 ## ADB 日志与本地数据排查
 
