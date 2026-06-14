@@ -66,6 +66,10 @@ build/test-run.log
 screenshot_*.png
 screen_*.png
 
+# ADB debug screenshots / database dumps
+tmp-adb-screens/
+tmp-adb-db/
+
 # Device/UI dumps
 ui*.xml
 

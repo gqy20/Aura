@@ -61,6 +61,18 @@
 app/
 ├─ feature/                    # 功能模块（UI 层）
 │  ├─ chat/                    #   聊天对话（已实现）
+│  │  ├─ presence/             #     角色视觉(背景光晕 + Aura 本体)
+│  │  ├─ mapper/               #     Entity/Config → Chat* 纯函数映射
+│  │  ├─ usecase/              #     SendMessageUseCase / SettingsUseCase
+│  │  ├─ ChatViewModel.kt      #     编排器(8 个 collector + Presence 编排)
+│  │  ├─ ChatScreen.kt         #     聊天页 Composable 编排
+│  │  ├─ ChatHeader.kt         #     顶栏 + Memory/Reminders/MCP/Settings 入口
+│  │  ├─ ChatInputBar.kt       #     输入栏 + IME 副作用封装
+│  │  ├─ ChatDialogs.kt        #     弹窗集合(Reminders/Permission/Aura 原语)
+│  │  ├─ SettingsScreen.kt     #     设置页
+│  │  ├─ McpSettingsScreen.kt  #     MCP 服务配置
+│  │  ├─ MemoryRoomScreen.kt   #     记忆房间
+│  │  └─ AuraHomeScreen.kt     #     角色主屏入口
 │  ├─ avatar/                  #   角色主屏（规划中）
 │  ├─ memory_room/             #   记忆房间（规划中）
 │  ├─ settings/                #   设置页（规划中）
@@ -71,6 +83,9 @@ app/
 │  ├─ llm/                     #   Anthropic Messages 兼容 LLM client / executor
 │  ├─ prompt/                  #   ★ Prompt 组装引擎（自研）
 │  ├─ tools/                   #   Agent tools（已实现基础能力）
+│  ├─ presence/                #   PresenceController / PresenceReactionPolicy(状态推导与反应节流)
+│  ├─ local/                   #   本地 LLM 链路(MNN + Qwen 模型下载/加载/推理)
+│  ├─ reminder/                #   提醒系统(AlarmManager + Worker)
 │  ├─ logging/                 #   日志封装与字段脱敏
 │  └─ pulse/                   #   ★ 生命脉冲策略（规划中）
 │
@@ -88,7 +103,24 @@ app/
    └─ permissions/            #   权限管理
 ```
 
-> 上面包含目标形态。当前源码中已经落地 `feature/chat`、`core/companion`、`core/llm`、`core/prompt`、`core/tools`、`core/logging`、`data`、`di`；`platform` 与多数非聊天 feature 仍在 roadmap 中。
+> 上面包含目标形态。当前源码中已经落地 `feature/chat`（含 `presence` / `mapper` / `usecase` 三个子包）、`core/companion`、`core/llm`、`core/prompt`、`core/tools`、`core/logging`、`core/presence`、`core/local`、`core/reminder`、`data`、`di`；`platform` 与多数非聊天 feature 仍在 roadmap 中。
+
+### 2.1 核心调用链（聊天主路径）
+
+```text
+ChatScreen (Composable)
+  └─→ ChatViewModel (@HiltViewModel)
+        ├─ 8 个 init { launch } collector(配置 / 状态 / 消息 / 记忆 / 提醒 / 工具 / 偏好)
+        ├─ Presence 编排(withPresence / triggerPresenceReaction)
+        └─ 委托给 UseCase:
+              ├─ SendMessageUseCase  → CompanionRuntime → Koog AIAgent → LLM
+              │     └─ 消费 AgentEvent 流(Streaming / ToolCall / MemorySaved / Complete / Error)
+              └─ SettingsUseCase     → ConfigRepository / AppPreferences / LocalQwenModelDownloader
+```
+
+- **ViewModel 只做编排**：8 个 collector 把仓库状态汇入 `uiState`；复杂业务交给 UseCase
+- **UseCase 不持有 MutableStateFlow**：通过 `(ChatUiState.() -> ChatUiState) -> Unit` 回调写状态,可独立单元测试
+- **Mapper 全部为纯函数**：`feature/chat/mapper/ChatMappers.kt` 集中 9 个 Entity/Config → Chat* 映射,无副作用
 
 ### 自研范围（标 ★）
 

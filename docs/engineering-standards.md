@@ -509,6 +509,19 @@ main (受保护)
 - [ ] Room 查询是否有合适索引？
 - [ ] 大列表是否使用了 LazyColumn？
 
+### 3.7 开发边界（架构硬约束）
+
+以下规则与本节其他规范具有同等优先级,违反应作为 PR 阻断项:
+
+| 编号 | 规则 | 原因 |
+|------|------|------|
+| B1 | **不要在 Activity / Fragment / Compose UI 中直接创建 `AIAgent` 或 LLM client** | UI 层只消费 ViewModel 暴露的状态;Koog 细节留在 `runtime` / `factory` / `llm` 层 |
+| B2 | **UI 层只消费 ViewModel 暴露的 StateFlow / SharedFlow** | Koog 事件、LLM 响应解析、Tool 协议不得泄漏到 Composable |
+| B3 | **`CompanionRuntime` 是主流程编排层** | 新增 Agent 行为前先确认归属:runtime / tool / repository / UseCase / UI,避免在错误层堆逻辑 |
+| B4 | **记忆 / 情绪 / 关系写入以"回复完成后系统阶段"为主** | 不要轻易重新暴露为主对话可写工具,避免模型自行写敏感状态 |
+| B5 | **Vision 主回复禁用 tools** | Vision 路径只走图像理解,工具调用留给回复后的 reflection 做记忆整理 |
+| B6 | **改 Room schema / DataStore key / Prompt 行为 / 工具协议时必须同步补测试** | 任何涉及持久化、配置或跨层契约的改动,先写测试再改实现 |
+
 ---
 
 ## 四、质量门禁
