@@ -136,7 +136,7 @@ for r in conn.execute('select id, type, source, importance, confidence, timestam
     d['timestamp'] = ms(d['timestamp'])
     d['updatedAt'] = ms(d['updatedAt'])
     print(d)
-'@ | python -
+'@ | uv run python -
 ```
 
 排查重点：

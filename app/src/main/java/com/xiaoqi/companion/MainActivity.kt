@@ -5,6 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -49,11 +56,38 @@ private fun AuraAppNavHost(
     viewModel: ChatViewModel,
     navController: NavHostController = rememberNavController(),
 ) {
+    val slideIn = slideInHorizontally(
+        initialOffsetX = { it },
+        animationSpec = tween(300),
+    ) + fadeIn(animationSpec = tween(300))
+    val slideOut = slideOutHorizontally(
+        targetOffsetX = { -it / 3 },
+        animationSpec = tween(300),
+    ) + fadeOut(animationSpec = tween(300))
+    val popSlideIn = slideInHorizontally(
+        initialOffsetX = { -it },
+        animationSpec = tween(300),
+    ) + fadeIn(animationSpec = tween(300))
+    val popSlideOut = slideOutHorizontally(
+        targetOffsetX = { it },
+        animationSpec = tween(300),
+    ) + fadeOut(animationSpec = tween(300))
+
     NavHost(
         navController = navController,
         startDestination = AuraRoutes.Home,
+        enterTransition = { slideIn },
+        exitTransition = { slideOut },
+        popEnterTransition = { popSlideIn },
+        popExitTransition = { popSlideOut },
     ) {
-        composable(AuraRoutes.Home) {
+        composable(
+            route = AuraRoutes.Home,
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
+        ) {
             AuraHomeScreen(
                 viewModel = viewModel,
                 onOpenChat = { navController.navigate(AuraRoutes.Chat) },

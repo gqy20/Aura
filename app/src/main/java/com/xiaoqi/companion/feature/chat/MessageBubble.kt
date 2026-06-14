@@ -40,13 +40,13 @@ import coil.compose.AsyncImage
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MessageBubble(message: ChatMessage) {
+fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val isUser = message.role == "USER"
     val contentColor = if (isUser) Color(0xFF20362F) else MaterialTheme.colorScheme.onSurface
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top,
     ) {
