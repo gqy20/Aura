@@ -69,7 +69,7 @@ class PresenceController @Inject constructor() {
             PresenceMode.THINKING -> "Thinking"
             PresenceMode.SPEAKING -> "Replying"
             PresenceMode.SEARCHING -> "Searching"
-            PresenceMode.REMEMBERING -> "Saved"
+            PresenceMode.REMEMBERING -> ""
             PresenceMode.HAPPY -> "Bright"
             PresenceMode.SAD -> "Soft"
             PresenceMode.TIRED -> "Resting"

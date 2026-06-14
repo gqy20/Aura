@@ -91,10 +91,9 @@ internal fun InputBar(
     var imeStuck by remember { mutableStateOf(false) }
 
     Surface(
-        color = Color.White.copy(alpha = 0.74f),
-        shadowElevation = 6.dp,
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(28.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(
@@ -112,9 +111,8 @@ internal fun InputBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Surface(
-                    color = Color(0xFFFFF8EA),
+                    color = InputBarContainerColor,
                     shape = CircleShape,
-                    shadowElevation = 1.dp,
                 ) {
                     IconButton(
                         onClick = onPickImage,
@@ -154,9 +152,9 @@ internal fun InputBar(
                     shape = RoundedCornerShape(22.dp),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color(0xFFFFFCF6),
-                        unfocusedContainerColor = Color(0xFFFFF8EA),
-                        disabledContainerColor = Color(0xFFEDE4D3),
-                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedContainerColor = InputBarContainerColor,
+                        disabledContainerColor = InputBarContainerColor.copy(alpha = 0.6f),
+                        focusedIndicatorColor = Color(0xFF496B5E).copy(alpha = 0.18f),
                         unfocusedIndicatorColor = Color.Transparent,
                         cursorColor = Color(0xFF496B5E),
                     ),
@@ -169,7 +167,7 @@ internal fun InputBar(
                     )
                 } else {
                     Surface(
-                        color = if (canSend) Color(0xFFDDE8D9) else Color(0xFFE4DBC9),
+                        color = if (canSend) Color(0xFFDDE8D9) else InputBarContainerColor,
                         shape = CircleShape,
                     ) {
                         IconButton(
@@ -180,7 +178,7 @@ internal fun InputBar(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = null,
-                                tint = if (canSend) Color(0xFF496B5E) else Color(0xFF918B82),
+                                tint = if (canSend) Color(0xFF496B5E) else Color(0xFF496B5E).copy(alpha = 0.32f),
                             )
                         }
                     }
@@ -319,3 +317,7 @@ private fun Context.showInputMethodPicker() {
 
 private const val MIN_USEFUL_IME_HEIGHT_RATIO = 0.12f
 private const val IME_STUCK_CHECK_INTERVAL_MS = 350L
+
+// 图片按钮 / 输入框 unfocused / 发送按钮 disabled 共用同一容器色,
+// 比 #FFF8EA 再淡一档,让三处看起来同源;焦点态用 #FFFCF6 区分。
+private val InputBarContainerColor = Color(0xFFFBF5E7)

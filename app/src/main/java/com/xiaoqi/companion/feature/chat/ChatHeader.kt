@@ -3,10 +3,13 @@ package com.xiaoqi.companion.feature.chat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
@@ -68,12 +71,21 @@ internal fun CompanionHeader(
         ) {
             AuraPetAvatar(
                 presence = presence,
-                size = 42.dp,
+                size = 40.dp,
                 onClick = onPresenceTapped,
             )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(0.dp),
+            // Aura 标题 + 副标题横向排成一行,占满到右侧 icon,
+            // 避免 Column 双行撑高 Row 让"Aura" 文字偏离 Row 中心。
+            // 副标题为空时直接不渲染,不占行高。
+            // Text 显式 height(48.dp) + wrapContentHeight 让 glyph 视觉中心
+            // 跟外 Row 中心对齐(否则 lineHeight 容器会让 glyph 偏上 12px)。
+            val subtitle = presence.chatHeaderStatus(configStatus)
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "Aura",
@@ -82,14 +94,21 @@ internal fun CompanionHeader(
                     color = Color(0xFF496B5E),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .height(48.dp)
+                        .wrapContentHeight(align = Alignment.CenterVertically),
                 )
-                Text(
-                    text = presence.chatHeaderStatus(configStatus),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.wrapContentHeight(align = Alignment.CenterVertically),
+                    )
+                }
             }
             HeaderActionIcon(
                 imageVector = Icons.Default.Favorite,
@@ -111,16 +130,11 @@ internal fun CompanionHeader(
                 contentDescription = "Open MCP",
                 active = mcpLabel != "MCP",
             )
-            IconButton(
+            HeaderActionIcon(
+                imageVector = Icons.Default.Settings,
                 onClick = onOpenSettings,
-                modifier = Modifier.semantics { contentDescription = "Open settings" },
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
-                )
-            }
+                contentDescription = "Open settings",
+            )
         }
 
         if (!configStatus.isReady) {
@@ -138,11 +152,11 @@ private fun HeaderActionIcon(
     active: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.size(34.dp)) {
+    Box(modifier = modifier.size(40.dp)) {
         IconButton(
             onClick = onClick,
             modifier = Modifier
-                .size(34.dp)
+                .size(40.dp)
                 .semantics { this.contentDescription = contentDescription },
         ) {
             Icon(
@@ -153,7 +167,7 @@ private fun HeaderActionIcon(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f)
                 },
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
         badge?.let {
