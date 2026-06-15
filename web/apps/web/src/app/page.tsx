@@ -28,13 +28,14 @@ const PhoneOrb = dynamic(
  * - SplitText 逐字符进场
  * - Mesh Gradient 背景 + 3D 手机主视觉
  * - 2 段滚动叙事（Presence / Memory）
- * - 移动端降级
+ * - 沉浸式布局：nav / Hero / Data Strip / 滚动叙事 / footer 全部铺满视口
+ *   （删除原 max-w-[1400px] 容器，文字区单独加水平内边距）
  */
 export default function Home() {
   return (
     <SmoothScroll>
       <MagneticCursor />
-      <main className="relative min-h-screen overflow-hidden">
+      <main className="relative min-h-screen overflow-x-clip">
         {/* ─── 全局深色底（叙事段/footer 用） ─── */}
         <div
           aria-hidden
@@ -42,14 +43,18 @@ export default function Home() {
           style={{ background: '#08090a' }}
         />
 
-        <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col px-6 sm:px-10 lg:px-16">
+        {/* 沉浸式首页：nav / Hero / Data Strip 全部铺满视口
+            - 文字区保留 px-6 sm:px-10 lg:px-16 让阅读舒适
+            - Hero 内的 Mesh Gradient 背景 / PhoneOrb 仍 absolute 撑满 viewport
+        */}
+        <div className="flex min-h-screen flex-col">
           <AnnouncementBar />
           {/* ─── Nav ─── */}
           <motion.nav
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="flex h-20 items-center justify-between"
+            className="flex h-20 items-center justify-between px-6 sm:px-10 lg:px-16"
           >
             <Link href="/" className="flex items-center gap-2" aria-label="Aura home">
               <AuraLogo size={28} />
@@ -87,7 +92,7 @@ export default function Home() {
 
           {/* ─── Hero ─── */}
           <section className="relative min-h-[90vh] overflow-hidden">
-            {/* Hero 内的 Mesh Gradient 背景（仅桌面） */}
+            {/* Hero 内的 Mesh Gradient 背景（仅桌面，撑满整个 section） */}
             <div
               className="pointer-events-none absolute inset-0 hidden md:block"
               style={{
@@ -110,7 +115,7 @@ export default function Home() {
               }}
             />
 
-            <div className="relative grid h-full min-h-[90vh] grid-cols-1 items-center gap-12 pb-16 pt-12 md:grid-cols-2">
+            <div className="relative grid h-full min-h-[90vh] grid-cols-1 items-center gap-12 px-6 pb-16 pt-12 sm:px-10 md:grid-cols-2 lg:px-16">
               {/* 左：文字 */}
               <div className="flex flex-col">
                 <motion.p
@@ -202,7 +207,7 @@ export default function Home() {
 
           {/* ─── Data Strip ─── */}
           <section className="border-t border-border py-12">
-            <dl className="grid grid-cols-2 gap-x-12 gap-y-8 sm:grid-cols-3">
+            <dl className="grid grid-cols-2 gap-x-12 gap-y-8 px-6 sm:grid-cols-3 sm:px-10 lg:px-16">
               {[
                 { label: '模块数', value: '7' },
                 { label: 'Kotlin 代码行', value: '12k+' },
@@ -236,17 +241,15 @@ export default function Home() {
           <ScrollSection
             number="02"
             title="它替你记住一切。"
-            description="每一次对话都被结构化地保存，不是简单日志，而是可被大模型调用的记忆图谱。从早安到晚安，从今天到明年。"
+            description="每一次对话都被结构化地保存，不是简单日志，而是可被 LLM 调用的记忆图谱。从早安到晚安，从今天到明年。"
           />
         </div>
 
         {/* ─── Footer ─── */}
-        <div className="mx-auto max-w-6xl px-8 sm:px-12">
-          <footer className="flex items-center justify-between border-t border-border py-8 font-mono text-xs text-muted">
-            <span>© 2026 Aura · 开源</span>
-            <span>P2 · 三个特性深度页</span>
-          </footer>
-        </div>
+        <footer className="flex items-center justify-between border-t border-border px-6 py-8 font-mono text-xs text-muted sm:px-10 lg:px-16">
+          <span>© 2026 Aura · 开源</span>
+          <span>P2 · 三个特性深度页</span>
+        </footer>
       </main>
     </SmoothScroll>
   )
