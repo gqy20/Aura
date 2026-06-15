@@ -8,6 +8,7 @@ import { SmoothScroll } from '@/components/SmoothScroll'
 import { ScrollSection } from '@/components/ScrollSection'
 import { MagneticCursor } from '@/components/MagneticCursor'
 import { AnnouncementBar } from '@/components/AnnouncementBar'
+import { AuraLogo } from '@/components/AuraLogo'
 
 // 3D 组件仅客户端渲染，禁用 SSR
 const MeshGradient = dynamic(
@@ -49,8 +50,11 @@ export default function Home() {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="flex h-20 items-center justify-between"
           >
-            <Link href="/" className="font-mono text-sm font-medium tracking-tight">
-              aura<span className="text-accent">.</span>
+            <Link href="/" className="flex items-center gap-2" aria-label="Aura home">
+              <AuraLogo size={28} />
+              <span className="font-mono text-sm font-medium tracking-tight">
+                aura<span className="text-accent">.</span>
+              </span>
             </Link>
             <div className="flex items-center gap-6 text-sm sm:gap-8">
               <Link

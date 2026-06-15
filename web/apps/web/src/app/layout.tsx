@@ -34,6 +34,11 @@ export const metadata: Metadata = {
     title: 'Aura — AI companion that lives with you',
     description: 'Presence, memory, and local LLM in your pocket.',
   },
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 }
 
 export const viewport: Viewport = {
