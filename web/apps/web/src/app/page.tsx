@@ -50,7 +50,25 @@ export default function Home() {
             <Link href="/" className="font-mono text-sm font-medium tracking-tight">
               aura<span className="text-accent">.</span>
             </Link>
-            <div className="flex items-center gap-8 text-sm">
+            <div className="flex items-center gap-6 text-sm sm:gap-8">
+              <Link
+                href="/presence"
+                className="text-muted transition-colors hover:text-foreground"
+              >
+                Presence
+              </Link>
+              <Link
+                href="/memory"
+                className="text-muted transition-colors hover:text-foreground"
+              >
+                Memory
+              </Link>
+              <Link
+                href="/agent"
+                className="text-muted transition-colors hover:text-foreground"
+              >
+                Agent
+              </Link>
               <Link
                 href="https://github.com"
                 className="text-muted transition-colors hover:text-foreground"
@@ -199,7 +217,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-8 sm:px-12">
           <footer className="flex items-center justify-between border-t border-border py-8 font-mono text-xs text-muted">
             <span>© 2026 Aura · Open Source</span>
-            <span>P1 · Lenis + 滚动叙事</span>
+            <span>P2 · 三个特性深度页</span>
           </footer>
         </div>
       </main>
