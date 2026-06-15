@@ -154,3 +154,15 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* 磁性光标启用时，隐藏原生光标 */
+html.cursor-hidden,
+html.cursor-hidden * {
+  cursor: none !important;
+}
+
+html.cursor-hidden a,
+html.cursor-hidden button,
+html.cursor-hidden [data-cursor='hover'] {
+  cursor: none !important;
+}

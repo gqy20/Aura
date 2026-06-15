@@ -23,12 +23,12 @@ function HeroPhone() {
       const { x, y } = state.mouse
       group.current.rotation.y = THREE.MathUtils.lerp(
         group.current.rotation.y,
-        x * 0.3,
+        x * 0.25,
         0.05,
       )
       group.current.rotation.x = THREE.MathUtils.lerp(
         group.current.rotation.x,
-        -y * 0.2,
+        -y * 0.15,
         0.05,
       )
     }
@@ -38,8 +38,8 @@ function HeroPhone() {
   })
 
   return (
-    <group ref={group}>
-      <Float speed={1.4} rotationIntensity={0.4} floatIntensity={0.8}>
+    <group ref={group} scale={0.7}>
+      <Float speed={1.4} rotationIntensity={0.3} floatIntensity={0.6}>
         {/* 手机外框 */}
         <RoundedBox args={[1.2, 2.4, 0.12]} radius={0.18} smoothness={6}>
           <meshStandardMaterial
@@ -80,7 +80,7 @@ function HeroPhone() {
 export function PhoneOrb() {
   return (
     <Canvas
-      camera={{ position: [0, 0, 4.5], fov: 35 }}
+      camera={{ position: [0, 0, 5], fov: 32 }}
       gl={{ antialias: true, alpha: true }}
       dpr={[1, 2]}
       className="absolute inset-0 h-full w-full"

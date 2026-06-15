@@ -6,6 +6,7 @@ import { motion } from 'motion/react'
 import { SplitText } from '@/components/SplitText'
 import { SmoothScroll } from '@/components/SmoothScroll'
 import { ScrollSection } from '@/components/ScrollSection'
+import { MagneticCursor } from '@/components/MagneticCursor'
 
 // 3D 组件仅客户端渲染，禁用 SSR
 const MeshGradient = dynamic(
@@ -29,20 +30,13 @@ const PhoneOrb = dynamic(
 export default function Home() {
   return (
     <SmoothScroll>
+      <MagneticCursor />
       <main className="relative min-h-screen overflow-hidden">
-        {/* ─── Mesh Gradient 背景（仅桌面） ─── */}
-        <div className="pointer-events-none absolute inset-0 -z-10 hidden md:block">
-          <MeshGradient />
-        </div>
-
-        {/* 移动端降级：纯 CSS 渐变 */}
+        {/* ─── 全局深色底（叙事段/footer 用） ─── */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 md:hidden"
-          style={{
-            background:
-              'radial-gradient(ellipse 60% 40% at 15% 0%, rgba(124, 92, 255, 0.12), transparent), radial-gradient(ellipse 50% 35% at 85% 100%, rgba(124, 92, 255, 0.06), transparent)',
-          }}
+          className="pointer-events-none fixed inset-0 -z-20"
+          style={{ background: '#08090a' }}
         />
 
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-8 sm:px-12">
@@ -67,68 +61,93 @@ export default function Home() {
           </motion.nav>
 
           {/* ─── Hero ─── */}
-          <section className="relative grid flex-1 grid-cols-1 items-center gap-12 pb-24 pt-12 md:grid-cols-2">
-            {/* 左：文字 */}
-            <div className="flex flex-col">
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                className="mb-12 font-mono text-xs uppercase tracking-[0.2em] text-muted"
-              >
-                v0 · coming soon
-              </motion.p>
-
-              <h1 className="relative z-10 max-w-xl text-balance text-5xl font-medium leading-[1.05] tracking-tight sm:text-6xl md:text-6xl lg:text-7xl">
-                <span className="block">
-                  <SplitText text="The AI companion" stagger={0.045} delay={0.4} />
-                </span>
-                <span className="block">
-                  <SplitText
-                    text="that lives with you."
-                    stagger={0.045}
-                    delay={0.95}
-                  />
-                </span>
-              </h1>
-
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 1.6, ease: [0.22, 1, 0.36, 1] }}
-                className="mt-10 max-w-xl text-pretty text-lg leading-relaxed text-muted sm:text-xl"
-              >
-                Aura 是一个开源 AI 陪伴应用，把 Presence（存在感）、Memory（记忆）和 Local LLM
-                装进你的口袋。
-              </motion.p>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 1.8, ease: [0.22, 1, 0.36, 1] }}
-                className="mt-12 flex flex-wrap items-center gap-4"
-              >
-                <Link
-                  href="#"
-                  className="group inline-flex h-12 items-center justify-center rounded-full bg-foreground px-7 text-sm font-medium text-background transition-all hover:bg-foreground/90"
-                >
-                  Start
-                  <span className="ml-1 transition-transform group-hover:translate-x-0.5">
-                    →
-                  </span>
-                </Link>
-                <Link
-                  href="https://github.com"
-                  className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong px-7 text-sm font-medium text-foreground transition-all hover:bg-subtle"
-                >
-                  View on GitHub
-                </Link>
-              </motion.div>
+          <section className="relative min-h-[90vh] overflow-hidden">
+            {/* Hero 内的 Mesh Gradient 背景（仅桌面） */}
+            <div
+              className="pointer-events-none absolute inset-0 hidden md:block"
+              style={{
+                WebkitMaskImage:
+                  'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
+                maskImage:
+                  'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
+              }}
+            >
+              <MeshGradient />
             </div>
 
-            {/* 右：3D 主视觉（仅桌面，浮于背景层） */}
-            <div className="pointer-events-none absolute right-0 top-1/2 hidden h-[500px] w-1/2 -translate-y-1/2 md:block">
-              <PhoneOrb />
+            {/* 移动端 Hero 降级 */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 md:hidden"
+              style={{
+                background:
+                  'radial-gradient(ellipse 60% 40% at 15% 0%, rgba(124, 92, 255, 0.12), transparent), radial-gradient(ellipse 50% 35% at 85% 100%, rgba(124, 92, 255, 0.06), transparent)',
+              }}
+            />
+
+            <div className="relative grid h-full min-h-[90vh] grid-cols-1 items-center gap-12 pb-16 pt-12 md:grid-cols-2">
+              {/* 左：文字 */}
+              <div className="flex flex-col">
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  className="mb-12 font-mono text-xs uppercase tracking-[0.2em] text-muted"
+                >
+                  v0 · coming soon
+                </motion.p>
+
+                <h1 className="relative z-10 max-w-xl text-balance text-5xl font-medium leading-[1.05] tracking-tight sm:text-6xl md:text-6xl lg:text-7xl">
+                  <span className="block">
+                    <SplitText text="The AI companion" stagger={0.045} delay={0.4} />
+                  </span>
+                  <span className="block">
+                    <SplitText
+                      text="that lives with you."
+                      stagger={0.045}
+                      delay={0.95}
+                    />
+                  </span>
+                </h1>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 1.6, ease: [0.22, 1, 0.36, 1] }}
+                  className="mt-10 max-w-xl text-pretty text-lg leading-relaxed text-muted sm:text-xl"
+                >
+                  Aura 是一个开源 AI 陪伴应用，把 Presence（存在感）、Memory（记忆）和 Local LLM
+                  装进你的口袋。
+                </motion.p>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 1.8, ease: [0.22, 1, 0.36, 1] }}
+                  className="mt-12 flex flex-wrap items-center gap-4"
+                >
+                  <Link
+                    href="#"
+                    className="group inline-flex h-12 items-center justify-center rounded-full bg-foreground px-7 text-sm font-medium text-background transition-all hover:bg-foreground/90"
+                  >
+                    Start
+                    <span className="ml-1 transition-transform group-hover:translate-x-0.5">
+                      →
+                    </span>
+                  </Link>
+                  <Link
+                    href="https://github.com"
+                    className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong px-7 text-sm font-medium text-foreground transition-all hover:bg-subtle"
+                  >
+                    View on GitHub
+                  </Link>
+                </motion.div>
+              </div>
+
+              {/* 右：3D 主视觉（仅桌面，浮于背景层） */}
+              <div className="pointer-events-none absolute right-0 top-1/2 hidden h-[420px] w-[55%] -translate-y-1/2 md:block">
+                <PhoneOrb />
+              </div>
             </div>
           </section>
 
