@@ -17,6 +17,7 @@ import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.InsightRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MemoryRepository
@@ -64,6 +65,7 @@ class ChatViewModelTest {
     private lateinit var toolCallRepository: FakeToolCallRepository
     private lateinit var reminderRepository: FakeReminderRepository
     private lateinit var memoryRepository: MemoryRepository
+    private lateinit var insightRepository: InsightRepository
     private lateinit var agentStateDao: AgentStateDao
     private lateinit var appPreferences: AppPreferences
     private lateinit var remoteMcpClient: RemoteMcpClient
@@ -170,6 +172,10 @@ class ChatViewModelTest {
         memoryRepository = mockk(relaxed = true) {
             every { observeMemoriesPinnedFirst() } returns flowOf(emptyList())
         }
+        insightRepository = mockk(relaxed = true) {
+            every { observeVisibleNotMuted(any()) } returns flowOf(emptyList())
+            coEvery { seedDemoInsights() } returns 0
+        }
         remoteMcpClient = mockk(relaxed = true)
         agentStateDao = mockk(relaxed = true) {
             every { observeByCompanionId("default") } returns flowOf(null)
@@ -183,6 +189,7 @@ class ChatViewModelTest {
             configRepository = configRepo,
             messageRepository = messageRepo,
             memoryRepository = memoryRepository,
+            insightRepository = insightRepository,
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,
@@ -330,6 +337,7 @@ class ChatViewModelTest {
             configRepository = configRepo,
             messageRepository = imageMessageRepo,
             memoryRepository = memoryRepository,
+            insightRepository = insightRepository,
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,

@@ -31,6 +31,9 @@ interface MemoryDao {
     @Query("SELECT * FROM memories WHERE id = :id")
     suspend fun getById(id: String): MemoryEntity?
 
+    @Query("SELECT EXISTS(SELECT 1 FROM memories WHERE id = :id)")
+    suspend fun existsById(id: String): Boolean
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: MemoryEntity)
 

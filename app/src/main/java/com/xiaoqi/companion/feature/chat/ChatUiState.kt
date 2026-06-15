@@ -64,6 +64,19 @@ data class ChatReminder(
     val status: String,
 )
 
+data class ChatInsight(
+    val id: Long,
+    val triggerType: String,
+    val category: String,
+    val headline: String,
+    val bodyMarkdown: String,
+    val confidence: Float,
+    val relevanceWindow: String,
+    val status: String,
+    val evidenceView: com.xiaoqi.companion.data.repository.InsightEvidenceView =
+        com.xiaoqi.companion.data.repository.InsightEvidenceView(),
+)
+
 data class ChatConfigStatus(
     val label: String = "Checking model",
     val isReady: Boolean = false,
@@ -139,4 +152,5 @@ data class ChatUiState(
     val connectivityResult: ConnectivityResult? = null,
     val mcpConnectivityResult: ConnectivityResult? = null,
     val isCheckingConnectivity: Boolean = false,
+    val insights: List<ChatInsight> = emptyList(),
 )

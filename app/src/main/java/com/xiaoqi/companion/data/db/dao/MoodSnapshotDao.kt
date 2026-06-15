@@ -19,6 +19,9 @@ interface MoodSnapshotDao {
     @Query("SELECT * FROM mood_snapshots WHERE companion_id = :companionId ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLatestSnapshot(companionId: String): MoodSnapshotEntity?
 
+    @Query("SELECT EXISTS(SELECT 1 FROM mood_snapshots WHERE id = :id)")
+    suspend fun existsById(id: String): Boolean
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: MoodSnapshotEntity)
 

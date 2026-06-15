@@ -7,8 +7,10 @@ import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
+import com.xiaoqi.companion.data.db.entity.InsightEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
+import com.xiaoqi.companion.data.repository.InsightRepository
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import com.xiaoqi.companion.feature.chat.ChatConfigStatus
@@ -16,6 +18,7 @@ import com.xiaoqi.companion.feature.chat.ChatImageAttachment
 import com.xiaoqi.companion.feature.chat.ChatMemory
 import com.xiaoqi.companion.feature.chat.ChatMessage
 import com.xiaoqi.companion.feature.chat.ChatReminder
+import com.xiaoqi.companion.feature.chat.ChatInsight
 import com.xiaoqi.companion.feature.chat.ChatToolCall
 import com.xiaoqi.companion.feature.chat.CompanionStatus
 import com.xiaoqi.companion.feature.chat.LocalQwenDownloadUiState
@@ -62,6 +65,19 @@ internal fun ReminderEntity.toChatReminder(): ChatReminder =
         triggerAtMillis = triggerAtMillis,
         exact = exact,
         status = status,
+    )
+
+internal fun InsightEntity.toChatInsight(): ChatInsight =
+    ChatInsight(
+        id = id,
+        triggerType = triggerType,
+        category = category,
+        headline = headline,
+        bodyMarkdown = bodyMarkdown,
+        confidence = confidence,
+        relevanceWindow = relevanceWindow,
+        status = status,
+        evidenceView = com.xiaoqi.companion.data.repository.InsightRepository.decodeEvidenceStatic(this),
     )
 
 internal fun ToolCallSnapshot.toChatToolCall(displayLabel: String): ChatToolCall =

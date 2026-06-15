@@ -29,6 +29,9 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getById(id: String): MessageEntity?
 
+    @Query("SELECT EXISTS(SELECT 1 FROM messages WHERE id = :id)")
+    suspend fun existsById(id: String): Boolean
+
     @Query(
         """
         SELECT * FROM messages

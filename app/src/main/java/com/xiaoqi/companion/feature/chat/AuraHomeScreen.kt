@@ -12,13 +12,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Favorite
@@ -31,6 +35,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -67,6 +74,11 @@ fun AuraHomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    var actionInsight by remember {
+        mutableStateOf<com.xiaoqi.companion.feature.chat.ChatInsight?>(null)
+    }
+    var showEvidence by remember { mutableStateOf(false) }
+
     AuraHomeContent(
         uiState = uiState,
         onOpenChat = onOpenChat,
@@ -74,6 +86,29 @@ fun AuraHomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenMemoryRoom = onOpenMemoryRoom,
         onOpenMcpSettings = onOpenMcpSettings,
+        onInsightClick = { insight -> viewModel.openInsight(insight.id) },
+        onInsightLongPress = { insight ->
+            showEvidence = false
+            actionInsight = insight
+        },
+        onInsightDismiss = { insight -> viewModel.dismissInsight(insight.id) },
+        onInsightChat = { insight -> viewModel.openInsight(insight.id) },
+        actionInsight = actionInsight,
+        onActionDismiss = { actionInsight = null; showEvidence = false },
+        onActionMute = { insight, days ->
+            viewModel.muteInsightCategory(insight.id, insight.category, days)
+            actionInsight = null
+        },
+        onActionAcknowledge = { insight ->
+            viewModel.dismissInsight(insight.id)
+            actionInsight = null
+        },
+        onShowEvidence = { showEvidence = !showEvidence },
+        onChatFromAction = { insight ->
+            viewModel.openInsight(insight.id)
+            actionInsight = null
+        },
+        showEvidence = showEvidence,
     )
 }
 
@@ -85,6 +120,17 @@ private fun AuraHomeContent(
     onOpenSettings: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
     onOpenMcpSettings: () -> Unit,
+    onInsightClick: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
+    onInsightLongPress: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
+    onInsightDismiss: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
+    onInsightChat: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
+    actionInsight: com.xiaoqi.companion.feature.chat.ChatInsight?,
+    onActionDismiss: () -> Unit,
+    onActionMute: (com.xiaoqi.companion.feature.chat.ChatInsight, Int) -> Unit,
+    onActionAcknowledge: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
+    onShowEvidence: () -> Unit,
+    onChatFromAction: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
+    showEvidence: Boolean,
 ) {
     val presenceColors = uiState.presence.homePalette().animated()
 
@@ -106,31 +152,66 @@ private fun AuraHomeContent(
                     )
                 ),
         ) {
-            Column(
+            androidx.compose.foundation.lazy.LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .navigationBarsPadding()
                     .padding(horizontal = 24.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                HomeTopBar(
-                    onOpenMemoryRoom = onOpenMemoryRoom,
-                    onOpenMcpSettings = onOpenMcpSettings,
-                    onOpenSettings = onOpenSettings,
-                )
-
-                PresenceStage(
-                    uiState = uiState,
-                    palette = presenceColors,
-                    onPresenceTapped = onPresenceTapped,
-                    onOpenChat = onOpenChat,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                )
+                item {
+                    HomeTopBar(
+                        onOpenMemoryRoom = onOpenMemoryRoom,
+                        onOpenMcpSettings = onOpenMcpSettings,
+                        onOpenSettings = onOpenSettings,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                item {
+                    PresenceStage(
+                        uiState = uiState,
+                        palette = presenceColors,
+                        onPresenceTapped = onPresenceTapped,
+                        onOpenChat = onOpenChat,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 280.dp),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                }
+                if (uiState.insights.isNotEmpty()) {
+                    item {
+                        com.xiaoqi.companion.feature.insight.InsightCardList(
+                            insights = uiState.insights,
+                            onInsightClick = onInsightClick,
+                            onInsightLongPress = onInsightLongPress,
+                            onInsightDismiss = onInsightDismiss,
+                            onInsightChat = onInsightChat,
+                        )
+                    }
+                }
+                item {
+                    Spacer(
+                        Modifier.windowInsetsBottomHeight(
+                            androidx.compose.foundation.layout.WindowInsets.navigationBars,
+                        ),
+                    )
+                }
             }
         }
+    }
+
+    actionInsight?.let { insight ->
+        com.xiaoqi.companion.feature.insight.InsightLongPressDialog(
+            insight = insight,
+            evidence = insight.evidenceView,
+            showEvidence = showEvidence,
+            onDismiss = onActionDismiss,
+            onMute = { days -> onActionMute(insight, days) },
+            onAcknowledge = { onActionAcknowledge(insight) },
+            onShowEvidence = onShowEvidence,
+            onChat = { onChatFromAction(insight) },
+        )
     }
 }
 

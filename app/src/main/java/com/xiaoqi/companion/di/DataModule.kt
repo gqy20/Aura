@@ -10,6 +10,7 @@ import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.db.CompanionDatabase
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
@@ -71,6 +72,7 @@ object DataModule {
                 CompanionDatabase.MIGRATION_3_4,
                 CompanionDatabase.MIGRATION_4_5,
                 CompanionDatabase.MIGRATION_5_6,
+                CompanionDatabase.MIGRATION_6_7,
             )
             .build()
 
@@ -101,4 +103,8 @@ object DataModule {
     @Provides
     fun provideReminderDao(database: CompanionDatabase): ReminderDao =
         database.reminderDao()
+
+    @Provides
+    fun provideInsightDao(database: CompanionDatabase): InsightDao =
+        database.insightDao()
 }

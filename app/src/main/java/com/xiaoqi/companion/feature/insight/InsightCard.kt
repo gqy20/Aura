@@ -1,0 +1,119 @@
+package com.xiaoqi.companion.feature.insight
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.xiaoqi.companion.feature.chat.ChatInsight
+
+/**
+ * 单条 Insight 卡片(plan §4.2 样式)。
+ *
+ * 布局:类别图标 + "近 7 天" pill → headline (titleMedium) → body (≤ 3 行) →
+ * 底部 "和 Aura 聊聊" TextButton + ⨯ IconButton。
+ *
+ * 长按卡片 → 触发 [onLongPress] 弹层(类别静音 / 知道了 / 查看依据)。
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun InsightCard(
+    insight: ChatInsight,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
+    onDismiss: () -> Unit,
+    onChat: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = Color(0xFFFFF8EA),
+        tonalElevation = 0.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Lightbulb,
+                    contentDescription = null,
+                    tint = Color(0xFFE5A100),
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = "${insight.category} · ${insight.relevanceWindow}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = insight.headline,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (insight.bodyMarkdown.isNotBlank()) {
+                Text(
+                    text = insight.bodyMarkdown,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onChat) {
+                    Text("和 Aura 聊聊")
+                }
+                Spacer(Modifier.width(8.dp))
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "知道了",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+}

@@ -7,6 +7,7 @@ import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.xiaoqi.companion.data.db.converter.Converters
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
@@ -14,6 +15,7 @@ import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
+import com.xiaoqi.companion.data.db.entity.InsightEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MemorySummaryEntity
@@ -30,8 +32,9 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         MoodSnapshotEntity::class,
         ToolCallEntity::class,
         ReminderEntity::class,
+        InsightEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -44,6 +47,7 @@ abstract class CompanionDatabase : RoomDatabase() {
     abstract fun moodSnapshotDao(): MoodSnapshotDao
     abstract fun toolCallDao(): ToolCallDao
     abstract fun reminderDao(): ReminderDao
+    abstract fun insightDao(): InsightDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -142,6 +146,34 @@ abstract class CompanionDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `memories` ADD COLUMN `archived` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_memories_pinned` ON `memories` (`pinned`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_memories_archived` ON `memories` (`archived`)")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `insights` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `createdAt` INTEGER NOT NULL,
+                        `triggerType` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `headline` TEXT NOT NULL,
+                        `bodyMarkdown` TEXT NOT NULL,
+                        `evidence` TEXT NOT NULL,
+                        `confidence` REAL NOT NULL,
+                        `relevanceWindow` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `mutedUntil` INTEGER,
+                        `deliveredAt` INTEGER,
+                        `userClickedAt` INTEGER,
+                        `userFeedback` TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_insights_createdAt` ON `insights` (`createdAt`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_insights_category` ON `insights` (`category`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_insights_status` ON `insights` (`status`)")
             }
         }
     }

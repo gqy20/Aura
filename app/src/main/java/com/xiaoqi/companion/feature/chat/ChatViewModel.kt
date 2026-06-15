@@ -17,6 +17,7 @@ import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.InsightRepository
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ReminderRepository
@@ -25,6 +26,7 @@ import com.xiaoqi.companion.feature.chat.mapper.after
 import com.xiaoqi.companion.feature.chat.mapper.displayLabel
 import com.xiaoqi.companion.feature.chat.mapper.extractIntensity
 import com.xiaoqi.companion.feature.chat.mapper.toChatConfigStatus
+import com.xiaoqi.companion.feature.chat.mapper.toChatInsight
 import com.xiaoqi.companion.feature.chat.mapper.toChatMemory
 import com.xiaoqi.companion.feature.chat.mapper.toChatMessage
 import com.xiaoqi.companion.feature.chat.mapper.toChatReminder
@@ -66,6 +68,7 @@ class ChatViewModel @Inject constructor(
     private val configRepository: ConfigRepository,
     private val messageRepository: MessageRepository,
     private val memoryRepository: MemoryRepository,
+    private val insightRepository: InsightRepository,
     private val agentStateDao: AgentStateDao,
     private val presenceController: PresenceController,
     private val presenceReactionPolicy: PresenceReactionPolicy,
@@ -204,6 +207,27 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+
+        // 8. Insight 卡片(主页用,带静音过滤,见 PR-B InsightRepository)
+        viewModelScope.launch {
+            insightRepository.observeVisibleNotMuted(limit = INSIGHT_CARD_LIMIT).collect { insights ->
+                _uiState.update { state ->
+                    state.copy(insights = insights.map { it.toChatInsight() })
+                }
+            }
+        }
+
+        // 9. 首次启动:种 2-3 条占位 insight(仅当 DB 为空)
+        viewModelScope.launch {
+            runCatching { insightRepository.seedDemoInsights() }
+                .onFailure {
+                    AppLogger.warn(
+                        LogTags.Repo,
+                        "insight_seed_failed",
+                        "cause" to (it.message ?: it::class.simpleName.orEmpty()),
+                    )
+                }
+        }
     }
 
     //region 简单 UI 反馈
@@ -332,6 +356,50 @@ class ChatViewModel @Inject constructor(
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_unarchive_memory_failed", "memoryId" to memoryId)
                 _uiState.update { it.copy(error = "Unarchive memory failed. Please try again.") }
+            }
+        }
+    }
+
+    fun dismissInsight(insightId: Long) {
+        viewModelScope.launch {
+            try {
+                insightRepository.dismiss(insightId)
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_dismiss_insight_failed", "insightId" to insightId)
+                _uiState.update { it.copy(error = "Dismiss insight failed. Please try again.") }
+            }
+        }
+    }
+
+    fun muteInsightCategory(insightId: Long, category: String, days: Int = 7) {
+        viewModelScope.launch {
+            try {
+                val mutedUntil = System.currentTimeMillis() + days * MUTE_DAY_MS
+                insightRepository.muteCategory(insightId, category, mutedUntil)
+            } catch (e: Exception) {
+                AppLogger.error(
+                    LogTags.Repo,
+                    e,
+                    "ui_mute_insight_failed",
+                    "insightId" to insightId,
+                    "category" to category,
+                )
+                _uiState.update { it.copy(error = "Mute category failed. Please try again.") }
+            }
+        }
+    }
+
+    fun openInsight(insightId: Long) {
+        viewModelScope.launch {
+            try {
+                insightRepository.markClicked(insightId)
+            } catch (e: Exception) {
+                AppLogger.warn(
+                    LogTags.Repo,
+                    "ui_mark_insight_clicked_failed",
+                    "insightId" to insightId,
+                    "cause" to (e.message ?: e::class.simpleName.orEmpty()),
+                )
             }
         }
     }
@@ -596,6 +664,8 @@ class ChatViewModel @Inject constructor(
     companion object {
         private const val DEFAULT_SESSION_ID = "default"
         private const val RECENT_TOOL_CALL_LIMIT = 3
+        private const val INSIGHT_CARD_LIMIT = 3
+        private const val MUTE_DAY_MS = 24L * 60L * 60L * 1000L
     }
 }
 
