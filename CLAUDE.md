@@ -8,6 +8,7 @@
 - **[工程化规范](docs/engineering-standards.md)** — CI/CD、测试策略、代码规范、质量门禁。
 - **[Koog API 参考](docs/koog-api-reference.md)** — 从 Gradle 缓存 JAR (`javap -p -s`) 提取的 Koog v0.8.0 完整 API 签名，覆盖 Agent/Builder/Strategy/Service/Tool/Pipeline/Prompt&LLM 等 15 个模块，含架构图和类型签名表。
 - **[Koog ↔ Android 集成指南](docs/koog-android-integration.md)** — Koog 在 Android 上的集成状态：当前已接入真实 `AIAgent`、流式文本和工具事件；保留线程规则（禁止 runBlocking/KG-750 死锁）、生命周期模式、后续待补项。
+- **[Agent 编排层文档](docs/agent-architecture.md)** — Aura 云端 Agent 编排层（Provider 路由、Graph Strategy、Tool 系统、Memory Reflection、流式 UX 节流）的详细技术说明。与 `architecture.md` §5 配合阅读：顶层讲位置，这篇讲实现。
 
 ## 当前项目状态
 

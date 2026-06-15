@@ -1,6 +1,10 @@
-# Koog v0.8.0 <-> Android 集成指南
+# Koog v0.8.0 ↔ Android 集成参考
 
-> **版本**: Koog 0.8.0 | 项目: Aura Companion App | 最后更新: 2026-05-15
+> **版本**: Koog 0.8.0 | 项目: Aura Companion App | 最后更新: 2026-06-15
+>
+> 本文是 **Koog SDK 集成参考**：版本、官方对 Android 的立场、我们用了哪些 API、线程 / 生命周期规则、已知 SDK 问题。
+>
+> **Aura 编排层**（Provider 路由、graph strategy、event 翻译、tool 持久化、reflection、流式 UX 节流）见 [`docs/agent-architecture.md`](./agent-architecture.md)。本文不复述。
 >
 > 本文档基于以下材料交叉验证：
 > - [Koog GitHub README](https://github.com/koog-ai/koog)（官方源码仓库）
@@ -14,13 +18,12 @@
 
 1. [Koog 对 Android 的官方立场](#1-koog-对-android-的官方立场)
 2. [当前项目集成状态审计](#2-当前项目集成状态审计)
-3. [真实 Agent 实现要点](#3-真实-agent-实现要点)
+3. [我们用到的 Koog API 表面](#3-我们用到的-koog-api-表面)
 4. [线程与调度器规则](#4-线程与调度器规则)
 5. [Android 生命周期集成模式](#5-android-生命周期集成模式)
-6. [流式输出在 Chat UI 中的集成](#6-流式输出在-chat-ui-中的集成)
-7. [当前实现参考](#7-当前实现参考)
-8. [已知问题与规避策略](#8-已知问题与规避策略)
-9. [检查清单](#9-检查清单)
+6. [已知问题与规避策略](#6-已知问题与规避策略)
+7. [检查清单](#7-检查清单)
+8. [附录 A：关键文件路径](#附录-a关键文件路径)
 
 ---
 
@@ -65,8 +68,8 @@ Koog 是一个 **Kotlin Multiplatform (KMP)** 框架，官方声明支持以下�
    └───────┬────────┘
            │ LLM 调用
    ┌───────▼────────┐
-   │  AnthropicLLMClient │  ← 或其他 PromptExecutor 实现
-   └─────────────────────┘
+   │  PromptExecutor │  ← 我们用自研 AnthropicMessagesLLMClient
+   └─────────────────┘
 ```
 
 **原则**:
@@ -76,130 +79,189 @@ Koog 是一个 **Kotlin Multiplatform (KMP)** 框架，官方声明支持以下�
 
 ### 1.3 Anthropic 兼容层
 
-Koog 的 `AnthropicLLMClient` 实现了 Anthropic Messages API 协议。本项目使用的智谱 GLM 和 Moonshot Kimi 均提供 **Anthropic 兼容端点**：
+Koog 自带 `AnthropicLLMClient`，但我们**没有用** Koog 官方的 client，原因：
 
-| 提供商 | Base URL | 兼容协议 |
-|--------|----------|---------|
-| 智谱 GLM | `https://open.bigmodel.cn/api/paas/v1` | Anthropic Messages API |
-| Moonshot Kimi | `https://api.moonshot.cn/v1` | Anthropic Messages API |
+1. GLM / Kimi 的 Anthropic 兼容端点与官方 API 有细节差异（SSE 事件格式、`tool_use` 块的 input 增量等），需要我们控制报文结构
+2. 想要复用 OkHttp / 共用 HTTP client 配置 / 自定义错误码映射
 
-> 当前项目通过自定义 `AnthropicMessagesLLMClient` 适配 Koog `PromptExecutor`，GLM 默认 base URL 由 `.env` / `BuildConfig.LLM_BASE_URL` 提供，Kimi base URL 在 `ConfigRepository` 中固定为 `https://api.moonshot.cn/v1`。
+我们改用自研的 `AnthropicMessagesLLMClient`（`core/llm/AnthropicMessagesLLMClient.kt`），包成 Koog `LLMClient` 接口，包进 `MultiLLMPromptExecutor`：
+
+```kotlin
+MultiLLMPromptExecutor(AnthropicMessagesLLMClient(apiKey, baseUrl))
+```
+
+`AnthropicMessagesLLMClient` 实现 Koog 的 `LLMClient` 三个方法：
+
+- `execute(prompt, model, tools): List<Message.Response>` — 一次性
+- `executeStreaming(prompt, model, tools): Flow<StreamFrame>` — SSE 流
+- `moderate / models` — stub 即可
+
+| 提供商 | Base URL | 协议 |
+|--------|----------|------|
+| 智谱 GLM | `https://open.bigmodel.cn/api/paas/v1` | Anthropic Messages 兼容 |
+| Moonshot Kimi | `https://api.moonshot.cn/v1` | Anthropic Messages 兼容 |
+
+> 当前项目 GLM / Kimi base URL 在 `ConfigRepository` 中按 provider 维护，`.env` / `BuildConfig.LLM_BASE_URL` 提供默认。
 
 ---
 
 ## 2. 当前项目集成状态审计
 
-### 2.1 架构分层现状
+> Last verified: 2026-06-15. 详细编排逻辑（Pipeline / graph strategy / 事件翻译）见 [`docs/agent-architecture.md`](./agent-architecture.md)。
 
-| 层 | 文件 | 状态 | 说明 |
-|----|------|------|------|
-| UI 层 | `MainActivity.kt` | ✅ 正常 | 只负责 `setContent`，通过 Hilt 获取 `ChatViewModel` |
-| UI 层 | `ChatScreen.kt` / `MessageBubble.kt` | ✅ 正常 | Compose UI，展示消息、输入框、工具状态 |
-| ViewModel | `ChatViewModel.kt` | ✅ 正常 | 正确使用 viewModelScope + CompanionRuntime |
-| Runtime | `CompanionRuntime.kt` | ✅ 已接入 | 构建 prompt、注入记忆、调用 Agent、解析输出、更新情绪/关系 |
-| Agent 工厂 | `KoogAgentFactoryImpl.kt` | ✅ 已接入 | 使用 Koog `AIAgent`，支持流式文本与工具事件 |
-| LLM client | `AnthropicMessagesLLMClient.kt` | ✅ 已实现 | Anthropic Messages 兼容请求、SSE streaming、tool schema、Vision content |
-| Agent 接口 | `KoogAgentFactory.kt` | ✅ 设计合理 | 抽象层设计良好 |
-| 配置 | `ConfigRepository.kt` | ✅ 可用 | DataStore + BuildConfig 组合读取 provider/key/model |
-| Prompt | `PromptBuilder.kt` | ✅ 正常 | 正确构建 BuiltPrompt |
-| DI | `AppModule.kt` | ✅ 正常 | Hilt 绑定完整 |
+### 2.1 我们用到的 Koog 入口
 
-### 2.2 当前已验证事项
+| 入口 | 位置 | 状态 |
+|------|------|------|
+| `ai.koog.agents.core.agent.AIAgent` | `KoogAgentFactoryImpl.createAgent()` | ✅ `AIAgent.builder()` + 自定义 strategy |
+| `ai.koog.agents.core.dsl.builder.strategy { }` | `streamingSingleRunStrategy()` | ✅ `nodeLLMRequestStreamingAndSendResults` + `nodeExecuteMultipleTools` + `nodeSendToolResult` |
+| `ai.koog.agents.core.tools.ToolRegistry` | `CompanionToolRegistry.create()` | ✅ 9 内置 + 远程 MCP 工具 |
+| `ai.koog.agents.features.eventHandler.feature.EventHandler` | `install { install(EventHandler.Feature) { … } }` | ✅ `onToolCallStarting/Completed/Failed/ValidationFailed` + `onLLMStreamingFrameReceived` |
+| `ai.koog.prompt.executor.model.PromptExecutor` | `KoogPromptExecutorFactory.create()` | ✅ 包成 `MultiLLMPromptExecutor` |
+| `ai.koog.prompt.executor.model.executeStructured` | `KoogPromptExecutorWrapper.runStructured()` | ✅ 用于 memory reflection |
+| `ai.koog.prompt.executor.clients.LLMClient` | `AnthropicMessagesLLMClient : LLMClient()` | ✅ 自研 OkHttp + SSE |
+| `ai.koog.prompt.dsl.prompt { }` | `BuiltPrompt.toKoogAgentPrompt()` | ✅ `system {}` / `user { text + image }` |
+| `ai.koog.prompt.llm.LLModel` + `LLMProvider` + `LLMCapability` | `KoogPromptExecutorWrapper.model` | ✅ `LLMCapability.Vision.Image` 启用图片 |
+| `ai.koog.prompt.streaming.StreamFrame` | `onLLMStreamingFrameReceived` 回调 | ✅ `TextDelta` / `TextComplete` |
 
-- `MainActivity` 已清理为 ViewModel 驱动，不再直接创建 LLM client。
-- `KoogAgentFactoryImpl` 已不再是 stub，当前通过 `AIAgent.builder()` 构建真实 Agent。
-- `CompanionRuntime.send()` 已返回 `Flow<AgentEvent>`，支持 `Streaming`、`Complete`、`Error` 与工具事件。
-- `testDebugUnitTest` 和 `assembleDebug` 已在 2026-05-15 验证通过。
+### 2.2 我们 **没有** 用的 Koog 入口
 
-### 2.3 仍待完善
+- `ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient`（官方 client）— 见 §1.3
+- `AIAgentHelper.functionalAgent()` 的一行接入 — 我们需要 graph 定制 + event 翻译
+- `SingleRunStrategy` 预设 — 我们自写 `streamingSingleRunStrategy`
+- `Agent` 的 M0 老接口（pre-Agent-Core）— 当前项目使用 Agent Core 的 `AIAgent`
 
-- 设置页尚未实现，用户不能在 UI 中修改 API Key / Provider / Model。
-- CameraX 依赖和 Vision 数据结构已预留，但拍照/选图 UI 尚未实现。
-- WorkManager pulse、语音、通知、角色表情层尚未实现。
-- 进程死亡后的输入框草稿、情绪/关系状态恢复仍需补齐。
+### 2.3 当前已验证
+
+- ✅ `MainActivity` 只负责 `setContent`，不直接构造 LLM client
+- ✅ `ChatViewModel` 通过 `SendMessageUseCase` 委托给 `CompanionRuntime`
+- ✅ `KoogAgentFactoryImpl` 走 `AIAgent.builder()` + 自定义 strategy + `EventHandler.Feature`
+- ✅ `CompanionRuntime.send()` 返回 `Flow<AgentEvent>`，支持 `Streaming / ToolCallUpdated / ToolStarted / ToolFinished / MemorySaved / Complete / Error`
+- ✅ 工具调用状态经 `ToolCallRecorder` 写 Room，UI 上能看到 `MessageBubble` 的 tool status
+- ✅ 视觉输入经 `LLMCapability.Vision.Image` + `ContentPart.Image(AttachmentContent.Binary.Base64)` 完整跑通
+- ✅ LLM 连通性检查（`LlmConnectivityChecker`）能在设置页 "Test connection" 按钮里区分 200 / 401 / 网络失败
+- ✅ 本地模型分流（`LlmProvider.LOCAL_QWEN` 走 `ReactiveCompanion`，不进 Koog）
+- ✅ `./gradlew.bat testDebugUnitTest` 于 2026-06-14 通过（41 测试 / 0 失败）
+
+### 2.4 仍待补
+
+- ⏳ 进程死亡后的输入框草稿（`SavedStateHandle` 接入）
+- ⏳ EmotionMachine / RelationshipModel 序列化到 DataStore（进程死亡后情感/关系状态归零）
+- ⏳ GLM / Kimi 在生产端的流式端到端手动验证（连通性检查 OK，但完整 streaming 链路在真机还需补一次手动跑）
 
 ---
 
-## 3. 真实 Agent 实现要点
+## 3. 我们用到的 Koog API 表面
 
-> 当前项目已经采用真实 Koog `AIAgent` 集成；本节记录实现要点，历史上的 stub 替换任务已完成。
+> 这一节是 **API 速查**，每条都标了 Aura 的使用位置。
+> 完整签名见 [`docs/koog-api-reference.md`](./koog-api-reference.md)（基于 `javap` 提取的 JAR 签名）。
 
-### 3.1 接口适配分析
+### 3.1 AIAgent 构造
 
-需要桥接的两个接口体系：
-
-```
-你的抽象层                          Koog 实际 API
-┌──────────────────┐              ┌─────────────────────────────┐
-│ KoogAgentWrapper │              │ FunctionalAIAgent            │
-│  run(prompt)      │─── 适配 ──▶│  .run(prompt: Prompt): String │
-│  : String         │              │  .runStreaming(prompt): Flow  │
-└──────────────────┘              └─────────────────────────────┘
-
-BuiltPrompt (你的)                  Prompt (Koog)
-├─ systemPrompt: String             ├─ messages: List<PromptMessage>
-├─ userMessage: String              ├─ system: String?
-├─ hasImage: Boolean                └─ tools: List<ToolDescriptor>
-├─ imageBase64: String?
-└─ imageMediaType: String?
-
-LlmConfig (你的)                   AnthropicClientSettings (Koog)
-├─ provider: LlmProvider            ├─ baseUrl: String
-├─ baseUrl: String                  ├─ apiKey: String
-├─ apiKey: String                   ├─ model: String?
-├─ modelName: String                └─ timeout: Duration?
+```kotlin
+AIAgent.builder()
+    .promptExecutor(executor)              // MultiLLMPromptExecutor
+    .llmModel(model)                        // LLModel(provider, id, capabilities)
+    .prompt(prompt)                         // ai.koog.prompt.Prompt
+    .toolRegistry(toolRegistry)             // 9 内置 + 远程 MCP,或 ToolRegistry.EMPTY
+    .maxIterations(12)                      // 硬上限防 tool loop
+    .id("companion-agent-${provider}")      // 仅用于日志
+    .graphStrategy(streamingSingleRunStrategy())  // 自定义 strategy
+    .install {
+        install(EventHandler.Feature) {
+            onToolCallStarting { ctx -> ... }
+            onToolCallCompleted { ctx -> ... }
+            onToolCallFailed { ctx -> ... }
+            onToolValidationFailed { ctx -> ... }
+            onLLMStreamingFrameReceived { ctx -> ... }
+        }
+    }
+    .build()
 ```
 
-### 3.2 两种集成策略对比
+**关键 trade-off**：
 
-#### 策略 A：简单包装（推荐起步）
+| 选择 | 理由 |
+|------|------|
+| `.graphStrategy(...)` 而不是 `SingleRunStrategy` | 需要"tool result 后再次 LLM 决定 tool 还是 finish"的循环 |
+| `EventHandler.Feature` 而不是 `agent.onEachEvent` | 后者是 `Flow<AgentEvent>` 旧 API（pre-Agent-Core），当前是 Agent Core 的 install DSL |
+| `toolRegistry = ToolRegistry.EMPTY if hasImage \|\| !allowTools` | Vision 输入 / 反射时禁 tool，避免 LLM 在 vision 上下文里调 tool 出错 |
 
-用 `AIAgentHelper.functionalAgent()` 快速创建 Functional Agent，
-将 `BuiltPrompt` 转换为 Koog `Prompt`，调用 `agent.run()` 获取完整响应。
+### 3.2 Graph Strategy
 
-**优点**: 最少代码量，5 分钟可跑通
-**缺点**: 无流式输出，用户需等待完整响应
-**适用**: 第一阶段验证，确认端到端通路
+```kotlin
+strategy<String, String>("single_run_streaming_tools") {
+    val nodeCallLLM by nodeLLMRequestStreamingAndSendResults<String>()
+    val nodeExecuteTool by nodeExecuteMultipleTools(parallelTools = false)
+    val nodeSendToolResult by node<List<ReceivedToolResult>, List<Message.Response>> { results ->
+        llm.writeSession {
+            appendPrompt { tool { results.forEach { result(it) } } }
+            requestLLMStreaming().toList().toMessageResponses().also { responses ->
+                appendPrompt { messages(responses) }
+            }
+        }
+    }
 
-#### 策略 B：流式集成（生产目标）
+    edge(nodeStart forwardTo nodeCallLLM)
+    edge(nodeCallLLM forwardTo nodeExecuteTool onMultipleToolCalls { true })
+    edge(nodeCallLLM forwardTo nodeFinish onMultipleAssistantMessages { true }
+        transformed { it.joinToString("\n") { it.content } })
+    edge(nodeExecuteTool forwardTo nodeSendToolResult)
+    edge(nodeSendToolResult forwardTo nodeExecuteTool onMultipleToolCalls { true })
+    edge(nodeSendToolResult forwardTo nodeFinish onMultipleAssistantMessages { true }
+        transformed { it.joinToString("\n") { it.content } })
+}
+```
 
-使用 `AnthropicLLMClient.executeStreaming()` 直接获取 `Flow<StreamFrame>`，
-在 CompanionRuntime 层将 StreamFrame 转换为 `AgentEvent.Streaming`。
+**Edge 表**：
 
-**优点**: 流式输出，用户体验好
-**缺点**: 需要改造 CompanionRuntime.send() 的返回类型语义
-**适用**: 生产环境
+| 边 | 触发 | 行为 |
+|----|------|------|
+| `nodeStart → nodeCallLLM` | 进入 | 第一次 LLM 流式请求 |
+| `nodeCallLLM → nodeExecuteTool` | LLM 返回 tool_call | 串行执行（`parallelTools = false`） |
+| `nodeCallLLM → nodeFinish` | LLM 返回纯文本 | 聚合 assistant messages 退出 |
+| `nodeExecuteTool → nodeSendToolResult` | tool 执行完 | 结果写回 prompt |
+| `nodeSendToolResult → nodeExecuteTool` | LLM 再次要 tool | 循环 |
+| `nodeSendToolResult → nodeFinish` | LLM 返回纯文本 | 聚合退出 |
 
-**建议**: 先实现策略 A 验证通路，再升级到策略 B。
+**详细推理和与 CompanionRuntime 的对接**见 [`docs/agent-architecture.md` §4](./agent-architecture.md#4-koog-graph-strategy)。
 
 ### 3.3 BuiltPrompt → Prompt 转换
 
-Koog 的 `prompt {}` DSL 是构建 `Prompt` 的标准方式：
-
 ```kotlin
-import ai.koog.prompt.dsl.prompt
-import ai.koog.prompt.dsl.system
-import ai.koog.prompt.dsl.user
-import ai.koog.prompt.dsl.image
-
-// 将 BuiltPrompt 转为 Koog Prompt
-fun BuiltPrompt.toKoogPrompt(): Prompt {
-    return prompt("chat") {
-        system(systemPrompt)
-        if (hasImage && imageBase64 != null) {
-            user {
-                text(userMessage)
-                image(imageBase64!!, imageMediaType ?: "image/jpeg")
-            }
-        } else {
-            user(userMessage)
+private fun BuiltPrompt.toKoogAgentPrompt() = prompt("companion-chat") {
+    system(systemPrompt)
+    if (hasImage && imageBase64 != null) {
+        user {
+            text(userMessage)
+            image(
+                ContentPart.Image(
+                    content = AttachmentContent.Binary.Base64(imageBase64),
+                    format = "base64",
+                    mimeType = imageMediaType ?: "image/jpeg",
+                )
+            )
         }
+    } else {
+        user(userMessage)
     }
 }
 ```
 
-> **验证依据**: `koog-api-reference.md` 第 13 节记录了 `prompt {}` DSL 的完整签名：
-> `system(String)`, `user(String)`, `user(lambda)` (支持 text+image 组合)。
+`LLModel` 必须声明 `LLMCapability.Vision.Image`，否则 Koog 会拒绝 `ContentPart.Image`。
+
+### 3.4 Structured Output（reflection 用）
+
+```kotlin
+val response = executor.executeStructured(
+    prompt = structuredPrompt.toKoogAgentPrompt(),
+    model = model,
+    serializer = ReflectionResponse.serializer(),
+    examples = examples,   // List<ReflectionResponse>
+).getOrThrow().data
+```
+
+`examples` 用于 few-shot 提示，从 yml 加载；`serializer` 必须是 `@Serializable` 类型（`kotlinx.serialization`）。
 
 ---
 
@@ -239,38 +301,46 @@ private val scope = CoroutineScope(Dispatchers.Main)
 - 内部使用了 `ExecutorService` based 的调度器
 
 **规避方法**:
-1. **永远不要在 Android 上使用 `runBlocking`**
+1. **永远不要在 Android 上使用 `runBlocking`** — 当前项目唯一例外是 `CompanionToolRegistry.addRemoteMcpTools` 的 `runBlocking { mcpServerListRepository.readAll() }`，但它跑在 Hilt 提供的工具创建入口里，**不**与 LLM call 共线程，已在 §4.4 标注
 2. 所有 LLM 调用使用 `suspend fun` + `viewModelScope.launch {}`
 3. 如需同步等待（极少场景），使用 `runInterruptible` 或自定义 Channel
 
-### 4.4 正确的 Dispatcher 使用模式
+### 4.4 `runBlocking` 例外：MCP tool 列表加载
 
 ```kotlin
-// ✅ 正确：ViewModel 中的标准模式
-class ChatViewModel(
-    private val runtime: CompanionRuntime,
-) : ViewModel() {
+private fun addRemoteMcpTools(builder: ToolRegistryBuilder) {
+    val servers = runBlocking { mcpServerListRepository.readAll() }   // ← 唯一例外
+    // ... listTools / tool 注册
+}
+```
 
+- **位置**: `CompanionToolRegistry.addRemoteMcpTools`
+- **原因**: `ToolRegistry.create()` 是 `fun create(): ToolRegistry`（非 suspend），而 `mcpServerListRepository.readAll()` 是 suspend + Room
+- **安全条件**: 在 `koogAgentFactory.create(config)` 时同步执行，调用方在 `CompanionRuntime.send()` 内位于 `Dispatchers.IO` 上下文，**不**在主线程
+- **已知风险**: MCP server 慢 / 不可达会阻塞 ToolRegistry 构造（agent 创建路径），影响首条消息延迟
+- **后续方案**: 缓存 + 异步预热 + 单独 ToolRegistryManager
+
+### 4.5 正确的 Dispatcher 使用模式
+
+```kotlin
+// ✅ ViewModel 标准模式
+class ChatViewModel(private val runtime: CompanionRuntime) : ViewModel() {
     fun sendMessage(text: String) {
-        viewModelScope.launch {
-            // 自动运行在 Main，但 runtime.send() 内部会切换到 IO
+        viewModelScope.launch {                    // 默认 Dispatchers.Main.immediate
             runtime.send(UserInput.Text(text)).collect { event ->
-                // collect 回调在 Main（viewModelScope 的 Dispatcher）
-                _uiState.update { /* 更新 UI */ }
+                _uiState.update { ... }            // Main 线程,Compose 安全
             }
         }
     }
 }
 
-// ✅ 正确：Runtime 层的 IO 切换
+// ✅ Runtime 编排层 (主循环)
 class CompanionRuntime(...) {
-    suspend fun send(input: UserInput): Flow<AgentEvent> = flow {
-        // flow 构建器继承调用者的上下文
-        // 但 LLM 调用应在 IO 上执行
-        val result = withContext(Dispatchers.IO) {
-            agent.run(prompt)
+    open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
+        val job = launch(Dispatchers.IO) {         // ← 显式 IO
+            agent.runEvents(prompt).collect { event -> ... }
         }
-        emit(AgentEvent.Complete(result))
+        job.join()
     }
 }
 ```
@@ -320,7 +390,7 @@ ViewModel.onCleared() → viewModelScope.cancel()
 正在运行的 runtime.send() 协程被取消
     │
     ▼
-flow {} 构建器收到 CancellationException
+callbackFlow 收到 CancellationException
     │
     ▼
 LLM 调用被中断（底层 HTTP 连接关闭）
@@ -329,7 +399,7 @@ LLM 调用被中断（底层 HTTP 连接关闭）
 资源自动释放 ✅
 ```
 
-**关键点**: 不需要手动取消逻辑。`viewModelScope` + `flow` 的组合天然支持结构化并发。
+**关键点**: 不需要手动取消逻辑。`viewModelScope` + `callbackFlow` 的组合天然支持结构化并发。
 
 ### 5.3 进程死亡恢复 (Process Death)
 
@@ -339,387 +409,118 @@ Android 系统可能在后台杀死应用进程。重启时：
 |------|---------|---------|
 | 聊天消息历史 | Room DB (`MessageRepository`) | ✅ 已实现 |
 | 用户偏好设置 | DataStore (`AppPreferences`) | ✅ 已实现 |
+| mood / intensity / relationship | AgentStateDao（每次 `Complete` 落） | ✅ 已实现 |
+| Tool call 状态 | ToolCallDao（每次 hook 落） | ✅ 已实现 |
 | 当前对话状态 (输入框文字) | `SavedStateHandle` | ⚠️ 待实现 |
-| 正在进行中的 LLM 请求 | **不可恢复** | — 设计如此 |
-| EmotionMachine 状态 | 可序列化到 DataStore | ⚠️ 待实现 |
-| RelationshipModel 状态 | 可序列化到 DataStore | ⚠️ 待实现 |
+| 进行中的 LLM 请求 | **不可恢复** | — 设计如此 |
 
 **进程死亡时的 LLM 请求**: 这是正常行为。恢复后应显示一条系统消息：
 "之前的回复因应用切换丢失了"，而不是尝试恢复中断的流。
 
 ---
 
-## 6. 流式输出在 Chat UI 中的集成
+## 6. 已知问题与规避策略
 
-### 6.1 Koog StreamFrame 类型层次
-
-```
-StreamFrame (sealed interface)
-├── TextDelta(text: String)          // 文本增量 ← 主要关注
-├── TextComplete(fullText: String)   // 文本完成
-├── ToolCall(id, name, arguments)    // 工具调用
-├── ToolCallResult(id, output)       // 工具结果
-└── End                               // 流结束
-```
-
-> 来源: `koog-api-reference.md` 第 13 节 + JAR javap 提取
-
-### 6.2 流式集成架构
-
-```
-用户发送 "你好"
-    │
-    ▼
-ChatViewModel.sendMessage("你好")
-    │
-    ▼
-CompanionRuntime.send(UserInput.Text("你好"))
-    │
-    ├── emit(AgentEvent.Streaming("你"))          → UI 显示 "你"
-    ├── emit(AgentEvent.Streaming("好"))          → UI 显示 "你好"
-    ├── emit(AgentEvent.Streaming("！"))          → UI 显示 "你好！"
-    ├── emit(AgentEvent.Streaming("我是"))        → UI 显示 "你好！我是"
-    │   ... (持续流式)
-    │
-    └── emit(AgentEvent.Complete(parsedOutput))   → UI 最终化，isStreaming=false
-```
-
-### 6.3 CompanionRuntime 流式改造
-
-当前的 `CompanionRuntime.send()` 返回 `Flow<AgentEvent>`，已预留流式扩展点。
-需要将内部的 `agent.run()` (同步返回 String) 替换为流式调用：
-
-```kotlin
-// 改造后的 CompanionRuntime.send() (伪代码，详见第 7 节完整实现)
-open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
-    val prompt = promptBuilder.build(input, emotionCtx, relationCtx)
-    val config = configRepository.getCurrentLlmConfig().first()
-
-    // 使用流式执行
-    client.executeStreaming(prompt.toKoogPrompt(), llmModel).collect { frame ->
-        when (frame) {
-            is StreamFrame.TextDelta -> trySend(AgentEvent.Streaming(frame.text))
-            is StreamFrame.End -> {
-                val parsed = outputParser.parse(accumulatedText)
-                emotionMachine.feed(parsed.emotionSignal)
-                relationshipModel.update(parsed.interactionSignal)
-                trySend(AgentEvent.Complete(parsed))
-            }
-            is StreamFrame.ErrorFrame -> trySend(AgentEvent.Error(...))
-            else -> {}
-        }
-    }
-    close()
-}
-```
-
-### 6.4 ChatViewModel 中的消费模式（已正确实现）
-
-当前 `ChatViewModel.kt` 的消费逻辑已经是正确的：
-
-```kotlin
-runtime.send(UserInput.Text(trimmed)).collect { event ->
-    when (event) {
-        is AgentEvent.Streaming -> {
-            // 追加文本到 assistant 消息
-            assistantContent += event.delta
-            _uiState.update { /* 更新 messages 中对应的消息 content */ }
-        }
-        is AgentEvent.Complete -> {
-            // 最终化：用 parsed.textReply 替换（可能包含后处理修正）
-            _uiState.update { /* isStreaming = false */ }
-        }
-        is AgentEvent.Error -> {
-            // 移除 placeholder，显示错误
-            _uiState.update { /* error = ... */ }
-        }
-    }
-}
-```
-
-**无需修改 ChatViewModel** — 它已经正确消费 `Flow<AgentEvent>`。
-
----
-
-## 7. 当前实现参考
-
-当前实现位于 `app/src/main/java/com/xiaoqi/companion/core/companion/KoogAgentFactoryImpl.kt`：
-
-- `KoogAgentFactoryImpl.create(config)` 创建 `KoogPromptExecutorWrapper`。
-- `KoogPromptExecutorWrapper` 使用 `AIAgent.builder()` 配置 prompt executor、LLM model、tool registry 和 event handler。
-- `runEvents(prompt)` 通过 `callbackFlow` 将 Koog streaming frame 和 tool call 生命周期转换为项目内 `KoogAgentEvent`。
-- `BuiltPrompt.toKoogAgentPrompt()` 将 system prompt、user text 和可选 base64 image 转为 Koog prompt DSL。
-- 工具调用通过 `ToolCallRecorder` 写入 Room，并同步推送给聊天 UI。
-
-下面的代码片段属于历史实现参考，实际代码请以当前源码为准。
-
-### 7.1 新增依赖导入
-
-`KoogAgentFactoryImpl` 需要新增以下 import：
-
-```kotlin
-import ai.koog.prompt.dsl.prompt
-import ai.koog.prompt.dsl.system
-import ai.koog.prompt.dsl.user
-import ai.koog.prompt.dsl.image
-import ai.koog.prompt.llm.LLModel
-import ai.koog.prompt.llm.LLMProvider
-import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
-import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
-import ai.koog.prompt.streaming.StreamFrame
-```
-
-### 7.2 策略 A：非流式实现（快速验证版）
-
-```kotlin
-package com.xiaoqi.companion.core.companion
-
-import com.xiaoqi.companion.core.prompt.BuiltPrompt
-import com.xiaoqi.companion.data.repository.LlmConfig
-import ai.koog.prompt.dsl.prompt
-import ai.koog.prompt.dsl.system
-import ai.koog.prompt.dsl.user
-import ai.koog.prompt.dsl.image
-import ai.koog.prompt.llm.LLModel
-import ai.koog.prompt.llm.LLMProvider
-import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
-import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
-import javax.inject.Inject
-import javax.inject.Singleton
-
-/**
- * 将 BuiltPrompt 转换为 Koog Prompt DSL 格式
- */
-private fun BuiltPrompt.toKoogPrompt() = prompt("chat") {
-    system(systemPrompt)
-    if (hasImage && imageBase64 != null) {
-        user {
-            text(userMessage)
-            image(imageBase64!!, imageMediaType ?: "image/jpeg")
-        }
-    } else {
-        user(userMessage)
-    }
-}
-
-@Singleton
-class KoogAgentFactoryImpl @Inject constructor() : KoogAgentFactory {
-
-    override fun create(config: LlmConfig): KoogAgentWrapper =
-        RealKoogAgentWrapper(config)
-}
-
-class RealKoogAgentWrapper(private val config: LlmConfig) : KoogAgentWrapper {
-
-    private val client by lazy {
-        AnthropicLLMClient(
-            apiKey = config.apiKey,
-            settings = AnthropicClientSettings(baseUrl = config.baseUrl),
-        )
-    }
-
-    private val model = LLModel(
-        id = config.modelName,
-        provider = LLMProvider.Anthropic,
-    )
-
-    override suspend fun run(prompt: BuiltPrompt): String {
-        val koogPrompt = prompt.toKoogPrompt()
-        return client.execute(koogPrompt, model)
-    }
-}
-```
-
-> **注意**: `client.execute(prompt, model)` 是同步（非流式）执行方法。
-> 根据 API 参考，此方法阻塞直到完整响应返回。由于外层已有 `suspend fun` 包装
-> 且会在 `Dispatchers.IO` 上调用，不会阻塞主线程。
-
-### 7.3 策略 B：流式实现（生产目标版）
-
-流式版本需要同时改造 `KoogAgentWrapper` 接口和 `CompanionRuntime`：
-
-**Step 1**: 扩展 KoogAgentWrapper 接口
-
-```kotlin
-// core/companion/KoogAgentFactory.kt — 新增流式接口
-interface KoogAgentWrapper {
-    suspend fun run(prompt: BuiltPrompt): String
-    /** 流式执行，返回原始 StreamFrame 流 */
-    fun runStreaming(prompt: BuiltPrompt): kotlinx.coroutines.flow.Flow<StreamFrame>
-}
-```
-
-**Step 2**: 实现流式 Wrapper
-
-```kotlin
-class StreamingKoogAgentWrapper(private val config: LlmConfig) : KoogAgentWrapper {
-
-    private val client by lazy {
-        AnthropicLLMClient(
-            apiKey = config.apiKey,
-            settings = AnthropicClientSettings(baseUrl = config.baseUrl),
-        )
-    }
-
-    private val model = LLModel(
-        id = config.modelName,
-        provider = LLMProvider.Anthropic,
-    )
-
-    override suspend fun run(prompt: BuiltPrompt): String {
-        // 非流式 fallback
-        val koogPrompt = prompt.toKoogPrompt()
-        return client.execute(koogPrompt, model)
-    }
-
-    override fun runStreaming(prompt: BuiltPrompt): Flow<StreamFrame> = callbackFlow {
-        val koogPrompt = prompt.toKoogPrompt()
-        client.executeStreaming(koogPrompt, model).collect { frame ->
-            trySend(frame)
-        }
-        close()
-    }.flowOn(Dispatchers.IO)
-}
-```
-
-**Step 3**: 改造 CompanionRuntime 使用流式
-
-```kotlin
-// core/companion/CompanionRuntime.kt — 流式版本
-open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
-    var accumulatedText = ""
-
-    try {
-        val prompt = promptBuilder.build(
-            input = input,
-            emotionContext = emotionMachine.getContext(),
-            relationshipContext = relationshipModel.contextModifier(),
-        )
-        val config = configRepository.getCurrentLlmConfig().first()
-        val agent = koogAgentFactory.create(config)
-
-        messageRepository.sendMessage(sessionId = "default", content = input.content)
-
-        agent.runStreaming(prompt).collect { frame ->
-            when (frame) {
-                is StreamFrame.TextDelta -> {
-                    accumulatedText += frame.text
-                    trySend(AgentEvent.Streaming(frame.text))
-                }
-                is StreamFrame.End -> {
-                    val parsed = outputParser.parse(accumulatedText)
-                    emotionMachine.feed(parsed.emotionSignal)
-                    relationshipModel.update(parsed.interactionSignal)
-                    trySend(AgentEvent.Complete(parsed))
-                }
-                else -> { /* ToolCall 等 frame 暂不处理 */ }
-            }
-        }
-    } catch (e: Exception) {
-        val error = when (e) {
-            is java.net.SocketTimeoutException -> AgentError.NetworkTimeout
-            is java.net.io.IOException -> AgentError.ApiError(e.message ?: "网络错误")
-            else -> AgentError.ApiError(e.message ?: "未知错误")
-        }
-        trySend(AgentEvent.Error(error))
-    } finally {
-        close()
-    }
-}
-```
-
-### 7.4 关于 execute() vs executeStreaming() 的 API 验证
-
-从 JAR 提取的签名（`koog-api-reference.md` 第 13 节）：
-
-```java
-// AnthropicLLMClient
-public java.lang.String execute(ai.koog.prompt.Prompt, ai.koog.prompt.llm.LLModel);
-public kotlinx.coroutines.flow.Flow<ai.koog.prompt.streaming.StreamFrame>
-    executeStreaming(ai.koog.prompt.Prompt, ai.koog.prompt.llm.LLModel);
-```
-
-两个方法均已在 JAR 中确认存在：
-- `execute()`: 同步返回 `String`
-- `executeStreaming()`: 返回 `Flow<StreamFrame>`
-
----
-
-## 8. 已知问题与规避策略
-
-### 8.1 问题汇总表
+### 6.1 问题汇总表
 
 | ID | 问题 | 影响 | 规避/解决方案 | 状态 |
 |----|------|------|--------------|------|
 | P1 | GLM base URL 依赖 `.env` / `BuildConfig.LLM_BASE_URL` | 未配置时会报 `LLM_BASE_URL is not configured` | 在 `.env` 中配置 `LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v1` | 需运行环境配置 |
 | P2 | MainActivity 直接 LLM 调用反模式 | 绕过架构 | 已改为 `ChatViewModel` 驱动 | 已修复 |
-| P3 | 历史上的 KoogAgentFactoryImpl stub | 所有 AI 回复为空 | 已替换为真实 Koog `AIAgent` | 已修复 |
-| P4 | 进程死亡时 EmotionMachine/RelationshipModel 状态丢失 | 重启后情感和关系上下文归零 | 序列化到 DataStore | 低优先级 |
-| P5 | SavedStateHandle 未接入 | 旋转屏幕/进程死亡后输入框内容丢失 | 在 ViewModel 中添加 | 低优先级 |
-| KG-750 | runBlocking + ExecutorService 死锁 | ANR | 全项目禁用 runBlocking | 已规避（设计中未使用） |
+| P3 | 历史上的 KoogAgentFactoryImpl stub | 所有 AI 回复为空 | 已替换为真实 `AIAgent.builder()` + 自定义 strategy | 已修复 |
+| P4 | 进程死亡时输入框草稿丢失 | 旋转屏幕 / 进程死亡后输入框为空 | `SavedStateHandle` 接入 | 低优先级 |
+| P5 | MCP server 慢 / 不可达 → ToolRegistry 构造阻塞 | 首条消息延迟 1-5s | 缓存 + 异步预热 | 中优先级 |
+| KG-750 | `runBlocking` + `ExecutorService` 死锁 | ANR | 全项目禁用 `runBlocking`（§4.4 例外已标注） | 已规避 |
 
-### 8.2 Anthropic 兼容端点的注意事项
+### 6.2 Anthropic 兼容端点的注意事项
 
 智谱和 Kimi 的 Anthropic 兼容端点**并非 100% 兼容**，已知差异：
 
 | 特性 | 标准 Anthropic API | 智谱兼容 | Kimi 兼容 |
 |------|-------------------|---------|-----------|
 | streaming | SSE | ✅ | ✅ |
-| tool_use | ✅ | ⚠️ 可能不支持 | ⚠️ 可能不支持 |
-| cache_control | ✅ | ❌ | ❌ |
+| `tool_use` | ✅ | ⚠️ 可能不支持 | ⚠️ 可能不支持 |
+| `cache_control` | ✅ | ❌ | ❌ |
 | thinking / extended thinking | ✅ | ❌ | ❌ |
 | 图片输入 (base64) | ✅ | ✅ | ✅ |
 
-**建议**: 如果未来需要 tool_use 功能，需验证目标端点是否支持。
-当前纯聊天场景不受影响。
+**建议**: 如果未来需要 `tool_use` 功能，需验证目标端点是否支持。
+当前纯聊天 + tool 场景需在真机端到端验证。
+
+### 6.3 `execute() vs executeStreaming()` 的 API 验证
+
+从 JAR 提取的签名（`koog-api-reference.md` 第 13 节）：
+
+```java
+// LLMClient (基类)
+public abstract java.util.List<ai.koog.prompt.message.Message$Response>
+    execute(ai.koog.prompt.Prompt, ai.koog.prompt.llm.LLModel, java.util.List<ToolDescriptor>);
+
+public abstract kotlinx.coroutines.flow.Flow<ai.koog.prompt.streaming.StreamFrame>
+    executeStreaming(ai.koog.prompt.Prompt, ai.koog.prompt.llm.LLModel, java.util.List<ToolDescriptor>);
+```
+
+两个方法均已在 JAR 中确认存在。
 
 ---
 
-## 9. 检查清单
+## 7. 检查清单
 
-### 本地运行前
+### 7.1 本地运行前
 
 - [ ] 确认 `.env` 文件中 `LLM_API_KEY` 已配置有效 API Key
 - [ ] 确认 `.env` 文件中 `LLM_BASE_URL` 已配置有效 Anthropic Messages 兼容端点
-- [ ] 确认网络权限 `<uses-permission android:name="android.permission.INTERNET" />` 已在 AndroidManifest.xml 中声明
+- [ ] 确认网络权限 `<uses-permission android:name="android.permission.INTERNET" />` 已在 `AndroidManifest.xml` 中声明
 - [ ] 确认明文流量允许（如果使用 HTTP 而非 HTTPS）：`android:usesCleartextTraffic="true"` （仅 debug）
 
-### 已完成的 Koog 集成检查
+### 7.2 已完成的 Koog 集成检查
 
 - [x] `MainActivity` 只负责 `setContent`
-- [x] `ChatViewModel` 通过 `CompanionRuntime` 发送消息
-- [x] `KoogAgentFactoryImpl` 创建真实 `AIAgent`
-- [x] `CompanionRuntime` 支持 streaming / complete / error / tool events
-- [x] 工具调用状态写入 Room 并显示在聊天 UI
+- [x] `ChatViewModel` 通过 `SendMessageUseCase` 委托给 `CompanionRuntime`
+- [x] `KoogAgentFactoryImpl` 创建真实 `AIAgent`（自定义 graph strategy + `EventHandler.Feature`）
+- [x] `CompanionRuntime` 支持 `Streaming / ToolCallUpdated / ToolStarted / ToolFinished / MemorySaved / Complete / Error` 7 类事件
+- [x] 工具调用状态经 `ToolCallRecorder` 写 Room 并显示在聊天 UI
+- [x] `runStructured` 用于 memory reflection
+- [x] LLM 连通性检查区分 200/401/网络失败
+- [x] 本地模型（`LlmProvider.LOCAL_QWEN`）走 `ReactiveCompanion` 不进 Koog
+- [x] `./gradlew.bat testDebugUnitTest` 于 2026-06-14 通过（41 测试 / 0 失败）
 
-### 后续待补
+### 7.3 后续待补
 
-- [ ] 设置页配置 API key/provider/model
-- [ ] 真机/模拟器手动验证 GLM/Kimi 端到端回复
-- [ ] CameraX Vision 输入接入 `UserInput.Vision`
-- [ ] 进程死亡后的状态恢复
+- [ ] 进程死亡后的输入框草稿（`SavedStateHandle`）
+- [ ] 真机/模拟器手动验证 GLM/Kimi 端到端回复（含流式 + tool 链路）
+- [ ] MCP server 列表异步预热
+- [ ] 切换到 Agent Core 最新 API（跟踪 Koog 上游 release notes）
 
 ---
 
-## 附录 A：关键文件路径速查
+## 附录 A：关键文件路径
 
 | 文件 | 路径 | 作用 |
 |------|------|------|
-| Agent 工厂接口 | `core/companion/KoogAgentFactory.kt` | 定义 `KoogAgentWrapper` / `KoogAgentFactory` |
-| Agent 工厂实现 | `core/companion/KoogAgentFactoryImpl.kt` | **本文档主要修改目标** |
-| Runtime 编排 | `core/companion/CompanionRuntime.kt` | 调用工厂 → Agent → 解析 → 发事件 |
-| 数据模型 | `core/companion/model/CoreModels.kt` | UserInput / AgentEvent / ParsedOutput |
-| Prompt 构建 | `core/prompt/PromptBuilder.kt` | BuiltPrompt 构建 |
-| 配置仓库 | `data/repository/ConfigRepository.kt` | LlmConfig (provider/url/key/model) |
-| Chat ViewModel | `feature/chat/ChatViewModel.kt` | UI 层状态管理 |
-| MainActivity | `MainActivity.kt` | Activity 入口，委托给 `ChatViewModel` |
-| Build Config | `app/build.gradle.kts` | BuildConfig 字段定义 |
+| Agent 工厂接口 | `core/companion/KoogAgentFactory.kt` | `KoogAgentWrapper` / `KoogAgentFactory` / `KoogAgentEvent` sealed |
+| Agent 工厂实现 | `core/companion/KoogAgentFactoryImpl.kt` | **Provider 路由 + AIAgent 构造 + graph strategy** |
+| Runtime 编排 | `core/companion/CompanionRuntime.kt` | **Pipeline 编排**（详见 `agent-architecture.md` §1） |
+| LLM Client | `core/llm/AnthropicMessagesLLMClient.kt` | 自研 OkHttp + SSE 实现 Anthropic Messages 协议 |
+| Executor 工厂 | `core/llm/KoogPromptExecutorFactory.kt` | 把 client 包进 `MultiLLromptExecutor` |
+| 连通性检查 | `core/llm/LlmConnectivityChecker.kt` | 设置页 "Test connection" 按钮 |
+| Prompt 构建 | `core/prompt/PromptBuilder.kt` | BuiltPrompt 组装 |
+| Tool 注册 | `core/tools/CompanionToolRegistry.kt` | 9 内置 + 远程 MCP tool |
+| Tool 持久化 | `core/tools/ToolCallRecorder.kt` | tool call 写 Room（4 个状态） |
+| 数据模型 | `core/companion/model/CoreModels.kt` | `UserInput` / `AgentEvent` / `AgentToolCall` / `ParsedOutput` |
+| Output 解析 | `core/companion/OutputParser.kt` | regex 解析 `[mood:..][intensity:..]..` |
+| Memory Reflection | `core/companion/ConversationReflection.kt` | `runStructured` 写记忆 |
+| 配置仓库 | `data/repository/ConfigRepository.kt` | `LlmConfig` (provider/url/key/model) |
+| Chat ViewModel | `feature/chat/ChatViewModel.kt` | UI 层状态编排（8 个 collector） |
+| SendMessageUseCase | `feature/chat/usecase/SendMessageUseCase.kt` | `Flow<AgentEvent>` → `ChatUiState` 翻译 |
+| 编排层文档 | [`docs/agent-architecture.md`](./agent-architecture.md) | **Provider 路由 / Graph Strategy / Tool / Reflection / 流式 UX** |
+| 顶层架构 | [`docs/architecture.md`](./architecture.md) | 项目分层 + 数据层 + Agent Core |
+| 完整 API 签名 | [`docs/koog-api-reference.md`](./koog-api-reference.md) | JAR 提取的精确 API 签名 |
 | 版本目录 | `gradle/libs.versions.toml` | `koog = "0.8.0"` |
-| API 参考 | `docs/koog-api-reference.md` | JAR 提取的完整 API 签名 |
 
 ---
 
-## 附录 B：依赖关系图（集成后）
+## 附录 B：依赖关系图
 
 ```
                     ┌──────────────┐
@@ -727,20 +528,42 @@ public kotlinx.coroutines.flow.Flow<ai.koog.prompt.streaming.StreamFrame>
                     │ (setContent)  │
                     └──────┬───────┘
                            │ state collection
-                    ┌──────▼───────┐
-                    │ChatViewModel │ ◀── viewModelScope
-                    │  .uiState    │
-                    └──────┬───────┘
-                           │ send(UserInput)
+                    ┌──────▼───────────┐
+                    │ ChatViewModel    │ ◀── viewModelScope
+                    │   .uiState       │
+                    └──────┬───────────┘
+                           │ sendMessage(text, pendingImage)
                     ┌──────▼──────────────┐
-                    │  CompanionRuntime    │ ◀── Singleton
-                    │  ┌────────────────┐  │
-                    │  │PromptBuilder    │  │
-                    │  │KoogAgentFactory│──┼──▶ RealKoogAgentWrapper
-                    │  │OutputParser     │  │     │
-                    │  │EmotionMachine   │  │     ▼
-                    │  │RelationshipModel│  │  AnthropicLLMClient
-                    │  │MessageRepo      │  │     │
-                    │  └────────────────┘  │     ▼
-                    └──────────────────────┘  GLM / Kimi API
+                    │ SendMessageUseCase   │  ← 90ms 批量 / 30s 空闲 / markdown chunker
+                    └──────┬──────────────┘
+                           │ runtime.send(UserInput)
+                    ┌──────▼──────────────────┐
+                    │   CompanionRuntime       │ ◀── Singleton
+                    │  Pipeline (10 步)        │   ├─ MemoryRepository
+                    │                           │   ├─ ConversationContextBuilder
+                    │                           │   ├─ PromptBuilder
+                    │                           │   ├─ ConfigRepository
+                    │                           │   ├─ MessageRepository
+                    │                           │   ├─ OutputParser
+                    │                           │   ├─ EmotionStateMachine
+                    │                           │   ├─ RelationshipModel
+                    │                           │   └─ ConversationReflection
+                    └──────┬──────────────────┘
+                           │ koogAgentFactory.create(config)
+                    ┌──────▼──────────────┐
+                    │  KoogAgentFactoryImpl  │
+                    │  - LOCAL_QWEN → ReactiveCompanion
+                    │  - else → KoogPromptExecutorWrapper
+                    └──────┬──────────────┘
+                           │ executorFactory.create(config)
+                    ┌──────▼──────────────────┐
+                    │  MultiLLMPromptExecutor  │
+                    │  └─ AnthropicMessagesLLMClient (自研)
+                    └──────┬──────────────────┘
+                           │ HTTP POST /v1/messages  (SSE)
+                    ┌──────▼──────────────────┐
+                    │   GLM-5v-turbo / Kimi 2.6 │
+                    └──────────────────────────┘
 ```
+
+详见 [`docs/agent-architecture.md` §1](./agent-architecture.md#1-分层与依赖关系)。

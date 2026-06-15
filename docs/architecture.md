@@ -189,13 +189,15 @@ ChatScreen (Composable)
 
 只有以下模块需要深度自研：
 
-- `core/companion` — Agent 主循环运行时（调用 Koog AIAgent，但主流程自研）
-- `core/emotion` — 情绪状态机
-- `core/relationship` — 关系亲密度模型
-- `core/pulse` — 生命感脉冲策略
-- `core/prompt` — Prompt 组装与模板引擎
+- `core/companion/` — 云端 Agent 主循环运行时（`CompanionRuntime` + `KoogAgentFactoryImpl` + `OutputParser` + `EmotionStateMachineImpl` + `RelationshipModelImpl` + `LlmConversationReflection`）。详见 [`docs/agent-architecture.md`](./agent-architecture.md)
+- `core/presence/runtime/` + `core/local/` — 本地陪伴体运行时（MNN 推理 + Heartbeat + DreamLoop + ReactiveCompanion）。详见 [`plan/dual-mind-architecture.md`](./plan/dual-mind-architecture.md)
+- `core/prompt/` — Prompt 组装（`PromptBuilder` + `SystemPersona` yml 模板）
+- `core/llm/AnthropicMessagesLLMClient.kt` — 自研 OkHttp + SSE 实现，包成 Koog `LLMClient`
+- `core/tools/CompanionToolRegistry.kt` — 9 内置 + 远程 MCP tool 合并
+- `feature/chat/ChatViewModel.kt` — 8 个 collector + Presence 编排
+- `feature/chat/usecase/SendMessageUseCase.kt` — Flow\<AgentEvent\> → ChatUiState 翻译 + 90ms/30s 节流
 
-**Koog 覆盖的部分：** LLM 客户端（Anthropic 兼容）、对话历史管理、流式输出、结构化 Tool Use、错误重试。
+**Koog 覆盖的部分：** LLM 调用抽象（`PromptExecutor` / `MultiLLMPromptExecutor`）、AIAgent 构造、graph strategy 调度、EventHandler 4 个 hook、Tool registry 注册抽象、structured output（`executeStructured`）。
 
 ### 双轨智能体架构（2026-06 新增设计；2026-06-15 叙事升级）
 
@@ -395,15 +397,17 @@ ksp("androidx.hilt:hilt-compiler:<version>")
 
 当前项目通过 `core/llm/AnthropicMessagesLLMClient.kt` 实现 Anthropic Messages 兼容请求，再接入 Koog 的 `PromptExecutor` / `AIAgent`：
 
-- HTTP 连接管理（基于内部 HttpClient）
-- 请求序列化（Anthropic Messages 格式）
-- 响应反序列化（SSE stream 解析）
-- 错误处理与重试
-- 超时控制
+- HTTP 连接管理（OkHttp 4.12.0，60s callTimeout）
+- 请求序列化（Anthropic Messages 格式，含 system / messages / tools / image base64）
+- 响应反序列化（SSE stream 解析，区分 `text_delta` / `input_json_delta` / `content_block_stop` / `message_delta`）
+- 错误处理与重试（**当前未启用重试**，只把错误转成 `AgentError.NetworkTimeout` / `ApiError`）
+- 超时控制（callTimeout 60s + LlmConnectivityChecker connect 5s / read 8s）
 
-App 业务层只需通过 DataStore / BuildConfig 提供 `baseUrl`、`apiKey`、`modelName`，由 `KoogPromptExecutorFactory` 和 `KoogAgentFactoryImpl` 负责创建执行器与 Agent。
+App 业务层通过 `ConfigRepository`（DataStore）管理 `baseUrl / apiKey / modelName`：
+- **GLM / Kimi** 在 `SettingsScreen` 切换 provider → 改 DataStore → 下次 `send()` 自动用新模型
+- **连通性检查**：`SettingsScreen` / `McpSettingsScreen` 的 "Test connection" 按钮调 `LlmConnectivityChecker.check()`，区分 200 / 401-403 / 网络失败，缓存到 `uiState.connectivityResult`
 
-> **注意：** App 中仍可能需要 Ktor/Retrofit 用于非 LLM 的其他网络请求（如崩溃上报、 analytics 等）。如有需要再单独引入。
+> 详细 SDK 集成（API 表面、线程规则、KG-750 死锁规避）见 [`docs/koog-android-integration.md`](./koog-android-integration.md)。本项目**没有**用 Ktor / Retrofit — 全部走自研的 `AnthropicMessagesLLMClient`，LLM 是 App 唯一对外 HTTP 流量。
 
 ---
 
@@ -426,24 +430,38 @@ ksp("androidx.hilt:hilt-compiler:<version>")
 
 ### 4.7 动画与角色显示
 
-分阶段演进策略：
+**当前实现（2026-06-15）**：
 
-| 阶段 | 方案 | 说明 |
+| 组件 | 实现 | 位置 |
 |------|------|------|
-| MVP | Lottie + 静态立绘 | 轻、成熟、够用 |
-| 进阶 | Rive | 交互动画更强，支持状态机式角色动画 |
-| 高级 | Live2D / Unity | 真实角色表现力 |
+| `AuraPetAvatar` | Compose Canvas 自绘（眼睛 / 腮红 / 表情） | `feature/chat/AuraPetAvatar.kt` |
+| `PresenceAvatar` | Compose Canvas + 表情层（mood / intensity） | `feature/chat/PresenceAvatar.kt` |
+| `HomePresenceAvatar` | 主页背景上的呼吸动画 | `feature/chat/presence/HomePresenceAvatar.kt` |
+| `AuraHomeScreen` | 角色主屏 LazyColumn 集成 | `feature/chat/AuraHomeScreen.kt` |
+
+**演进路径**：
+
+| 阶段 | 方案 | 状态 |
+|------|------|------|
+| MVP | **Compose Canvas 自绘** | ✅ 已实现 |
+| 进阶 | **Lottie 状态机** | ⏳ `lottie-compose 6.6.0` 依赖在但**未启用**；需要设计 mood→animation 映射 + 资源 |
+| 高级 | Rive | 未来规划；状态机式角色动画 |
 
 ```kotlin
-implementation("com.airbnb.android:lottie-compose:<version>")
-implementation("io.coil-kt:coil-compose:<version>")
+// 当前实际依赖
+implementation("com.airbnb.android:lottie-compose:6.6.0")   // 备用,未启用
+implementation("io.coil-kt:coil-compose:2.7.0")            // 头像 / 记忆缩略图
 ```
+
+> **决策原因**：MVP 阶段 Compose Canvas 自绘已足够表达 mood × intensity × relationshipLevel 的 8-12 个表情，**避免** Lottie 资源文件带来的包体膨胀和热更新难题。Lottie 将在角色表现力成为产品瓶颈时引入。
 
 ---
 
-### 4.8 语音
+### 4.8 语音（尚未实现）
 
-第一版使用系统原生能力，封装为接口便于后续替换：
+**当前状态**：CLAUDE.md 已声明 "`SpeechRecognizer` / `TextToSpeech` 语音 I/O" 尚未实现。数据模型**已经预留** `UserInput.Speech`（`core/companion/model/CoreModels.kt`），但 runtime / UI / VM 都没有接。
+
+**未来设计（接口层）**：
 
 ```kotlin
 interface SpeechInput {
@@ -458,175 +476,238 @@ interface SpeechOutput {
 - ASR：`SpeechRecognizer`（系统语音识别）
 - TTS：`TextToSpeech`（系统语音合成）
 
-后续可无缝替换为云端方案（Whisper API / ElevenLabs 等），只换实现不改接口。
-
-**第一版不做：** 实时全双工语音、唤醒词、打断检测（VAD）。
+**第一版不做**：实时全双工语音、唤醒词、打断检测（VAD）。后续可无缝替换为云端方案（Whisper API / ElevenLabs 等），只换实现不改接口。
 
 ---
 
-### 4.9 相机：CameraX → Vision 多模态
+### 4.9 视觉输入：Photo Picker → Vision 多模态（M4 闭环）
 
-相机拍帧通过 **GLM-5v-turbo Vision** 能力实现真正的"看见"用户世界：
+> **范围变更（2026-06）**：原本设计用 CameraX 预览/拍照作为 Vision 入口。**当前 MVP 改用系统 Photo Picker**（`ActivityResultContracts.PickVisualMedia`），不接 CameraX 预览。CameraX 1.4.0 依赖**保留在 `libs.versions.toml` 但未启用**，等真有"实时拍摄 + 即时分析"场景再启用。
 
 #### 多模态交互场景
 
 | 场景 | 输入 | 模型理解 | Agent 响应 |
 |------|------|---------|-----------|
-| "你看我今天的穿搭怎么样" | CameraX 拍帧 | 衣服颜色、风格、搭配 | 情绪化评价 + 关系亲昵度影响语气 |
-| "帮我看看这个" | 用户拍照/选图 | 物体识别、场景理解 | 记忆存储 + 情绪反应 |
-| 分享屏幕截图 | 截图 | UI 内容、文字提取 | 上下文感知对话 |
-| 食物照片 | 拍帧 | 菜品识别、热量估算 | 关心/调侃（取决于关系等级） |
-| 外出风景 | 拍帧 | 天气、地点、氛围 | 共鸣情绪 + 记忆标记 |
+| "你看我今天的穿搭怎么样" | Photo Picker 选图 | 衣服颜色、风格、搭配 | 情绪化评价 + 关系亲昵度影响语气 |
+| "帮我看看这个" | 用户拍照/选图 | 物体识别、场景理解 | 记忆存储（`saveVisionMemory`）+ 情绪反应 |
+| 食物照片 | 选图 | 菜品识别 | 关心/调侃（取决于关系等级） |
+| 外出风景 | 选图 | 天气、地点、氛围 | 共鸣情绪 + 记忆标记 |
 
-#### 数据流
+#### 数据流（M4 闭环）
 
 ```
-CameraX ImageCapture
+Photo Picker (ActivityResultContracts.PickVisualMedia)
+    ↓ URI
+ChatImageProcessor.prepare(uriString)        // ContentResolver + BitmapFactory
     ↓ JPEG Bitmap
-ImageProcessor (压缩 / 裁剪 / base64 编码)
-    ↓ base64 字符串 (~500KB 以内)
-Koog AIAgent.run(
-    content = [
-        TextBlock("用户说：你看这个"),
-        ImageBlock(base64, media_type="image/jpeg")  // Anthropic image block 格式
-    ]
-)
-    ↓ Koog 自动以 Anthropic 格式发送给 GLM-5v-turbo
-    ↓ 模型 Vision 理解图片内容
-AgentOutputParser 解析结构化响应
-    ↓ 情绪信号 + 文字回复 + 记忆动作
-UI 更新（表情 / 气泡 / 记忆卡片）
-```
-
-```kotlin
-implementation("androidx.camera:camera-core:<version>")
-implementation("androidx.camera:camera-camera2:<version>")
-implementation("androidx.camera:camera-lifecycle:<version>")
-implementation("androidx.camera:camera-view:<version>")
+    ↓ Bitmap → JPEG compress(q=80) → base64
+    ↓ ChatImageAttachment(uriString, imageBase64, mediaType)
+SendMessageUseCase.attachImage → _uiState.pendingImage
+User 发送消息
+    ├─ ① fire-and-forget: memoryRepository.saveVisionMemory(summary, imageBase64, ...)
+    │      ↓ 写 MemoryEntity (含 imageBase64 / imageMediaType, MIGRATION_7_8)
+    │      ↓ 失败仅 log,不影响主流程
+    └─ ② 立即发: UserInput.Vision(text, imageBase64, mediaType, displayText)
+            ↓ CompanionRuntime.send
+            ↓ promptBuilder.build(allowTools = true)
+            ↓ KoogPromptExecutorWrapper.toKoogAgentPrompt() (ContentPart.Image + AttachmentContent.Binary.Base64)
+            ↓ MultiLLMPromptExecutor → AnthropicMessagesLLMClient.executeStreaming
+            ↓ POST /v1/messages with image source.base64
+            ↓ 模型 Vision 理解
+            ↓ Tool / Streaming / Complete 事件流 → UI
+            ↓
+DreamDataCollector (M3 末 M4 补)
+    ↓ 7 天图 memory 聚合
+    ↓ 把 metadata 注入 ## 视觉证据 section
+    ↓ base64 不进 DreamPrompt
 ```
 
 关键设计：
-- **图片压缩**：CameraX 拍帧需压缩到合理大小（建议 < 500KB），避免 API 成本过高和延迟
+- **图片压缩**：`ChatImageProcessor` 内部用 `BitmapFactory` 二次采样（`inSampleSize`）+ JPEG `compress(quality=80)`，目标 < 500KB
 - **base64 编码**：Anthropic 兼容 API 接受 inline base64 图片，无需外部 URL
-- **缓存策略**：同一帧不重复发送，短时间内的连续请求复用上一次结果
-- **权限管理**：运行时申请 CAMERA 权限，优雅降级（无权限时纯文本模式）
-- **隐私保护**：图片数据仅用于单次 API 调用，不持久化存储原始帧
+- **持久化策略**：图片数据持久化到 Room（`MemoryEntity.imageBase64`），用于"看过的图"清单与 Dream 聚合；**不**走系统相册
+- **权限管理**：Photo Picker 不需要任何运行时权限（Android 13+ 系统级），低版本走 `READ_MEDIA_IMAGES`；CameraX 暂不接
+- **隐私保护**：图片数据仅本机 Room + 单次 API 调用；导出 / 删除走 `MemoryRepository.clearAll()` 或单条 `deleteMemory`
+
+> `MemoryEntity.imageBase64` / `imageMediaType` + MIGRATION_7_8 已落库。`MemoryRoomScreen` 列表会显示图缩略图（Coil + base64 URI）。
 
 ---
 
 ## 五、Agent Core 设计
 
-### 5.1 核心运行时（基于 Koog）
+> **范围说明**：本章只讲**云端对话体**的 Agent Core。本地陪伴体（Continuous Presence）的运行时独立于 Koog，在 `core/presence/runtime/` + `core/local/` 目录，自有 task orchestration 协议，详见 [`plan/dual-mind-architecture.md`](./plan/dual-mind-architecture.md)。
+>
+> 详细编排（Provider 路由、Graph Strategy、Tool 系统、Memory Reflection、流式 UX 节流）见 [`docs/agent-architecture.md`](./agent-architecture.md)。Koog SDK 集成参考（API 表面、线程规则、KG-750 死锁规避）见 [`docs/koog-android-integration.md`](./koog-android-integration.md)。本章不复述。
 
-Koog 负责 LLM 执行层，自研负责情绪驱动的完整主循环：
+### 5.1 一句话定位
+
+> **Aura 的云端 Agent 是一条"事件流"**：
+> `ChatViewModel → SendMessageUseCase → CompanionRuntime → KoogAgentFactory → KoogPromptExecutorWrapper → LLM`，
+> 返回 `Flow<AgentEvent>`，UI 按事件类型分别消费。
+
+Koog 负责 **LLM 调度 + 工具循环 + 流式**。其他所有事情（情绪机、关系模型、记忆注入、tool 注册、tool 持久化、output 解析、reflection、UX 节流）都是 Aura 自研。
+
+### 5.2 核心运行时：11 步 Pipeline
+
+`CompanionRuntime.send(input: UserInput): Flow<AgentEvent>` 是云端 Agent 的总入口，**不是同步返回 String**——它返回 `Flow<AgentEvent>`，UI 在 `SendMessageUseCase` 里消费。
 
 ```kotlin
-class CompanionRuntime(
-    // Koog 提供的 LLM 执行器（通过 Hilt 注入，根据配置动态创建）
-    private val koogAgentFactory: KoogAgentFactory,
-    // 自研核心
-    private val promptBuilder: PromptBuilder,         // Prompt 组装引擎
-    private val emotionMachine: EmotionStateMachine,  // 情绪状态机
-    private val relationship: RelationshipModel,      // 关系系统
-    private val outputParser: OutputParser,           // LLM 输出解析器
-    private val stateReducer: StateReducer,            // 状态归约
-    private val memoryManager: MemoryManager,          // Room 记忆管理
-    private val actionDispatcher: ActionDispatcher     // 动作分发
+class CompanionRuntime @Inject constructor(
+    // 外部依赖
+    private val configRepository: ConfigRepository,                // LlmConfig（provider/url/key/model）
+    private val koogAgentFactory: KoogAgentFactory,                // AIAgent 工厂
+    private val promptBuilder: PromptBuilder,                      // BuiltPrompt 组装
+    private val outputParser: OutputParser,                        // regex 解析 [mood:..] 等
+    private val messageRepository: MessageRepository,              // USER/ASSISTANT 消息落库
+    private val memoryRepository: MemoryRepository,                // 记忆库 + selectPromptContext
+    private val conversationContextBuilder: ConversationContextBuilder, // 近 N 条对话
+    private val conversationReflection: ConversationReflection,    // runStructured 写记忆
+    private val emotionMachine: EmotionStateMachine,               // mood 状态机（Singleton）
+    private val relationshipModel: RelationshipModel,               // affinity 累加（Singleton）
 ) {
-    suspend fun send(input: UserInput): Flow<AgentEvent> = flow {
-        // 1. 获取当前 LLM 配置（从 DataStore 读取，支持 GLM/Kimi 切换）
-        val llmConfig = configRepository.getCurrentLlmConfig()
-        val koogAgent = koogAgentFactory.create(llmConfig)
-
-        // 2. 情绪状态影响 Prompt → 自研
-        val emotionContext = emotionMachine.currentContext()
-
-        // 3. 关系等级修饰 → 自研
-        val relContext = relationship.contextModifier()
-
-        // 4. 组装 Prompt（含记忆注入）→ 自研
-        val enhancedInput = promptBuilder.build(input, emotionContext, relContext)
-
-        // 5. 调用 Koog Agent → Koog 处理 LLM 调用（Streaming / 重试 / 压缩）
-        val result = koogAgent.run(enhancedInput)
-
-        // 6. 解析输出 → 自研
-        val parsed = outputParser.parse(result)
-
-        // 7. 情绪更新 → 自研
+    open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
+        // ① 拉记忆 context（向量检索 + summary 检索）
+        val memoryContext = memoryRepository.selectPromptContext(input.content)
+        // ② 拉近 50 条对话
+        val conversationContext = conversationContextBuilder.build(DEFAULT_SESSION_ID)
+        // ③ 组装 prompt（persona + emotion + relation + summaries + recent + memories + tools）
+        val prompt = promptBuilder.build(input, emotionMachine.getContext(),
+            relationshipModel.contextModifier(), conversationContext.recentMessages,
+            memoryContext.memorySnippets, memoryContext.summarySnippets)
+        // ④ 读 LlmConfig
+        val config = configRepository.getCurrentLlmConfig().first()
+        // ⑤ 构造 agent（Provider 路由：LOCAL_QWEN → ReactiveCompanion，其他 → KoogPromptExecutorWrapper）
+        val agent = koogAgentFactory.create(config)
+        // ⑥ 写 user message（Vision 时附 imageBase64）
+        val userMessageId = messageRepository.sendMessage(...)
+        // ⑦ 跑 agent.runEvents(prompt).collect → 转 AgentEvent
+        // ⑧ 解析 raw response → ParsedOutput（textReply / emotionSignal / interactionSignal / actions）
+        val parsed = outputParser.parse(rawResponse)
+        // ⑨ 喂情绪 + 关系
         emotionMachine.feed(parsed.emotionSignal)
-
-        // 8. 关系更新 → 自研
-        relationship.update(parsed.interactionSignal)
-
-        // 9. 状态归约 → 自研
-        stateReducer.reduce(parsed)
-
-        // 10. 存储记忆 → Room
-        memoryManager.store(parsed)
-
-        // 11. 分发动作 → 自研
-        actionDispatcher.dispatch(parsed.actions)
-
-        emit(AgentEvent.Complete(parsed))
+        relationshipModel.update(parsed.interactionSignal)
+        // ⑩ memory reflection（agent.runStructured，不走主 turn 的 graph）
+        val savedMemoryCount = conversationReflection.reflectAndSave(...).savedMemoryCount
+        // ⑪ 写 assistant message + emit Complete / MemorySaved
     }
 }
 ```
 
-### 5.2 多模态输入处理
+**关键事实**：
 
-主循环需支持 **文本 + 图片** 混合输入：
+- 整个 11 步跑在 `callbackFlow` 里，第 ⑦ 步显式 `launch(Dispatchers.IO)` 切线程，详见 [agent-architecture.md §1](./agent-architecture.md#1-分层与依赖关系)。
+- 记忆 reflection 在第 ⑩ 步**额外**调一次 `agent.runStructured`，**绕开**主 turn 的 graph strategy（不允许 `allowTools`），详见 [agent-architecture.md §7](./agent-architecture.md#7-memory-reflection)。
+- 历史上 §5 旧版本的 `StateReducer` / `ActionDispatcher` / `MemoryManager` **不存在** — 状态归约已合并进 `SendMessageUseCase.persistStatus`，动作分发已合并进 `ToolCallRecorder`，记忆存储已下沉到 `memoryRepository.saveMemory`。
+
+### 5.3 多模态输入处理
 
 ```kotlin
 sealed class UserInput {
-    data class Text(val content: String) : UserInput()
+    abstract val content: String
+    data class Text(override val content: String) : UserInput()
     data class Vision(
-        val text: String,              // 用户文字描述
-        val imageBase64: String,       // CameraX 拍帧 / 选图
-        val mediaType: String = "image/jpeg"
-    ) : UserInput()
-    data class Speech(val transcript: String) : UserInput()  // STT 结果
+        val text: String,                  // 用户文字描述
+        val imageBase64: String,           // Photo Picker / CameraX 选图
+        val mediaType: String = "image/jpeg",
+        val displayText: String = text,    // 历史区展示用；空时 fallback "Shared a picture"
+    ) : UserInput() { override val content get() = displayText.ifBlank { "Shared a picture" } }
+    data class Speech(val transcript: String) : UserInput() { override val content get() = transcript }
 }
 ```
 
-### 5.3 Koog Agent 工厂（模型切换）
+**Vision 来源（M4 闭环）**：
+- 不接 CameraX 预览/拍照（CLAUDE.md 已声明"用 Photo Picker 替代 MVP"）
+- `ChatImageProcessor.prepare(uriString)` 走 `ContentResolver` + `BitmapFactory` 压缩到 base64
+- 选图后 `SendMessageUseCase` 走 **fire-and-forget** 落 vision memory：
 
 ```kotlin
-class KoogAgentFactoryImpl @Inject constructor(
-    private val executorFactory: KoogPromptExecutorFactory,
-    private val toolRegistry: AgentToolRegistry,
-    private val toolCallRecorder: ToolCallRecorder,
-) : KoogAgentFactory {
-
-    override fun create(config: LlmConfig): KoogAgentWrapper =
-        KoogPromptExecutorWrapper(
-            config = config,
-            executor = executorFactory.create(config),
-            toolRegistry = toolRegistry,
-            toolCallRecorder = toolCallRecorder,
+scope.launch {
+    runCatching {
+        memoryRepository.saveVisionMemory(
+            summary = trimmed,
+            imageBase64 = pendingImage.imageBase64,
+            imageMediaType = pendingImage.mediaType,
+            sourceMessageId = userMsg.id,
         )
+    }.onFailure { AppLogger.warn(...) }   // 失败仅 log,不影响主流程
+}
+UserInput.Vision(...)   // 立即发,不等 vision memory 写完
+```
+
+- `MemoryEntity.imageBase64 / imageMediaType` + MIGRATION_7_8 已落
+- `DreamDataCollector` 把图 memory **metadata** 注入 `## 视觉证据` section（**base64 不进 DreamPrompt**）
+
+**LLM 模型要求**：Vision 输入时 `LLModel` 必须声明 `LLMCapability.Vision.Image`，否则 Koog 拒绝 `ContentPart.Image`（详见 [koog-android-integration.md §3.3](./koog-android-integration.md#33-builtprompt--prompt-转换)）。
+
+### 5.4 Provider 路由
+
+`KoogAgentFactoryImpl.create(config)` 是路由总闸：
+
+```kotlin
+override fun create(config: LlmConfig): KoogAgentWrapper {
+    if (config.provider == LlmProvider.LOCAL_QWEN) {
+        // dual-mind Phase 0 临时二选一;Phase 1 拆开云端对话体/本地觉察面后,
+        // 这条分支应改为 "ReactiveCompanion 仅在 presence runtime 内被 LocalQwenExecutor 调"
+        @Suppress("DEPRECATION_RENAMED_TO_REACTIVE_COMPANION")
+        return ReactiveCompanion(engine = localQwenEngine, modelName = config.modelName)
+    }
+    return KoogPromptExecutorWrapper(
+        config = config,
+        executor = executorFactory.create(config),     // MultiLLMPromptExecutor
+        toolRegistry = toolRegistry,                    // AgentToolRegistry（9 内置 + MCP）
+        toolCallRecorder = toolCallRecorder,            // 写 Room tool_calls 表
+    )
 }
 ```
 
-切换模型只需修改 DataStore 中的配置，下次 `send()` 调用时自动使用新模型。
+| 路由 | 走什么 | 说明 |
+|------|-------|------|
+| `LlmProvider.LOCAL_QWEN` | `ReactiveCompanion` | MNN 本地推理，不进 Koog，**不**支持流式 + tool |
+| `LlmProvider.GLM` / `KIMI` / 其他云端 | `KoogPromptExecutorWrapper` | 走 Anthropic Messages 兼容端点，支持流式 + tool + reflection |
 
-### 5.4 不要自己造的轮子
+切换模型只需改 `ConfigRepository`（DataStore），下次 `send()` 自动用新模型。
 
-| 能力 | 使用什么 |
-|------|----------|
-| LLM HTTP 客户端 | **项目内 Anthropic Messages 兼容层** |
-| Streaming SSE 解析 | **项目内兼容层转换为 Koog streaming events** |
-| 对话历史管理 / Token 压缩 | **Koog 能力，当前未启用压缩** |
-| 结构化 Tool Use | **Koog tools + 项目内 tool schema 适配** |
-| 错误重试 / 容错 | **规划中，当前以错误事件和 UI 提示为主** |
-| JSON 解析 | kotlinx.serialization |
-| 数据库 ORM | Room |
-| 后台调度 | WorkManager |
-| DI 容器 | Hilt |
-| 日志系统 | Timber |
-| 权限系统 | Google Accompanist Permissions |
-| 动画播放 | Lottie / Rive |
-| 图片加载 | Coil |
+### 5.5 Tool 系统
+
+详见 [agent-architecture.md §6](./agent-architecture.md#6-tool-系统)。这里只列 9 个内置 tool 的总览：
+
+| Tool | 类别 | 用途 |
+|------|------|------|
+| `SearchMemoryTool` | memory | 向量检索记忆 |
+| `SearchRecordsTool` | memory | 检索消息历史 |
+| `SearchSummariesTool` | memory | 检索摘要 |
+| `GetCurrentTimeTool` | context | 让 LLM 知道"现在" |
+| `GetRecentInteractionContextTool` | context | 拉近 N 条对话 |
+| `GetUserContextSettingsTool` | context | 读 5 个 capability 偏好 |
+| `GetDeviceStatusTool` | context | 设备电量 / 网络（API 29+） |
+| `GetWeatherTool` | context | 外部 weather provider |
+| `CreateLocalReminderTool` | action | 写本地 Reminder + AlarmManager |
+
+**Tool 双源注册**：`CompanionToolRegistry.create()` 合并内置 9 个 + 远程 MCP tool，任何一个 MCP server 失败不影响其他 server。
+
+**Tool 状态 → Presence**：`ChatViewModel` 第 7 个 collector 订阅 `ToolCallRepository.observeBySession`，每次 tool 状态变化（STARTED/SUCCEEDED/FAILED）→ `presenceController.reactionFor(PresenceEvent.ToolChanged(...))` → Presence Reaction 节流展示。
+
+### 5.6 不要自己造的轮子
+
+> 来源：`gradle/libs.versions.toml` + 实际 import 清单
+
+| 能力 | 使用什么 | 版本 / 备注 |
+|------|---------|------------|
+| LLM HTTP 客户端 | **项目内 AnthropicMessagesLLMClient** | OkHttp 4.12.0 + 自研 SSE 解析，包成 Koog `LLMClient` |
+| Streaming SSE → Koog StreamFrame | **项目内兼容层** | 走 `executeStreaming` 的 `Flow<StreamFrame>` |
+| 对话历史 / Token 压缩 | Koog prompt 上下文 | **未启用压缩**；靠 `ConversationContextBuilder` 控制近 50 条 |
+| 结构化 Tool Use | Koog `ToolRegistry` + `EventHandler.Feature` | 9 内置 + 远程 MCP（`McpRemoteTool`） |
+| 错误重试 / 容错 | **当前以错误事件 + UI 提示为主** | 规划中；`AgentError` 已分 4 类（NetworkTimeout/RateLimited/ApiError/ParseError） |
+| JSON 解析 | `kotlinx.serialization` 1.7.3 | `ReflectionResponse` 等 `@Serializable` 数据类 |
+| 数据库 ORM | Room 2.8.4 | `MessageDao` / `ToolCallDao` / `AgentStateDao` 等 |
+| 后台调度 | WorkManager 2.10.0 + hilt-work 1.3.0 | `DreamLoopWorker` (PeriodicWorkRequest 6h) + `ReminderNotificationWorker` (OneTimeWorkRequest) |
+| DI 容器 | Hilt 2.59.2 | `@HiltViewModel` / `@AndroidEntryPoint` / `@HiltWorker` |
+| 日志系统 | Timber 5.0.1 + 自研 `AppLogger` / `LogTags` | 走 Timber `Tree`，自研 `LogFieldSanitizer` 防 PII |
+| 精确闹钟权限 | **自研**（`ChatPermissionPrompt` + `ChatPermissionType.EXACT_ALARM`） | 不用 Accompanist Permissions |
+| 角色动画 | **Compose Canvas 临时替代** | `AuraPetAvatar.kt` / `PresenceAvatar.kt`；Lottie / Rive 资源**尚未实现**（仅有 `lottie-compose 6.6.0` 依赖） |
+| 图片加载 | Coil 2.7.0 | 头像 / 记忆缩略图 |
+| 相机 / 选图 | **Photo Picker 替代 CameraX** | `ActivityResultContracts.PickVisualMedia`；CameraX 1.4.0 依赖保留但未启用 |
+| Coroutines | `kotlinx-coroutines-android` 1.8.1 | `viewModelScope` / `Dispatchers.IO` / `callbackFlow` |
 
 ---
 
