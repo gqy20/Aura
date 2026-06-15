@@ -65,6 +65,27 @@ class ConfigRepositoryTest {
     }
 
     @Test
+    fun getCurrentLlmConfig_modelScopeProvider_usesAnthropicCompatibleEndpoint() = runTest {
+        val prefs: AppPreferences = mockk {
+            every { apiKey } returns flowOf("ms-test-token")
+            every { llmProvider } returns flowOf(LlmProvider.MODELSCOPE)
+            every { modelName } returns flowOf(DefaultLlmValues.MODELSCOPE_MODEL)
+            every { baseUrl } returns flowOf("https://stale.example.com/v1")
+        }
+
+        val repo = buildRepo(prefs)
+
+        repo.getCurrentLlmConfig().test {
+            val config = awaitItem()
+            assertEquals(LlmProvider.MODELSCOPE, config.provider)
+            assertEquals(DefaultLlmValues.MODELSCOPE_BASE_URL, config.baseUrl)
+            assertEquals(DefaultLlmValues.MODELSCOPE_MODEL, config.modelName)
+            assertEquals("ms-test-token", config.apiKey)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun getCurrentLlmConfig_localQwenProvider_doesNotRequireApiKey() = runTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf(null)

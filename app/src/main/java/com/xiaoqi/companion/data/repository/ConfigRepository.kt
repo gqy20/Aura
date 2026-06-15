@@ -22,6 +22,10 @@ object DefaultLlmValues {
     const val GLM_MODEL = "glm-5v-turbo"
     const val KIMI_BASE_URL = "https://api.kimi.com/coding"
     const val KIMI_MODEL = "kimi-for-coding"
+    // 魔搭 (ModelScope) Inference 端点,兼容 Anthropic Messages 协议:
+    // 鉴权用 `x-api-key: <ms-token>`,请求路径 `${baseUrl}/v1/messages`。
+    const val MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn"
+    const val MODELSCOPE_MODEL = "Qwen/Qwen3.5-397B-A17B"
     const val LOCAL_QWEN_BASE_URL = ""
     const val LOCAL_QWEN_MODEL = "Qwen3.5-0.8B-MNN"
     const val LOCAL_QWEN_2B_MODEL = "Qwen3.5-2B-MNN"
@@ -31,6 +35,7 @@ object DefaultLlmValues {
         when (provider) {
             LlmProvider.GLM -> GLM_BASE_URL
             LlmProvider.KIMI -> KIMI_BASE_URL
+            LlmProvider.MODELSCOPE -> MODELSCOPE_BASE_URL
             LlmProvider.LOCAL_QWEN -> LOCAL_QWEN_BASE_URL
         }
 
@@ -38,6 +43,7 @@ object DefaultLlmValues {
         when (provider) {
             LlmProvider.GLM -> GLM_MODEL
             LlmProvider.KIMI -> KIMI_MODEL
+            LlmProvider.MODELSCOPE -> MODELSCOPE_MODEL
             LlmProvider.LOCAL_QWEN -> LOCAL_QWEN_MODEL
         }
 
@@ -45,6 +51,7 @@ object DefaultLlmValues {
         when (provider) {
             LlmProvider.GLM -> listOf(GLM_MODEL)
             LlmProvider.KIMI -> listOf(KIMI_MODEL)
+            LlmProvider.MODELSCOPE -> listOf(MODELSCOPE_MODEL)
             LlmProvider.LOCAL_QWEN -> listOf(
                 LOCAL_QWEN_MODEL,
                 LOCAL_QWEN_2B_MODEL,

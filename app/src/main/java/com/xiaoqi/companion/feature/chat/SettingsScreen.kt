@@ -267,6 +267,11 @@ private fun ProviderPicker(
             label = { Text("Kimi") },
         )
         FilterChip(
+            selected = provider == LlmProvider.MODELSCOPE,
+            onClick = { onProviderChanged(LlmProvider.MODELSCOPE) },
+            label = { Text("ModelScope") },
+        )
+        FilterChip(
             selected = provider == LlmProvider.LOCAL_QWEN,
             onClick = { onProviderChanged(LlmProvider.LOCAL_QWEN) },
             label = { Text("Local Qwen") },
