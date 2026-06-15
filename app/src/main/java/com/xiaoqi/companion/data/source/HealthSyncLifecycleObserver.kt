@@ -19,8 +19,11 @@ import kotlinx.coroutines.launch
  *
  * 触发条件全部满足才会同步:
  * 1. [ProcessLifecycleOwner] 报告 ON_START(从后台 / 冷启动回到前台)
- * 2. 用户没在 DataStore 里关掉 auto-sync([AppPreferences.healthAutoSyncEnabled])
- * 3. 防抖由 [HealthSyncManager] 内部把控(默认 30 分钟一次)
+ * 2. **任一** [HealthSource] 报告 `isAvailable() = true`
+ *    — HC 在 realme ColorOS 上 dead,但 SensorManager 几乎所有设备都活着,
+ *    所以门是 OR 不是 AND,保证至少一个 source 能写数据
+ * 3. 用户没在 DataStore 里关掉 auto-sync([AppPreferences.healthAutoSyncEnabled])
+ * 4. 防抖由 [HealthSyncManager] 内部把控(默认 30 分钟一次)
  *
  * 实现用 [ProcessLifecycleOwner] 而不是 [LifecycleOwner] 单独观察 Activity —
  * - ProcessLifecycleOwner 聚合全 App 的 Activity,任意 Activity 启动时都计数
@@ -31,7 +34,7 @@ import kotlinx.coroutines.launch
 @Singleton
 class HealthSyncLifecycleObserver @Inject constructor(
     private val healthSyncManager: HealthSyncManager,
-    private val healthConnectDataSource: HealthConnectDataSource,
+    private val sources: Set<@JvmSuppressWildcards HealthSource>,
     private val appPreferences: AppPreferences,
 ) : DefaultLifecycleObserver {
 
@@ -47,11 +50,20 @@ class HealthSyncLifecycleObserver @Inject constructor(
     }
 
     private suspend fun maybeSync(force: Boolean, reason: String) {
-        // 三重门:SDK 不可用 / 用户关掉 / 30 分钟防抖。前两关直接 return,避免无意义 spam。
-        val available = runCatching { healthConnectDataSource.isAvailable() }
-            .onFailure { AppLogger.warn(LogTags.HealthConnect, "availability_check_failed", "err" to it.message) }
-            .getOrDefault(false)
-        if (!available) {
+        // 三重门:任一 source 可用 / 用户关掉 / 30 分钟防抖。前两关直接 return,避免无意义 spam。
+        val availableSources = sources.filter { source ->
+            runCatching { source.isAvailable() }
+                .onFailure {
+                    AppLogger.warn(
+                        LogTags.HealthConnect,
+                        "availability_check_failed",
+                        "source" to (source::class.simpleName ?: "?"),
+                        "err" to (it.message ?: it::class.simpleName.orEmpty()),
+                    )
+                }
+                .getOrDefault(false)
+        }
+        if (availableSources.isEmpty()) {
             AppLogger.info(LogTags.HealthConnect, "auto_sync_skipped_no_runtime", "reason" to reason)
             return
         }
@@ -61,7 +73,12 @@ class HealthSyncLifecycleObserver @Inject constructor(
             AppLogger.info(LogTags.HealthConnect, "auto_sync_disabled_by_pref")
             return
         }
-        AppLogger.info(LogTags.HealthConnect, "auto_sync_trigger", "reason" to reason)
+        AppLogger.info(
+            LogTags.HealthConnect,
+            "auto_sync_trigger",
+            "reason" to reason,
+            "availableSources" to availableSources.joinToString(",") { it::class.simpleName ?: "?" },
+        )
         healthSyncManager.requestSync(force = force)
     }
 }

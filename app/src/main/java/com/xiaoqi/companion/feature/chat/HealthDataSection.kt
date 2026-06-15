@@ -1,6 +1,11 @@
 package com.xiaoqi.companion.feature.chat
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,7 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.health.connect.client.HealthConnectClient
+import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HeartRateRecord
@@ -37,6 +42,7 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.HealthSyncManager
+import com.xiaoqi.companion.data.source.SensorManagerHealthSource
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
@@ -44,7 +50,8 @@ import kotlinx.coroutines.launch
  * M7 Health Connect 设置区。
  *
  * 显示:
- * - 三个权限开关状态(步数 / 心率 / 睡眠),带"去授权"按钮
+ * - Health Connect 三个权限开关状态(步数 / 心率 / 睡眠),带"去授权"按钮
+ * - **本机传感器** 状态(步数) — 当 HC 不可用时是唯一数据源
  * - 上次同步时间(显示为"N 分钟前 / 刚刚 / 从未同步")
  * - 同步状态指示(Loading / 失败原因)
  * - "自动同步"开关
@@ -58,15 +65,17 @@ fun HealthDataSection(
     onAutoSyncEnabledChanged: (Boolean) -> Unit,
     onSyncNow: () -> Unit,
     healthConnectDataSource: HealthConnectDataSource,
+    sensorSource: SensorManagerHealthSource,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingsSectionTitle(
             title = "健康数据接入",
-            subtitle = "Health Connect · 步数 / 心率 / 睡眠(国内版小米运动健康已支持)",
+            subtitle = "Health Connect · 步数 / 心率 / 睡眠 + 本机传感器兜底步数",
         )
 
         HealthPermissionsCard(dataSource = healthConnectDataSource)
+        SensorSourceCard(sensorSource = sensorSource)
 
         HealthSyncStatusCard(
             syncState = syncState,
@@ -197,6 +206,110 @@ private fun HealthPermissionsCard(dataSource: HealthConnectDataSource) {
                 }
             }
         }
+    }
+}
+
+/**
+ * 本机传感器卡片 — 显示:
+ * - ACTIVITY_RECOGNITION 权限状态
+ * - TYPE_STEP_COUNTER 硬件存在
+ * - 若两者都 ok,显示"✓ 已支持(本机步数)"
+ * - 若权限未授,显示"授予活动识别"按钮(Android 10+ 必须)
+ */
+@Composable
+private fun SensorSourceCard(sensorSource: SensorManagerHealthSource) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var hasPermission by remember {
+        mutableStateOf(hasActivityRecognitionGranted(context))
+    }
+    var isAvailable by remember { mutableStateOf(false) }
+    var hasHardware by remember { mutableStateOf(false) }
+
+    val refresh = {
+        scope.launch {
+            hasPermission = hasActivityRecognitionGranted(context)
+            hasHardware = sensorSource.let {
+                val sm = context.getSystemService(android.hardware.SensorManager::class.java)
+                sm?.getDefaultSensor(android.hardware.Sensor.TYPE_STEP_COUNTER) != null
+            }
+            isAvailable = sensorSource.isAvailable()
+        }
+    }
+    LaunchedEffect(Unit) { refresh() }
+
+    val activityRecognitionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { _: Boolean ->
+        refresh()
+    }
+
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = Color(0xFFF7F2EA),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "本机传感器兜底",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "当 Health Connect 不可用(国行 ROM / realme 等)时,使用 TYPE_STEP_COUNTER 提供今日步数。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SensorRow("活动识别权限", if (hasPermission) "✓ 已授予" else "✗ 未授予",
+                ok = hasPermission, error = !hasPermission)
+            SensorRow("步数传感器", if (hasHardware) "✓ 已内置" else "✗ 不支持",
+                ok = hasHardware, error = !hasHardware)
+            SensorRow("Sensor 数据源", if (isAvailable) "✓ 可用" else "✗ 不可用",
+                ok = isAvailable, error = !isAvailable)
+            if (!hasPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                OutlinedButton(
+                    onClick = {
+                        activityRecognitionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("授予活动识别权限")
+                }
+            }
+        }
+    }
+}
+
+private fun hasActivityRecognitionGranted(context: android.content.Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
+    return ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACTIVITY_RECOGNITION,
+    ) == PackageManager.PERMISSION_GRANTED
+}
+
+@Composable
+private fun SensorRow(label: String, statusText: String, ok: Boolean, error: Boolean) {
+    val color = when {
+        ok -> Color(0xFF2E7D32)
+        error -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = statusText,
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

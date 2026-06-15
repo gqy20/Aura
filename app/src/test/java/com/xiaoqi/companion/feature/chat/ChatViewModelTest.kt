@@ -223,6 +223,7 @@ class ChatViewModelTest {
             dreamLoopScheduler = dreamLoopScheduler,
             healthSyncManager = io.mockk.mockk(relaxed = true),
             healthConnectDataSource = io.mockk.mockk(relaxed = true),
+            sensorHealthSource = io.mockk.mockk(relaxed = true),
         )
     }
 
@@ -377,6 +378,7 @@ class ChatViewModelTest {
             dreamLoopScheduler = io.mockk.mockk(relaxed = true),
             healthSyncManager = io.mockk.mockk(relaxed = true),
             healthConnectDataSource = io.mockk.mockk(relaxed = true),
+            sensorHealthSource = io.mockk.mockk(relaxed = true),
         )
         advanceUntilIdle()
 

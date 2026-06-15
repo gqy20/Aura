@@ -29,6 +29,7 @@ import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.HealthSyncManager
+import com.xiaoqi.companion.data.source.SensorManagerHealthSource
 import com.xiaoqi.companion.feature.chat.mapper.after
 import com.xiaoqi.companion.feature.chat.mapper.displayLabel
 import com.xiaoqi.companion.feature.chat.mapper.extractIntensity
@@ -90,6 +91,8 @@ class ChatViewModel @Inject constructor(
     private val healthSyncManager: HealthSyncManager,
     /** 对 Settings 暴露,用于查询 SDK 状态和已授权权限。 */
     val healthConnectDataSource: HealthConnectDataSource,
+    /** 对 Settings 暴露,用于显示本机传感器兜底状态。 */
+    val sensorHealthSource: SensorManagerHealthSource,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())

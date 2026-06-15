@@ -16,6 +16,19 @@
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
 
+    <!--
+      本机传感器兜底:Android 10 (API 29) 起,读 TYPE_STEP_COUNTER 必须
+      运行时申请 ACTIVITY_RECOGNITION,旧设备系统会静默授空权限。
+      maxSdkVersion 让旧版平台不报错。
+    -->
+    <uses-permission
+        android:name="android.permission.ACTIVITY_RECOGNITION"
+        android:minSdkVersion="29" />
+
+    <uses-feature
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="false" />
+
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />

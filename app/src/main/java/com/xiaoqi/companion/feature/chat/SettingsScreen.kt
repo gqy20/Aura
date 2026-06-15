@@ -276,6 +276,7 @@ private fun SettingsScreenContent(
                     onAutoSyncEnabledChanged = onHealthAutoSyncEnabledChanged,
                     onSyncNow = onHealthSyncNow,
                     healthConnectDataSource = viewModel.healthConnectDataSource,
+                    sensorSource = viewModel.sensorHealthSource,
                 )
             }
             item {

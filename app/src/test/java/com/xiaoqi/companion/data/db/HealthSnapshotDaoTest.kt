@@ -98,4 +98,46 @@ class HealthSnapshotDaoTest : BaseDaoTest() {
         assertTrue(got.sleepStagesJson.contains("DEEP"))
         assertTrue(got.sourcePackages.contains("com.mi.health"))
     }
+
+    /**
+     * M7 多源合并写入:[SensorManagerHealthSource] 调 `updateStepsOnly`,只覆盖
+     * `steps` / `sourcePackages` / `fetchedAt` 三列,**保留**心率/睡眠。
+     */
+    @Test fun `updateStepsOnly preserves heart rate and sleep fields`() = runTest {
+        // 1) Health Connect 先写一行全指标
+        dao.upsert(
+            HealthSnapshotEntity(
+                date = 20260615,
+                steps = 5000,
+                avgHeartRate = 72,
+                sleepDurationMinutes = 480,
+                sourcePackages = """["com.mi.health"]""",
+                fetchedAt = 1_700_000_000_000L,
+            ),
+        )
+        // 2) 本机 sensor 后写 — 模拟步数更新
+        val updated = dao.updateStepsOnly(
+            date = 20260615,
+            steps = 8500,
+            sourcePackages = """["com.mi.health","android.sensor"]""",
+            fetchedAt = 1_700_000_001_000L,
+        )
+        assertEquals(1, updated)
+        // 3) 心率/睡眠应保留,步数被更新
+        val got = dao.findByDate(20260615)!!
+        assertEquals(8500, got.steps)
+        assertEquals(72, got.avgHeartRate)
+        assertEquals(480, got.sleepDurationMinutes)
+    }
+
+    @Test fun `updateStepsOnly on missing date returns zero rows affected`() = runTest {
+        val updated = dao.updateStepsOnly(
+            date = 20991231,
+            steps = 1,
+            sourcePackages = "[]",
+            fetchedAt = 1L,
+        )
+        assertEquals(0, updated)
+        assertNull(dao.findByDate(20991231))
+    }
 }
