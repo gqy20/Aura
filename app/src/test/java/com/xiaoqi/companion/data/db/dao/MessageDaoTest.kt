@@ -133,26 +133,6 @@ class MessageDaoTest : BaseDaoTest() {
     }
 
     @Test
-    fun searchRecords_findsRawMessagesWithFilters() = runTest {
-        dao.insert(makeMessage(id = "m1", role = MessageRole.USER, content = "We discussed MCP records", timestamp = 1_000L))
-        dao.insert(makeMessage(id = "m2", role = MessageRole.ASSISTANT, content = "MCP summary is separate", timestamp = 2_000L))
-        dao.insert(makeMessage(id = "m3", role = MessageRole.USER, content = "Vision photo note", imageBase64 = "base64", timestamp = 3_000L))
-        dao.insert(makeMessage(id = "other", sessionId = "other", role = MessageRole.USER, content = "MCP elsewhere", timestamp = 4_000L))
-
-        val results = dao.searchRecords(
-            sessionId = "default",
-            pattern = "%MCP%",
-            role = MessageRole.USER,
-            after = 500L,
-            before = 2_500L,
-            hasImage = false,
-            limit = 10,
-        )
-
-        assertEquals(listOf("m1"), results.map { it.id })
-    }
-
-    @Test
     fun getMessagesBeforeAndAfter_returnsNearbyContext() = runTest {
         dao.insert(makeMessage(id = "m1", timestamp = 1_000L))
         dao.insert(makeMessage(id = "m2", timestamp = 2_000L))
@@ -167,6 +147,7 @@ class MessageDaoTest : BaseDaoTest() {
     }
 
     // --- deleteBySession ---
+    // 注：仅断言 messages 表删除行为。FTS5 rowid 清理的真行为由 androidTest MessageDaoFts5Test 验证。
 
     @Test
     fun deleteBySession_removesOnlyThatSessionsMessages() = runTest {

@@ -19,6 +19,7 @@ import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
+import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.InsightRepository
@@ -79,6 +80,7 @@ class ChatViewModel @Inject constructor(
     private val insightRepository: InsightRepository,
     private val moodSnapshotDao: MoodSnapshotDao,
     private val messageDao: MessageDao,
+    private val messageSearchDao: MessageSearchDao,
     private val agentStateDao: AgentStateDao,
     private val presenceController: PresenceController,
     private val presenceReactionPolicy: PresenceReactionPolicy,
@@ -271,6 +273,7 @@ class ChatViewModel @Inject constructor(
                     memoryRepository = memoryRepository,
                     moodSnapshotDao = moodSnapshotDao,
                     messageDao = messageDao,
+                    messageSearchDao = messageSearchDao,
                     agentStateDao = agentStateDao,
                 )
             }.onFailure {

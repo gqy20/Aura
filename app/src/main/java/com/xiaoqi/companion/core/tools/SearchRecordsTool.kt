@@ -5,6 +5,7 @@ import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.MessageDao
+import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,7 @@ import kotlinx.serialization.json.put
 
 class SearchRecordsTool @Inject constructor(
     private val messageDao: MessageDao,
+    private val messageSearchDao: MessageSearchDao,
 ) : SimpleTool<SearchRecordsTool.Args>(
     typeToken<Args>(),
     name = "search_records",
@@ -54,18 +56,45 @@ class SearchRecordsTool @Inject constructor(
                 }
             val limit = args.limit.coerceIn(1, MAX_RESULTS)
             val contextLimit = args.contextMessages.coerceIn(0, MAX_CONTEXT_MESSAGES)
-            val matches = messageDao.searchRecords(
-                sessionId = args.sessionId,
-                pattern = query.toRecordLikePattern(),
-                role = role,
-                after = args.after,
-                before = args.before,
-                hasImage = args.hasImage,
-                limit = (limit * CANDIDATE_MULTIPLIER).coerceAtMost(MAX_CANDIDATES),
-            )
-                .map { message -> RecordSearchHit(message, scoreRecord(message.content, query)) }
-                .sortedWith(compareByDescending<RecordSearchHit> { it.score }.thenByDescending { it.message.timestamp })
-                .take(limit)
+            val candidateLimit = (limit * CANDIDATE_MULTIPLIER).coerceAtMost(MAX_CANDIDATES)
+            val matches = if (query.isBlank()) {
+                messageDao.getRecentMessages(
+                    sessionId = args.sessionId,
+                    limit = candidateLimit,
+                )
+                    .map { message -> RecordSearchHit(message, score = 1f, source = "recent") }
+                    .sortedByDescending { it.message.timestamp }
+                    .take(limit)
+            } else {
+                val ftsMatches = runCatching {
+                    messageSearchDao.searchRecordsFts(
+                        sessionId = args.sessionId,
+                        matchQuery = query.toFtsQuery(),
+                        role = role,
+                        after = args.after,
+                        before = args.before,
+                        hasImage = args.hasImage,
+                        limit = candidateLimit,
+                    )
+                }.getOrDefault(emptyList())
+
+                ftsMatches.map { hit ->
+                    RecordSearchHit(
+                        message = MessageEntity(
+                            id = hit.id,
+                            sessionId = hit.sessionId,
+                            role = hit.role,
+                            content = hit.content,
+                            imageBase64 = hit.imageBase64,
+                            timestamp = hit.timestamp,
+                        ),
+                        score = normalizeFtsRank(hit.ftsRank),
+                        source = "fts5",
+                    )
+                }
+                    .sortedWith(compareByDescending<RecordSearchHit> { it.score }.thenByDescending { it.message.timestamp })
+                    .take(limit)
+            }
 
             val items = matches.map { hit ->
                 val beforeContext = if (contextLimit == 0) {
@@ -81,7 +110,12 @@ class SearchRecordsTool @Inject constructor(
                     messageDao.getMessagesAfter(hit.message.sessionId, hit.message.timestamp, contextLimit)
                         .map { it.toRecordContextItem() }
                 }
-                hit.message.toRecordSearchItem(score = hit.score, beforeContext = beforeContext, afterContext = afterContext)
+                hit.message.toRecordSearchItem(
+                    score = hit.score,
+                    beforeContext = beforeContext,
+                    afterContext = afterContext,
+                    source = hit.source,
+                )
             }
 
             json.encodeToString(
@@ -112,6 +146,7 @@ class SearchRecordsTool @Inject constructor(
         val score: Float,
         val contextBefore: List<RecordContextItem>,
         val contextAfter: List<RecordContextItem>,
+        val source: String,
     )
 
     @Serializable
@@ -126,12 +161,14 @@ class SearchRecordsTool @Inject constructor(
     private data class RecordSearchHit(
         val message: MessageEntity,
         val score: Float,
+        val source: String,
     )
 
     private fun MessageEntity.toRecordSearchItem(
         score: Float,
         beforeContext: List<RecordContextItem>,
         afterContext: List<RecordContextItem>,
+        source: String,
     ): RecordSearchItem =
         RecordSearchItem(
             id = id,
@@ -142,6 +179,7 @@ class SearchRecordsTool @Inject constructor(
             score = score,
             contextBefore = beforeContext,
             contextAfter = afterContext,
+            source = source,
         )
 
     private fun MessageEntity.toRecordContextItem(): RecordContextItem =
@@ -171,22 +209,19 @@ class SearchRecordsTool @Inject constructor(
         }.toString()
 }
 
-private fun String.toRecordLikePattern(): String =
-    if (isBlank()) "%" else "%${replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")}%"
+private fun String.toFtsQuery(): String =
+    trim()
+        .split(Regex("\\s+"))
+        .map { it.filterFtsToken() }
+        .filter { it.isNotBlank() }
+        .joinToString(" OR ")
+        .ifBlank { "\"\"" }
 
-private fun scoreRecord(content: String, query: String): Float {
-    if (query.isBlank()) return 1f
-    val normalizedContent = content.lowercase()
-    val normalizedQuery = query.lowercase()
-    val terms = normalizedQuery.split(Regex("\\s+")).filter { it.isNotBlank() }
-    var score = 0f
-    if (normalizedContent.contains(normalizedQuery)) score += 20f
-    terms.forEach { term ->
-        if (normalizedContent.contains(term)) score += 4f
-    }
-    if (normalizedContent.startsWith(normalizedQuery)) score += 3f
-    return score
-}
+private fun String.filterFtsToken(): String =
+    filter { it.isLetterOrDigit() || it == '_' || it.code > 127 }
+
+private fun normalizeFtsRank(rank: Double): Float =
+    (-rank).coerceIn(0.0001, 100.0).toFloat()
 
 private fun String.truncateRecordContent(): String =
     if (length <= MAX_RECORD_CONTENT_CHARS) this else take(MAX_RECORD_CONTENT_CHARS).trimEnd() + "..."

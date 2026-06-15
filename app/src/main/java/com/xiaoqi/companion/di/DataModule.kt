@@ -6,6 +6,10 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.db.CompanionDatabase
@@ -15,6 +19,7 @@ import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
+import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
@@ -67,6 +72,7 @@ object DataModule {
             CompanionDatabase::class.java,
             "companion.db",
         )
+            .setDriver(BundledSQLiteDriver())
             .addMigrations(
                 CompanionDatabase.MIGRATION_1_2,
                 CompanionDatabase.MIGRATION_2_3,
@@ -76,12 +82,28 @@ object DataModule {
                 CompanionDatabase.MIGRATION_6_7,
                 CompanionDatabase.MIGRATION_7_8,
                 CompanionDatabase.MIGRATION_8_9,
+                CompanionDatabase.MIGRATION_9_10,
+            )
+            .addCallback(
+                object : RoomDatabase.Callback() {
+                    override fun onCreate(connection: SQLiteConnection) {
+                        CompanionDatabase.createMessageSearchTables(connection)
+                    }
+
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        CompanionDatabase.createMessageSearchTables(db)
+                    }
+                }
             )
             .build()
 
     @Provides
     fun provideMessageDao(database: CompanionDatabase): MessageDao =
         database.messageDao()
+
+    @Provides
+    fun provideMessageSearchDao(database: CompanionDatabase): MessageSearchDao =
+        database.messageSearchDao()
 
     @Provides
     fun provideToolCallDao(database: CompanionDatabase): ToolCallDao =

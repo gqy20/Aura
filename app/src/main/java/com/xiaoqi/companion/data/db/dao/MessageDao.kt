@@ -4,10 +4,18 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * messages 主表 DAO。
+ *
+ * 只负责 `messages` 表的 CRUD。FTS5 索引维护（`message_search_docs` + `message_search_docs_fts`）
+ * 由 [MessageSearchDao] 独立承担，caller 在 insert/delete 后需手动调 `messageSearchDao.index()` /
+ * `messageSearchDao.unindexSession()` 同步索引。
+ *
+ * @see MessageSearchDao FTS5 索引与检索
+ */
 data class MessageInteractionSummary(
     val messageCount: Int,
     val userMessageCount: Int,
@@ -21,16 +29,16 @@ data class MessageInteractionSummary(
 )
 
 @Dao
-interface MessageDao {
+abstract class MessageDao {
 
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY timestamp ASC")
-    fun observeBySession(sessionId: String): Flow<List<MessageEntity>>
+    abstract fun observeBySession(sessionId: String): Flow<List<MessageEntity>>
 
     @Query("SELECT * FROM messages WHERE id = :id")
-    suspend fun getById(id: String): MessageEntity?
+    abstract suspend fun getById(id: String): MessageEntity?
 
     @Query("SELECT EXISTS(SELECT 1 FROM messages WHERE id = :id)")
-    suspend fun existsById(id: String): Boolean
+    abstract suspend fun existsById(id: String): Boolean
 
     @Query(
         """
@@ -40,35 +48,8 @@ interface MessageDao {
         LIMIT :limit
         """
     )
-    suspend fun getRecentMessages(
+    abstract suspend fun getRecentMessages(
         sessionId: String,
-        limit: Int,
-    ): List<MessageEntity>
-
-    @Query(
-        """
-        SELECT * FROM messages
-        WHERE session_id = :sessionId
-          AND (:role IS NULL OR role = :role)
-          AND (:after IS NULL OR timestamp >= :after)
-          AND (:before IS NULL OR timestamp <= :before)
-          AND (
-              :hasImage IS NULL
-              OR (:hasImage = 1 AND imageBase64 IS NOT NULL)
-              OR (:hasImage = 0 AND imageBase64 IS NULL)
-          )
-          AND content LIKE :pattern ESCAPE '\'
-        ORDER BY timestamp DESC
-        LIMIT :limit
-        """
-    )
-    suspend fun searchRecords(
-        sessionId: String,
-        pattern: String,
-        role: MessageRole?,
-        after: Long?,
-        before: Long?,
-        hasImage: Boolean?,
         limit: Int,
     ): List<MessageEntity>
 
@@ -81,7 +62,7 @@ interface MessageDao {
         LIMIT :limit
         """
     )
-    suspend fun getMessagesBefore(
+    abstract suspend fun getMessagesBefore(
         sessionId: String,
         timestamp: Long,
         limit: Int,
@@ -96,17 +77,17 @@ interface MessageDao {
         LIMIT :limit
         """
     )
-    suspend fun getMessagesAfter(
+    abstract suspend fun getMessagesAfter(
         sessionId: String,
         timestamp: Long,
         limit: Int,
     ): List<MessageEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(entity: MessageEntity)
+    abstract suspend fun insert(entity: MessageEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(entities: List<MessageEntity>)
+    abstract suspend fun insertAll(entities: List<MessageEntity>)
 
     @Query(
         """
@@ -129,14 +110,14 @@ interface MessageDao {
         WHERE session_id = :sessionId
         """
     )
-    suspend fun getInteractionSummary(
+    abstract suspend fun getInteractionSummary(
         sessionId: String,
         startOfToday: Long,
     ): MessageInteractionSummary
 
     @Query("DELETE FROM messages WHERE session_id = :sessionId")
-    suspend fun deleteBySession(sessionId: String)
+    abstract suspend fun deleteBySession(sessionId: String)
 
     @Query("SELECT COUNT(*) FROM messages")
-    suspend fun countAll(): Int
+    abstract suspend fun countAll(): Int
 }

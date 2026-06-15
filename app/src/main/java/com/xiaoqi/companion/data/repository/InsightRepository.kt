@@ -134,6 +134,7 @@ class InsightRepository @Inject constructor(
         memoryRepository: com.xiaoqi.companion.data.repository.MemoryRepository,
         moodSnapshotDao: com.xiaoqi.companion.data.db.dao.MoodSnapshotDao,
         messageDao: com.xiaoqi.companion.data.db.dao.MessageDao,
+        messageSearchDao: com.xiaoqi.companion.data.db.dao.MessageSearchDao,
         agentStateDao: com.xiaoqi.companion.data.db.dao.AgentStateDao,
     ): Int = withContext(Dispatchers.IO) {
         if (insightDao.countAll() > 0) return@withContext 0
@@ -199,24 +200,24 @@ class InsightRepository @Inject constructor(
                 timestamp = threeWeeksAgo + 14L * 24L * 60L * 60L * 1000,
             ),
         )
-        messageDao.insert(
-            com.xiaoqi.companion.data.db.entity.MessageEntity(
-                id = "seed-sleep-1",
-                sessionId = "default",
-                role = com.xiaoqi.companion.data.db.converter.MessageRole.USER,
-                content = "最近睡不着,有点失眠",
-                timestamp = oneWeekAgo,
-            ),
+        val seedMsg1 = com.xiaoqi.companion.data.db.entity.MessageEntity(
+            id = "seed-sleep-1",
+            sessionId = "default",
+            role = com.xiaoqi.companion.data.db.converter.MessageRole.USER,
+            content = "最近睡不着,有点失眠",
+            timestamp = oneWeekAgo,
         )
-        messageDao.insert(
-            com.xiaoqi.companion.data.db.entity.MessageEntity(
-                id = "seed-sleep-2",
-                sessionId = "default",
-                role = com.xiaoqi.companion.data.db.converter.MessageRole.USER,
-                content = "睡眠质量不好,想改善",
-                timestamp = now - 2L * 24L * 60L * 60L * 1000,
-            ),
+        messageDao.insert(seedMsg1)
+        messageSearchDao.index(seedMsg1)
+        val seedMsg2 = com.xiaoqi.companion.data.db.entity.MessageEntity(
+            id = "seed-sleep-2",
+            sessionId = "default",
+            role = com.xiaoqi.companion.data.db.converter.MessageRole.USER,
+            content = "睡眠质量不好,想改善",
+            timestamp = now - 2L * 24L * 60L * 60L * 1000,
         )
+        messageDao.insert(seedMsg2)
+        messageSearchDao.index(seedMsg2)
 
         val seeds = listOf(
             InsightDraft(

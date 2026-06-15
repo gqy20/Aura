@@ -21,6 +21,7 @@ hilt = "2.59.2"
 
 # Database
 room = "2.8.4"
+sqlite = "2.6.2"
 
 # Background
 work = "2.10.0"
@@ -81,6 +82,7 @@ hilt-compiler-androidx = { group = "androidx.hilt", name = "hilt-compiler", vers
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+androidx-sqlite-bundled = { group = "androidx.sqlite", name = "sqlite-bundled", version.ref = "sqlite" }
 
 # --- Config: DataStore ---
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version = "1.1.1" }

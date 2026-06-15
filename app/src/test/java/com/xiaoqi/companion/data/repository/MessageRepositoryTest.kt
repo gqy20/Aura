@@ -2,6 +2,7 @@ package com.xiaoqi.companion.data.repository
 
 import app.cash.turbine.test
 import com.xiaoqi.companion.data.db.dao.MessageDao
+import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import io.mockk.coEvery
@@ -24,7 +25,7 @@ class MessageRepositoryTest {
             )
         }
 
-        val repo = MessageRepositoryImpl(dao)
+        val repo = MessageRepositoryImpl(dao, mockk(relaxed = true))
         repo.getMessagesBySession("s1").test {
             val messages = awaitItem()
             assertEquals(1, messages.size)
@@ -38,12 +39,16 @@ class MessageRepositoryTest {
         val dao: MessageDao = mockk(relaxed = true) {
             coEvery { insert(any()) } returns Unit
         }
+        val searchDao: MessageSearchDao = mockk(relaxed = true)
 
-        val repo = MessageRepositoryImpl(dao)
+        val repo = MessageRepositoryImpl(dao, searchDao)
         val id = repo.sendMessage(sessionId = "s1", content = "hello")
 
         assertEquals(36, id.length)
         coVerify { dao.insert(match<MessageEntity> {
+            it.id == id && it.role == MessageRole.USER && it.content == "hello" && it.sessionId == "s1"
+        }) }
+        coVerify { searchDao.index(match<MessageEntity> {
             it.id == id && it.role == MessageRole.USER && it.content == "hello" && it.sessionId == "s1"
         }) }
     }
@@ -56,7 +61,7 @@ class MessageRepositoryTest {
             )
         }
 
-        val repo = MessageRepositoryImpl(dao)
+        val repo = MessageRepositoryImpl(dao, mockk(relaxed = true))
         val messages = repo.getRecentMessages("s1", 0)
 
         assertEquals(1, messages.size)
@@ -69,13 +74,19 @@ class MessageRepositoryTest {
         val dao: MessageDao = mockk(relaxed = true) {
             coEvery { insert(any()) } returns Unit
         }
+        val searchDao: MessageSearchDao = mockk(relaxed = true)
 
-        val repo = MessageRepositoryImpl(dao)
+        val repo = MessageRepositoryImpl(dao, searchDao)
         val id = repo.saveAssistantMessage(sessionId = "s1", content = "hello back")
 
         assertEquals(36, id.length)
         coVerify {
             dao.insert(match<MessageEntity> {
+                it.id == id && it.role == MessageRole.ASSISTANT && it.content == "hello back" && it.sessionId == "s1"
+            })
+        }
+        coVerify {
+            searchDao.index(match<MessageEntity> {
                 it.id == id && it.role == MessageRole.ASSISTANT && it.content == "hello back" && it.sessionId == "s1"
             })
         }
@@ -86,10 +97,12 @@ class MessageRepositoryTest {
         val dao: MessageDao = mockk(relaxed = true) {
             coEvery { deleteBySession(any()) } returns Unit
         }
+        val searchDao: MessageSearchDao = mockk(relaxed = true)
 
-        val repo = MessageRepositoryImpl(dao)
+        val repo = MessageRepositoryImpl(dao, searchDao)
         repo.deleteSession("s1")
 
         coVerify { dao.deleteBySession("s1") }
+        coVerify { searchDao.unindexSession("s1") }
     }
 }

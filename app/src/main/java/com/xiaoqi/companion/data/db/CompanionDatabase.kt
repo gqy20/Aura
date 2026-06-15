@@ -4,12 +4,14 @@ import androidx.room.Database
 import androidx.room.migration.Migration
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.xiaoqi.companion.data.db.converter.Converters
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
+import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
@@ -37,13 +39,14 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         InsightEntity::class,
         HealthSnapshotEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class CompanionDatabase : RoomDatabase() {
 
     abstract fun messageDao(): MessageDao
+    abstract fun messageSearchDao(): MessageSearchDao
     abstract fun memoryDao(): MemoryDao
     abstract fun memorySummaryDao(): MemorySummaryDao
     abstract fun agentStateDao(): AgentStateDao
@@ -214,5 +217,146 @@ abstract class CompanionDatabase : RoomDatabase() {
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_health_snapshots_date` ON `health_snapshots` (`date`)")
             }
         }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createMessageSearchTables(db)
+                rebuildMessageSearchIndex(db)
+            }
+        }
+
+        fun createMessageSearchTables(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `message_search_docs` (
+                    `search_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `message_id` TEXT NOT NULL,
+                    `session_id` TEXT NOT NULL,
+                    `role` TEXT NOT NULL,
+                    `content` TEXT NOT NULL,
+                    `has_image` INTEGER NOT NULL,
+                    `timestamp` INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_message_search_docs_message_id` " +
+                    "ON `message_search_docs` (`message_id`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_message_search_docs_session_timestamp` " +
+                    "ON `message_search_docs` (`session_id`, `timestamp`)"
+            )
+            db.execSQL(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS `message_search_docs_fts`
+                USING fts5(
+                    `content`,
+                    tokenize='trigram'
+                )
+                """.trimIndent()
+            )
+        }
+
+        fun createMessageSearchTables(connection: SQLiteConnection) {
+            connection.execSql(
+                """
+                CREATE TABLE IF NOT EXISTS `message_search_docs` (
+                    `search_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `message_id` TEXT NOT NULL,
+                    `session_id` TEXT NOT NULL,
+                    `role` TEXT NOT NULL,
+                    `content` TEXT NOT NULL,
+                    `has_image` INTEGER NOT NULL,
+                    `timestamp` INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            connection.execSql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_message_search_docs_message_id` " +
+                    "ON `message_search_docs` (`message_id`)"
+            )
+            connection.execSql(
+                "CREATE INDEX IF NOT EXISTS `index_message_search_docs_session_timestamp` " +
+                    "ON `message_search_docs` (`session_id`, `timestamp`)"
+            )
+            connection.execSql(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS `message_search_docs_fts`
+                USING fts5(
+                    `content`,
+                    tokenize='trigram'
+                )
+                """.trimIndent()
+            )
+        }
+
+        fun rebuildMessageSearchIndex(db: SupportSQLiteDatabase) {
+            db.execSQL("DELETE FROM `message_search_docs_fts`")
+            db.execSQL("DELETE FROM `message_search_docs`")
+            db.execSQL(
+                """
+                INSERT INTO `message_search_docs`(
+                    `message_id`,
+                    `session_id`,
+                    `role`,
+                    `content`,
+                    `has_image`,
+                    `timestamp`
+                )
+                SELECT
+                    `id`,
+                    `session_id`,
+                    `role`,
+                    `content`,
+                    CASE WHEN `imageBase64` IS NULL THEN 0 ELSE 1 END,
+                    `timestamp`
+                FROM `messages`
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `message_search_docs_fts`(`rowid`, `content`)
+                SELECT `search_id`, `content` FROM `message_search_docs`
+                """.trimIndent()
+            )
+        }
+
+        fun rebuildMessageSearchIndex(connection: SQLiteConnection) {
+            connection.execSql("DELETE FROM `message_search_docs_fts`")
+            connection.execSql("DELETE FROM `message_search_docs`")
+            connection.execSql(
+                """
+                INSERT INTO `message_search_docs`(
+                    `message_id`,
+                    `session_id`,
+                    `role`,
+                    `content`,
+                    `has_image`,
+                    `timestamp`
+                )
+                SELECT
+                    `id`,
+                    `session_id`,
+                    `role`,
+                    `content`,
+                    CASE WHEN `imageBase64` IS NULL THEN 0 ELSE 1 END,
+                    `timestamp`
+                FROM `messages`
+                """.trimIndent()
+            )
+            connection.execSql(
+                """
+                INSERT INTO `message_search_docs_fts`(`rowid`, `content`)
+                SELECT `search_id`, `content` FROM `message_search_docs`
+                """.trimIndent()
+            )
+        }
+    }
+}
+
+private fun SQLiteConnection.execSql(sql: String) {
+    prepare(sql).use { statement ->
+        statement.step()
     }
 }

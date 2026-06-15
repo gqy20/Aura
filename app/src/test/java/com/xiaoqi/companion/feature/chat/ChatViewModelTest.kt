@@ -188,7 +188,7 @@ class ChatViewModelTest {
         }
         insightRepository = mockk<com.xiaoqi.companion.data.repository.InsightRepository>(relaxed = true) {
             every { observeVisibleNotMuted(any()) } returns flowOf(emptyList())
-            coEvery { seedDemoInsights(any(), any(), any(), any()) } returns 0
+            coEvery { seedDemoInsights(any(), any(), any(), any(), any()) } returns 0
             coEvery { countAll() } returns 0
         }
         moodSnapshotDao = mockk<MoodSnapshotDao>(relaxed = true) {
@@ -212,6 +212,7 @@ class ChatViewModelTest {
             insightRepository = insightRepository,
             moodSnapshotDao = moodSnapshotDao,
             messageDao = mockk(relaxed = true),
+            messageSearchDao = mockk(relaxed = true),
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,
@@ -367,6 +368,7 @@ class ChatViewModelTest {
             insightRepository = insightRepository,
             moodSnapshotDao = moodSnapshotDao,
             messageDao = mockk(relaxed = true),
+            messageSearchDao = mockk(relaxed = true),
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,

@@ -235,6 +235,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.androidx.sqlite.bundled)
     ksp(libs.room.compiler)
 
     // Background
@@ -275,4 +276,5 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.androidx.sqlite.bundled)
 }
