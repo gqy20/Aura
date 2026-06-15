@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.feature.chat.presence.HomePresencePalette
 import com.xiaoqi.companion.feature.chat.presence.LuminousAuraAvatar
@@ -238,7 +239,7 @@ private fun HomeTopBar(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = "Aura",
+                text = BuildConfig.BRAND_NAME,
                 style = MaterialTheme.typography.displayMedium.copy(
                     fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.Normal,

@@ -10,6 +10,30 @@ plugins {
     alias(libs.plugins.room)
 }
 
+// ---------------------------------------------------------------------------
+// Brand single source of truth — see brand.properties at repo root.
+// CLI override: -PBRAND_NAME=... or env var BRAND_NAME=...
+// ---------------------------------------------------------------------------
+val brandProps = Properties().apply {
+    val f = rootProject.file("brand.properties")
+    if (f.exists()) {
+        f.inputStream().use { load(it) }
+        logger.lifecycle("Loaded brand.properties from ${f.absolutePath}")
+    } else {
+        logger.warn("brand.properties not found at ${f.absolutePath}; falling back to inline defaults.")
+    }
+}
+fun brand(key: String, default: String): String =
+    providers.gradleProperty("BRAND_${key}").orNull
+        ?: brandProps.getProperty("BRAND_${key}")
+        ?: default
+
+val brandName: String = brand("NAME", "Aura")
+val brandDisplayName: String = brand("DISPLAY_NAME", brandName)
+val brandPackage: String = brand("PACKAGE", "com.xiaoqi.companion")
+val brandVersionName: String = brand("VERSION_NAME", "0.1.3")
+val brandVersionCode: String = brand("VERSION_CODE", "4")
+
 val auraMnnHomeProvider = providers
     .gradleProperty("auraMnnHome")
     .orElse(providers.environmentVariable("AURA_MNN_HOME"))
@@ -53,16 +77,25 @@ val syncAuraMnnNativeLibs by tasks.registering(Sync::class) {
 }
 
 android {
-    namespace = "com.xiaoqi.companion"
+    namespace = brandPackage
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = "37.0.0"
 
     defaultConfig {
-        applicationId = "com.xiaoqi.companion"
+        applicationId = brandPackage
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = brandVersionCode.toInt()
+        versionName = brandVersionName
+
+        // Override launcher label so brand.properties is the single source of truth.
+        resValue("string", "app_name", brandDisplayName)
+
+        // Expose brand metadata to runtime code (see com.xiaoqi.companion.BuildConfig).
+        buildConfigField("String", "BRAND_NAME", "\"$brandDisplayName\"")
+        buildConfigField("String", "BRAND_PACKAGE", "\"$brandPackage\"")
+        buildConfigField("String", "BRAND_VERSION_NAME", "\"$brandVersionName\"")
+        buildConfigField("int",    "BRAND_VERSION_CODE", brandVersionCode)
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -135,6 +168,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
     packaging {

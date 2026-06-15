@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.presence.PresenceUiState
 
 /**
@@ -88,7 +89,7 @@ internal fun CompanionHeader(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Aura",
+                    text = BuildConfig.BRAND_NAME,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF496B5E),

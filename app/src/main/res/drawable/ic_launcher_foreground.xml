@@ -12,28 +12,28 @@
     android:viewportHeight="200">
 
     <!-- 不均匀渐变环：顺时针，右下最细→左上最粗 -->
-    <path android:strokeColor="#7B6EF6" android:strokeWidth="10" android:fillColor="#00000000"
+    <path android:strokeColor="@color/brand_aura_violet" android:strokeWidth="10" android:fillColor="#00000000"
         android:strokeAlpha="0.50" android:strokeLineCap="butt"
         android:pathData="M178,100 A78,78 0 0,1 154.8,155.2"/>
-    <path android:strokeColor="#7B6EF6" android:strokeWidth="14" android:fillColor="#00000000"
+    <path android:strokeColor="@color/brand_aura_violet" android:strokeWidth="14" android:fillColor="#00000000"
         android:strokeAlpha="0.60" android:strokeLineCap="butt"
         android:pathData="M154.8,155.2 A78,78 0 0,1 100,178"/>
-    <path android:strokeColor="#7B6EF6" android:strokeWidth="20" android:fillColor="#00000000"
+    <path android:strokeColor="@color/brand_aura_violet" android:strokeWidth="20" android:fillColor="#00000000"
         android:strokeAlpha="0.70" android:strokeLineCap="butt"
         android:pathData="M100,178 A78,78 0 0,1 45.2,155.2"/>
-    <path android:strokeColor="#7B6EF6" android:strokeWidth="26" android:fillColor="#00000000"
+    <path android:strokeColor="@color/brand_aura_violet" android:strokeWidth="26" android:fillColor="#00000000"
         android:strokeAlpha="0.78" android:strokeLineCap="butt"
         android:pathData="M45.2,155.2 A78,78 0 0,1 22,100"/>
-    <path android:strokeColor="#7B6EF6" android:strokeWidth="30" android:fillColor="#00000000"
+    <path android:strokeColor="@color/brand_aura_violet" android:strokeWidth="30" android:fillColor="#00000000"
         android:strokeAlpha="0.85" android:strokeLineCap="butt"
         android:pathData="M22,100 A78,78 0 0,1 45.2,44.8"/>
-    <path android:strokeColor="#7B6EF6" android:strokeWidth="26" android:fillColor="#00000000"
+    <path android:strokeColor="@color/brand_aura_violet" android:strokeWidth="26" android:fillColor="#00000000"
         android:strokeAlpha="0.78" android:strokeLineCap="butt"
         android:pathData="M45.2,44.8 A78,78 0 0,1 100,22"/>
-    <path android:strokeColor="#7B6EF6" android:strokeWidth="18" android:fillColor="#00000000"
+    <path android:strokeColor="@color/brand_aura_violet" android:strokeWidth="18" android:fillColor="#00000000"
         android:strokeAlpha="0.62" android:strokeLineCap="butt"
         android:pathData="M100,22 A78,78 0 0,1 154.8,44.8"/>
-    <path android:strokeColor="#7B6EF6" android:strokeWidth="13" android:fillColor="#00000000"
+    <path android:strokeColor="@color/brand_aura_violet" android:strokeWidth="13" android:fillColor="#00000000"
         android:strokeAlpha="0.52" android:strokeLineCap="butt"
         android:pathData="M154.8,44.8 A78,78 0 0,1 178,100"/>
 
@@ -44,11 +44,11 @@
          交点1≈(80.8, 72.4)  交点2≈(122.8, 128.0)
          紫月牙 = 从交点1沿Aura圆弧到交点2（小弧），再沿你圆弧反向回交点1
     -->
-    <path android:fillColor="#7B6EF6" android:fillAlpha="0.88"
+    <path android:fillColor="@color/brand_aura_violet" android:fillAlpha="0.88"
         android:pathData="M80.8,72.4 A30,30 0 1,1 122.8,128.0 A38,38 0 0,0 80.8,72.4 Z"/>
 
     <!-- 金新月 = 从交点1沿你圆弧到交点2（大弧），再沿Aura圆弧反向回交点1 -->
-    <path android:fillColor="#C9A96E" android:fillAlpha="0.58"
+    <path android:fillColor="@color/brand_aura_gold" android:fillAlpha="0.58"
         android:pathData="M80.8,72.4 A38,38 0 1,1 122.8,128.0 A30,30 0 0,0 80.8,72.4 Z"/>
 
 </vector>

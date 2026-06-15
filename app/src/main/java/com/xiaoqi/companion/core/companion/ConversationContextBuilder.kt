@@ -1,5 +1,6 @@
 package com.xiaoqi.companion.core.companion
 
+import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -89,7 +90,7 @@ class ConversationContextBuilder @Inject constructor(
     private fun MessageEntity.toPromptMessage(): PromptMessage {
         val roleLabel = when (role) {
             MessageRole.USER -> "User"
-            MessageRole.ASSISTANT -> "Aura"
+            MessageRole.ASSISTANT -> BuildConfig.BRAND_NAME
             MessageRole.SYSTEM -> "System"
         }
         val imageNote = if (imageBase64 != null) " [image attached]" else ""

@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Companion</string>
+    <!--
+      app_name is intentionally NOT defined here.
+      It is injected by `resValue("string", "app_name", brandDisplayName)`
+      in app/build.gradle.kts, driven by `brand.properties` (BRAND_DISPLAY_NAME).
+      See brand.properties for the single source of truth.
+    -->
 
     <!-- Dream Loop 周期档位 (Settings → Presence Layer) -->
     <string name="dream_loop_section_title">后台觉察 (Dream Loop)</string>

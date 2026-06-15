@@ -1,3 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--
+      Aura brand palette (single source of truth).
+      Update these values to re-skin the whole app — Logo vector (ic_launcher_foreground.xml),
+      launcher background, and any Compose code that switches to Color(brand_aura_violet).
+    -->
+    <color name="brand_aura_violet">#7B6EF6</color>
+    <color name="brand_aura_gold">#C9A96E</color>
+    <color name="brand_launcher_bg">#080808</color>
 </resources>

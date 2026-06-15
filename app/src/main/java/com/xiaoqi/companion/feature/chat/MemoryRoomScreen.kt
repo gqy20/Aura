@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xiaoqi.companion.BuildConfig
 
 @Composable
 fun MemoryRoomScreen(
@@ -524,8 +525,8 @@ private fun String.memoryTypeLabel(): String =
 
 private fun String.memorySourceLabel(): String =
     when {
-        isBlank() -> "Aura"
-        startsWith("tool:") -> "Aura"
+        isBlank() -> BuildConfig.BRAND_NAME
+        startsWith("tool:") -> BuildConfig.BRAND_NAME
         startsWith("reflection:") -> "Chat"
         else -> this
     }
