@@ -78,6 +78,15 @@ fun ChatScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // M3 prefill:从主页 Insight 卡片"和 Aura 聊聊"带过来的预填 prompt
+    androidx.compose.runtime.LaunchedEffect(uiState.pendingPrefill) {
+        val prefill = uiState.pendingPrefill ?: return@LaunchedEffect
+        viewModel.updateInputText(prefill)
+        // 清空 pendingPrefill,避免下次进入 Chat 重复触发
+        viewModel.consumePrefillPrompt("")
+    }
+
     ChatScreenContent(
         uiState = uiState,
         onSendMessage = { viewModel.sendMessage(uiState.inputText) },

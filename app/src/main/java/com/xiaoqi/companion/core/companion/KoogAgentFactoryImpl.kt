@@ -24,8 +24,8 @@ import ai.koog.prompt.message.Message
 import ai.koog.prompt.streaming.StreamFrame
 import ai.koog.prompt.streaming.toMessageResponses
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
-import com.xiaoqi.companion.core.local.LocalQwenAgentWrapper
 import com.xiaoqi.companion.core.local.LocalQwenEngine
+import com.xiaoqi.companion.core.local.ReactiveCompanion
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
@@ -62,7 +62,10 @@ class KoogAgentFactoryImpl @Inject constructor(
             "hasApiKey" to config.apiKey.isNotBlank(),
         )
         if (config.provider == LlmProvider.LOCAL_QWEN) {
-            return LocalQwenAgentWrapper(
+            // dual-mind Phase 0 临时二选一,Phase 1 拆开云端对话体/本地觉察面后,
+            // 这条分支应改为"ReactiveCompanion 仅在 presence runtime 内被 LocalQwenExecutor 调"
+            @Suppress("DEPRECATION_RENAMED_TO_REACTIVE_COMPANION")
+            return ReactiveCompanion(
                 engine = localQwenEngine,
                 modelName = config.modelName,
             )

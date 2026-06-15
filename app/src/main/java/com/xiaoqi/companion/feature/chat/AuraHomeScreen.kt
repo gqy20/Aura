@@ -92,7 +92,12 @@ fun AuraHomeScreen(
             actionInsight = insight
         },
         onInsightDismiss = { insight -> viewModel.dismissInsight(insight.id) },
-        onInsightChat = { insight -> viewModel.openInsight(insight.id) },
+        onInsightChat = { insight ->
+            val prefill = "我们聊聊: ${insight.headline}?"
+            viewModel.consumePrefillPrompt(prefill)
+            viewModel.openInsight(insight.id)
+            onOpenChat()
+        },
         actionInsight = actionInsight,
         onActionDismiss = { actionInsight = null; showEvidence = false },
         onActionMute = { insight, days ->
@@ -178,6 +183,11 @@ private fun AuraHomeContent(
                             .heightIn(min = 280.dp),
                     )
                     Spacer(Modifier.height(16.dp))
+                }
+                item {
+                    com.xiaoqi.companion.feature.insight.MoodTrendChartSection(
+                        snapshots = uiState.moodTrend,
+                    )
                 }
                 if (uiState.insights.isNotEmpty()) {
                     item {

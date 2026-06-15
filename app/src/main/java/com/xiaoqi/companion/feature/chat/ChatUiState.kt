@@ -153,4 +153,6 @@ data class ChatUiState(
     val mcpConnectivityResult: ConnectivityResult? = null,
     val isCheckingConnectivity: Boolean = false,
     val insights: List<ChatInsight> = emptyList(),
+    val moodTrend: List<com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity> = emptyList(),
+    val pendingPrefill: String? = null,
 )

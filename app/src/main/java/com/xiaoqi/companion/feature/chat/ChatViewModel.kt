@@ -230,6 +230,17 @@ class ChatViewModel @Inject constructor(
                     )
                 }
         }
+
+        // 10. 近 28 天 mood trend(M3 Chart 用)
+        viewModelScope.launch {
+            val cal = java.util.Calendar.getInstance()
+            val end = cal.timeInMillis
+            cal.add(java.util.Calendar.DAY_OF_YEAR, -28)
+            val start = cal.timeInMillis
+            moodSnapshotDao.observeByDateRange(DEFAULT_COMPANION_ID, start, end).collect { list ->
+                _uiState.update { it.copy(moodTrend = list) }
+            }
+        }
     }
 
     //region 简单 UI 反馈
@@ -404,6 +415,15 @@ class ChatViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    /**
+     * M3 主页卡片"和 Aura 聊聊"prefill 入口。
+     * 接收一个 prompt 字符串,塞到 uiState.pendingPrefill,ChatScreen 消费后清空。
+     */
+    fun consumePrefillPrompt(text: String) {
+        if (text.isBlank()) return
+        _uiState.update { it.copy(pendingPrefill = text) }
     }
 
     //region 隐私面板(PR-C)
@@ -723,6 +743,7 @@ class ChatViewModel @Inject constructor(
 
     companion object {
         private const val DEFAULT_SESSION_ID = "default"
+        private const val DEFAULT_COMPANION_ID = "default"
         private const val RECENT_TOOL_CALL_LIMIT = 3
         private const val INSIGHT_CARD_LIMIT = 3
         private const val MUTE_DAY_MS = 24L * 60L * 60L * 1000L
