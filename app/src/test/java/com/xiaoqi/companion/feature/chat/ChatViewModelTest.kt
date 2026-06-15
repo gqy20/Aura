@@ -169,7 +169,12 @@ class ChatViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         sendMessageUseCase = mockk(relaxed = true)
-        settingsUseCase = SettingsUseCase(configRepo, mockAppPreferences(), localQwenDownloader)
+        settingsUseCase = SettingsUseCase(
+            configRepo,
+            mockAppPreferences(),
+            localQwenDownloader,
+            io.mockk.mockk(relaxed = true),
+        )
         imageProcessor = FakeChatImageProcessor()
         toolCallRepository = FakeToolCallRepository()
         reminderRepository = FakeReminderRepository()
@@ -209,6 +214,7 @@ class ChatViewModelTest {
             reminderRepository = reminderRepository,
             toolDisplayRegistry = ToolDisplayRegistry(),
             remoteMcpClient = remoteMcpClient,
+            mcpServerListRepository = io.mockk.mockk(relaxed = true),
         )
     }
 
@@ -359,6 +365,7 @@ class ChatViewModelTest {
             reminderRepository = reminderRepository,
             toolDisplayRegistry = ToolDisplayRegistry(),
             remoteMcpClient = remoteMcpClient,
+            mcpServerListRepository = io.mockk.mockk(relaxed = true),
         )
         advanceUntilIdle()
 

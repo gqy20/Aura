@@ -6,6 +6,7 @@ import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.mcp.McpRemoteTool
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.data.datastore.AppPreferences
+import com.xiaoqi.companion.data.repository.McpServerListRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -26,6 +27,7 @@ class CompanionToolRegistry @Inject constructor(
     private val createLocalReminderTool: CreateLocalReminderTool,
     private val appPreferences: AppPreferences,
     private val remoteMcpClient: RemoteMcpClient,
+    private val mcpServerListRepository: McpServerListRepository,
 ) : AgentToolRegistry {
     override fun create(): ToolRegistry {
         val builder = ToolRegistry.builder()
@@ -44,34 +46,61 @@ class CompanionToolRegistry @Inject constructor(
     }
 
     private fun addRemoteMcpTools(builder: ai.koog.agents.core.tools.ToolRegistryBuilder) {
-        val serverName = runBlocking { appPreferences.mcpServerName.first() }.trim()
-        val serverUrl = runBlocking { appPreferences.mcpHttpUrl.first() }.trim()
-        if (serverUrl.isBlank()) return
-
-        runCatching {
-            runBlocking { remoteMcpClient.listTools(serverUrl) }
-        }.onSuccess { specs ->
-            specs.forEach { spec ->
-                builder.tool(
-                    McpRemoteTool(
-                        serverUrl = serverUrl,
-                        serverName = serverName,
-                        spec = spec,
-                        client = remoteMcpClient,
-                    )
-                )
-            }
-            AppLogger.info(
-                LogTags.Llm,
-                "mcp_tools_registered",
-                "count" to specs.size,
-                "serverName" to serverName.ifBlank { serverUrl },
-            )
-        }.onFailure { error ->
+        // 多 server 模式:遍历所有 enabled=true 且 isReady=true 的 server,分别调 listTools。
+        // 任何单个 server 失败不影响其他 server 的工具注册。
+        val servers = runCatching {
+            runBlocking { mcpServerListRepository.readAll() }
+        }.getOrElse { error ->
             AppLogger.warn(
                 LogTags.Llm,
-                "mcp_tools_register_failed",
+                "mcp_servers_read_failed",
                 "message" to (error.message ?: error::class.simpleName.orEmpty()),
+            )
+            return
+        }
+        val readyServers = servers.filter { it.enabled && it.isReady }
+        if (readyServers.isEmpty()) return
+
+        var totalCount = 0
+        readyServers.forEach { server ->
+            val url = server.resolvedUrl
+            val name = server.resolvedName
+            runCatching {
+                runBlocking { remoteMcpClient.listTools(url) }
+            }.onSuccess { specs ->
+                specs.forEach { spec ->
+                    builder.tool(
+                        McpRemoteTool(
+                            serverUrl = url,
+                            serverName = name,
+                            spec = spec,
+                            client = remoteMcpClient,
+                        )
+                    )
+                }
+                totalCount += specs.size
+                AppLogger.info(
+                    LogTags.Llm,
+                    "mcp_tools_registered",
+                    "count" to specs.size,
+                    "serverId" to server.id,
+                    "serverName" to name,
+                )
+            }.onFailure { error ->
+                AppLogger.warn(
+                    LogTags.Llm,
+                    "mcp_tools_register_failed",
+                    "serverId" to server.id,
+                    "message" to (error.message ?: error::class.simpleName.orEmpty()),
+                )
+            }
+        }
+        if (totalCount > 0) {
+            AppLogger.info(
+                LogTags.Llm,
+                "mcp_tools_registered_summary",
+                "serverCount" to readyServers.size,
+                "toolCount" to totalCount,
             )
         }
     }

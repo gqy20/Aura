@@ -36,8 +36,17 @@ data class McpToolSpec(
 interface RemoteMcpClient {
     suspend fun listTools(serverUrl: String): List<McpToolSpec>
     suspend fun callTool(serverUrl: String, toolName: String, arguments: JsonObject): String
-    suspend fun ping(serverUrl: String): Boolean
+
+    /**
+     * 探活 + 拉取工具清单:对 MCP server 做一次完整的 initialize + tools/list 握手。
+     * - 返回非空 list → server 真正可用 + 提供这些 tools
+     * - 抛 [McpUnreachableException] → 网络/协议层面连不上
+     * - 返回空 list → 握手成功但 server 没声明 tools(理论上不应该)
+     */
+    suspend fun probe(serverUrl: String): List<McpToolSpec>
 }
+
+class McpUnreachableException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 @Singleton
 class McpHttpClient @Inject constructor() : RemoteMcpClient {
@@ -140,40 +149,51 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         }
 
     /**
-     * 轻量连通性探测:对 `serverUrl` 发一个 HEAD 请求,只要服务端有响应(任意状态码)即视为可达。
+     * 真"探活":发 initialize + notifications/initialized + tools/list 三件套。
      *
-     * - 200/204:可作为 MCP server 使用
-     * - 404/405/415 等:端点可达,但 URL 可能不是 MCP 端点 — 仍视为"网络可达"
-     * - IOException/timeout:不可达
+     * 用 tools/list 而非 HEAD 是因为:
+     * - HEAD 请求很多 MCP server 不会正确响应(amap 测试返回 404 假阴性)
+     * - tools/list 是 server 真正"提供 MCP 服务"的标志,返回非空就一定能用
      *
-     * 不抛异常,只用 boolean 表示。
+     * 失败时抛 [McpUnreachableException] 让上层统一处理 + 在 UI 展示。
      */
-    override suspend fun ping(serverUrl: String): Boolean = withContext(Dispatchers.IO) {
-        if (serverUrl.isBlank()) return@withContext false
+    override suspend fun probe(serverUrl: String): List<McpToolSpec> = withContext(Dispatchers.IO) {
+        if (serverUrl.isBlank()) throw McpUnreachableException("URL 为空")
         val startedAt = System.currentTimeMillis()
-        val request = Request.Builder()
-            .url(serverUrl)
-            .head()
-            .build()
         try {
-            httpClient.newCall(request).execute().use { response ->
-                AppLogger.info(
-                    LogTags.Tools,
-                    "mcp_ping_completed",
-                    "serverHost" to serverUrl.hostForLog(),
-                    "statusCode" to response.code,
-                    "durationMs" to (System.currentTimeMillis() - startedAt),
-                )
-                true
-            }
+            ensureInitialized(serverUrl)
+            val requestId = ids.getAndIncrement()
+            val response = rpc(
+                serverUrl = serverUrl,
+                requestId = requestId,
+                method = "tools/list",
+                params = buildJsonObject {},
+            )
+            val tools = response.resultObject()["tools"]?.jsonArray
+                ?.mapNotNull { element -> element.jsonObject.toToolSpecOrNull() }
+                .orEmpty()
+            AppLogger.info(
+                LogTags.Tools,
+                "mcp_probe_completed",
+                "serverHost" to serverUrl.hostForLog(),
+                "toolCount" to tools.size,
+                "durationMs" to (System.currentTimeMillis() - startedAt),
+            )
+            tools
         } catch (e: Exception) {
             AppLogger.warn(
                 LogTags.Tools,
-                "mcp_ping_unreachable",
+                "mcp_probe_failed",
                 "serverHost" to serverUrl.hostForLog(),
                 "cause" to (e.message ?: e::class.simpleName.orEmpty()),
             )
-            false
+            // 失败时清掉缓存的 session id,下次重试重做握手
+            sessions.remove(serverUrl)
+            protocolVersions.remove(serverUrl)
+            throw McpUnreachableException(
+                e.message ?: e::class.simpleName.orEmpty(),
+                e,
+            )
         }
     }
 

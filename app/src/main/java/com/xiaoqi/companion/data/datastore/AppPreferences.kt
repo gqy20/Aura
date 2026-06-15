@@ -28,6 +28,10 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val reminderToolEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.reminderToolEnabled] ?: true }
     val mcpServerName: Flow<String> = dataStore.data.map { it[Keys.mcpServerName] ?: "" }
     val mcpHttpUrl: Flow<String> = dataStore.data.map { it[Keys.mcpHttpUrl] ?: "" }
+    val mcpProviderId: Flow<String> = dataStore.data.map { it[Keys.mcpProviderId] ?: "" }
+    val mcpApiKey: Flow<String> = dataStore.data.map { it[Keys.mcpApiKey] ?: "" }
+    /** 多 server 模式下的列表 (JSON 字符串,见 [McpServerConfig] 序列化)。老字段保留作迁移用。 */
+    val mcpServersJson: Flow<String> = dataStore.data.map { it[Keys.mcpServersJson] ?: "[]" }
     val llmProvider: Flow<LlmProvider> = dataStore.data.map {
         LlmProvider.valueOf(it[Keys.llmProvider] ?: defaultLlmProvider.name)
     }
@@ -48,6 +52,9 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     suspend fun setReminderToolEnabled(value: Boolean) { dataStore.edit { it[Keys.reminderToolEnabled] = value } }
     suspend fun setMcpServerName(value: String) { dataStore.edit { it[Keys.mcpServerName] = value } }
     suspend fun setMcpHttpUrl(value: String) { dataStore.edit { it[Keys.mcpHttpUrl] = value } }
+    suspend fun setMcpProviderId(value: String) { dataStore.edit { it[Keys.mcpProviderId] = value } }
+    suspend fun setMcpApiKey(value: String) { dataStore.edit { it[Keys.mcpApiKey] = value } }
+    suspend fun setMcpServersJson(value: String) { dataStore.edit { it[Keys.mcpServersJson] = value } }
     suspend fun setLlmProvider(value: LlmProvider) { dataStore.edit { it[Keys.llmProvider] = value.name } }
     suspend fun setModelName(value: String) { dataStore.edit { it[Keys.modelName] = value } }
     suspend fun setUserPatternsJson(value: String) { dataStore.edit { it[Keys.userPatternsJson] = value } }
@@ -67,6 +74,9 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val reminderToolEnabled = booleanPreferencesKey("reminder_tool_enabled")
         val mcpServerName = stringPreferencesKey("mcp_server_name")
         val mcpHttpUrl = stringPreferencesKey("mcp_http_url")
+        val mcpProviderId = stringPreferencesKey("mcp_provider_id")
+        val mcpApiKey = stringPreferencesKey("mcp_api_key")
+        val mcpServersJson = stringPreferencesKey("mcp_servers_json")
         val llmProvider = stringPreferencesKey("llm_provider")
         val modelName = stringPreferencesKey("model_name")
         val userPatternsJson = stringPreferencesKey("user_patterns_json")

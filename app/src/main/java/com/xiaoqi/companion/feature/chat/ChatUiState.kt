@@ -2,6 +2,7 @@ package com.xiaoqi.companion.feature.chat
 
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.llm.ConnectivityResult
+import com.xiaoqi.companion.core.mcp.McpServerConfig
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -92,8 +93,8 @@ data class ChatToolCapabilitySettings(
     val weatherContextEnabled: Boolean = true,
     val reminderToolEnabled: Boolean = true,
     val notificationEnabled: Boolean = true,
-    val mcpServerName: String = "",
-    val mcpHttpUrl: String = "",
+    /** 多 MCP server 列表 — 替代老的单 server 字段 (mcpProviderId/mcpApiKey/mcpServerName/mcpHttpUrl)。 */
+    val mcpServers: List<McpServerConfig> = emptyList(),
 )
 
 data class LocalQwenDownloadUiState(
@@ -141,7 +142,17 @@ data class ChatUiState(
     val localQwenDownload: LocalQwenDownloadUiState = LocalQwenDownloadUiState(),
     val mcpSettingsName: String = "",
     val mcpSettingsUrl: String = "",
+    val mcpSettingsProviderId: String = "amap",
+    val mcpSettingsApiKey: String = "",
+    val mcpSettingsKeyVisible: Boolean = false,
+    /** 当前 editor 正在编辑的 server id;null = 新建。 */
+    val mcpEditingServerId: String? = null,
     val mcpSettingsMessage: String? = null,
+    /**
+     * 一次性"已保存"事件,每次 saveMcpSettings 成功时 +1。UI 用 [LaunchedEffect] 监听
+     * 这个字段的变化来切回 list 模式 + 展示 snackbar。仅作信号用,UI 不要按它的值做业务判断。
+     */
+    val mcpEditorJustSaved: Long = 0L,
     val toolCapabilitySettings: ChatToolCapabilitySettings = ChatToolCapabilitySettings(),
     val pendingImage: ChatImageAttachment? = null,
     val isPreparingImage: Boolean = false,
@@ -152,6 +163,13 @@ data class ChatUiState(
     val connectivityResult: ConnectivityResult? = null,
     val mcpConnectivityResult: ConnectivityResult? = null,
     val isCheckingConnectivity: Boolean = false,
+    /**
+     * 上次 probe 后缓存的每个 server 的 tool 名列表,key = server id。
+     * McpListScreen 卡片展开时用它显示该 server 提供的具体工具。
+     * 值为 emptyList 表示"已探但 0 个 tool"(实际不应该)或"探失败"(见 isCheckingConnectivity)。
+     * 整个 key 不在 map 里表示"还没探过"。
+     */
+    val mcpServerTools: Map<String, List<String>> = emptyMap(),
     val insights: List<ChatInsight> = emptyList(),
     val moodTrend: List<com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity> = emptyList(),
     val pendingPrefill: String? = null,

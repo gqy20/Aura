@@ -246,9 +246,11 @@ private fun ConfigStatusCard(
     }
 }
 
-internal fun ChatToolCapabilitySettings.mcpDisplayLabel(): String =
-    when {
-        mcpHttpUrl.isBlank() -> "MCP"
-        mcpServerName.isNotBlank() -> mcpServerName
-        else -> "MCP on"
+internal fun ChatToolCapabilitySettings.mcpDisplayLabel(): String {
+    val first = mcpServers.firstOrNull { it.enabled && it.isReady } ?: mcpServers.firstOrNull { it.enabled }
+    return when {
+        first == null -> "MCP"
+        first.displayName.isNotBlank() -> first.displayName
+        else -> first.provider.displayName
     }
+}

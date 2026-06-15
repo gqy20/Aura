@@ -464,10 +464,12 @@ private fun ToolCapabilitiesSection(
         )
         ToolCapabilityRow(
             title = "MCP",
-            detail = settings.mcpHttpUrl.ifBlank { "Not connected." },
+            detail = settings.mcpServers.firstOrNull { it.isReady }?.resolvedName
+                ?: if (settings.mcpServers.isEmpty()) "未配置"
+                else "未配置 (补 key/URL)",
             meta = "Advanced",
             tools = "",
-            enabled = settings.mcpHttpUrl.isNotBlank(),
+            enabled = settings.mcpServers.any { it.isReady },
             locked = true,
             onEnabledChanged = {},
         )

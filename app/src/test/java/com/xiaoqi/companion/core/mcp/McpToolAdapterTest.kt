@@ -61,6 +61,6 @@ class McpToolAdapterTest {
             return "ok"
         }
 
-        override suspend fun ping(serverUrl: String): Boolean = true
+        override suspend fun probe(serverUrl: String): List<McpToolSpec> = emptyList()
     }
 }
