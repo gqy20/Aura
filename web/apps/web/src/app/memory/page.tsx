@@ -1,8 +1,8 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { motion } from 'motion/react'
 import { FeatureShell } from '@/components/feature/FeatureShell'
+import { Reveal } from '@/components/Reveal'
 
 // 3D 客户端渲染
 const MemoryNetworkDynamic = dynamic(
@@ -102,12 +102,10 @@ export default function MemoryPage() {
 
           <div className="mt-8 space-y-4">
             {MEMORY_TYPES.map((t, i) => (
-              <motion.div
+              <Reveal
                 key={t.name}
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: '-10%' }}
-                transition={{ duration: 0.5, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                direction="x"
+                delay={i * 100}
                 className="rounded-xl border border-border p-5"
               >
                 <div className="flex items-center gap-3">
@@ -131,7 +129,7 @@ export default function MemoryPage() {
                     </li>
                   ))}
                 </ul>
-              </motion.div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -150,12 +148,9 @@ export default function MemoryPage() {
 
         <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {SUMMARY_TYPES.map((s, i) => (
-            <motion.div
+            <Reveal
               key={s.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
+              delay={i * 80}
               className="rounded-xl border border-border p-5"
             >
               <span
@@ -166,7 +161,7 @@ export default function MemoryPage() {
                 {s.name}
               </p>
               <p className="mt-2 text-sm leading-relaxed text-muted">{s.desc}</p>
-            </motion.div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -196,18 +191,11 @@ export default function MemoryPage() {
             {/* 堆叠条 */}
             <div className="flex h-3 w-full overflow-hidden rounded-full bg-subtle">
               {STORAGE_BREAKDOWN.map((row, i) => (
-                <motion.div
+                <div
                   key={row.type}
-                  initial={{ width: 0 }}
-                  whileInView={{ width: `${row.weight * 100}%` }}
-                  viewport={{ once: true }}
-                  transition={{
-                    duration: 0.8,
-                    delay: i * 0.1,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
                   className="h-full"
                   style={{
+                    width: `${row.weight * 100}%`,
                     backgroundColor: [
                       '#7c5cff',
                       '#5cffb0',

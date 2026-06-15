@@ -8,6 +8,7 @@ import { SmoothScroll } from '@/components/SmoothScroll'
 import { ScrollSection } from '@/components/ScrollSection'
 import { MagneticCursor } from '@/components/MagneticCursor'
 import { AnnouncementBar } from '@/components/AnnouncementBar'
+import { Reveal } from '@/components/Reveal'
 import { AuraLogo } from '@/components/AuraLogo'
 
 // 3D 组件仅客户端渲染，禁用 SSR
@@ -191,32 +192,6 @@ export default function Home() {
                   </Link>
                 </motion.div>
 
-                {/* ─── 信任带 ─── */}
-                <motion.dl
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 2.0, ease: [0.22, 1, 0.36, 1] }}
-                  className="mt-10 grid max-w-xl grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4"
-                >
-                  {[
-                    { value: '41', label: 'Tests pass', color: '#4ade80' },
-                    { value: 'MIT', label: 'License', color: '#5cefff' },
-                    { value: 'v0.4', label: 'Latest release', color: '#7c5cff' },
-                    { value: '12k+', label: 'Lines of Kotlin', color: '#ffb85c' },
-                  ].map((stat) => (
-                    <div key={stat.label} className="flex flex-col gap-1">
-                      <dt
-                        className="font-mono text-2xl font-medium tracking-tight sm:text-3xl"
-                        style={{ color: stat.color }}
-                      >
-                        {stat.value}
-                      </dt>
-                      <dd className="font-mono text-[10px] uppercase tracking-wider text-muted">
-                        {stat.label}
-                      </dd>
-                    </div>
-                  ))}
-                </motion.dl>
               </div>
 
               {/* 右：3D 主视觉（仅桌面，浮于背景层） */}
@@ -235,12 +210,9 @@ export default function Home() {
                 { label: 'Lines of Kotlin', value: '12k+' },
                 { label: 'License', value: 'MIT' },
               ].map((stat, i) => (
-                <motion.div
+                <Reveal
                   key={stat.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-10%' }}
-                  transition={{ duration: 0.6, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                  delay={i * 100}
                   className="flex flex-col gap-2"
                 >
                   <dt className="text-3xl font-medium tracking-tight sm:text-4xl">
@@ -249,7 +221,7 @@ export default function Home() {
                   <dd className="font-mono text-xs uppercase tracking-wider text-muted">
                     {stat.label}
                   </dd>
-                </motion.div>
+                </Reveal>
               ))}
             </dl>
           </section>

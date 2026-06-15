@@ -1,8 +1,8 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { motion } from 'motion/react'
 import { FeatureShell } from '@/components/feature/FeatureShell'
+import { Reveal } from '@/components/Reveal'
 
 // 3D 客户端渲染
 const AgentGraphDynamic = dynamic(
@@ -103,12 +103,10 @@ export default function AgentPage() {
 
           <div className="mt-8 space-y-4">
             {TOOL_CATEGORIES.map((cat, i) => (
-              <motion.div
+              <Reveal
                 key={cat.name}
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: '-10%' }}
-                transition={{ duration: 0.5, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                direction="x"
+                delay={i * 100}
                 className="rounded-xl border border-border p-5"
               >
                 <div className="flex items-center justify-between">
@@ -136,7 +134,7 @@ export default function AgentPage() {
                     </span>
                   ))}
                 </div>
-              </motion.div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -156,12 +154,9 @@ export default function AgentPage() {
         <div className="mt-10">
           <div className="grid grid-cols-1 gap-0 md:grid-cols-6">
             {PIPELINE_STAGES.map((s, i) => (
-              <motion.div
+              <Reveal
                 key={s.stage}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.08 }}
+                delay={i * 80}
                 className="relative"
               >
                 {/* 阶段编号 */}
@@ -189,7 +184,7 @@ export default function AgentPage() {
                     style={{ transform: 'translateX(100%)' }}
                   />
                 )}
-              </motion.div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -214,12 +209,9 @@ export default function AgentPage() {
 
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
           {PROVIDERS.map((p, i) => (
-            <motion.div
+            <Reveal
               key={p.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
+              delay={i * 100}
               className="rounded-xl border border-border p-6"
             >
               <div className="flex items-start justify-between">
@@ -246,17 +238,16 @@ export default function AgentPage() {
                   <span>{i === 2 ? '~1.2s' : '~0.4s'}</span>
                 </div>
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-subtle">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    whileInView={{ width: i === 2 ? '40%' : '85%' }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: i * 0.15 }}
+                  <div
+                    style={{
+                      width: i === 2 ? '40%' : '85%',
+                      backgroundColor: p.color,
+                    }}
                     className="h-full rounded-full"
-                    style={{ backgroundColor: p.color }}
                   />
                 </div>
               </div>
-            </motion.div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -301,13 +292,11 @@ export default function AgentPage() {
               t: 'Failure visibility',
               d: 'onToolCallFailed / agent_run_failed 都走 AppLogger，logcat 可追。',
             },
-          ].map((p) => (
-            <motion.li
+          ].map((p, i) => (
+            <Reveal
               key={p.n}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
+              as="li"
+              delay={i * 60}
               className="flex gap-4 rounded-xl border border-border p-6"
             >
               <span className="shrink-0 font-mono text-xs text-accent">{p.n}</span>
@@ -315,7 +304,7 @@ export default function AgentPage() {
                 <h3 className="font-medium text-foreground">{p.t}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted">{p.d}</p>
               </div>
-            </motion.li>
+            </Reveal>
           ))}
         </ol>
       </section>

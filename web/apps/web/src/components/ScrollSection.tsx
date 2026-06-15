@@ -2,6 +2,7 @@
 
 import { motion, useScroll, useTransform, useReducedMotion } from 'motion/react'
 import { useRef } from 'react'
+import { Reveal } from '@/components/Reveal'
 
 interface ScrollSectionProps {
   number: string
@@ -11,8 +12,8 @@ interface ScrollSectionProps {
 
 /**
  * 滚动叙事段落
- * - 进入视口即显示（不依赖 scroll 进度控制 opacity，避免 fullPage 截图看不见）
- * - 视差：标题/数字略向上位移，制造层次
+ * - Reveal 替代 motion whileInView 做入场动画（默认可见 + 进入视口时跑）
+ * - 内层 motion.div 保留 useScroll + useTransform 做视差（MotionValue 必须用 motion 组件）
  */
 export function ScrollSection({ number, title, description }: ScrollSectionProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -21,26 +22,14 @@ export function ScrollSection({ number, title, description }: ScrollSectionProps
     target: ref,
     offset: ['start end', 'end start'],
   })
-
-  // 仅做视差位移，opacity 保持 1
-  const yParallax = useTransform(
-    scrollYProgress,
-    [0, 1],
-    [40, -40],
-  )
+  const yParallax = useTransform(scrollYProgress, [0, 1], [40, -40])
 
   return (
     <section
       ref={ref}
       className="relative flex min-h-[70vh] items-center py-24"
     >
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-15%' }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="mx-auto w-full max-w-6xl px-8 sm:px-12"
-      >
+      <Reveal duration={800} className="mx-auto w-full max-w-6xl px-8 sm:px-12">
         <motion.div
           style={{ y: reduced ? 0 : yParallax }}
           className="grid grid-cols-1 items-center gap-8 md:grid-cols-12"
@@ -57,7 +46,7 @@ export function ScrollSection({ number, title, description }: ScrollSectionProps
             </p>
           </div>
         </motion.div>
-      </motion.div>
+      </Reveal>
     </section>
   )
 }

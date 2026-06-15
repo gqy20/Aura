@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { motion } from 'motion/react'
 import { FeatureShell } from '@/components/feature/FeatureShell'
 import { TimelineLightUp } from '@/components/feature/TimelineLightUp'
+import { Reveal } from '@/components/Reveal'
 import {
   PresenceOrb,
   STATES,
@@ -137,13 +138,12 @@ export default function PresencePage() {
                 t: 'Render with duration',
                 d: '展示时长 1.2s ~ 2.6s，独立于 cooldown 控制，避免视觉堆叠。',
               },
-            ].map((step) => (
-              <motion.li
+            ].map((step, i) => (
+              <Reveal
                 key={step.n}
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: '-10%' }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                as="li"
+                direction="x"
+                delay={i * 80}
                 className="flex gap-4"
               >
                 <span className="shrink-0 font-mono text-xs text-accent">
@@ -155,7 +155,7 @@ export default function PresencePage() {
                     {step.d}
                   </p>
                 </div>
-              </motion.li>
+              </Reveal>
             ))}
           </ol>
         </div>
