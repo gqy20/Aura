@@ -21,9 +21,11 @@ repos:
         pass_filenames: true
 
       - id: aura-unit-tests
-        name: Aura debug unit tests
+        name: Aura Kotlin/Gradle compile check
+        # 只在改动 Kotlin / Gradle / KTS 时跑，避免 docs/web 改动误触发编译
+        # 改 docs/web 时直接跳过 — CI workflow 跑 build 是兜底，本地不再重复
         entry: uv run python scripts/hooks/run_gradle.py cleanTestDebugUnitTest testDebugUnitTest --stacktrace
         language: system
-        stages: [pre-push]
+        stages: [pre-commit]
+        files: '\.(kt|kts|gradle)$'
         pass_filenames: false
-        always_run: true
