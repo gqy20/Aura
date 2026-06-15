@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 import type { ReactNode } from 'react'
 import { SmoothScroll } from '@/components/SmoothScroll'
 import { MagneticCursor } from '@/components/MagneticCursor'
+import { AnnouncementBar } from '@/components/AnnouncementBar'
 import { FeatureNav } from './FeatureNav'
 import { cn } from '@/lib/utils'
 
@@ -53,6 +54,7 @@ export function FeatureShell({
         />
 
         <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col px-6 sm:px-10 lg:px-16">
+          <AnnouncementBar />
           <FeatureNav active={active} />
 
           {/* ─── 大标题区 ─── */}

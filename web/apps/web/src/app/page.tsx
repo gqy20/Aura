@@ -7,6 +7,7 @@ import { SplitText } from '@/components/SplitText'
 import { SmoothScroll } from '@/components/SmoothScroll'
 import { ScrollSection } from '@/components/ScrollSection'
 import { MagneticCursor } from '@/components/MagneticCursor'
+import { AnnouncementBar } from '@/components/AnnouncementBar'
 
 // 3D 组件仅客户端渲染，禁用 SSR
 const MeshGradient = dynamic(
@@ -40,6 +41,7 @@ export default function Home() {
         />
 
         <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col px-6 sm:px-10 lg:px-16">
+          <AnnouncementBar />
           {/* ─── Nav ─── */}
           <motion.nav
             initial={{ opacity: 0, y: -20 }}
@@ -142,24 +144,75 @@ export default function Home() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 1.8, ease: [0.22, 1, 0.36, 1] }}
-                  className="mt-12 flex flex-wrap items-center gap-4"
+                  className="mt-12 flex flex-wrap items-center gap-3"
                 >
+                  {/* 主 CTA：下载 Aura */}
                   <Link
-                    href="#"
+                    href="https://github.com/gqy20/Aura/releases"
                     className="group inline-flex h-12 items-center justify-center rounded-full bg-foreground px-7 text-sm font-medium text-background transition-all hover:bg-foreground/90"
                   >
-                    Start
+                    Get Aura
+                    <span className="ml-1.5 transition-transform group-hover:translate-x-0.5">
+                      ↓
+                    </span>
+                  </Link>
+                  {/* 次 CTA：源码 */}
+                  <Link
+                    href="https://github.com/gqy20/Aura"
+                    target="_blank"
+                    rel="noopener"
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-border-strong px-6 text-sm font-medium text-foreground transition-all hover:bg-subtle"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden
+                    >
+                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    </svg>
+                    View on GitHub
+                  </Link>
+                  {/* 文字链：阅读文档 */}
+                  <Link
+                    href="https://github.com/gqy20/Aura#readme"
+                    target="_blank"
+                    rel="noopener"
+                    className="group ml-2 inline-flex h-12 items-center text-sm text-muted transition-colors hover:text-foreground"
+                  >
+                    Read the docs
                     <span className="ml-1 transition-transform group-hover:translate-x-0.5">
                       →
                     </span>
                   </Link>
-                  <Link
-                    href="https://github.com"
-                    className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong px-7 text-sm font-medium text-foreground transition-all hover:bg-subtle"
-                  >
-                    View on GitHub
-                  </Link>
                 </motion.div>
+
+                {/* ─── 信任带 ─── */}
+                <motion.dl
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 2.0, ease: [0.22, 1, 0.36, 1] }}
+                  className="mt-10 grid max-w-xl grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4"
+                >
+                  {[
+                    { value: '41', label: 'Tests pass', color: '#4ade80' },
+                    { value: 'MIT', label: 'License', color: '#5cefff' },
+                    { value: 'v0.4', label: 'Latest release', color: '#7c5cff' },
+                    { value: '12k+', label: 'Lines of Kotlin', color: '#ffb85c' },
+                  ].map((stat) => (
+                    <div key={stat.label} className="flex flex-col gap-1">
+                      <dt
+                        className="font-mono text-2xl font-medium tracking-tight sm:text-3xl"
+                        style={{ color: stat.color }}
+                      >
+                        {stat.value}
+                      </dt>
+                      <dd className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                        {stat.label}
+                      </dd>
+                    </div>
+                  ))}
+                </motion.dl>
               </div>
 
               {/* 右：3D 主视觉（仅桌面，浮于背景层） */}
