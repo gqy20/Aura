@@ -107,50 +107,95 @@ export default function PresencePage() {
             Aura 如何决定"该有何感受"
           </h2>
           <p className="mt-4 text-pretty leading-relaxed text-muted">
-            Presence 状态机从一组输入信号（情绪 · 强度 · 是否流式 · 是否加载中 ·
-            工具状态）推导当前模式，然后用 5 条规则决定该呈现什么反应。
+            两段决策链：<code className="font-mono text-xs">PresenceController.derive</code> 从
+            14 个输入信号推导 11 个状态；<code className="font-mono text-xs">PresenceReactionPolicy.shouldShow</code> 用
+            3 条规则决定该呈现什么反应。
           </p>
 
-          <ol className="mt-8 space-y-5">
+          <h3 className="mt-8 font-mono text-xs uppercase tracking-wider text-muted">
+            状态推导 · 5 大类（PresenceController.derive）
+          </h3>
+          <ol className="mt-4 space-y-4">
             {[
               {
                 n: '01',
-                t: '从输入推导模式',
-                d: '从情绪 + 强度 + 流式/加载状态推出 PresenceMode（IDLE / LISTENING / THINKING / SPEAKING / REMEMBERING / TIRED …）',
+                t: '错误态优先',
+                d: '配置未就绪 / 出错 / 工具失败 → 直接 ERROR，跳过其他推导。',
               },
               {
                 n: '02',
-                t: '按冷却时间过滤反应',
-                d: '每个反应有自己的冷却时间（900ms ~ 10min）。如果距离上次展示没过冷却，禁止再触发。',
+                t: '反应事件触发',
+                d: 'MEMORY_SPARK 反应 → REMEMBERING；memory 工具 STARTED → SEARCHING。',
               },
               {
                 n: '03',
-                t: '解决优先级冲突',
-                d: '如果当前反应优先级（10 ~ 50）更高，新反应顶替；否则丢弃。',
+                t: '工具运行态',
+                d: 'tool STARTED → THINKING；tool SUCCEEDED on memory → REMEMBERING。',
               },
               {
                 n: '04',
-                t: '区分任务态与环境态',
-                d: '环境态反应（TOUCH_NUZZLE / RETURN_BLINK）只在非任务态展示，避免在大模型思考时打断。',
+                t: '流式 / 加载 / 输入',
+                d: 'isStreaming → SPEAKING；isLoading → THINKING；有文本/图片 → LISTENING。',
               },
               {
                 n: '05',
-                t: '按时长渲染',
-                d: '展示时长 1.2s ~ 2.6s，独立于冷却时间控制，避免视觉堆叠。',
+                t: '情绪映射 · 兜底 IDLE',
+                d: 'happy/joy/... → HAPPY；sad/... → SAD；tired/... → TIRED；其他 → IDLE。',
               },
             ].map((step, i) => (
               <Reveal
                 key={step.n}
                 as="li"
                 direction="x"
-                delay={i * 80}
+                delay={i * 60}
                 className="flex gap-4"
               >
                 <span className="shrink-0 font-mono text-xs text-accent">
                   {step.n}
                 </span>
                 <div>
-                  <h3 className="font-medium text-foreground">{step.t}</h3>
+                  <h4 className="font-medium text-foreground">{step.t}</h4>
+                  <p className="mt-1 text-sm leading-relaxed text-muted">
+                    {step.d}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </ol>
+
+          <h3 className="mt-10 font-mono text-xs uppercase tracking-wider text-muted">
+            反应节流 · 3 规则（PresenceReactionPolicy.shouldShow）
+          </h3>
+          <ol className="mt-4 space-y-4">
+            {[
+              {
+                n: '①',
+                t: '按冷却时间过滤',
+                d: '每个 reaction 有自己的冷却（0 / 1.5s / 1.5s / 10min / 0.9s）。没过冷却直接丢弃。',
+              },
+              {
+                n: '②',
+                t: '解决优先级冲突',
+                d: '当前 reaction 的 priority（10 / 20 / 30 / 40 / 50）更高则保留，新候选被丢弃。',
+              },
+              {
+                n: '③',
+                t: '区分任务态 / 环境态',
+                d: '环境态（RETURN_BLINK / TOUCH_NUZZLE）只在非任务态展示，避免打断 LLM 思考/说话/记忆/搜索/错误。',
+              },
+            ].map((step, i) => (
+              <Reveal
+                key={step.n}
+                as="li"
+                direction="x"
+                delay={i * 60}
+                className="flex gap-4"
+              >
+                <span className="shrink-0 font-mono text-xs text-accent">
+                  {step.n}
+                </span>
+                <div>
+                  <h4 className="font-medium text-foreground">{step.t}</h4>
                   <p className="mt-1 text-sm leading-relaxed text-muted">
                     {step.d}
                   </p>
@@ -197,7 +242,7 @@ export default function PresencePage() {
             反应节流策略
           </h2>
           <span className="font-mono text-xs text-muted">
-            反应策略 · 5 条规则
+            反应策略 · 3 规则 + 5 状态条件
           </span>
         </div>
 

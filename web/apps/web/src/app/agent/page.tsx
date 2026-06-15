@@ -30,6 +30,12 @@ const TOOL_CATEGORIES = [
     tools: ['GetDeviceStatus', 'GetWeather'],
   },
   {
+    name: 'Health',
+    color: '#ff7c9c',
+    desc: '查询健康数据',
+    tools: ['QueryHealthData'],
+  },
+  {
     name: 'Action',
     color: '#5cffb0',
     desc: '触发系统级动作',
@@ -38,9 +44,10 @@ const TOOL_CATEGORIES = [
 ] as const
 
 const PROVIDERS = [
-  { name: 'Cloud Qwen', runtime: 'Remote · HTTPS', fallback: true, color: '#a07cff' },
-  { name: 'OpenAI', runtime: 'Remote · HTTPS', fallback: false, color: '#9090a8' },
-  { name: 'Local MNN', runtime: 'On-device · JNI', fallback: true, color: '#5cffb0' },
+  { name: 'GLM', model: 'glm-5v-turbo', runtime: '智谱 · Anthropic 兼容', location: 'remote' as const, color: '#a07cff' },
+  { name: 'KIMI', model: 'kimi-for-coding', runtime: '月之暗面 · Anthropic 兼容', location: 'remote' as const, color: '#9090a8' },
+  { name: 'MODELSCOPE', model: 'Qwen3.5-397B-A17B', runtime: '魔搭 · Anthropic 兼容', location: 'remote' as const, color: '#ff7c9c' },
+  { name: 'LOCAL_QWEN', model: 'Qwen3.5-{0.8B,2B,4B}-MNN', runtime: '本地 MNN 推理', location: 'on-device' as const, color: '#5cffb0' },
 ]
 
 const PIPELINE_STAGES = [
@@ -58,7 +65,7 @@ export default function AgentPage() {
       number="03"
       category="Runtime"
       title="协调一切的智能体。"
-      subtitle="Aura 的灵魂是 Koog AIAgent：内置 9 个结构化工具、3 套大模型 Provider、流式响应、可观测事件流——它不是大模型，是大模型之上的编排者。"
+      subtitle="Aura 的灵魂是 Koog AIAgent：内置 10 个结构化工具、4 套大模型 Provider（3 个云端 + 1 个本地）、流式响应、可观测事件流——它不是大模型，是大模型之上的编排者。"
       active="agent"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 124, 156, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(160, 92, 255, 0.10), transparent 60%), #08090a"
     >
@@ -77,27 +84,27 @@ export default function AgentPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
-                <span className="text-muted">9 个工具（4 类）</span>
+                <span className="text-muted">10 个工具（5 类）</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rotate-45" style={{ background: 'transparent', border: '1px solid #9090a8' }} />
-                <span className="text-muted">3 个 LLM 提供方</span>
+                <span className="text-muted">4 个 LLM Provider（3 远程 + 1 本地）</span>
               </div>
             </div>
           </div>
 
           <p className="mt-4 font-mono text-xs text-muted">
-            Koog AIAgent.builder() · graphStrategy(streamingSingleRunStrategy()) · maxIterations=20
+            Koog AIAgent.builder() · graphStrategy(streamingSingleRunStrategy()) · maxIterations=12
           </p>
         </div>
 
-        {/* 右：4 类工具 */}
+        {/* 右：5 类工具 */}
         <div className="md:col-span-5">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            九个工具，四类划分
+            十个工具，五类划分
           </h2>
           <p className="mt-4 text-pretty leading-relaxed text-muted">
-            9 个内置工具 + 动态加载的远程 MCP 工具。AuraAgent 不会"调用 API"——它调度
+            10 个内置工具 + 动态加载的远程 MCP 工具。AuraAgent 不会"调用 API"——它调度
             ToolRegistry，把世界变成可执行的指令集。
           </p>
 
@@ -197,17 +204,18 @@ export default function AgentPage() {
             双模路由
           </h2>
           <span className="font-mono text-xs text-muted">
-            云端优先 · 本地兜底
+            3 远程 + 1 本地 · 用户在 Settings 选择
           </span>
         </div>
 
         <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
-          Aura 永远先尝试云端 Qwen（推理快、质量高）。当网络不通时，自动回退到
-          本地 MNN 推理，确保对话不中断。两个提供方共享同一个 Koog
-          Agent 接口，UI 层无感。
+          Aura 暴露 3 个云端 Provider（GLM / KIMI / MODELSCOPE，全部兼容 Anthropic
+          Messages）和 1 个本地 Provider（LOCAL_QWEN，走 MNN 推理）。用户在
+          Settings 任选其一，运行时只走一个。
+          全部 4 个 Provider 共享同一个 Koog Agent 接口，UI 层无感。
         </p>
 
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {PROVIDERS.map((p, i) => (
             <Reveal
               key={p.name}
@@ -223,10 +231,11 @@ export default function AgentPage() {
                     {p.name}
                   </p>
                   <p className="mt-3 text-sm text-foreground">{p.runtime}</p>
+                  <p className="mt-1 font-mono text-[10px] text-muted">{p.model}</p>
                 </div>
-                {p.fallback && (
+                {p.location === 'on-device' && (
                   <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">
-                    兜底
+                    本地
                   </span>
                 )}
               </div>
@@ -235,12 +244,12 @@ export default function AgentPage() {
               <div className="mt-6">
                 <div className="flex items-center justify-between font-mono text-[10px] text-muted">
                   <span>TTFT</span>
-                  <span>{i === 2 ? '~1.2s' : '~0.4s'}</span>
+                  <span>{p.location === 'on-device' ? '~1.2s' : '~0.4s'}</span>
                 </div>
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-subtle">
                   <div
                     style={{
-                      width: i === 2 ? '40%' : '85%',
+                      width: p.location === 'on-device' ? '40%' : '85%',
                       backgroundColor: p.color,
                     }}
                     className="h-full rounded-full"
@@ -275,7 +284,7 @@ export default function AgentPage() {
             {
               n: '03',
               t: '有界迭代',
-              d: 'maxIterations=20。大模型死循环不消耗资源，到上限自动停。',
+              d: 'maxIterations=12。大模型死循环不消耗资源，到上限自动停。',
             },
             {
               n: '04',

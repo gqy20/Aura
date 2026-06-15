@@ -18,7 +18,18 @@ import * as THREE from 'three'
  * - IDLE / LISTENING / THINKING / SPEAKING / REMEMBERING / TIRED
  */
 
-type StateKey = 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING' | 'REMEMBERING' | 'TIRED' | 'SLEEPING'
+type StateKey =
+  | 'IDLE'
+  | 'LISTENING'
+  | 'THINKING'
+  | 'SPEAKING'
+  | 'SEARCHING'
+  | 'REMEMBERING'
+  | 'HAPPY'
+  | 'SAD'
+  | 'TIRED'
+  | 'SLEEPING'
+  | 'ERROR'
 
 interface StateConfig {
   label: string
@@ -86,6 +97,38 @@ const STATES: Record<StateKey, StateConfig> = {
     speed: 0.2,
     description: '渐渐入睡',
   },
+  SEARCHING: {
+    label: '检索',
+    color: '#5cefff',
+    emissive: '#1c8fff',
+    distort: 0.45,
+    speed: 1.6,
+    description: '正在检索记忆',
+  },
+  HAPPY: {
+    label: '开心',
+    color: '#ffb85c',
+    emissive: '#ff8030',
+    distort: 0.4,
+    speed: 1.2,
+    description: '心情明亮',
+  },
+  SAD: {
+    label: '低落',
+    color: '#9090a8',
+    emissive: '#404060',
+    distort: 0.2,
+    speed: 0.5,
+    description: '情绪低落',
+  },
+  ERROR: {
+    label: '出错',
+    color: '#ff5c7c',
+    emissive: '#ff3060',
+    distort: 0.6,
+    speed: 2.2,
+    description: '需要配置或恢复',
+  },
 }
 
 const STATE_ORDER: StateKey[] = [
@@ -93,8 +136,13 @@ const STATE_ORDER: StateKey[] = [
   'LISTENING',
   'THINKING',
   'SPEAKING',
+  'SEARCHING',
   'REMEMBERING',
+  'HAPPY',
+  'SAD',
   'TIRED',
+  'SLEEPING',
+  'ERROR',
 ]
 
 function lerpColor(a: THREE.Color, b: THREE.Color, t: number) {
