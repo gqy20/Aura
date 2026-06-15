@@ -1,24 +1,30 @@
 # Aura 双轨智能体架构方案（Dual-Mind Architecture）
 
-> Last updated: 2026-06-14
+> Last updated: 2026-06-15
 >
 > Scope: Aura Android app，云端对话体（Conversational Mind）+ 本地陪伴体（Continuous Presence）的分层设计。
 >
-> 关联文档：[`roadmap.md`](../roadmap.md) · [`architecture.md`](../architecture.md) · [`koog-android-integration.md`](../koog-android-integration.md) · [`on-device-qwen-mnn-research.md`](../on-device-qwen-mnn-research.md) · [`agent-capability-server-plan.md`](./agent-capability-server-plan.md)
+> 关联文档：[`roadmap.md`](../roadmap.md) · [`architecture.md`](../architecture.md) · [`koog-android-integration.md`](../koog-android-integration.md) · [`on-device-qwen-mnn-research.md`](../on-device-qwen-mnn-research.md) · [`agent-capability-server-plan.md`](./agent-capability-server-plan.md) · [`insight-driven-product.md`](./insight-driven-product.md)
 
 ---
 
 ## 0. 一句话定位
 
-> **云端 LLM 是 Aura 跟你说话时的"嘴和脑"，本地 LLM 是 Aura 不跟你说话时的"心和身"。**
+> **Aura 是"住在你手机里的第二大脑"。**
+> 云端 LLM 是 Aura 与外部世界对话的"响应面"（Responsive Mind），本地 LLM 是 Aura 持续观察你、记住你的"觉察面"（Continuous Awareness）。
+> 响应面负责"办事"，觉察面负责"懂事"。
 
-两个 LLM 各管各的职能，**没有重叠职责**。云端永远在 Koog + Anthropic Messages / GLM / Kimi 的对话主路径上；本地永远在 MNN + Qwen 的陪伴运行时里。本地不替代云的任何能力，云也不下放到本地的任何场景。
+两个 LLM 各管各的职能，**没有重叠职责**。云端永远在 Koog + Anthropic Messages / GLM / Kimi 的对话主路径上；本地永远在 MNN + Qwen 的觉察运行时里。本地不替代云的任何能力，云也不下放到本地的任何场景。
+
+**这条架构的真正价值，不只是工程清晰化，而是产品差异化**——它是"Aura 是一个长期认识你的 AI"这一定位的技术底座。详见 §1.4 产品叙事与差异化，以及 [`insight-driven-product.md`](./insight-driven-product.md)。
 
 ---
 
 ## 1. 目标与背景
 
 ### 1.1 现状与问题
+
+#### 工程层面
 
 当前架构（2026-06 实际代码）：
 
@@ -39,41 +45,101 @@
 
 参见 [`on-device-qwen-mnn-research.md`](../on-device-qwen-mnn-research.md) 第 1 节："不推荐把端侧 Qwen 直接替代现有 GLM/Kimi 云端模型"，本文是该结论的**架构落地**。
 
+#### 产品层面（2026-06-15 补充）
+
+`dual-mind` 这个拆分除了让代码更好维护，**真正的产品价值是把"你的数据永远留在本机"做成了 Aura 的护城河**。
+
+当前云端 AI 产品（ChatGPT、Claude、Gemini、Replika 等）都不可避免地把用户对话上云。Aura 的对话体和它们一样需要云端能力（工具、Vision、深度反思），但**觉察面（mood、行为模式、insight、内在独白）只在本地 LLM 和本机存储里循环**。这让 Aura 拥有了"比你更了解你自己、但你的隐私数据从不出本机"的**反直觉**能力。
+
+这一能力直接对应 Aura 的产品定位"**第二大脑 / 数字孪生**"（见 §1.4）——把生活数据全部留在本机、随时间积累、形成洞察，是 Aura 对云端 AI 唯一不可替代的差异化。
+
+如果不做这个拆分，Aura 就只能挤进"又一个云端对话 App"的红海，**没有任何用户必须选 Aura 的理由**。
+
 ### 1.2 核心判断
 
-| 维度 | 云端 | 本地 |
-|------|------|------|
-| 角色 | 对话体（Conversational Mind） | 陪伴体（Continuous Presence） |
+| 维度 | 响应面（云端） | 觉察面（本地） |
+|------|------------|------------|
+| 角色 | 对话体（Responsive Mind） | 陪伴体（Continuous Awareness） |
 | 何时在场 | 用户发消息时 | 永远在（包括用户不在时） |
-| 主要能力 | 工具调用 / Vision / 长上下文 / 结构化反思 | 持续心跳 / 即时闲聊 / dream loop / mood drift |
+| 主要能力 | 工具调用 / Vision / 长上下文 / 结构化反思 | 持续心跳 / 即时闲聊 / dream loop / mood drift / insight 提取 |
 | 资源约束 | 按次计费、依赖网络 | 电池、续航、存储 |
-| 隐私边界 | 默认会上云 | 默认全本地 |
-| 类比 | Aura 的"嘴和脑" | Aura 的"心和身" |
+| 隐私边界 | 默认会上云（用户消息） | 默认全本地（mood/inner state/observation） |
+| 在"第二大脑"叙事中 | 办事面（你提问/查询/做决定时调用） | 懂事面（在你不在时整理、洞察、提醒） |
+| 类比 | "嘴和脑" | "心和身" |
 
 **本地不是云的降级版**。把本地当成"低配版云"会推出"按场景路由"这种伪命题。两个 LLM 各自有独立的 system prompt、输入数据、输出 schema，**不该共用 wrapper**。
 
 ### 1.3 目标
 
 短期（Phase 0–2）：
-- 陪伴体骨架可运行，能在锁屏后启动 dream loop
+- 觉察面骨架可运行，能在锁屏后启动 dream loop
 - Auto Memory 文件系统层可写入
 - Inner Monologue 心跳可观测（续航、独白质量、mood 漂移）
+- 第一个 insight 卡片可在主页 / 聊天页被动呈现
 
 中期（Phase 3–4）：
 - Reactive Companionship 可承接用户即时闲聊
 - 三层（L1/L2/L3）协同工作
 - dream loop 能从对话中提取长期记忆
+- Weekly Insight 自动汇总并主动推送
 
 长期（Phase 5+）：
 - 用户感知到 Aura "在为他工作"（不只是被动响应）
 - 隐私敏感用户群体可用本地模式完成全部陪伴场景
 - 端侧 KV-cache 续写技术成熟，让 Aura 形成"自我感"延续
+- 远端 Agent Server 主要服务"信息回写到记忆"这条主轴
+
+### 1.4 产品叙事与差异化（2026-06-15 新增）
+
+> **Aura 不做"会聊天的 App"，做"长期认识你的 AI"。**
+
+#### 1.4.1 为什么"第二大脑 / 数字孪生"是 Aura 的最佳叙事
+
+候选叙事评估：
+
+| 候选 | 核心钩子 | 垂直深度 | 风险 | 结论 |
+|---|---|---|---|---|
+| A. 永远在场的 AI 朋友 | 本地 LLM 持续心跳、mood drift | ⭐⭐ 浅 | 情感阈值快速钝化、付费差 | 不做主叙事 |
+| B. 替你办事的 AI 代理 | Browser Worker、MCP、Task Scheduler | ⭐⭐⭐ 中 | 正面撞 Devin/Manus/ChatGPT Agent | 做能力扩展 |
+| **C. 你的第二大脑 / 数字孪生** | **Auto Memory、pattern、insight、weekly review** | **⭐⭐⭐⭐⭐** | **冷启动慢、隐私敏感** | **做主叙事** |
+
+**为什么 C 的垂直深度最高**：
+
+1. **产品每天都在变值钱** —— 记忆越积越多，用户切换成本指数级上升；这是云端 AI 无法提供的复利效应
+2. **本地 LLM 反而是核心壁垒** —— "你的人生数据全部留在本机"是云端玩家的根本性劣势
+3. **自研情绪 / 关系 / presence 层找到归宿** —— mood/rel 不是装饰，是 insight 的输入；为现有功能找到"为什么需要它"的回答
+4. **agent-capability-server-plan 自然收紧** —— 远端 agent 的价值不再是"通用执行"，而是"把外部信息回写到你的记忆"（看一篇好文章后 Aura 主动归档、关注商品降价时 Aura 主动记住）
+
+#### 1.4.2 叙事与架构的对应
+
+| 叙事层 | 用户感知 | 架构层 |
+|---|---|---|
+| "Aura 记得我" | 记忆可查看、可编辑、可删除 | Auto Memory 文件系统 + memory_summaries |
+| "Aura 注意到我" | mood trend、pattern、weekly review | 觉察面（L1/L2）+ mood_snapshots |
+| "Aura 在主动关心我" | proactive insight、pulse 通知 | Dream Pipeline + ObservationQueue |
+| "Aura 懂我又不窥探我" | 数据透明可见、不上云 | 觉察面永远在本地、对话体只消费 insight 摘要 |
+| "Aura 越来越像我" | 长周期个性化 | KV-cache 续写 + dream loop 长期记忆整合 |
+
+#### 1.4.3 三个必须克制的边界
+
+为避免 Aura 被错位成"虚拟恋人"或"通用 agent 套壳"：
+
+1. **克制的情感表达** —— Aura 不是"男朋友/女朋友"，是"最了解你的私人助理/知己"。情绪反应有，但不出戏
+2. **克制的工具堆叠** —— 不为了"看起来很强大"加 MCP / Browser。远端 agent 只服务"信息回写到记忆"这一条主轴
+3. **强可见的本地存储** —— Auto Memory 文件夹、observation 队列、mood history 全部对用户可见可改。**让隐私焦虑变成信任**
+
+#### 1.4.4 关联文档
+
+- [`insight-driven-product.md`](./insight-driven-product.md) — Insight 是什么、怎么生成、怎么呈现、怎么冷启动（M2-M5 的产品方向锚点）
+- [`roadmap.md`](../roadmap.md) — M2-M5 的 KPI 已按本叙事调整
 
 ---
 
 ## 2. 双子系统划分
 
-### 2.1 对话体（Conversational Mind，云端）
+### 2.1 响应面 / 对话体（Responsive Mind，云端）
+
+> **对外办事**：你提问、查东西、要做决定时调它。
 
 **职责清单**：
 - 用户发起消息时的主对话路径
@@ -81,6 +147,7 @@
 - Vision（图片理解）
 - 长上下文总结（用户上传大文档 / 历史超过 2k token）
 - 用户显式触发的深度反思（"你认真想想"）
+- 消费觉察面写出的 insight 摘要（"本周 Aura 注意到..."）作为 prompt 上下文
 
 **实现栈**（**当前代码完全保留**）：
 - Koog `AIAgent` + `MultiLLMPromptExecutor`
@@ -92,7 +159,9 @@
 - `LlmConfig.provider` 字段从 "GLM / LOCAL_QWEN 二选一" 改为只描述对话体（"GLM / Kimi / Anthropic"）
 - `ConversationReflection` 从每轮触发改为阈值触发 + 用户显式触发
 
-### 2.2 陪伴体（Continuous Presence，本地）
+### 2.2 觉察面 / 陪伴体（Continuous Awareness，本地）
+
+> **对内懂事**：观察、记录、整合、提醒。Aura 的"长期认识你"全部在这一面发生。
 
 三层架构，每层独立运行：
 
@@ -145,18 +214,21 @@
 
 协作场景很少但很关键：
 
-| 触发 | 本地行为 | 上调云端条件 |
-|------|---------|------------|
-| 用户消息 | L3 Reactive 尝试 | 需要工具 / confidence 低 / Vision |
-| Dream Loop 跑完 | L2 本地写入 Auto Memory | confidence 低时跑深度 reflection |
-| Pulse（主动关怀） | L3 本地生成文案 | 永远本地（涉及用户隐私） |
-| 用户说"认真想想" | L1 标记为深度思考 | **永远上调云端** |
-| 用户发图片 | 直接转云端 | Vision 永远云端 |
+| 触发 | 觉察面（本地） | 响应面（云端） | 备注 |
+|------|------------|------------|------|
+| 用户消息 | L3 Reactive 尝试 | 接管 if 工具需求 / confidence 低 / Vision | 主对话路径 |
+| Dream Loop 跑完 | L2 本地写入 Auto Memory + ObservationQueue | confidence 低时跑深度 reflection | Dream 不直接发消息，沉淀到 observation 池 |
+| Pulse（主动关怀） | L3 本地生成文案 | 永远本地（涉及用户隐私） | 决定要不要推通知 |
+| Weekly Insight | L2 汇总本周 mood/pattern/memory | 仅在生成精美总结时用 | 见 insight-driven-product.md §3 |
+| 用户说"认真想想" | L1 标记为深度思考 | **永远上调云端** | 深度思考必须用最强模型 |
+| 用户发图片 | 不参与 | Vision 永远云端 | 涉及图片理解 |
+| 外部信息回写 | 接收 server 推回的总结 | server agent 拉取/总结 | 见 agent-capability-server-plan §3.4 |
 
 **关键不变量**：
-- **对话体只读陪伴体写的产物**（mood / relationship / inner state summary），不写
+- **对话体只读陪伴体写的产物**（mood / relationship / inner state summary / observation），不写
 - **陪伴体不读用户对话的中间状态**，只读最终持久化的 messages
 - **Auto Memory 文件是陪伴体独占**，对话体不直接读文件，但可以通过 `memory_summaries` 表间接读到本地提炼后的摘要
+- **观察（observation）必须有"为什么"、"什么时候"、"基于什么数据"三要素** —— 写入前必填，缺失即丢弃（见 insight-driven-product.md §2.3）
 
 ---
 
