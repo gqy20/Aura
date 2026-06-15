@@ -266,7 +266,7 @@ class HealthConnectDataSource @Inject constructor(
             dailySleep.flatMap { session ->
                 session.stages.map { stage ->
                     mapOf(
-                        "stage" to (SleepSessionRecord.STAGE_TYPE_INT_TO_STRING_MAP[stage.stage] ?: "UNKNOWN"),
+                        "stage" to sleepStageName(stage.stage),
                         "startEpoch" to stage.startTime.toEpochMilli(),
                         "endEpoch" to stage.endTime.toEpochMilli(),
                     )
@@ -298,6 +298,24 @@ class HealthConnectDataSource @Inject constructor(
 
     private fun HealthSnapshotEntity.hasData(): Boolean =
         steps > 0 || avgHeartRate != null || sleepDurationMinutes != null
+
+    /**
+     * Map [SleepSessionRecord] stage int → readable name.
+     *
+     * `SleepSessionRecord.STAGE_TYPE_INT_TO_STRING_MAP` would be the natural one-liner, but it is
+     * marked `@RestrictTo(LIBRARY_GROUP)` on `androidx.health.connect:connect-client` and trips
+     * lint `RestrictedApi` (CI gates fail on it). The public `STAGE_TYPE_*` Int constants are
+     * not restricted, so we map them ourselves here.
+     */
+    private fun sleepStageName(stage: Int): String = when (stage) {
+        SleepSessionRecord.STAGE_TYPE_AWAKE -> "AWAKE"
+        SleepSessionRecord.STAGE_TYPE_SLEEPING -> "SLEEPING"
+        SleepSessionRecord.STAGE_TYPE_OUT_OF_BED -> "OUT_OF_BED"
+        SleepSessionRecord.STAGE_TYPE_LIGHT -> "LIGHT"
+        SleepSessionRecord.STAGE_TYPE_DEEP -> "DEEP"
+        SleepSessionRecord.STAGE_TYPE_REM -> "REM"
+        else -> "UNKNOWN"
+    }
 
     companion object {
         const val DEFAULT_LOOKBACK_DAYS = 7
