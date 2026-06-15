@@ -19,8 +19,8 @@ class ReminderNotificationWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val reminderId = inputData.getString(KEY_REMINDER_ID)
-        val title = inputData.getString(KEY_TITLE)?.takeIf { it.isNotBlank() } ?: "Aura reminder"
-        val message = inputData.getString(KEY_MESSAGE)?.takeIf { it.isNotBlank() } ?: "You asked me to remind you."
+        val title = inputData.getString(KEY_TITLE)?.takeIf { it.isNotBlank() } ?: "Aura 提醒"
+        val message = inputData.getString(KEY_MESSAGE)?.takeIf { it.isNotBlank() } ?: "你让 Aura 提醒你的事。"
         val startedAt = System.currentTimeMillis()
         return try {
             AppLogger.info(LogTags.Reminder, "reminder_worker_started", "reminderId" to reminderId)

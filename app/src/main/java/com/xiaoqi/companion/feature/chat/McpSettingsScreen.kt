@@ -148,7 +148,7 @@ private fun McpListScreen(
                 title = { Text("MCP") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
             )
@@ -165,9 +165,9 @@ private fun McpListScreen(
             item {
                 Text(
                     text = if (servers.isEmpty()) {
-                        "尚未添加任何 MCP server。点下方按钮添加高德地图或其他自定义端点。"
+                        "还没有 MCP 服务，点下方添加高德或其他自定义。"
                     } else {
-                        "${servers.size} 个 server。点击卡片编辑,关闭右侧开关可临时停用。"
+                        "共 ${servers.size} 个，点卡片编辑，关右侧开关可临时停用。"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -276,10 +276,10 @@ private fun McpServerCard(
                 Text(
                     text = when {
                         !server.enabled -> "已停用"
-                        !server.isReady -> "未配置 (缺少 ${if (server.providerId == "amap") "API Key" else "URL"})"
-                        discoveredTools == null -> "已配置 · 未发现工具 (点测试连接)"
+                        !server.isReady -> "未配置（缺 ${if (server.providerId == "amap") "API Key" else "URL"}）"
+                        discoveredTools == null -> "已配置 · 未发现工具，点测试连接"
                         discoveredTools.isEmpty() -> "已连接 · 0 个工具"
-                        else -> "已连接 · ${discoveredTools.size} 个工具 (${discoveredTools.take(3).joinToString(", ")}${if (discoveredTools.size > 3) ", …" else ""})"
+                        else -> "已连接 · ${discoveredTools.size} 个工具（${discoveredTools.take(3).joinToString(", ")}${if (discoveredTools.size > 3) ", …" else ""}）"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -291,7 +291,7 @@ private fun McpServerCard(
             )
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = onClick) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                Icon(Icons.Filled.Edit, contentDescription = "编辑")
             }
         }
     }
@@ -316,7 +316,7 @@ private fun DiscoveredToolsSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text = "已发现的工具",
+            text = "已发现工具",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -346,7 +346,7 @@ private fun DiscoveredToolsSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     tools.isEmpty() -> Text(
-                        "已连接但 server 报告 0 个工具。",
+                        "已连接，但服务器未提供工具。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -398,7 +398,7 @@ private fun McpEditorScreen(
                 title = { Text(if (isEditing) "编辑 MCP" else "添加 MCP") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
             )
@@ -441,7 +441,7 @@ private fun McpEditorScreen(
                 OutlinedTextField(
                     value = settings.mcpSettingsName,
                     onValueChange = viewModel::updateMcpSettingsName,
-                    label = { Text("显示名 (可选)") },
+                    label = { Text("显示名（可选）") },
                     placeholder = { Text(preset.displayName) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -491,7 +491,7 @@ private fun McpEditorScreen(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(
-                                text = "接入 URL (只读)",
+                                text = "接入地址（只读）",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

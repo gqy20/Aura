@@ -38,10 +38,10 @@ data class CompanionStatus(
 ) {
     val relationshipLabel: String
         get() = when {
-            relationshipLevel >= 0.8f -> "Close"
-            relationshipLevel >= 0.5f -> "Known"
-            relationshipLevel >= 0.2f -> "New"
-            else -> "First"
+            relationshipLevel >= 0.8f -> "亲密"
+            relationshipLevel >= 0.5f -> "熟悉"
+            relationshipLevel >= 0.2f -> "初识"
+            else -> "陌生"
         }
 }
 
@@ -79,7 +79,7 @@ data class ChatInsight(
 )
 
 data class ChatConfigStatus(
-    val label: String = "Checking model",
+    val label: String = "正在检测模型",
     val isReady: Boolean = false,
     val detail: String = "",
     val provider: LlmProvider = LlmProvider.GLM,

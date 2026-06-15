@@ -12,7 +12,7 @@ sealed class UserInput {
         val mediaType: String = "image/jpeg",
         val displayText: String = text,
     ) : UserInput() {
-        override val content get() = displayText.ifBlank { "Shared a picture" }
+        override val content get() = displayText.ifBlank { "分享了一张图片" }
     }
     data class Speech(val transcript: String) : UserInput() {
         override val content get() = transcript

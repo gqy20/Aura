@@ -94,10 +94,10 @@ private fun MemoryRoomScreenContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Memory") },
+                title = { Text("记忆") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
             )
@@ -126,15 +126,15 @@ private fun MemoryRoomScreenContent(
                         modifier = Modifier.padding(28.dp),
                     ) {
                         Text(
-                            text = if (memories.isEmpty()) "No memories" else "Empty",
+                            text = if (memories.isEmpty()) "暂无记忆" else "该筛选下无内容",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = if (memories.isEmpty()) {
-                                "Memories will appear here."
+                                "记忆将出现在这里"
                             } else {
-                                "Try another filter."
+                                "换其他类型试试"
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -174,7 +174,7 @@ private fun MemoryRoomScreenContent(
     pendingDelete?.let { memory ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete?") },
+            title = { Text("删除？") },
             text = {
                 Text(
                     text = memory.content,
@@ -189,12 +189,12 @@ private fun MemoryRoomScreenContent(
                         pendingDelete = null
                     },
                 ) {
-                    Text("Delete")
+                    Text("删除")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) {
-                    Text("Cancel")
+                    Text("取消")
                 }
             },
         )
@@ -223,9 +223,9 @@ private fun MemoryRoomStats(memories: List<ChatMemory>) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MemoryStatPill(label = "Facts", value = memories.count { it.type == "FACT" }.toString())
-        MemoryStatPill(label = "Moments", value = memories.count { it.type == "EPISODE" }.toString())
-        MemoryStatPill(label = "Habits", value = memories.count { it.type == "PROCEDURAL" }.toString())
+        MemoryStatPill(label = "事实", value = memories.count { it.type == "FACT" }.toString())
+        MemoryStatPill(label = "时刻", value = memories.count { it.type == "EPISODE" }.toString())
+        MemoryStatPill(label = "习惯", value = memories.count { it.type == "PROCEDURAL" }.toString())
     }
 }
 
@@ -269,7 +269,7 @@ private fun MemoryTypeFilters(
         FilterChip(
             selected = selectedType == null,
             onClick = { onSelectedTypeChanged(null) },
-            label = { Text("All") },
+            label = { Text("全部") },
         )
         listOf("FACT", "EPISODE", "PROCEDURAL").forEach { type ->
             FilterChip(
@@ -317,7 +317,7 @@ private fun MemoryRoomItemCard(
                     if (memory.pinned) {
                         Icon(
                             imageVector = Icons.Filled.Star,
-                            contentDescription = "Pinned",
+                            contentDescription = "已置顶",
                             tint = Color(0xFFE5A100),
                             modifier = Modifier.size(14.dp),
                         )
@@ -325,7 +325,7 @@ private fun MemoryRoomItemCard(
                     if (memory.archived) {
                         Icon(
                             imageVector = Icons.Filled.Archive,
-                            contentDescription = "Archived",
+                            contentDescription = "已归档",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
                             modifier = Modifier.size(14.dp),
                         )
@@ -359,7 +359,7 @@ private fun MemoryRoomItemCard(
                     onClick = onDelete,
                     modifier = Modifier
                         .size(32.dp)
-                        .semantics { contentDescription = "Delete memory" },
+                        .semantics { contentDescription = "删除记忆" },
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -409,7 +409,7 @@ private fun MemoryActionDialog(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Unpin")
+                        Text("取消置顶")
                     }
                 } else {
                     TextButton(onClick = onPin) {
@@ -419,7 +419,7 @@ private fun MemoryActionDialog(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Pin")
+                        Text("置顶")
                     }
                 }
                 if (memory.archived) {
@@ -430,7 +430,7 @@ private fun MemoryActionDialog(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Unarchive")
+                        Text("取消归档")
                     }
                 } else {
                     TextButton(onClick = onArchive) {
@@ -440,7 +440,7 @@ private fun MemoryActionDialog(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Archive")
+                        Text("归档")
                     }
                 }
                 TextButton(onClick = onDelete) {
@@ -450,13 +450,13 @@ private fun MemoryActionDialog(
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Delete")
+                    Text("删除")
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text("关闭")
             }
         },
     )
@@ -478,7 +478,7 @@ private fun MemoryDetailDialog(
             ) {
                 Text(memory.type.memoryTypeLabel())
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
+                    Icon(Icons.Default.Close, contentDescription = "关闭")
                 }
             }
         },
@@ -504,12 +504,12 @@ private fun MemoryDetailDialog(
         },
         confirmButton = {
             TextButton(onClick = onDelete) {
-                Text("Delete")
+                Text("删除")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Done")
+                Text("完成")
             }
         },
     )
@@ -517,9 +517,9 @@ private fun MemoryDetailDialog(
 
 private fun String.memoryTypeLabel(): String =
     when (this) {
-        "FACT" -> "Fact"
-        "EPISODE" -> "Moment"
-        "PROCEDURAL" -> "Habit"
+        "FACT" -> "事实"
+        "EPISODE" -> "时刻"
+        "PROCEDURAL" -> "习惯"
         else -> lowercase()
     }
 
@@ -527,13 +527,13 @@ private fun String.memorySourceLabel(): String =
     when {
         isBlank() -> BuildConfig.BRAND_NAME
         startsWith("tool:") -> BuildConfig.BRAND_NAME
-        startsWith("reflection:") -> "Chat"
+        startsWith("reflection:") -> "对话"
         else -> this
     }
 
 private fun Float.memoryImportanceLabel(): String =
     when {
-        this >= 0.82f -> "Important"
-        this >= 0.58f -> "Useful"
-        else -> "Note"
+        this >= 0.82f -> "重要"
+        this >= 0.58f -> "有用"
+        else -> "一般"
     }

@@ -161,20 +161,20 @@ private fun SettingsScreenContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text("设置") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
                     IconButton(onClick = onOpenMcpSettings) {
-                        Icon(Icons.Default.Build, contentDescription = "MCP settings")
+                        Icon(Icons.Default.Build, contentDescription = "MCP 设置")
                     }
-                    // Save 按钮提到 TopAppBar — 之前放在 LazyColumn 末尾会被数据透明 Section
+                    // 保存按钮提到 TopAppBar — 之前放在 LazyColumn 末尾会被数据透明 Section
                     // 推到屏外,用户根本点不到,导致 api_key 等字段没真正写进 DataStore。
                     androidx.compose.material3.TextButton(onClick = onSave) {
-                        Text("Save")
+                        Text("保存")
                     }
                 },
             )
@@ -189,8 +189,8 @@ private fun SettingsScreenContent(
         ) {
             item {
                 SettingsSectionTitle(
-                    title = "Model",
-                    subtitle = "Reply engine",
+                    title = "模型",
+                    subtitle = "对话引擎",
                 )
             }
             item {
@@ -209,8 +209,8 @@ private fun SettingsScreenContent(
             if (provider == LlmProvider.LOCAL_QWEN) {
                 item {
                     SettingsSectionTitle(
-                        title = "Local model",
-                        subtitle = "Offline replies",
+                        title = "本地模型",
+                        subtitle = "离线回复",
                     )
                 }
                 item {
@@ -225,7 +225,7 @@ private fun SettingsScreenContent(
                         value = baseUrl,
                         onValueChange = onBaseUrlChanged,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Endpoint") },
+                        label = { Text("接口地址") },
                         readOnly = true,
                         singleLine = true,
                     )
@@ -236,7 +236,7 @@ private fun SettingsScreenContent(
                         onValueChange = onApiKeyChanged,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("API Key") },
-                        placeholder = { Text("Keep current key") },
+                        placeholder = { Text("保留当前密钥") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -390,10 +390,10 @@ private fun LocalQwenDownloadSection(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val status = when {
-                state.isDownloading -> "Downloading ${formatPercent(state.progress)}"
-                state.isInstalled -> "Installed"
-                state.error != null -> "Download failed"
-                else -> "Not installed"
+                state.isDownloading -> "下载中 ${formatPercent(state.progress)}"
+                state.isInstalled -> "已安装"
+                state.error != null -> "下载失败"
+                else -> "未安装"
             }
             Text(
                 text = status,
@@ -433,7 +433,7 @@ private fun LocalQwenDownloadSection(
                 onClick = onDownload,
                 enabled = !state.isDownloading,
             ) {
-                Text(if (state.isInstalled) "Retry" else "Download")
+                Text(if (state.isInstalled) "重试" else "下载")
             }
         }
     }
@@ -457,84 +457,77 @@ private fun ToolCapabilitiesSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Tools",
+                    text = "能力",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Text(
-                    text = "Context and actions",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
             TextButton(onClick = onRequestContextPermissions) {
-                Text("Allow")
+                Text("授权")
             }
         }
         ToolCapabilityRow(
-            title = "Context",
-            detail = "Time and recent chat.",
-            meta = "On",
+            title = "上下文",
+            detail = "时间与近期对话",
+            meta = "",
             tools = "",
             enabled = true,
             locked = true,
             onEnabledChanged = {},
         )
         ToolCapabilityRow(
-            title = "Device",
-            detail = "Battery and network.",
-            meta = "Local",
+            title = "设备",
+            detail = "电量与网络",
+            meta = "本机",
             tools = "",
             enabled = settings.deviceStatusEnabled,
             onEnabledChanged = onDeviceStatusEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Location",
-            detail = "Last granted location.",
-            meta = "Permission",
+            title = "位置",
+            detail = "上次授权位置",
+            meta = "需授权",
             tools = "",
             enabled = settings.locationContextEnabled,
             onEnabledChanged = onLocationContextEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Weather",
-            detail = "Current weather.",
-            meta = "Network",
+            title = "天气",
+            detail = "当前天气",
+            meta = "需联网",
             tools = "",
             enabled = settings.weatherContextEnabled,
             onEnabledChanged = onWeatherContextEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Reminders",
-            detail = "Local reminders.",
-            meta = "Notify",
+            title = "提醒",
+            detail = "本地提醒",
+            meta = "",
             tools = "",
             enabled = settings.reminderToolEnabled,
             onEnabledChanged = onReminderToolEnabledChanged,
         )
         ToolCapabilityRow(
             title = "MCP",
-            detail = settings.mcpServers.firstOrNull { it.isReady }?.resolvedName
-                ?: if (settings.mcpServers.isEmpty()) "未配置"
-                else "未配置 (补 key/URL)",
-            meta = "Advanced",
+            detail = settings.mcpServers.firstOrNull { it.isReady }?.resolvedName ?: "未配置（缺密钥/地址）",
+            meta = "高级",
             tools = "",
             enabled = settings.mcpServers.any { it.isReady },
             locked = true,
             onEnabledChanged = {},
         )
         ToolCapabilityRow(
-            title = "Notifications",
-            detail = "Reminder alerts.",
-            meta = "App",
+            title = "通知",
+            detail = "提醒推送",
+            meta = "需通知",
             tools = "",
             enabled = settings.notificationEnabled,
             onEnabledChanged = onNotificationEnabledChanged,
         )
         ToolCapabilityRow(
-            title = "Memory",
-            detail = "Reflection after replies.",
-            meta = "On",
+            title = "记忆",
+            detail = "回复后自动复盘",
+            meta = "",
             tools = "",
             enabled = true,
             locked = true,
@@ -592,7 +585,7 @@ private fun ToolCapabilityRow(
                 }
             }
             if (locked) {
-                CapabilityMetaPill(text = "On")
+                // locked 行没有 Switch,不放右侧 pill 避免无意义标签
             } else {
                 Switch(
                     checked = enabled,
@@ -734,7 +727,7 @@ private fun ConnectivityCheckRow(
             onClick = onTest,
             enabled = !isChecking,
         ) {
-            Text("Test connection")
+            Text("测试连接")
         }
         if (isChecking) {
             CircularProgressIndicator(
@@ -751,13 +744,13 @@ private fun ConnectivityResultLabel(result: ConnectivityResult?) {
     val (text, color) = when (result) {
         null -> "" to MaterialTheme.colorScheme.onSurfaceVariant
         is ConnectivityResult.Success -> {
-            "OK · ${result.latencyMs}ms" to Color(0xFF2E7D32)
+            "成功 · 延迟 ${result.latencyMs} ms" to Color(0xFF2E7D32)
         }
         is ConnectivityResult.AuthFailure -> {
-            "鉴权失败 (${result.statusCode})" to MaterialTheme.colorScheme.error
+            "鉴权失败（${result.statusCode}）" to MaterialTheme.colorScheme.error
         }
         is ConnectivityResult.Unreachable -> {
-            "不可达: ${result.cause}" to MaterialTheme.colorScheme.error
+            "不可达：${result.cause}" to MaterialTheme.colorScheme.error
         }
     }
     if (text.isNotEmpty()) {
@@ -803,7 +796,7 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingsSectionTitle(
             title = "数据透明",
-            subtitle = "本地存储 · 你随时可查可改可删",
+            subtitle = "本地存储，可查可改可删",
         )
         Surface(
             shape = MaterialTheme.shapes.medium,
@@ -814,9 +807,9 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CountRow("insights", insightCount)
-                CountRow("mood_snapshots", moodCount)
-                CountRow("memories", memoryCount)
+                CountRow(ClearTarget.Insights.label, insightCount)
+                CountRow(ClearTarget.MoodSnapshots.label, moodCount)
+                CountRow(ClearTarget.Memories.label, memoryCount)
                 Spacer(Modifier.height(4.dp))
                 androidx.compose.material3.OutlinedButton(
                     onClick = {
@@ -830,13 +823,13 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
                 }
                 Spacer(Modifier.height(4.dp))
                 androidx.compose.material3.Text(
-                    text = "清空(二次确认)",
+                    text = "清空（需二次确认）",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                 )
-                ClearButton("清空 insights", ClearTarget.Insights) { pendingClear = it }
-                ClearButton("清空 mood_snapshots", ClearTarget.MoodSnapshots) { pendingClear = it }
-                ClearButton("清空 memories", ClearTarget.Memories) { pendingClear = it }
+                ClearButton("清空洞察", ClearTarget.Insights) { pendingClear = it }
+                ClearButton("清空情绪快照", ClearTarget.MoodSnapshots) { pendingClear = it }
+                ClearButton("清空记忆", ClearTarget.Memories) { pendingClear = it }
             }
         }
     }
@@ -844,10 +837,10 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
     pendingClear?.let { target ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { pendingClear = null },
-            title = { Text("确认清空?") },
+            title = { Text("确认清空？") },
             text = {
                 Text(
-                    "将永久删除所有 ${target.label} 数据,无法恢复。",
+                    "将永久删除所有${target.label}，无法恢复。",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -867,7 +860,7 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
                             moodCount = viewModel.moodSnapshotCount()
                         }
                     },
-                ) { Text("确认清空") }
+                ) { Text("确定清空") }
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { pendingClear = null }) {
@@ -916,7 +909,7 @@ private fun ClearButton(
 }
 
 private enum class ClearTarget(val label: String) {
-    Insights("insights"),
-    MoodSnapshots("mood_snapshots"),
-    Memories("memories"),
+    Insights("洞察"),
+    MoodSnapshots("情绪快照"),
+    Memories("记忆"),
 }

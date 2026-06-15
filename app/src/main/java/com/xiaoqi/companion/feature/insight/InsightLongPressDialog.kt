@@ -91,7 +91,7 @@ internal fun InsightLongPressDialog(
                 )
                 InsightActionRow(
                     icon = Icons.Filled.VolumeOff,
-                    label = "本周不再说 ${insight.category}",
+                    label = "本周不聊 ${insight.category}",
                     onClick = { onMute(7) },
                 )
                 InsightActionRow(
@@ -108,7 +108,7 @@ internal fun InsightLongPressDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text("关闭")
             }
         },
     )
@@ -151,21 +151,21 @@ private fun EvidenceSection(evidence: InsightEvidenceView) {
             )
             if (evidence.messageIds.isNotEmpty()) {
                 Text(
-                    text = "messages: ${evidence.messageIds.joinToString(", ")}",
+                    text = "消息：${evidence.messageIds.joinToString(", ")}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (evidence.memoryIds.isNotEmpty()) {
                 Text(
-                    text = "memories: ${evidence.memoryIds.joinToString(", ")}",
+                    text = "记忆：${evidence.memoryIds.joinToString(", ")}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (evidence.moodSnapshotIds.isNotEmpty()) {
                 Text(
-                    text = "mood_snapshots: ${evidence.moodSnapshotIds.joinToString(", ")}",
+                    text = "情绪快照：${evidence.moodSnapshotIds.joinToString(", ")}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

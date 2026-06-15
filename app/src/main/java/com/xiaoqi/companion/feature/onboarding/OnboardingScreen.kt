@@ -99,7 +99,7 @@ fun OnboardingScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = "第 ${step + 1} 步 / 共 5 步",
+                text = "第 ${step + 1} / 5 步",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -133,7 +133,7 @@ fun OnboardingScreen(
                                 value = q2,
                                 onValueChange = { q2 = it },
                                 modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("例: 6/22 妈妈生日, 6/30 论文 deadline") },
+                                placeholder = { Text("例：6/22 妈妈生日，6/30 论文截止") },
                                 minLines = 2,
                                 maxLines = 4,
                             )

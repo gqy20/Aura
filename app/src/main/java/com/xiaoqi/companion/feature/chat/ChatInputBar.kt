@@ -117,7 +117,7 @@ internal fun InputBar(
                     IconButton(
                         onClick = onPickImage,
                         enabled = !isLoading && !isPreparingImage,
-                        modifier = Modifier.semantics { contentDescription = "Add image" },
+                        modifier = Modifier.semantics { contentDescription = "添加图片" },
                     ) {
                         Icon(
                             imageVector = Icons.Default.Image,
@@ -134,7 +134,7 @@ internal fun InputBar(
                         .heightIn(min = 48.dp),
                     placeholder = {
                         Text(
-                            text = "Say something",
+                            text = "说点什么",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     },
@@ -173,7 +173,7 @@ internal fun InputBar(
                         IconButton(
                             onClick = onSendMessage,
                             enabled = canSend,
-                            modifier = Modifier.semantics { contentDescription = "Send" },
+                            modifier = Modifier.semantics { contentDescription = "发送" },
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
@@ -229,7 +229,7 @@ private fun ImeRecoveryHint(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextButton(onClick = onSwitchInputMethod) {
-            Text("Switch input")
+            Text("切换输入法")
         }
     }
 }
@@ -251,7 +251,7 @@ private fun PendingImagePreview(
         ) {
             AsyncImage(
                 model = imageUri,
-                contentDescription = "Selected image",
+                contentDescription = "已选图片",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .height(78.dp)
@@ -263,13 +263,13 @@ private fun PendingImagePreview(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = "Ready to share",
+                    text = "就绪",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Add a thought, or send it as-is.",
+                    text = "加句话，或直接发",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -277,7 +277,7 @@ private fun PendingImagePreview(
             }
             IconButton(
                 onClick = onRemoveImage,
-                modifier = Modifier.semantics { contentDescription = "Remove image" },
+                modifier = Modifier.semantics { contentDescription = "移除图片" },
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,

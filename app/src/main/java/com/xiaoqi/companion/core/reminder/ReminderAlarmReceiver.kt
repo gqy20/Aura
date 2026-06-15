@@ -20,8 +20,8 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val reminderId = intent.getStringExtra(EXTRA_REMINDER_ID)
-        val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: "Aura reminder"
-        val message = intent.getStringExtra(EXTRA_MESSAGE)?.takeIf { it.isNotBlank() } ?: "You asked me to remind you."
+        val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: "Aura 提醒"
+        val message = intent.getStringExtra(EXTRA_MESSAGE)?.takeIf { it.isNotBlank() } ?: "你让 Aura 提醒你的事。"
         AppLogger.info(LogTags.Reminder, "reminder_alarm_received", "reminderId" to reminderId)
         ReminderNotificationPoster.post(context, title, message)
         reminderId?.let { id ->

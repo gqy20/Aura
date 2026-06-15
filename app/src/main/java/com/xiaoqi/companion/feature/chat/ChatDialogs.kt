@@ -61,8 +61,8 @@ internal fun RemindersDialog(
         fillHeight = 0.72f,
     ) {
         AuraDialogHeader(
-            title = "Reminders",
-            subtitle = "$scheduledReminderCount active",
+            title = "提醒",
+            subtitle = "$scheduledReminderCount 个待生效",
             onDismiss = onDismiss,
         )
 
@@ -72,8 +72,8 @@ internal fun RemindersDialog(
                 contentAlignment = Alignment.Center,
             ) {
                 AuraEmptyState(
-                    title = "No reminders",
-                    message = "Try: remind me in 3 minutes.",
+                    title = "暂无提醒",
+                    message = "试试：3 分钟后提醒我",
                 )
             }
         } else {
@@ -116,7 +116,7 @@ private fun ReminderItemCard(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CapabilityMetaPill(text = if (reminder.exact) "Exact" else "Flex")
+                    CapabilityMetaPill(text = if (reminder.exact) "精准" else "宽限")
                     CapabilityMetaPill(text = reminder.status.reminderStatusLabel())
                 }
                 Text(
@@ -138,7 +138,7 @@ private fun ReminderItemCard(
             }
             if (reminder.status == "SCHEDULED") {
                 TextButton(onClick = onCancel) {
-                    Text("Cancel")
+                    Text("取消")
                 }
             }
         }
@@ -147,9 +147,9 @@ private fun ReminderItemCard(
 
 private fun String.reminderStatusLabel(): String =
     when (uppercase(Locale.US)) {
-        "SCHEDULED" -> "Due"
-        "CANCELLED" -> "Off"
-        "FIRED" -> "Done"
+        "SCHEDULED" -> "待生效"
+        "CANCELLED" -> "已关闭"
+        "FIRED" -> "已触发"
         else -> lowercase(Locale.US)
     }
 
@@ -190,7 +190,7 @@ internal fun PermissionPromptCard(
                 )
             }
             TextButton(onClick = onDismiss) {
-                Text("Later")
+                Text("稍后")
             }
             Button(onClick = onOpenSettings) {
                 Text(prompt.primaryActionLabel)
@@ -271,7 +271,7 @@ internal fun AuraDialogHeader(
                 onClick = onDismiss,
                 modifier = Modifier
                     .size(38.dp)
-                    .semantics { contentDescription = "Close" },
+                    .semantics { contentDescription = "关闭" },
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,

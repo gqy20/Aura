@@ -114,27 +114,27 @@ internal fun CompanionHeader(
             HeaderActionIcon(
                 imageVector = Icons.Default.Favorite,
                 onClick = onOpenMemoryRoom,
-                contentDescription = "Open memory",
+                contentDescription = "打开记忆",
                 badge = memories.size.takeIf { it > 0 }?.toString(),
             )
             if (scheduledReminderCount > 0) {
                 HeaderActionIcon(
                     imageVector = Icons.Default.Notifications,
                     onClick = onOpenReminders,
-                    contentDescription = "Open reminders",
+                    contentDescription = "打开提醒",
                     badge = scheduledReminderCount.toString(),
                 )
             }
             HeaderActionIcon(
                 imageVector = Icons.Default.Build,
                 onClick = onOpenMcpSettings,
-                contentDescription = "Open MCP",
+                contentDescription = "打开 MCP",
                 active = mcpLabel != "MCP",
             )
             HeaderActionIcon(
                 imageVector = Icons.Default.Settings,
                 onClick = onOpenSettings,
-                contentDescription = "Open settings",
+                contentDescription = "打开设置",
             )
         }
 
@@ -194,7 +194,7 @@ private fun HeaderActionIcon(
 
 private fun PresenceUiState.chatHeaderStatus(configStatus: ChatConfigStatus): String =
     when {
-        !configStatus.isReady -> "Setup"
+        !configStatus.isReady -> "待配置"
         else -> label
     }
 
@@ -218,7 +218,7 @@ private fun ConfigStatusCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Model",
+                    text = "模型",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -240,7 +240,7 @@ private fun ConfigStatusCard(
                     color = MaterialTheme.colorScheme.error,
                 )
                 TextButton(onClick = onOpenSettings) {
-                    Text("Set")
+                    Text("去设置")
                 }
             }
         }

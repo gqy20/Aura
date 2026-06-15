@@ -88,7 +88,7 @@ class SendMessageUseCase @Inject constructor(
         )
 
         val userPrompt = trimmed.ifBlank { IMAGE_ONLY_PROMPT }
-        val userDisplayContent = trimmed.ifBlank { "Shared a picture" }
+        val userDisplayContent = trimmed.ifBlank { "分享了一张图片" }
         val userMsg = ChatMessage(
             id = UUID.randomUUID().toString(),
             role = "USER",
@@ -314,7 +314,7 @@ class SendMessageUseCase @Inject constructor(
             }
 
             if (timedOut) {
-                finishWithError("Response timed out. Please try again.")
+                finishWithError("回复超时，请重试。")
             }
         } catch (e: Exception) {
             AppLogger.error(
@@ -324,7 +324,7 @@ class SendMessageUseCase @Inject constructor(
                 "requestHash" to LogFieldSanitizer.hash(requestId),
                 "textLength" to trimmed.length,
             )
-            finishWithError("Send failed. Please try again.")
+            finishWithError("发送失败，请重试。")
         }
     }
 
@@ -353,9 +353,9 @@ class SendMessageUseCase @Inject constructor(
             copy(
                 permissionPrompt = ChatPermissionPrompt(
                     type = ChatPermissionType.EXACT_ALARM,
-                    title = "Enable precise reminders",
-                    message = "Aura needs the Android alarm permission to deliver exact reminders on time.",
-                    primaryActionLabel = "Open settings",
+                    title = "开启精准提醒",
+                    message = "Aura 需要「闹钟与提醒」权限才能准时提醒你。",
+                    primaryActionLabel = "去设置",
                 )
             )
         }
@@ -363,8 +363,8 @@ class SendMessageUseCase @Inject constructor(
 
     private fun formatError(error: AgentError): String =
         when (error) {
-            is AgentError.NetworkTimeout -> "Network timed out. Check your connection."
-            is AgentError.RateLimited -> "Too many requests. Try again later."
+            is AgentError.NetworkTimeout -> "网络超时，请检查连接。"
+            is AgentError.RateLimited -> "请求过于频繁，稍后再试。"
             is AgentError.ApiError -> error.message
             is AgentError.ParseError -> error.reason
         }

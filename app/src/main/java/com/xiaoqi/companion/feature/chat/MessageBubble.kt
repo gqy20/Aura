@@ -67,7 +67,7 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
                         onLongClick = {
                             if (message.content.isNotBlank()) {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("Aura message", message.content))
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Aura 消息", message.content))
                                 Toast.makeText(context, "已复制消息", Toast.LENGTH_SHORT).show()
                             }
                         },
@@ -107,7 +107,7 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
                     onLongClick = {
                         if (message.content.isNotBlank()) {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Aura message", message.content))
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Aura 消息", message.content))
                             Toast.makeText(context, "已复制消息", Toast.LENGTH_SHORT).show()
                         }
                     },
@@ -132,7 +132,7 @@ private fun MessageBubbleContent(
         message.imageUri?.let { imageUri ->
             AsyncImage(
                 model = imageUri,
-                contentDescription = "Message image",
+                contentDescription = "消息图片",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .width(188.dp)
@@ -145,7 +145,7 @@ private fun MessageBubbleContent(
             CircularProgressIndicator(
                 modifier = Modifier
                     .size(18.dp)
-                    .semantics { contentDescription = "Assistant response loading" },
+                    .semantics { contentDescription = "Aura 正在回复" },
                 strokeWidth = 2.dp,
                 color = MaterialTheme.colorScheme.primary,
             )

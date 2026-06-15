@@ -342,13 +342,13 @@ private fun EmptyChatState() {
             }
         }
         Text(
-            text = "Aura is here",
+            text = "Aura 在这里",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            text = "Tell her what happened today, or send a picture.",
+            text = "告诉我今天发生了什么，或发张图片。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

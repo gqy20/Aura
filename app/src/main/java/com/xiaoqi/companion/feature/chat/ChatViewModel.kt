@@ -365,7 +365,7 @@ class ChatViewModel @Inject constructor(
                 AppLogger.info(LogTags.Reminder, "ui_cancel_reminder_completed", "reminderId" to reminderId)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Reminder, e, "ui_cancel_reminder_failed", "reminderId" to reminderId)
-                _uiState.update { it.copy(error = "Cancel reminder failed. Please try again.") }
+                _uiState.update { it.copy(error = "取消提醒失败，请重试。") }
             }
         }
     }
@@ -378,7 +378,7 @@ class ChatViewModel @Inject constructor(
                 AppLogger.info(LogTags.Repo, "ui_delete_memory_completed", "memoryId" to memoryId)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_delete_memory_failed", "memoryId" to memoryId)
-                _uiState.update { it.copy(error = "Delete memory failed. Please try again.") }
+                _uiState.update { it.copy(error = "删除记忆失败，请重试。") }
             }
         }
     }
@@ -389,7 +389,7 @@ class ChatViewModel @Inject constructor(
                 memoryRepository.pinMemory(memoryId)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_pin_memory_failed", "memoryId" to memoryId)
-                _uiState.update { it.copy(error = "Pin memory failed. Please try again.") }
+                _uiState.update { it.copy(error = "置顶失败，请重试。") }
             }
         }
     }
@@ -400,7 +400,7 @@ class ChatViewModel @Inject constructor(
                 memoryRepository.unpinMemory(memoryId)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_unpin_memory_failed", "memoryId" to memoryId)
-                _uiState.update { it.copy(error = "Unpin memory failed. Please try again.") }
+                _uiState.update { it.copy(error = "取消置顶失败，请重试。") }
             }
         }
     }
@@ -411,7 +411,7 @@ class ChatViewModel @Inject constructor(
                 memoryRepository.archiveMemory(memoryId)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_archive_memory_failed", "memoryId" to memoryId)
-                _uiState.update { it.copy(error = "Archive memory failed. Please try again.") }
+                _uiState.update { it.copy(error = "归档失败，请重试。") }
             }
         }
     }
@@ -422,7 +422,7 @@ class ChatViewModel @Inject constructor(
                 memoryRepository.unarchiveMemory(memoryId)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_unarchive_memory_failed", "memoryId" to memoryId)
-                _uiState.update { it.copy(error = "Unarchive memory failed. Please try again.") }
+                _uiState.update { it.copy(error = "取消归档失败，请重试。") }
             }
         }
     }
@@ -433,7 +433,7 @@ class ChatViewModel @Inject constructor(
                 insightRepository.dismiss(insightId)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_dismiss_insight_failed", "insightId" to insightId)
-                _uiState.update { it.copy(error = "Dismiss insight failed. Please try again.") }
+                _uiState.update { it.copy(error = "已忽略，请重试。") }
             }
         }
     }
@@ -451,7 +451,7 @@ class ChatViewModel @Inject constructor(
                     "insightId" to insightId,
                     "category" to category,
                 )
-                _uiState.update { it.copy(error = "Mute category failed. Please try again.") }
+                _uiState.update { it.copy(error = "静音失败，请重试。") }
             }
         }
     }

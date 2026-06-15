@@ -57,7 +57,7 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
             throw IOException("Cannot create model download directory: ${partialDir.absolutePath}")
         }
 
-        emit(status(modelName).copy(isDownloading = true, message = "Starting download"))
+        emit(status(modelName).copy(isDownloading = true, message = "开始下载"))
 
         var downloadedBytes = 0L
         var totalBytes = LocalQwenCatalogSizes.estimatedTotalBytes(modelName)
@@ -153,7 +153,7 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
             "model" to modelName,
             "targetDir" to modelDir.absolutePath,
         )
-        emit(status(modelName).copy(message = "Download complete"))
+        emit(status(modelName).copy(message = "下载完成"))
     }.flowOn(Dispatchers.IO)
 
     private fun status(modelName: String): LocalQwenModelDownloadState {
@@ -163,7 +163,7 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
             modelName = modelName,
             isInstalled = installed,
             progress = if (installed) 1f else 0f,
-            message = if (installed) "Installed" else "Not installed",
+            message = if (installed) "已安装" else "未安装",
         )
     }
 

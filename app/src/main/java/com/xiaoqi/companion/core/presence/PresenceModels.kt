@@ -41,8 +41,8 @@ data class PresenceUiState(
     val mood: String = "neutral",
     val intensity: Float = 0.5f,
     val relationshipLevel: Float = 0f,
-    val label: String = "Aura is here",
-    val detail: String = "Quietly present",
+    val label: String = "Aura 在这里",
+    val detail: String = "静静陪着你",
     val accent: String = "present",
 )
 

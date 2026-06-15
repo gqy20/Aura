@@ -158,7 +158,7 @@ class SettingsUseCase @Inject constructor(
                 "model" to model,
                 "durationMs" to (System.currentTimeMillis() - startedAt),
             )
-            update { copy(settingsMessage = "Save settings failed. Please try again.") }
+            update { copy(settingsMessage = "保存失败，请重试。") }
         }
     }
 
@@ -468,7 +468,7 @@ class SettingsUseCase @Inject constructor(
             AppLogger.info(LogTags.Config, "preference_update_completed", "name" to name, "value" to value)
         } catch (e: Exception) {
             AppLogger.error(LogTags.Config, e, "preference_update_failed", "name" to name, "value" to value)
-            update { copy(error = "Update setting failed. Please try again.") }
+            update { copy(error = "更新设置失败，请重试。") }
         }
     }
 

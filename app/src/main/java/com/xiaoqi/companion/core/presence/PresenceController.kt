@@ -63,40 +63,40 @@ class PresenceController @Inject constructor() {
 
     private fun PresenceMode.labelFor(mood: String, inputs: PresenceInputs): String =
         when (this) {
-            PresenceMode.ERROR -> if (!inputs.isConfigReady) "Setup" else "Recovering"
-            PresenceMode.IDLE -> "Here"
-            PresenceMode.LISTENING -> "Listening"
-            PresenceMode.THINKING -> "Thinking"
-            PresenceMode.SPEAKING -> "Replying"
-            PresenceMode.SEARCHING -> "Searching"
+            PresenceMode.ERROR -> if (!inputs.isConfigReady) "待配置" else "恢复中"
+            PresenceMode.IDLE -> "在这里"
+            PresenceMode.LISTENING -> "在听"
+            PresenceMode.THINKING -> "思考中"
+            PresenceMode.SPEAKING -> "回复中"
+            PresenceMode.SEARCHING -> "查找中"
             PresenceMode.REMEMBERING -> ""
-            PresenceMode.HAPPY -> "Bright"
-            PresenceMode.SAD -> "Soft"
-            PresenceMode.TIRED -> "Resting"
-            PresenceMode.SLEEPING -> "Resting"
+            PresenceMode.HAPPY -> "心情好"
+            PresenceMode.SAD -> "低落"
+            PresenceMode.TIRED -> "休息中"
+            PresenceMode.SLEEPING -> "休息中"
         }
 
     private fun PresenceMode.detailFor(inputs: PresenceInputs): String =
         when (this) {
             PresenceMode.ERROR -> if (!inputs.isConfigReady) {
-                inputs.configDetail.ifBlank { "Model needed" }
+                inputs.configDetail.ifBlank { "需要先配置模型" }
             } else {
-                "Try again"
+                "再试一次"
             }
             PresenceMode.IDLE -> if (inputs.recentMemoryCount > 0) {
-                "${inputs.recentMemoryCount} memories"
+                "${inputs.recentMemoryCount} 条记忆"
             } else {
                 ""
             }
             PresenceMode.LISTENING -> if (inputs.hasPendingImage) {
-                "Image ready"
+                "图就绪"
             } else {
                 ""
             }
             PresenceMode.THINKING -> ""
             PresenceMode.SPEAKING -> ""
-            PresenceMode.SEARCHING -> "Memory"
-            PresenceMode.REMEMBERING -> "Memory"
+            PresenceMode.SEARCHING -> "查找记忆"
+            PresenceMode.REMEMBERING -> "查找记忆"
             PresenceMode.HAPPY -> ""
             PresenceMode.SAD -> ""
             PresenceMode.TIRED -> ""

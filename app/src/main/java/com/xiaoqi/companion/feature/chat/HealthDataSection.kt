@@ -71,7 +71,7 @@ fun HealthDataSection(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingsSectionTitle(
             title = "健康数据接入",
-            subtitle = "Health Connect · 步数 / 心率 / 睡眠 + 本机传感器兜底步数",
+            subtitle = "Health Connect · 步数/心率/睡眠；HC 不可用时用本机传感器兜底步数",
         )
 
         HealthPermissionsCard(dataSource = healthConnectDataSource)
@@ -141,8 +141,7 @@ private fun HealthPermissionsCard(dataSource: HealthConnectDataSource) {
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "ColorOS / 部分定制 ROM 只装了 HC APK 但未挂载 service — " +
-                            "无法授权。Pixel / 国行三星 / 部分小米机型可用。",
+                        text = "部分 ROM（如 ColorOS）只装了 HC APK 但未挂载服务，无法授权。Pixel / 国行三星 / 部分小米机型可用。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -152,7 +151,7 @@ private fun HealthPermissionsCard(dataSource: HealthConnectDataSource) {
                     PermissionRow("心率", HealthConnectDataSource.READ_HEART_RATE, probeResult[HealthConnectDataSource.READ_HEART_RATE])
                     PermissionRow("睡眠", HealthConnectDataSource.READ_SLEEP, probeResult[HealthConnectDataSource.READ_SLEEP])
                     Text(
-                        text = "说明:状态以实际 readRecords 是否成功为准(系统 HC 控制器在部分 ROM 上无法查询已授权列表)。",
+                        text = "说明：状态以实际 readRecords 是否成功为准（部分 ROM 的 HC 控制器无法查询已授权列表）。",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -201,7 +200,7 @@ private fun HealthPermissionsCard(dataSource: HealthConnectDataSource) {
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("打开系统 Health Connect 主设置")
+                        Text("打开系统 Health Connect")
                     }
                 }
             }
@@ -259,15 +258,15 @@ private fun SensorSourceCard(sensorSource: SensorManagerHealthSource) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "当 Health Connect 不可用(国行 ROM / realme 等)时,使用 TYPE_STEP_COUNTER 提供今日步数。",
+                text = "HC 不可用时（如国行 ROM、realme），用本机传感器统计今日步数。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            SensorRow("活动识别权限", if (hasPermission) "✓ 已授予" else "✗ 未授予",
+            SensorRow("活动识别", if (hasPermission) "已授予" else "未授予",
                 ok = hasPermission, error = !hasPermission)
-            SensorRow("步数传感器", if (hasHardware) "✓ 已内置" else "✗ 不支持",
+            SensorRow("计步传感器", if (hasHardware) "已内置" else "不支持",
                 ok = hasHardware, error = !hasHardware)
-            SensorRow("Sensor 数据源", if (isAvailable) "✓ 可用" else "✗ 不可用",
+            SensorRow("传感器", if (isAvailable) "可用" else "不可用",
                 ok = isAvailable, error = !isAvailable)
             if (!hasPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 OutlinedButton(
@@ -276,7 +275,7 @@ private fun SensorSourceCard(sensorSource: SensorManagerHealthSource) {
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("授予活动识别权限")
+                    Text("授予活动识别")
                 }
             }
         }
@@ -397,7 +396,7 @@ private fun HealthSyncStatusCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "自动同步", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        text = "回到 App 时自动拉取最近 7 天",
+                        text = "回到 App 时自动拉取近 7 天数据",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -58,7 +58,7 @@ class MessageBubbleTest {
             )
         }
 
-        composeTestRule.onNodeWithContentDescription("Assistant response loading").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Aura 正在回复").assertIsDisplayed()
     }
 
     @Test

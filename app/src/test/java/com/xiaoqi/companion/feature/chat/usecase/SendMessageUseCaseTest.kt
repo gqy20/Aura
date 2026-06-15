@@ -307,8 +307,8 @@ class SendMessageUseCaseTest {
         assertTrue(input is UserInput.Vision)
         input as UserInput.Vision
         assertTrue(input.text.contains("给你看这张图片"))
-        assertEquals("Shared a picture", input.content)
-        assertTrue(state.value.messages.any { it.content == "Shared a picture" })
+        assertEquals("分享了一张图片", input.content)
+        assertTrue(state.value.messages.any { it.content == "分享了一张图片" })
     }
 
     @Test
@@ -434,7 +434,7 @@ class SendMessageUseCaseTest {
 
         val prompt = state.value.permissionPrompt
         assertEquals(ChatPermissionType.EXACT_ALARM, prompt?.type)
-        assertEquals("Open settings", prompt?.primaryActionLabel)
+        assertEquals("去设置", prompt?.primaryActionLabel)
     }
 
     @Test

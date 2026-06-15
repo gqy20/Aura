@@ -254,7 +254,7 @@ private fun HomeTopBar(
         ) {
             HomeTopActionIcon(
                 imageVector = Icons.Default.Favorite,
-                contentDescription = "Memory",
+                contentDescription = "记忆",
                 onClick = onOpenMemoryRoom,
             )
             HomeTopActionIcon(
@@ -271,7 +271,7 @@ private fun HomeTopBar(
                 IconButton(onClick = onOpenSettings) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
+                        contentDescription = "设置",
                         tint = Color(0xFF496B5E),
                     )
                 }
@@ -366,15 +366,12 @@ private fun PresenceStage(
 
 private fun ChatUiState.homePresenceLine(): String =
     when {
-        isPreparingImage -> "Reading image"
-        pendingImage != null -> "Image ready"
-        isLoading -> "Thinking"
-        inputText.isNotBlank() -> "Listening"
-        presence.mode == PresenceMode.REMEMBERING -> "Here"
-        presence.mode == PresenceMode.SEARCHING -> "Searching"
-        presence.mode == PresenceMode.HAPPY -> "Bright"
-        presence.mode == PresenceMode.SAD -> "Here"
-        presence.mode == PresenceMode.TIRED || presence.mode == PresenceMode.SLEEPING -> "Resting"
-        messages.isEmpty() -> "Here"
-        else -> "Here"
+        isPreparingImage -> "读图中"
+        pendingImage != null -> "图就绪"
+        isLoading -> "思考中"
+        inputText.isNotBlank() -> "在听"
+        presence.mode == PresenceMode.SEARCHING -> "查找中"
+        presence.mode == PresenceMode.HAPPY -> "心情好"
+        presence.mode == PresenceMode.TIRED || presence.mode == PresenceMode.SLEEPING -> "休息中"
+        else -> "在这里"
     }
