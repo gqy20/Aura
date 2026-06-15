@@ -83,7 +83,11 @@ class SearchRecordsTool @Inject constructor(
                         hasImage = args.hasImage,
                         limit = candidateLimit,
                     )
-                }.getOrDefault(emptyList())
+                }.getOrElse { error ->
+                    return@withContext encode(
+                        ToolEnvelopeFactory.ftsFailure(error.message ?: error::class.simpleName.orEmpty())
+                    )
+                }
 
                 ftsMatches.map { hit ->
                     RecordSearchHit(
@@ -208,12 +212,7 @@ class SearchRecordsTool @Inject constructor(
     }
 
     private fun invalidRole(role: String): String =
-        buildJsonObject {
-            put("status", "error")
-            put("reason", "invalid_message_role")
-            put("role", role)
-            put("allowedRoles", MessageRole.entries.joinToString(",") { it.name })
-        }.toString()
+        encode(ToolEnvelopeFactory.invalidMessageRole(role))
 }
 
 private fun String.toFtsQuery(): String =

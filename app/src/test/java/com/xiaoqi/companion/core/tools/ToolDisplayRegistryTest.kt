@@ -1,12 +1,13 @@
 package com.xiaoqi.companion.core.tools
 
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
+import com.xiaoqi.companion.core.tools.parser.ToolCallResultParser
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ToolDisplayRegistryTest {
 
-    private val registry = ToolDisplayRegistry()
+    private val registry = ToolDisplayRegistry(ToolCallResultParser())
 
     @Test
     fun label_returnsSpecificLabelsForRegisteredTools() {

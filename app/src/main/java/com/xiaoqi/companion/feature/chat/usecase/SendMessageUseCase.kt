@@ -112,6 +112,7 @@ class SendMessageUseCase @Inject constructor(
         var streamingRenderJob: Job? = null
         var idleTimeoutJob: Job? = null
         var timedOut = false
+        val toolCallIds = mutableListOf<String>()
 
         fun resetIdleTimer() {
             timedOut = false
@@ -248,10 +249,21 @@ class SendMessageUseCase @Inject constructor(
                     }
                     is AgentEvent.ToolCallUpdated -> {
                         maybeShowPermissionPrompt(event.call, update)
-                        updateAssistantToolStatus(
-                            toolDisplayRegistry.label(event.call.name, event.call.status),
-                            event.call.status,
-                        )
+                        val statusLabel = if (event.call.status == ToolCallStatus.FAILED) {
+                            formatToolError(event.call)
+                        } else {
+                            toolDisplayRegistry.label(event.call.name, event.call.status)
+                        }
+                        updateAssistantToolStatus(statusLabel, event.call.status)
+                        // 记录 callId 到消息,让 detail panel 能反查具体 tool call
+                        event.call.callId?.takeIf { it.isNotBlank() }?.let { id ->
+                            if (id !in toolCallIds) {
+                                toolCallIds += id
+                                updateAssistantMessage(assistantId, update) {
+                                    it.copy(toolCallIds = toolCallIds.toList())
+                                }
+                            }
+                        }
                     }
                     is AgentEvent.ToolStarted -> {
                         updateAssistantToolStatus(
@@ -373,6 +385,28 @@ class SendMessageUseCase @Inject constructor(
             is AgentError.ApiError -> error.message
             is AgentError.ParseError -> error.reason
         }
+
+    /**
+     * 把单个 tool call 的失败原因翻译成用户可读字符串。
+     *
+     * 输入可来自两个字段:
+     * - `call.resultJson`: envelope error 文本(优先,理由更具体)
+     * - `call.errorMessage`: 早期异常的纯字符串兜底
+     *
+     * 输出策略:
+     * - 有 envelope reason → 返回 "工具失败 · <reason>"(不暴露 hint,因为 hint 是给 LLM 的)
+     * - 有 errorMessage → 返回 "工具失败 · <errorMessage>"
+     * - 都无 → 返回 "工具失败"
+     */
+    private fun formatToolError(call: AgentToolCall): String {
+        val resultJson = call.resultJson
+        if (!resultJson.isNullOrBlank() && com.xiaoqi.companion.core.tools.isError(resultJson)) {
+            val reason = com.xiaoqi.companion.core.tools.parseErrorReason(resultJson)
+            if (!reason.isNullOrBlank()) return "工具失败 · $reason"
+        }
+        val msg = call.errorMessage?.takeIf { it.isNotBlank() }
+        return if (msg != null) "工具失败 · $msg" else "工具失败"
+    }
 
     private fun persistStatus(status: CompanionStatus, scope: CoroutineScope) {
         scope.launch {

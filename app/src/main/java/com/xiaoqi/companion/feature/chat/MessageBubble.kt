@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
@@ -43,7 +44,11 @@ import com.xiaoqi.companion.ui.theme.ChatStatusColors
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
+fun MessageBubble(
+    message: ChatMessage,
+    modifier: Modifier = Modifier,
+    onToolStatusClick: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val isUser = message.role == "USER"
     val contentColor = if (isUser) Color(0xFF20362F) else MaterialTheme.colorScheme.onSurface
@@ -81,6 +86,7 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
                     isUser = true,
                     contentColor = contentColor,
                     modifier = Modifier.padding(horizontal = 15.dp, vertical = 11.dp),
+                    onToolStatusClick = null,
                 )
             }
         } else {
@@ -116,6 +122,7 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
                     },
                 )
                     .padding(top = 1.dp, bottom = 8.dp),
+                onToolStatusClick = onToolStatusClick,
             )
         }
     }
@@ -127,6 +134,7 @@ private fun MessageBubbleContent(
     isUser: Boolean,
     contentColor: Color,
     modifier: Modifier = Modifier,
+    onToolStatusClick: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier,
@@ -163,7 +171,11 @@ private fun MessageBubbleContent(
         }
         if (!isUser && message.toolStatus != null) {
             Spacer(modifier = Modifier.size(6.dp))
-            ToolStatusPill(text = message.toolStatus, status = message.toolStatusType)
+            ToolStatusPill(
+                text = message.toolStatus,
+                status = message.toolStatusType,
+                onClick = onToolStatusClick,
+            )
         }
     }
 }
@@ -198,18 +210,26 @@ private fun StreamingMessageText(message: ChatMessage, color: androidx.compose.u
 }
 
 @Composable
-private fun ToolStatusPill(text: String, status: ToolCallStatus? = null) {
+private fun ToolStatusPill(
+    text: String,
+    status: ToolCallStatus? = null,
+    onClick: (() -> Unit)? = null,
+) {
     val dotColor = when (status) {
         ToolCallStatus.SUCCEEDED -> ChatStatusColors.SuccessDot
         ToolCallStatus.FAILED -> MaterialTheme.colorScheme.error
         ToolCallStatus.STARTED -> ChatStatusColors.Warning
         null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
     }
+    val baseModifier = Modifier
+        .clip(RoundedCornerShape(8.dp))
+        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f))
+        .then(
+            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+        )
+        .padding(horizontal = 8.dp, vertical = 4.dp)
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = baseModifier,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

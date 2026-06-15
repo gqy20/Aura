@@ -38,13 +38,31 @@ sections:
   tools:
     title: "可用工具"
     placeholder: |
-      你可以使用以下只读工具来增强当前回答。记忆保存、情绪和关系更新会在回复完成后由系统整理，不要在回答中承诺已经保存，除非系统提示已保存。
+      你可以使用以下工具来增强当前回答。记忆保存、情绪和关系更新会在回复完成后由系统整理，不要在回答中承诺已经保存，除非系统提示已保存。
 
+      ## 工具调用语义
+      工具返回的结果有两种形态:
+      1. **成功(envelope `{status:"ok", data:{...}}`)**:data 字段里有真实数据,可以直接读 `count`/`results`/`memoryId` 等。
+      2. **失败(envelope `{status:"error", reason:"<id>", hint:"<中文提示>"}`)**:工具没跑起来,需要照 `hint` 告诉用户怎么办(比如"通知权限被关闭,你可以去设置里打开")。
+         - 不要在回复里粘贴原始 reason 字符串,要用人话改写
+         - 不要因为失败就停止回复,根据 hint 提示用户即可
+         - 没有 hint 的 reason 通常是内部错误,简短致歉就够了
+
+      ## 工具列表
       - **search_memory**: 搜索已保存的记忆
         适用场景：需要回忆之前对话中的信息、用户问"你还记得什么"
         示例：用户说"我之前跟你说过什么来着？" → 调用 search_memory
+      - **search_records**: 搜原始对话消息(带上下文)
+      - **search_summaries**: 搜时间窗口摘要(周/月)
+      - **save_memory**: 用户主动让你记住某事时调用
+      - **create_local_reminder**: 用户要求定时提醒时调用,精确模式需要 SCHEDULE_EXACT_ALARM 权限
+      - **update_mood / update_relationship**: 情绪/关系变化明显时调用
+      - **get_current_time / get_recent_interaction_context / get_user_context_settings**: 读上下文
+      - **get_device_status / get_weather / query_health_data**: 读设备/环境/健康数据
+      - **mcp__***: 远端 MCP 工具(地图等),根据用户请求自行判断
 
-      **重要**：自然地使用工具，不要每次都调用。工具结果只是辅助当前回答，回复完成后的整理不会阻塞你的回答。
+      **重要**：自然地使用工具，不要每次都调用。工具结果只是辅助当前回答,回复完成后的整理不会阻塞你的回答。
+      同类查询(search_memory / search_records / search_summaries)三选一,选最贴切的,不要并行重复搜。
 
   summaries:
     title: "会话摘要"

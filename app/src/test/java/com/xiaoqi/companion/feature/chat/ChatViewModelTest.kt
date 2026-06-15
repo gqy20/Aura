@@ -218,7 +218,8 @@ class ChatViewModelTest {
             presenceReactionPolicy = presenceReactionPolicy,
             appPreferences = appPreferences,
             reminderRepository = reminderRepository,
-            toolDisplayRegistry = ToolDisplayRegistry(),
+            toolDisplayRegistry = ToolDisplayRegistry(com.xiaoqi.companion.core.tools.parser.ToolCallResultParser()),
+            toolCallResultParser = com.xiaoqi.companion.core.tools.parser.ToolCallResultParser(),
             remoteMcpClient = remoteMcpClient,
             mcpServerListRepository = io.mockk.mockk(relaxed = true),
             dreamLoopScheduler = dreamLoopScheduler,
@@ -325,7 +326,13 @@ class ChatViewModelTest {
     @Test
     fun init_observesRecentToolCalls() = runTest {
         toolCallRepository.calls.value = listOf(
-            toolCallSnapshot("1", "save_memory", ToolCallStatus.SUCCEEDED, completedAt = 1_100L),
+            toolCallSnapshot(
+                id = "1",
+                toolName = "save_memory",
+                status = ToolCallStatus.SUCCEEDED,
+                completedAt = 1_100L,
+                resultJson = """{"status":"ok","data":{"memoryId":"mem-1","type":"FACT"}}""",
+            ),
             toolCallSnapshot("2", "search_memory", ToolCallStatus.STARTED),
             toolCallSnapshot("3", "update_mood", ToolCallStatus.FAILED, errorMessage = "bad args"),
             toolCallSnapshot("4", "update_relationship", ToolCallStatus.SUCCEEDED),
@@ -334,7 +341,8 @@ class ChatViewModelTest {
 
         val calls = viewModel.uiState.value.toolCalls
         assertEquals(3, calls.size)
-        assertEquals("已保存", calls[0].label)
+        // save_memory 的 envelope ok data 有 memoryId → 动态 label "已保存记忆 · 记忆 mem-1"
+        assertEquals("已保存记忆 · 记忆 mem-1", calls[0].label)
         assertEquals("Done", calls[0].status)
         assertEquals(100L, calls[0].durationMs)
         assertEquals("Failed", calls[2].status)
@@ -374,7 +382,8 @@ class ChatViewModelTest {
             presenceReactionPolicy = presenceReactionPolicy,
             appPreferences = appPreferences,
             reminderRepository = reminderRepository,
-            toolDisplayRegistry = ToolDisplayRegistry(),
+            toolDisplayRegistry = ToolDisplayRegistry(com.xiaoqi.companion.core.tools.parser.ToolCallResultParser()),
+            toolCallResultParser = com.xiaoqi.companion.core.tools.parser.ToolCallResultParser(),
             remoteMcpClient = remoteMcpClient,
             mcpServerListRepository = io.mockk.mockk(relaxed = true),
             dreamLoopScheduler = io.mockk.mockk(relaxed = true),
@@ -394,13 +403,14 @@ class ChatViewModelTest {
         status: ToolCallStatus,
         completedAt: Long? = null,
         errorMessage: String? = null,
+        resultJson: String? = null,
     ) = ToolCallSnapshot(
         id = id,
         sessionId = "default",
         toolName = toolName,
         status = status,
         argumentsJson = "{}",
-        resultJson = null,
+        resultJson = resultJson,
         errorMessage = errorMessage,
         startedAt = 1_000L,
         completedAt = completedAt,

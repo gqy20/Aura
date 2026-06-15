@@ -142,6 +142,7 @@ fun ChatScreenContent(
         uri?.let(onAttachImage)
     }
     var isRemindersOpen by remember { mutableStateOf(false) }
+    var selectedToolCall by remember { mutableStateOf<ChatToolCall?>(null) }
     val messages = uiState.messages
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
     var hasCompletedInitialScroll by remember { mutableStateOf(false) }
@@ -262,11 +263,19 @@ fun ChatScreenContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(reversedMessages, key = { it.id }) { message ->
+                        val onToolClick = remember(message.id, uiState.toolCalls) {
+                            if (message.toolStatus == null || uiState.toolCalls.isEmpty()) {
+                                null
+                            } else {
+                                { selectedToolCall = uiState.toolCalls.first() }
+                            }
+                        }
                         MessageBubble(
                             message = message,
                             modifier = Modifier.animateItem(
                                 fadeInSpec = androidx.compose.animation.core.tween(durationMillis = 250),
                             ),
+                            onToolStatusClick = onToolClick,
                         )
                     }
                 }
@@ -278,6 +287,13 @@ fun ChatScreenContent(
                     onOpenSettings = { onOpenPermissionSettings(prompt) },
                     onDismiss = onDismissPermissionPrompt,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+
+            selectedToolCall?.let { toolCall ->
+                ToolCallDetailSheet(
+                    toolCall = toolCall,
+                    onDismiss = { selectedToolCall = null },
                 )
             }
 

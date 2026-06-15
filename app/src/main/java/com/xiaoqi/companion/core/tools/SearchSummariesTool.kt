@@ -139,9 +139,4 @@ private fun String.decodeStringList(): List<String> =
     Json.decodeFromString(this)
 
 private fun invalidType(type: String): String =
-    buildJsonObject {
-        put("status", "error")
-        put("reason", "invalid_summary_type")
-        put("type", type)
-        put("allowedTypes", SummaryType.entries.joinToString(",") { it.name })
-    }.toString()
+    encode(ToolEnvelopeFactory.invalidSummaryType(type))

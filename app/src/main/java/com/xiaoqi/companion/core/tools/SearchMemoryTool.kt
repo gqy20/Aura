@@ -93,10 +93,5 @@ class SearchMemoryTool @Inject constructor(
     }
 
     private fun invalidType(type: String): String =
-        buildJsonObject {
-            put("status", "error")
-            put("reason", "invalid_memory_type")
-            put("type", type)
-            put("allowedTypes", MemoryType.entries.joinToString(",") { it.name })
-        }.toString()
+        encode(ToolEnvelopeFactory.invalidMemoryType(type))
 }

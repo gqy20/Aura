@@ -80,7 +80,10 @@ internal fun InsightEntity.toChatInsight(): ChatInsight =
         evidenceView = com.xiaoqi.companion.data.repository.InsightRepository.decodeEvidenceStatic(this),
     )
 
-internal fun ToolCallSnapshot.toChatToolCall(displayLabel: String): ChatToolCall =
+internal fun ToolCallSnapshot.toChatToolCall(
+    displayLabel: String,
+    summary: com.xiaoqi.companion.core.tools.parser.ToolResultSummary? = null,
+): ChatToolCall =
     ChatToolCall(
         id = id,
         toolName = toolName,
@@ -93,6 +96,7 @@ internal fun ToolCallSnapshot.toChatToolCall(displayLabel: String): ChatToolCall
         },
         durationMs = durationMs,
         errorMessage = errorMessage,
+        summary = summary,
     )
 
 internal fun LlmConfigStatus.toChatConfigStatus(): ChatConfigStatus =
@@ -161,9 +165,6 @@ internal fun LocalQwenModelDownloadState.toUiState(): LocalQwenDownloadUiState =
 
 internal fun defaultBaseUrl(provider: LlmProvider): String =
     DefaultLlmValues.defaultBaseUrl(provider)
-
-internal fun ToolDisplayRegistry.displayLabel(toolName: String, status: ToolCallStatus): String =
-    label(toolName, status)
 
 internal fun CompanionStatus.after(
     mood: String,

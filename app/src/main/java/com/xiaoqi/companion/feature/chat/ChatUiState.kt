@@ -20,6 +20,11 @@ data class ChatMessage(
     val renderBlocks: List<MessageRenderBlock> = emptyList(),
     val renderDraft: String = "",
     val isRenderDraftCode: Boolean = false,
+    /**
+     * 本条消息触发的 tool call id 列表(只对 ASSISTANT 消息有意义)。
+     * 用于 detail panel 反查 `uiState.toolCalls`,避免整个 `toolCalls` 池混淆。
+     */
+    val toolCallIds: List<String> = emptyList(),
 )
 
 data class ChatToolCall(
@@ -30,6 +35,14 @@ data class ChatToolCall(
     val status: String,
     val durationMs: Long? = null,
     val errorMessage: String? = null,
+    /**
+     * 工具结果的结构化摘要,供 detail panel 渲染。
+     * - STARTED 时为 null(还没结果)
+     * - SUCCEEDED 时可能是 ListHits / SavedOne / Scheduled / KeyValueReport / Empty
+     * - FAILED 时是 Failed
+     * - 兜底时是 Unknown
+     */
+    val summary: com.xiaoqi.companion.core.tools.parser.ToolResultSummary? = null,
 )
 
 data class CompanionStatus(

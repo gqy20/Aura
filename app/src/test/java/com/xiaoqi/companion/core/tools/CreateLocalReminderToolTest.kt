@@ -81,8 +81,9 @@ class CreateLocalReminderToolTest {
             )
         )
 
-        assertTrue(result.contains(""""status":"disabled""""))
-        assertTrue(result.contains("exact_alarm_permission_missing"))
+        assertTrue(result.contains(""""status":"error""""))
+        assertTrue(result.contains(""""reason":"permission_missing""""))
+        assertTrue(result.contains("SCHEDULE_EXACT_ALARM"))
         assertEquals(null, reminders.lastTriggerAtMillis)
     }
 
@@ -97,8 +98,9 @@ class CreateLocalReminderToolTest {
 
         val result = tool.execute(CreateLocalReminderTool.Args(title = "Review", message = "Time", delayMinutes = 10))
 
-        assertTrue(result.contains(""""status":"disabled""""))
-        assertTrue(result.contains("notification_permission_missing"))
+        assertTrue(result.contains(""""status":"error""""))
+        assertTrue(result.contains(""""reason":"permission_missing""""))
+        assertTrue(result.contains("POST_NOTIFICATIONS"))
     }
 
     @Test

@@ -112,3 +112,38 @@ private fun MessageEntity.toSearchHit(ftsRank: Double = -1.0): MessageSearchHit 
         timestamp = timestamp,
         ftsRank = ftsRank,
     )
+
+// --- envelope 行为 ---
+
+class SearchRecordsToolEnvelopeTest {
+
+    private val messageDao: MessageDao = mockk()
+    private val messageSearchDao: MessageSearchDao = mockk()
+
+    @Test
+    fun execute_ftsFailure_returnsEnvelopeErrorInsteadOfEmptyList() = runTest {
+        coEvery { messageSearchDao.searchRecordsFts(any(), any(), any(), any(), any(), any(), any()) } throws
+            RuntimeException("no such column: rowid")
+
+        val result = SearchRecordsTool(messageDao, messageSearchDao)
+            .execute(SearchRecordsTool.Args(query = "jasmine"))
+
+        // 之前:静默返空 list;现在:envelope error,告诉 LLM 检索失败 + 怎么兜底
+        assertTrue("result should be envelope error but was: $result", isError(result))
+        assertTrue(result.contains("\"reason\":\"fts_index_failure\""))
+        assertTrue(result.contains("\"hint\""))
+        // 不应再 fallback 到 LIKE 路径 —— context 调用不应该发生
+        coVerify(exactly = 0) { messageDao.getMessagesBefore(any(), any(), any()) }
+    }
+
+    @Test
+    fun execute_invalidRole_returnsEnvelopeErrorWithAllowedRoles() = runTest {
+        val result = SearchRecordsTool(messageDao, messageSearchDao)
+            .execute(SearchRecordsTool.Args(query = "x", role = "WIZARD"))
+
+        assertTrue(isError(result))
+        assertTrue(result.contains("\"reason\":\"invalid_message_role\""))
+        assertTrue(result.contains("USER"))
+        assertTrue(result.contains("ASSISTANT"))
+    }
+}

@@ -65,7 +65,7 @@ class SendMessageUseCaseTest {
     private lateinit var fakeRuntime: FakeCompanionRuntime
     private lateinit var imageProcessor: FakeChatImageProcessor
     private lateinit var sendMessageUseCase: SendMessageUseCase
-    private val toolDisplayRegistry = ToolDisplayRegistry()
+    private val toolDisplayRegistry = ToolDisplayRegistry(com.xiaoqi.companion.core.tools.parser.ToolCallResultParser())
     private val presenceController = PresenceController()
     private val agentStateDao = mockk<com.xiaoqi.companion.data.db.dao.AgentStateDao>(relaxed = true) {
         coEvery { getByCompanionId("default") } returns null

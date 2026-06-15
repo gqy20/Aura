@@ -37,7 +37,7 @@ class GetDeviceStatusToolTest {
 
         val result = tool.execute(GetDeviceStatusTool.Args())
 
-        assertTrue(result.contains(""""status":"disabled""""))
+        assertTrue(result.contains(""""status":"error""""))
         assertTrue(result.contains("device_status_context_disabled"))
     }
 

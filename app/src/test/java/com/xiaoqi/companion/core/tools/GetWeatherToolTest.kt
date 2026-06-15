@@ -62,7 +62,7 @@ class GetWeatherToolTest {
 
         val result = tool.execute(GetWeatherTool.Args(city = "Shanghai"))
 
-        assertTrue(result.contains(""""status":"disabled""""))
+        assertTrue(result.contains(""""status":"error""""))
         assertTrue(result.contains("weather_context_disabled"))
     }
 

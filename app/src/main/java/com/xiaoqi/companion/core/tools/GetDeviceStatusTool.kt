@@ -29,10 +29,12 @@ class GetDeviceStatusTool @Inject constructor(
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.Default) {
             if (!appPreferences.deviceStatusContextEnabled.first()) {
-                return@withContext buildJsonObject {
-                    put("status", "disabled")
-                    put("reason", "device_status_context_disabled")
-                }.toString()
+                return@withContext encode(
+                    ToolEnvelopeFactory.disabled(
+                        reason = "device_status_context_disabled",
+                        hint = "用户在 Settings > 工具能力 中关闭了设备状态工具。请建议用户在设置中重新开启。",
+                    )
+                )
             }
 
             val status = deviceStatusProvider.getStatus()

@@ -32,7 +32,6 @@ import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.HealthSyncManager
 import com.xiaoqi.companion.data.source.SensorManagerHealthSource
 import com.xiaoqi.companion.feature.chat.mapper.after
-import com.xiaoqi.companion.feature.chat.mapper.displayLabel
 import com.xiaoqi.companion.feature.chat.mapper.extractIntensity
 import com.xiaoqi.companion.feature.chat.mapper.toChatConfigStatus
 import com.xiaoqi.companion.feature.chat.mapper.toChatInsight
@@ -87,6 +86,7 @@ class ChatViewModel @Inject constructor(
     private val appPreferences: AppPreferences,
     private val reminderRepository: ReminderRepository,
     private val toolDisplayRegistry: ToolDisplayRegistry,
+    private val toolCallResultParser: com.xiaoqi.companion.core.tools.parser.ToolCallResultParser,
     private val remoteMcpClient: RemoteMcpClient,
     private val mcpServerListRepository: McpServerListRepository,
     private val dreamLoopScheduler: DreamLoopScheduler,
@@ -229,7 +229,19 @@ class ChatViewModel @Inject constructor(
                 var shouldClearReaction = false
                 _uiState.update { state ->
                     val visibleCalls = calls.take(RECENT_TOOL_CALL_LIMIT)
-                        .map { it.toChatToolCall(toolDisplayRegistry.displayLabel(it.toolName, it.status)) }
+                        .map { snap ->
+                            val summary = toolCallResultParser.parse(
+                                toolName = snap.toolName,
+                                resultJson = snap.resultJson,
+                            )
+                            val label = toolDisplayRegistry.resolveLabel(
+                                toolName = snap.toolName,
+                                status = snap.status,
+                                resultJson = snap.resultJson,
+                                errorMessage = snap.errorMessage,
+                            )
+                            snap.toChatToolCall(displayLabel = label, summary = summary)
+                        }
                     val previousLatest = state.toolCalls.firstOrNull()
                     val nextLatest = visibleCalls.firstOrNull()
                     val reaction = nextLatest

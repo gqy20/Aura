@@ -37,7 +37,10 @@ class GetWeatherTool @Inject constructor(
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.IO) {
             if (!appPreferences.weatherContextEnabled.first()) {
-                return@withContext disabled("weather_context_disabled")
+                return@withContext disabled(
+                    reason = "weather_context_disabled",
+                    hint = "用户在 Settings > 工具能力 中关闭了天气工具。请建议用户在设置中重新开启,或直接让用户报城市名。",
+                )
             }
 
             val report = when {
@@ -45,14 +48,20 @@ class GetWeatherTool @Inject constructor(
                 args.latitude != null && args.longitude != null -> weatherProvider.getByCoordinates(args.latitude, args.longitude)
                 appPreferences.locationContextEnabled.first() -> {
                     val location = locationProvider.getLastKnownLocation()
-                        ?: return@withContext disabled("last_known_location_unavailable")
+                        ?: return@withContext disabled(
+                            reason = "last_known_location_unavailable",
+                            hint = "系统拿不到最近一次定位,无法按当前位置查天气。请让用户显式提供城市名或经纬度。",
+                        )
                     weatherProvider.getByCoordinates(
                         latitude = location.latitude,
                         longitude = location.longitude,
                         locationName = "current_location",
                     )
                 }
-                else -> return@withContext disabled("location_context_disabled_and_no_city")
+                else -> return@withContext disabled(
+                    reason = "location_context_disabled_and_no_city",
+                    hint = "用户没开定位上下文,也没传 city/经纬度。请让用户显式提供城市名。",
+                )
             }
 
             buildJsonObject {
@@ -73,9 +82,6 @@ class GetWeatherTool @Inject constructor(
             }.toString()
         }
 
-    private fun disabled(reason: String): String =
-        buildJsonObject {
-            put("status", "disabled")
-            put("reason", reason)
-        }.toString()
+    private fun disabled(reason: String, hint: String): String =
+        encode(ToolEnvelopeFactory.disabled(reason, hint))
 }
