@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { motion } from 'motion/react'
 import { FeatureShell } from '@/components/feature/FeatureShell'
+import { TimelineLightUp } from '@/components/feature/TimelineLightUp'
 import {
   PresenceOrb,
   STATES,
@@ -18,11 +19,11 @@ const PresenceOrbDynamic = dynamic(
 )
 
 const REACTIONS = [
-  { name: 'ERROR_RECOVER', priority: 50, cooldown: '0s', duration: '2.6s', desc: 'Highest priority · no cooldown' },
-  { name: 'MEMORY_SPARK', priority: 40, cooldown: '1.5s', duration: '2.3s', desc: 'Save memory feedback' },
-  { name: 'SEARCH_SWEEP', priority: 30, cooldown: '1.5s', duration: '1.9s', desc: 'Search tool running' },
-  { name: 'RETURN_BLINK', priority: 20, cooldown: '10 min', duration: '1.6s', desc: 'Ambient · 10 min lock' },
-  { name: 'TOUCH_NUZZLE', priority: 10, cooldown: '0.9s', duration: '1.2s', desc: 'Ambient · tap reaction' },
+  { name: 'ERROR_RECOVER', priority: 50, cooldown: '0s', duration: '2.6s', desc: 'Highest priority · no cooldown', color: '#ff5c7c' },
+  { name: 'MEMORY_SPARK', priority: 40, cooldown: '1.5s', duration: '2.3s', desc: 'Save memory feedback', color: '#ffb85c' },
+  { name: 'SEARCH_SWEEP', priority: 30, cooldown: '1.5s', duration: '1.9s', desc: 'Search tool running', color: '#5cefff' },
+  { name: 'RETURN_BLINK', priority: 20, cooldown: '10 min', duration: '1.6s', desc: 'Ambient · 10 min lock', color: '#a07cff' },
+  { name: 'TOUCH_NUZZLE', priority: 10, cooldown: '0.9s', duration: '1.2s', desc: 'Ambient · tap reaction', color: '#5cffb0' },
 ]
 
 // 24h 状态时间线（演示数据）
@@ -37,6 +38,14 @@ const TIMELINE = [
   { time: '23:30', state: 'SLEEPING' as StateKey, label: 'Dim to sleep' },
 ]
 
+// 喂给 TimelineLightUp 的扁平化数据
+const TIMELINE_POINTS = TIMELINE.map((p) => ({
+  time: p.time,
+  color: STATES[p.state].color,
+  label: STATES[p.state].label,
+  note: p.label,
+}))
+
 export default function PresencePage() {
   const { stateKey, index } = usePresenceAutoCycle(3200)
   const currentState = STATES[stateKey]
@@ -48,6 +57,7 @@ export default function PresencePage() {
       title="Presence that lives with you."
       subtitle="Aura 不只是一个 chat 工具，而是一个有「存在感」的陪伴体。它能感知你的设备状态、情绪、时间，适时地响应或沉默——而且不打扰你。"
       active="presence"
+      bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(124, 92, 255, 0.18), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(92, 167, 255, 0.10), transparent 60%), #08090a"
     >
       {/* ─── 3D 主体 + 状态说明 ─── */}
       <section className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">
@@ -172,43 +182,9 @@ export default function PresencePage() {
               </p>
             </div>
 
-            {/* 时间轴 */}
+            {/* 时间轴 — GSAP ScrollTrigger 按时间顺序点亮 */}
             <div className="md:col-span-10">
-              <div className="relative">
-                {/* 横向轴线 */}
-                <div className="absolute left-0 right-0 top-[14px] h-px bg-border" />
-
-                <div className="relative grid grid-cols-8 gap-2">
-                  {TIMELINE.map((point, i) => (
-                    <motion.div
-                      key={point.time}
-                      initial={{ opacity: 0, y: 10 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{
-                        duration: 0.5,
-                        delay: i * 0.06,
-                        ease: [0.22, 1, 0.36, 1],
-                      }}
-                      className="flex flex-col items-start"
-                    >
-                      <span
-                        className="h-3.5 w-3.5 rounded-full"
-                        style={{ backgroundColor: STATES[point.state].color }}
-                      />
-                      <span className="mt-2 font-mono text-[10px] text-muted">
-                        {point.time}
-                      </span>
-                      <span className="mt-1 text-xs font-medium text-foreground">
-                        {STATES[point.state].label}
-                      </span>
-                      <span className="text-[10px] text-muted">
-                        {point.label}
-                      </span>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
+              <TimelineLightUp points={TIMELINE_POINTS} />
             </div>
           </div>
         </div>
@@ -250,15 +226,25 @@ export default function PresencePage() {
                     {r.name}
                   </td>
                   <td className="py-4 pr-6">
-                    <span
-                      className="inline-block h-1.5 w-12 rounded-full"
-                      style={{
-                        backgroundColor: `rgba(124,92,255,${0.2 + r.priority / 60})`,
-                      }}
-                    />
-                    <span className="ml-3 font-mono text-xs text-muted">
-                      {r.priority}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      {/* 强度条 — 宽度按 priority 比例（50 = 100%，10 = 20%） */}
+                      <div className="relative h-1.5 w-20 overflow-hidden rounded-full bg-subtle/60">
+                        <span
+                          className="absolute inset-y-0 left-0 rounded-full"
+                          style={{
+                            width: `${(r.priority / 50) * 100}%`,
+                            backgroundColor: r.color,
+                            boxShadow: `0 0 8px ${r.color}60`,
+                          }}
+                        />
+                      </div>
+                      <span
+                        className="font-mono text-xs font-medium"
+                        style={{ color: r.color }}
+                      >
+                        {r.priority}
+                      </span>
+                    </div>
                   </td>
                   <td className="py-4 pr-6 font-mono text-xs text-foreground">
                     {r.cooldown}

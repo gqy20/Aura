@@ -60,6 +60,7 @@ export default function AgentPage() {
       title="Agent that orchestrates everything."
       subtitle="Aura 的灵魂是 Koog AIAgent：内置 9 个结构化工具、3 套 LLM Provider、流式响应、可观测事件流——它不是 LLM，是 LLM 之上的编排者。"
       active="agent"
+      bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 124, 156, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(160, 92, 255, 0.10), transparent 60%), #08090a"
     >
       {/* ─── 3D 主体 + 工具分类 ─── */}
       <section className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">

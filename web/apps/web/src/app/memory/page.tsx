@@ -57,6 +57,7 @@ export default function MemoryPage() {
       title="Memory that grows with you."
       subtitle="每一次对话都被结构化地保存，不是简单日志，而是可被 LLM 调用的记忆图谱。Aura 记得你今天穿的衬衫，也记得你三年前的梦想。"
       active="memory"
+      bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 255, 176, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(92, 239, 255, 0.10), transparent 60%), #08090a"
     >
       {/* ─── 3D 主体 + Type 分类 ─── */}
       <section className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">

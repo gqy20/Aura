@@ -23,6 +23,14 @@ interface FeatureShellProps {
   children: ReactNode
   /** 整页 extra className */
   className?: string
+  /**
+   * 页面专属背景渐变（CSS background 字符串）
+   * - /presence 紫蓝
+   * - /memory 青绿
+   * - /agent 紫粉
+   * 默认走深色底 #08090a
+   */
+  bgGradient?: string
 }
 
 /**
@@ -41,16 +49,19 @@ export function FeatureShell({
   active,
   children,
   className,
+  bgGradient,
 }: FeatureShellProps) {
   return (
     <SmoothScroll>
       <MagneticCursor />
       <main className="relative min-h-screen overflow-hidden">
-        {/* 全局深色底 */}
+        {/* 全局深色底 + 页面渐变（中心光晕） */}
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-20"
-          style={{ background: '#08090a' }}
+          style={{
+            background: bgGradient ?? '#08090a',
+          }}
         />
 
         <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col px-6 sm:px-10 lg:px-16">
