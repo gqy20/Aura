@@ -57,6 +57,7 @@ import androidx.core.view.WindowInsetsCompat
 import coil.compose.AsyncImage
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.ui.theme.ChatColors
 import kotlinx.coroutines.delay
 
 /**
@@ -88,6 +89,7 @@ internal fun InputBar(
         !isPreparingImage
     val context = LocalContext.current
     val inputView = LocalView.current
+    val primary = MaterialTheme.colorScheme.primary
     var imeStuck by remember { mutableStateOf(false) }
 
     Surface(
@@ -122,7 +124,7 @@ internal fun InputBar(
                         Icon(
                             imageVector = Icons.Default.Image,
                             contentDescription = null,
-                            tint = Color(0xFF496B5E),
+                            tint = primary,
                         )
                     }
                 }
@@ -151,23 +153,23 @@ internal fun InputBar(
                     textStyle = MaterialTheme.typography.bodyMedium,
                     shape = RoundedCornerShape(22.dp),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFFFFFCF6),
+                        focusedContainerColor = InputFieldFocusedColor,
                         unfocusedContainerColor = InputBarContainerColor,
                         disabledContainerColor = InputBarContainerColor.copy(alpha = 0.6f),
-                        focusedIndicatorColor = Color(0xFF496B5E).copy(alpha = 0.18f),
+                        focusedIndicatorColor = primary.copy(alpha = 0.18f),
                         unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = Color(0xFF496B5E),
+                        cursorColor = primary,
                     ),
                 )
                 if (isLoading || isPreparingImage) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp).padding(4.dp),
                         strokeWidth = 2.dp,
-                        color = Color(0xFF496B5E),
+                        color = primary,
                     )
                 } else {
                     Surface(
-                        color = if (canSend) Color(0xFFDDE8D9) else InputBarContainerColor,
+                        color = if (canSend) SendButtonReadyColor else InputBarContainerColor,
                         shape = CircleShape,
                     ) {
                         IconButton(
@@ -178,7 +180,7 @@ internal fun InputBar(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = null,
-                                tint = if (canSend) Color(0xFF496B5E) else Color(0xFF496B5E).copy(alpha = 0.32f),
+                                tint = if (canSend) primary else primary.copy(alpha = 0.32f),
                             )
                         }
                     }
@@ -321,3 +323,5 @@ private const val IME_STUCK_CHECK_INTERVAL_MS = 350L
 // 图片按钮 / 输入框 unfocused / 发送按钮 disabled 共用同一容器色,
 // 比 #FFF8EA 再淡一档,让三处看起来同源;焦点态用 #FFFCF6 区分。
 private val InputBarContainerColor = Color(0xFFFBF5E7)
+private val InputFieldFocusedColor = ChatColors.InputSurface
+private val SendButtonReadyColor = ChatColors.BubbleUser

@@ -18,8 +18,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -58,11 +60,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.core.llm.ConnectivityResult
 import com.xiaoqi.companion.core.mcp.McpServerConfig
 import com.xiaoqi.companion.core.mcp.McpServerPresets
+import com.xiaoqi.companion.ui.theme.ChatColors
+import com.xiaoqi.companion.ui.theme.ChatStatusColors
 
 /**
  * MCP 设置页面 — 多 server 模式。
@@ -226,7 +231,7 @@ private fun McpListScreen(
                 item {
                     val (text, color) = when (result) {
                         is ConnectivityResult.Success ->
-                            "OK · ${result.modelName}" to Color(0xFF2E7D32)
+                            "OK · ${result.modelName}" to ChatStatusColors.SuccessText
                         is ConnectivityResult.AuthFailure ->
                             "鉴权失败" to MaterialTheme.colorScheme.error
                         is ConnectivityResult.Unreachable ->
@@ -328,9 +333,9 @@ private fun mcpStatusLabel(server: McpServerConfig, discoveredTools: List<String
 @Composable
 private fun McpStatusDot(server: McpServerConfig, discoveredTools: List<String>?) {
     val color = when (mcpStatusOf(server, discoveredTools)) {
-        McpStatus.READY -> Color(0xFF3FA86B)
-        McpStatus.DISABLED -> Color(0xFFB7B0A4)
-        McpStatus.NOT_READY, McpStatus.NOT_TESTED, McpStatus.EMPTY -> Color(0xFFE5A100)
+        McpStatus.READY -> ChatStatusColors.SuccessDot
+        McpStatus.DISABLED -> ChatStatusColors.Unknown
+        McpStatus.NOT_READY, McpStatus.NOT_TESTED, McpStatus.EMPTY -> ChatStatusColors.Warning
     }
     androidx.compose.foundation.Canvas(modifier = Modifier.size(8.dp)) {
         drawCircle(color = color)
@@ -347,13 +352,19 @@ private fun McpStatusDot(server: McpServerConfig, discoveredTools: List<String>?
  * 状态:
  * - null (没探过)        → 提示"未发现"
  * - emptyList() (探过)    → 警告"0 个工具"
- * - non-empty             → 列出所有工具名(全宽 grid 风格)
+ * - non-empty             → 列出所有工具名(全宽 grid 风格),支持按名搜索
  */
 @Composable
 private fun DiscoveredToolsSection(
     tools: List<String>?,
     isLoading: Boolean,
 ) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val hasTools = !tools.isNullOrEmpty()
+    val filtered = remember(tools, query) {
+        if (query.isBlank() || tools == null) tools.orEmpty()
+        else tools.filter { it.contains(query, ignoreCase = true) }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = "已发现工具",
@@ -362,13 +373,33 @@ private fun DiscoveredToolsSection(
         )
         Surface(
             shape = MaterialTheme.shapes.medium,
-            color = Color(0xFFF7F2EA),
+            color = ChatColors.CardSurface,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                if (hasTools) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text("搜索工具名") },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Search, contentDescription = null)
+                        },
+                        trailingIcon = if (query.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { query = "" }) {
+                                    Icon(Icons.Filled.Close, contentDescription = "清空")
+                                }
+                            }
+                        } else null,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 when {
                     isLoading -> Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -390,11 +421,16 @@ private fun DiscoveredToolsSection(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
+                    filtered.isEmpty() -> Text(
+                        "未找到匹配的工具",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     else -> androidx.compose.foundation.layout.FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        tools.forEach { name ->
+                        filtered.forEach { name ->
                             Surface(
                                 shape = MaterialTheme.shapes.small,
                                 color = Color.White,
@@ -403,7 +439,7 @@ private fun DiscoveredToolsSection(
                                 Text(
                                     text = name,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF496B5E),
+                                    color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 )
                             }
@@ -523,7 +559,7 @@ private fun McpEditorScreen(
                 item {
                     Surface(
                         shape = MaterialTheme.shapes.medium,
-                        color = Color(0xFFF7F2EA),
+                        color = ChatColors.CardSurface,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(

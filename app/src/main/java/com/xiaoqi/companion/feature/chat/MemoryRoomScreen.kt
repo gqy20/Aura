@@ -52,6 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.BuildConfig
+import com.xiaoqi.companion.ui.theme.ChatColors
+import com.xiaoqi.companion.ui.theme.ChatStatusColors
 
 @Composable
 fun MemoryRoomScreen(
@@ -291,7 +293,7 @@ private fun MemoryRoomItemCard(
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF7F2EA),
+        color = ChatColors.CardSurface,
         tonalElevation = 0.dp,
         modifier = Modifier.combinedClickable(
             onClick = onOpen,
@@ -318,7 +320,7 @@ private fun MemoryRoomItemCard(
                         Icon(
                             imageVector = Icons.Filled.Star,
                             contentDescription = "已置顶",
-                            tint = Color(0xFFE5A100),
+                            tint = ChatStatusColors.Warning,
                             modifier = Modifier.size(14.dp),
                         )
                     }
@@ -352,9 +354,9 @@ private fun MemoryRoomItemCard(
                     androidx.compose.foundation.Canvas(modifier = Modifier.size(7.dp)) {
                         drawCircle(
                             color = when {
-                                memory.importance >= 0.82f -> Color(0xFF3FA86B)
-                                memory.importance >= 0.58f -> Color(0xFFE5A100)
-                                else -> Color(0xFFB7B0A4)
+                                memory.importance >= 0.82f -> ChatStatusColors.SuccessDot
+                                memory.importance >= 0.58f -> ChatStatusColors.Warning
+                                else -> ChatStatusColors.Unknown
                             },
                         )
                     }

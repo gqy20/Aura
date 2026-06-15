@@ -50,11 +50,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.presence.PresenceMode
-import com.xiaoqi.companion.feature.chat.presence.HomePresencePalette
+import com.xiaoqi.companion.feature.chat.HomePresencePalette
+import com.xiaoqi.companion.feature.chat.animated
+import com.xiaoqi.companion.feature.chat.homePalette
 import com.xiaoqi.companion.feature.chat.presence.LuminousAuraAvatar
 import com.xiaoqi.companion.feature.chat.presence.PresenceBackdropAndHalo
-import com.xiaoqi.companion.feature.chat.presence.animated
-import com.xiaoqi.companion.feature.chat.presence.homePalette
+import com.xiaoqi.companion.ui.theme.ChatColors
 
 /**
  * 主屏(Aura Home Stage):
@@ -151,9 +152,9 @@ private fun AuraHomeContent(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFFFFCF6),
+                            ChatColors.InputSurface,
                             presenceColors.backgroundTint,
-                            Color(0xFFF7F2EA),
+                            ChatColors.CardSurface,
                         ),
                     )
                 ),
@@ -232,6 +233,7 @@ private fun HomeTopBar(
     onOpenMcpSettings: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    val primary = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -245,7 +247,7 @@ private fun HomeTopBar(
                     fontWeight = FontWeight.Normal,
                     letterSpacing = 0.sp,
                 ),
-                color = Color(0xFF496B5E),
+                color = primary,
             )
         }
         Row(
@@ -272,7 +274,7 @@ private fun HomeTopBar(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "设置",
-                        tint = Color(0xFF496B5E),
+                        tint = primary,
                     )
                 }
             }
@@ -296,7 +298,7 @@ private fun HomeTopActionIcon(
             Icon(
                 imageVector = imageVector,
                 contentDescription = contentDescription,
-                tint = Color(0xFF496B5E).copy(alpha = 0.78f),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
             )
         }
     }
@@ -353,7 +355,7 @@ private fun PresenceStage(
                         fontWeight = FontWeight.Normal,
                         letterSpacing = 0.sp,
                     ),
-                    color = Color(0xFF496B5E),
+                    color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .padding(horizontal = 24.dp)

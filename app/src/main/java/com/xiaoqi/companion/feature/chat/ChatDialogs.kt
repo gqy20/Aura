@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.xiaoqi.companion.ui.theme.ChatColors
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -99,7 +100,7 @@ private fun ReminderItemCard(
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFFF7F2EA),
+        color = ChatColors.CardSurface,
     ) {
         Row(
             modifier = Modifier
@@ -220,7 +221,7 @@ internal fun AuraDialogPanel(
 
         Surface(
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xFFFFFCF6),
+            color = ChatColors.InputSurface,
             tonalElevation = 0.dp,
             shadowElevation = 8.dp,
             modifier = panelModifier,
@@ -297,13 +298,13 @@ internal fun AuraEmptyState(
     ) {
         Surface(
             shape = CircleShape,
-            color = Color(0xFFFFF8EA),
+            color = ChatColors.BubbleAi,
             modifier = Modifier.size(52.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = "A",
-                    color = Color(0xFF496B5E),
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )

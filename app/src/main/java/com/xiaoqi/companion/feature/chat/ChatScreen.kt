@@ -54,6 +54,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceUiState
+import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.CompanionTheme
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
@@ -218,9 +219,9 @@ fun ChatScreenContent(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFFFFCF6),
-                            Color(0xFFF7F2EA),
-                            Color(0xFFFFFCF6),
+                            ChatColors.InputSurface,
+                            ChatColors.CardSurface,
+                            ChatColors.InputSurface,
                         ),
                     ),
                 ),

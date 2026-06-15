@@ -43,6 +43,8 @@ import androidx.health.connect.client.records.StepsRecord
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.HealthSyncManager
 import com.xiaoqi.companion.data.source.SensorManagerHealthSource
+import com.xiaoqi.companion.ui.theme.ChatColors
+import com.xiaoqi.companion.ui.theme.ChatStatusColors
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
@@ -125,7 +127,7 @@ private fun HealthPermissionsCard(dataSource: HealthConnectDataSource) {
 
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF7F2EA),
+        color = ChatColors.CardSurface,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -245,7 +247,7 @@ private fun SensorSourceCard(sensorSource: SensorManagerHealthSource) {
 
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF7F2EA),
+        color = ChatColors.CardSurface,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -301,8 +303,8 @@ private fun StatusRow(
     state: RowState,
 ) {
     val dotColor = when (state) {
-        RowState.OK -> Color(0xFF3FA86B)
-        RowState.UNKNOWN -> Color(0xFFB7B0A4)
+        RowState.OK -> ChatStatusColors.SuccessDot
+        RowState.UNKNOWN -> ChatStatusColors.Unknown
         RowState.ERROR -> MaterialTheme.colorScheme.error
     }
     Row(
@@ -365,7 +367,7 @@ private fun HealthSyncStatusCard(
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF7F2EA),
+        color = ChatColors.CardSurface,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -436,7 +438,7 @@ private fun describeSyncState(state: HealthSyncManager.SyncState): Pair<String, 
     is HealthSyncManager.SyncState.Idle -> "空闲" to MaterialTheme.colorScheme.onSurfaceVariant
     is HealthSyncManager.SyncState.Syncing -> "同步中…" to MaterialTheme.colorScheme.primary
     is HealthSyncManager.SyncState.Skipped -> "防抖 · 上次同步在 ${humanizeDuration(state.sinceLastMs)} 前" to MaterialTheme.colorScheme.onSurfaceVariant
-    is HealthSyncManager.SyncState.Success -> "成功 · ${state.daysWithData} 天有数据" to Color(0xFF2E7D32)
+    is HealthSyncManager.SyncState.Success -> "成功 · ${state.daysWithData} 天有数据" to ChatStatusColors.SuccessText
     is HealthSyncManager.SyncState.Failure -> "失败: ${state.reason}" to MaterialTheme.colorScheme.error
 }
 

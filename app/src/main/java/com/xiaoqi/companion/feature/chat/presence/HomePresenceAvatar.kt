@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.Dp
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
+import com.xiaoqi.companion.feature.chat.HomePresencePalette
+import com.xiaoqi.companion.feature.chat.homePalette
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin

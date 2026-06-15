@@ -38,6 +38,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
+import com.xiaoqi.companion.ui.theme.ChatColors
+import com.xiaoqi.companion.ui.theme.ChatStatusColors
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -53,7 +55,7 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
     ) {
         if (isUser) {
             Surface(
-                color = Color(0xFFDDE8D9),
+                color = ChatColors.BubbleUser,
                 tonalElevation = 0.dp,
                 shape = RoundedCornerShape(
                     topStart = 20.dp,
@@ -83,7 +85,7 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
             }
         } else {
             Surface(
-                color = Color(0xFFFFF8EA),
+                color = ChatColors.BubbleAi,
                 shape = CircleShape,
                 tonalElevation = 0.dp,
                 modifier = Modifier.size(26.dp),
@@ -91,7 +93,7 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = "A",
-                        color = Color(0xFF496B5E),
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
@@ -198,9 +200,9 @@ private fun StreamingMessageText(message: ChatMessage, color: androidx.compose.u
 @Composable
 private fun ToolStatusPill(text: String, status: ToolCallStatus? = null) {
     val dotColor = when (status) {
-        ToolCallStatus.SUCCEEDED -> Color(0xFF3FA86B)
+        ToolCallStatus.SUCCEEDED -> ChatStatusColors.SuccessDot
         ToolCallStatus.FAILED -> MaterialTheme.colorScheme.error
-        ToolCallStatus.STARTED -> Color(0xFFE5A100)
+        ToolCallStatus.STARTED -> ChatStatusColors.Warning
         null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
     }
     Row(

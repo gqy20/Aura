@@ -71,6 +71,8 @@ import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
 import kotlinx.coroutines.launch
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
+import com.xiaoqi.companion.ui.theme.ChatColors
+import com.xiaoqi.companion.ui.theme.ChatStatusColors
 import java.util.Locale
 
 @Composable
@@ -389,7 +391,7 @@ private fun LocalQwenDownloadSection(
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF7F2EA),
+        color = ChatColors.CardSurface,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -527,9 +529,9 @@ private fun ToolCapabilitiesSection(
             locked = true,
             onEnabledChanged = {},
             statusDotColor = if (settings.mcpServers.any { it.enabled && it.isReady }) {
-                Color(0xFF3FA86B)
+                ChatStatusColors.SuccessDot
             } else {
-                Color(0xFFB7B0A4)
+                ChatStatusColors.Unknown
             },
         )
         ToolCapabilityRow(
@@ -567,7 +569,7 @@ private fun ToolCapabilityRow(
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF7F2EA),
+        color = ChatColors.CardSurface,
     ) {
         Row(
             modifier = Modifier
@@ -646,7 +648,7 @@ private fun DreamLoopSection(
         )
         Surface(
             shape = MaterialTheme.shapes.medium,
-            color = Color(0xFFF7F2EA),
+            color = ChatColors.CardSurface,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
@@ -777,7 +779,7 @@ private fun ConnectivityResultLabel(result: ConnectivityResult?) {
     val (text, color) = when (result) {
         null -> "" to MaterialTheme.colorScheme.onSurfaceVariant
         is ConnectivityResult.Success -> {
-            "成功 · 延迟 ${result.latencyMs} ms" to Color(0xFF2E7D32)
+            "成功 · 延迟 ${result.latencyMs} ms" to ChatStatusColors.SuccessText
         }
         is ConnectivityResult.AuthFailure -> {
             "鉴权失败（${result.statusCode}）" to MaterialTheme.colorScheme.error
@@ -833,7 +835,7 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
         )
         Surface(
             shape = MaterialTheme.shapes.medium,
-            color = Color(0xFFF7F2EA),
+            color = ChatColors.CardSurface,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
