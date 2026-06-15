@@ -65,34 +65,49 @@ class PromptBuilder {
         val sb = StringBuilder(SystemPersona.base)
 
         emotionContext?.let {
-            sb.append(SystemPersona.emotionSectionTemplate.replace("{{emotion_context}}", it))
+            sb.append(replacePlaceholders(SystemPersona.emotionSectionTemplate, mapOf("emotion_context" to it)))
         }
 
         relationshipContext?.let {
-            sb.append(SystemPersona.relationshipSectionTemplate.replace("{{relationship_context}}", it))
+            sb.append(replacePlaceholders(SystemPersona.relationshipSectionTemplate, mapOf("relationship_context" to it)))
         }
 
         if (summaries.isNotEmpty()) {
             sb.appendLine()
-            sb.appendLine("## 会话摘要")
+            sb.appendLine("## ${SystemPersona.summariesTitle}")
             sb.append(summaries.joinToString("\n"))
         }
 
         if (recentConversation.isNotEmpty()) {
             sb.appendLine()
-            sb.appendLine("## 最近对话")
+            sb.appendLine("## ${SystemPersona.recentTitle}")
             sb.append(recentConversation.joinToString("\n"))
         }
 
         if (memories.isNotEmpty()) {
             val memoryText = memories.joinToString("\n")
-            sb.append(SystemPersona.memorySectionTemplate.replace("{{memories}}", memoryText))
+            sb.append(replacePlaceholders(SystemPersona.memorySectionTemplate, mapOf("memories" to memoryText)))
         }
 
         if (SystemPersona.toolsSectionTemplate.isNotEmpty()) {
-            sb.append(SystemPersona.toolsSectionTemplate)
+            sb.append(replacePlaceholders(SystemPersona.toolsSectionTemplate, emptyMap()))
         }
 
         return sb.toString()
+    }
+
+    /**
+     * Replace `{{key}}` placeholders in [template]. Any placeholder whose key
+     * is not provided is left in the output as a visible marker so we can
+     * tell at a glance when the yml is missing a slot — better than silently
+     * passing `{{memories}}` to the LLM.
+     */
+    private fun replacePlaceholders(template: String, values: Map<String, String>): String {
+        if (template.isEmpty()) return template
+        val regex = Regex("""\{\{([a-zA-Z0-9_]+)\}\}""")
+        return regex.replace(template) { match ->
+            val key = match.groupValues[1]
+            values[key] ?: "[MISSING:$key]"
+        }
     }
 }

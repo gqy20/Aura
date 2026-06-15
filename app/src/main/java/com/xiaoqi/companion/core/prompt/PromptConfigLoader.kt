@@ -1,17 +1,21 @@
 package com.xiaoqi.companion.core.prompt
 
 import android.content.Context
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import java.io.InputStream
 
 object PromptConfigLoader {
 
     private const val ASSET_PATH = "prompts/system_persona.yml"
+    private const val FALLBACK_ASSET_PATH = "prompts/system_persona.default.yml"
+    private const val EXAMPLES_SECTION_PREFIX = "examples_"
 
     private var cached: PromptConfig? = null
 
     fun load(context: Context): PromptConfig {
         cached?.let { return it }
-        val config = parse(context.assets.open(ASSET_PATH))
+        val config = parseWithFallback(context)
         cached = config
         return config
     }
@@ -19,6 +23,31 @@ object PromptConfigLoader {
     fun reload(context: Context) {
         cached = null
         load(context)
+    }
+
+    private fun parseWithFallback(context: Context): PromptConfig {
+        return try {
+            parse(context.assets.open(ASSET_PATH))
+        } catch (primaryError: Exception) {
+            AppLogger.warn(
+                LogTags.Prompt,
+                "primary_yaml_load_failed",
+                "assetPath" to ASSET_PATH,
+                "error" to (primaryError.message ?: primaryError::class.simpleName.orEmpty()),
+            )
+            try {
+                parse(context.assets.open(FALLBACK_ASSET_PATH))
+            } catch (fallbackError: Exception) {
+                AppLogger.error(
+                    LogTags.Prompt,
+                    fallbackError,
+                    "fallback_yaml_load_failed",
+                    "assetPath" to FALLBACK_ASSET_PATH,
+                    "error" to (fallbackError.message ?: fallbackError::class.simpleName.orEmpty()),
+                )
+                throw fallbackError
+            }
+        }
     }
 
     internal fun parse(input: InputStream): PromptConfig {
@@ -174,7 +203,11 @@ object PromptConfigLoader {
                     placeholder = fields["placeholder"] ?: "",
                 )
             }
-            return PromptConfig(name = name, base = base, sections = parsedSections)
+            val examples = sections
+                .filterKeys { it.startsWith(EXAMPLES_SECTION_PREFIX) }
+                .mapKeys { it.key.removePrefix(EXAMPLES_SECTION_PREFIX) }
+                .mapValues { it.value["placeholder"] ?: "" }
+            return PromptConfig(name = name, base = base, sections = parsedSections, examples = examples)
         }
     }
 }

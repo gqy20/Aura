@@ -4,6 +4,7 @@ import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
+import com.xiaoqi.companion.core.prompt.templates.SystemPersona
 import com.xiaoqi.companion.data.db.converter.MemoryType
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.MemoryRepository
@@ -11,6 +12,7 @@ import com.xiaoqi.companion.data.repository.SaveMemoryRequest
 import javax.inject.Inject
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 data class ConversationReflectionInput(
     val userInput: UserInput,
@@ -34,6 +36,54 @@ interface ConversationReflection {
 class LlmConversationReflection @Inject constructor(
     private val memoryRepository: MemoryRepository,
 ) : ConversationReflection {
+
+    private val emptyReflectionExample: ReflectionResponse by lazy {
+        parseExampleOrFallback("reflection_empty") {
+            ReflectionResponse(memories = emptyList())
+        }
+    }
+
+    private val saveReflectionExample: ReflectionResponse by lazy {
+        parseExampleOrFallback("reflection_save") {
+            ReflectionResponse(
+                memories = listOf(
+                    ReflectionMemory(
+                        shouldSave = true,
+                        content = "User likes jasmine tea.",
+                        type = "FACT",
+                        importance = 0.8f,
+                        confidence = 0.9f,
+                        sensitivity = "normal",
+                        reason = "Durable user preference.",
+                    )
+                )
+            )
+        }
+    }
+
+    private fun parseExampleOrFallback(
+        key: String,
+        fallback: () -> ReflectionResponse,
+    ): ReflectionResponse {
+        val raw = SystemPersona.reflectionExamples[key]?.takeIf { it.isNotBlank() }
+            ?: return fallback().also {
+                AppLogger.warn(
+                    LogTags.Runtime,
+                    "reflection_example_missing",
+                    "key" to key,
+                )
+            }
+        return runCatching { reflectionJson.decodeFromString(ReflectionResponse.serializer(), raw) }
+            .onFailure { error ->
+                AppLogger.warn(
+                    LogTags.Runtime,
+                    "reflection_example_parse_failed",
+                    "key" to key,
+                    "error" to (error.message ?: error::class.simpleName.orEmpty()),
+                )
+            }
+            .getOrElse { fallback() }
+    }
 
     override suspend fun reflectAndSave(
         input: ConversationReflectionInput,
@@ -82,37 +132,18 @@ class LlmConversationReflection @Inject constructor(
         return ConversationReflectionResult(savedMemoryCount = saved)
     }
 
-    private fun reflectionSystemPrompt(nowMillis: Long): String =
-        """
-        You are Aura's private memory reflection module.
-        Analyze the just-finished conversation turn and decide what should be saved for future conversations.
-        Return only the requested structured output. Do not include markdown, explanations, or free text.
+    private fun reflectionSystemPrompt(nowMillis: Long): String {
+        val template = SystemPersona.reflectionSystemPrompt.ifBlank { FALLBACK_REFLECTION_SYSTEM_PROMPT }
+        return template.replace("{{now_millis}}", nowMillis.toString())
+    }
 
-        Save memories only when they are useful later:
-        - explicit user requests to remember something
-        - durable user facts, preferences, relationships, routines, plans, or important episodes
-        - short-term tasks/plans can be saved if the user clearly asked to remember them
-
-        Do not save:
-        - assistant claims that something was saved
-        - generic questions, chit-chat, temporary wording, or model speculation
-        - facts about other people unless useful to the user's future context
-        - content the user says not to remember
-
-        Use the requested structured output shape. Return an empty memories array when nothing should be saved.
-
-        Current epoch millis: $nowMillis
-        """.trimIndent()
-
-    private fun reflectionUserMessage(input: ConversationReflectionInput): String =
-        buildString {
-            appendLine("User input type: ${input.userInput::class.simpleName}")
-            appendLine("User message:")
-            appendLine(input.userInput.content)
-            appendLine()
-            appendLine("Assistant reply:")
-            appendLine(input.assistantReply)
-        }
+    private fun reflectionUserMessage(input: ConversationReflectionInput): String {
+        val template = SystemPersona.reflectionUserTemplate.ifBlank { FALLBACK_REFLECTION_USER_TEMPLATE }
+        return template
+            .replace("{{input_type}}", input.userInput::class.simpleName.orEmpty())
+            .replace("{{user_message}}", input.userInput.content)
+            .replace("{{assistant_reply}}", input.assistantReply)
+    }
 
     @Serializable
     private data class ReflectionResponse(
@@ -133,20 +164,27 @@ class LlmConversationReflection @Inject constructor(
 
     private companion object {
         const val MAX_MEMORIES_PER_TURN = 3
-        val emptyReflectionExample = ReflectionResponse(memories = emptyList())
-        val saveReflectionExample = ReflectionResponse(
-            memories = listOf(
-                ReflectionMemory(
-                    shouldSave = true,
-                    content = "User likes jasmine tea.",
-                    type = "FACT",
-                    importance = 0.8f,
-                    confidence = 0.9f,
-                    sensitivity = "normal",
-                    reason = "Durable user preference.",
-                )
-            )
-        )
+        val reflectionJson = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
+
+        const val FALLBACK_REFLECTION_SYSTEM_PROMPT = """
+            You are Aura's private memory reflection module.
+            Return only the requested structured output.
+            Save durable user facts; do not save generic chit-chat.
+            Current epoch millis: {{now_millis}}
+        """
+
+        const val FALLBACK_REFLECTION_USER_TEMPLATE = """
+            User input type: {{input_type}}
+
+            User message:
+            {{user_message}}
+
+            Assistant reply:
+            {{assistant_reply}}
+        """
     }
 }
 
