@@ -10,6 +10,7 @@ import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.db.CompanionDatabase
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
@@ -74,6 +75,7 @@ object DataModule {
                 CompanionDatabase.MIGRATION_5_6,
                 CompanionDatabase.MIGRATION_6_7,
                 CompanionDatabase.MIGRATION_7_8,
+                CompanionDatabase.MIGRATION_8_9,
             )
             .build()
 
@@ -108,4 +110,8 @@ object DataModule {
     @Provides
     fun provideInsightDao(database: CompanionDatabase): InsightDao =
         database.insightDao()
+
+    @Provides
+    fun provideHealthSnapshotDao(database: CompanionDatabase): HealthSnapshotDao =
+        database.healthSnapshotDao()
 }

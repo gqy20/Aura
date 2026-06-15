@@ -7,6 +7,7 @@ import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.xiaoqi.companion.data.db.converter.Converters
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
@@ -15,6 +16,7 @@ import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
+import com.xiaoqi.companion.data.db.entity.HealthSnapshotEntity
 import com.xiaoqi.companion.data.db.entity.InsightEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
@@ -33,8 +35,9 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         ToolCallEntity::class,
         ReminderEntity::class,
         InsightEntity::class,
+        HealthSnapshotEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -48,6 +51,7 @@ abstract class CompanionDatabase : RoomDatabase() {
     abstract fun toolCallDao(): ToolCallDao
     abstract fun reminderDao(): ReminderDao
     abstract fun insightDao(): InsightDao
+    abstract fun healthSnapshotDao(): HealthSnapshotDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -182,6 +186,32 @@ abstract class CompanionDatabase : RoomDatabase() {
                 // M4 Vision 视觉入 memory。imageBase64 文本可空(base64 字符串);imageMediaType 兜底 image/jpeg
                 db.execSQL("ALTER TABLE `memories` ADD COLUMN `imageBase64` TEXT")
                 db.execSQL("ALTER TABLE `memories` ADD COLUMN `imageMediaType` TEXT NOT NULL DEFAULT 'image/jpeg'")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Health Connect 接入:每日聚合健康快照(步数/心率/睡眠)
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `health_snapshots` (
+                        `date` INTEGER NOT NULL,
+                        `steps` INTEGER NOT NULL,
+                        `distance_meters` REAL NOT NULL,
+                        `calories_kcal` REAL NOT NULL,
+                        `avg_heart_rate` INTEGER,
+                        `resting_heart_rate` INTEGER,
+                        `min_heart_rate` INTEGER,
+                        `max_heart_rate` INTEGER,
+                        `sleep_duration_minutes` INTEGER,
+                        `sleep_stages_json` TEXT NOT NULL DEFAULT '[]',
+                        `source_packages` TEXT NOT NULL DEFAULT '[]',
+                        `fetched_at` INTEGER NOT NULL,
+                        PRIMARY KEY(`date`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_health_snapshots_date` ON `health_snapshots` (`date`)")
             }
         }
     }

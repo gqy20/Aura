@@ -1,7 +1,9 @@
 package com.xiaoqi.companion.core.presence.runtime
 
+import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
+import com.xiaoqi.companion.data.db.entity.HealthSnapshotEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity
 import java.util.Calendar
@@ -13,7 +15,7 @@ import kotlinx.coroutines.withContext
 /**
  * Dream Loop 数据收集器(dual-mind §6.4)。
  *
- * 从 `mood_snapshots` / `messages` / `memories` 拉近 7 天数据,渲染成 prompt 输入。
+ * 从 `mood_snapshots` / `messages` / `memories` / `health_snapshots` 拉近 7 天数据,渲染成 prompt 输入。
  * MVP 阶段不解析、不做 LLM 二次处理;Collector 100% 离线 + SQL 聚合。
  */
 @Singleton
@@ -21,6 +23,7 @@ class DreamDataCollector @Inject constructor(
     private val moodSnapshotDao: MoodSnapshotDao,
     private val messageDao: MessageDao,
     private val memoryDao: com.xiaoqi.companion.data.db.dao.MemoryDao,
+    private val healthSnapshotDao: HealthSnapshotDao,
 ) {
 
     /**
@@ -45,12 +48,14 @@ class DreamDataCollector @Inject constructor(
         val memoryCount: Int,
         val topKeywords: List<String>,
         val imageMemories: List<ImageMemorySummary> = emptyList(),
+        val healthSnapshots: List<HealthSnapshotEntity> = emptyList(),
     ) {
         val isEmpty: Boolean
             get() = moodSnapshots.isEmpty() &&
                 messages.isEmpty() &&
                 memoryCount == 0 &&
-                imageMemories.isEmpty()
+                imageMemories.isEmpty() &&
+                healthSnapshots.isEmpty()
     }
 
     suspend fun collectLast7Days(
@@ -81,6 +86,14 @@ class DreamDataCollector @Inject constructor(
                 )
             }
 
+        // 健康快照:近 7 天(从 date 计算,date 形如 20260615)
+        val today = Calendar.getInstance().apply { timeInMillis = end }
+        val endDate = today.get(Calendar.YEAR) * 10000 +
+            (today.get(Calendar.MONTH) + 1) * 100 +
+            today.get(Calendar.DAY_OF_MONTH)
+        val startDate = endDate - HEALTH_LOOKBACK_DAYS * 100  // 简单按月内回退,跨月会被 Dream 端的 SQL 兜住
+        val healthSnapshots = healthSnapshotDao.findInRange(startDate.coerceAtLeast(0), endDate)
+
         Snapshot(
             rangeStart = start,
             rangeEnd = end,
@@ -89,6 +102,7 @@ class DreamDataCollector @Inject constructor(
             memoryCount = memoryCount,
             topKeywords = topKeywords,
             imageMemories = imageMemories,
+            healthSnapshots = healthSnapshots,
         )
     }
 
@@ -127,6 +141,31 @@ class DreamDataCollector @Inject constructor(
                 appendLine("- ${formatTimestamp(img.timestamp)} ${img.content}")
             }
         }
+        // Health Connect:健康快照(小米运动健康等)
+        if (snapshot.healthSnapshots.isNotEmpty()) {
+            appendLine()
+            appendLine("## 健康快照(${snapshot.healthSnapshots.size} 天)")
+            snapshot.healthSnapshots.sortedBy { it.date }.forEach { h ->
+                val parts = mutableListOf<String>()
+                if (h.steps > 0) parts += "步数=${h.steps}"
+                if (h.avgHeartRate != null) parts += "平均心率=${h.avgHeartRate}bpm(${h.minHeartRate ?: "-"}-${h.maxHeartRate ?: "-"})"
+                if (h.sleepDurationMinutes != null) {
+                    val h2 = h.sleepDurationMinutes / 60
+                    val m2 = h.sleepDurationMinutes % 60
+                    parts += "睡眠=${h2}h${m2}m"
+                }
+                if (parts.isNotEmpty()) {
+                    appendLine("- ${formatDate(h.date)}: ${parts.joinToString(", ")}")
+                }
+            }
+        }
+    }
+
+    private fun formatDate(dateInt: Int): String {
+        val year = dateInt / 10000
+        val month = (dateInt % 10000) / 100
+        val day = dateInt % 100
+        return "${month}/${day}"
     }
 
     private fun dayOfWeek(timestamp: Long): String {
@@ -175,6 +214,7 @@ class DreamDataCollector @Inject constructor(
         const val KEYWORD_LIMIT = 10
         // M4:视觉证据上限。防止 prompt 膨胀,5 张图 metadata ≈ 500 字符,可控。
         const val IMAGE_MEMORY_LIMIT = 5
+        const val HEALTH_LOOKBACK_DAYS = 7
 
         private val STOPWORDS = setOf(
             "the", "a", "an", "is", "are", "was", "were", "be", "been",

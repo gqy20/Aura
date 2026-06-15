@@ -184,6 +184,8 @@ dependencies {
     implementation(libs.compose.activity)
     implementation(libs.compose.material.icons.extended)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    // Health Connect M7: ProcessLifecycleOwner 用于"回到前台自动同步"
+    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
 
     // Coroutines
     implementation(libs.coroutines.android)
@@ -222,6 +224,9 @@ dependencies {
 
     // Agent Framework: Koog
     implementation(libs.koog.agents)
+
+    // Health Connect: 接小米运动健康国内版(用户已实测国内版支持 HC,详见 docs/research/health-connect-mi-fitness.md)
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
 
     // Testing
     testImplementation(libs.junit)

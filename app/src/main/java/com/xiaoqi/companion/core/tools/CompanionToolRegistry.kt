@@ -25,6 +25,7 @@ class CompanionToolRegistry @Inject constructor(
     private val getDeviceStatusTool: GetDeviceStatusTool,
     private val getWeatherTool: GetWeatherTool,
     private val createLocalReminderTool: CreateLocalReminderTool,
+    private val queryHealthDataTool: QueryHealthDataTool,
     private val appPreferences: AppPreferences,
     private val remoteMcpClient: RemoteMcpClient,
     private val mcpServerListRepository: McpServerListRepository,
@@ -40,6 +41,7 @@ class CompanionToolRegistry @Inject constructor(
             .tool(getDeviceStatusTool)
             .tool(getWeatherTool)
             .tool(createLocalReminderTool)
+            .tool(queryHealthDataTool)
 
         addRemoteMcpTools(builder)
         return builder.build()

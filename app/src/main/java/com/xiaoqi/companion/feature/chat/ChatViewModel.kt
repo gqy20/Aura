@@ -27,6 +27,8 @@ import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
+import com.xiaoqi.companion.data.source.HealthConnectDataSource
+import com.xiaoqi.companion.data.source.HealthSyncManager
 import com.xiaoqi.companion.feature.chat.mapper.after
 import com.xiaoqi.companion.feature.chat.mapper.displayLabel
 import com.xiaoqi.companion.feature.chat.mapper.extractIntensity
@@ -85,6 +87,9 @@ class ChatViewModel @Inject constructor(
     private val remoteMcpClient: RemoteMcpClient,
     private val mcpServerListRepository: McpServerListRepository,
     private val dreamLoopScheduler: DreamLoopScheduler,
+    private val healthSyncManager: HealthSyncManager,
+    /** 对 Settings 暴露,用于查询 SDK 状态和已授权权限。 */
+    val healthConnectDataSource: HealthConnectDataSource,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -99,6 +104,27 @@ class ChatViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = DreamLoopInterval.DEFAULT,
+        )
+
+    /**
+     * M7 Health Connect: 同步状态机直接对外暴露(供 Settings UI 显示 loading / 失败原因)。
+     */
+    val healthSyncState: StateFlow<HealthSyncManager.SyncState> = healthSyncManager.state
+
+    /** 用户是否开启"自动同步"开关。 */
+    val healthAutoSyncEnabled: StateFlow<Boolean> = appPreferences.healthAutoSyncEnabled
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = true,
+        )
+
+    /** 上次成功同步的时间戳(epoch ms,0L 表示从未同步)。 */
+    val healthLastSyncAt: StateFlow<Long> = appPreferences.healthLastSyncAt
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = 0L,
         )
 
     val uiState: StateFlow<ChatUiState> = _uiState
@@ -742,6 +768,24 @@ class ChatViewModel @Inject constructor(
      */
     fun triggerDreamLoopNow() {
         dreamLoopScheduler.triggerNow()
+    }
+
+    /**
+     * M7 Health Connect: 切换"自动同步"开关。关掉后,前台 / 冷启动都不会自动拉取,
+     * 但用户仍可手动点"立即同步"。
+     */
+    fun setHealthAutoSyncEnabled(value: Boolean) {
+        viewModelScope.launch {
+            appPreferences.setHealthAutoSyncEnabled(value)
+        }
+    }
+
+    /**
+     * M7 Health Connect: 用户在 Settings 点"立即同步"。默认 force=true 绕过防抖,
+     * 满足"按钮就是用户当前明确意图"语义。
+     */
+    fun triggerHealthSyncNow() {
+        healthSyncManager.requestSync(force = true)
     }
 
     //endregion

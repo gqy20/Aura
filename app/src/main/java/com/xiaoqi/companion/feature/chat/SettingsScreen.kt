@@ -74,6 +74,9 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val dreamLoopInterval by viewModel.dreamLoopInterval.collectAsStateWithLifecycle()
+    val healthSyncState by viewModel.healthSyncState.collectAsStateWithLifecycle()
+    val healthAutoSyncEnabled by viewModel.healthAutoSyncEnabled.collectAsStateWithLifecycle()
+    val healthLastSyncAt by viewModel.healthLastSyncAt.collectAsStateWithLifecycle()
     val contextPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
@@ -89,6 +92,9 @@ fun SettingsScreen(
         connectivityResult = uiState.connectivityResult,
         isCheckingConnectivity = uiState.isCheckingConnectivity,
         dreamLoopInterval = dreamLoopInterval,
+        healthSyncState = healthSyncState,
+        healthAutoSyncEnabled = healthAutoSyncEnabled,
+        healthLastSyncAt = healthLastSyncAt,
         viewModel = viewModel,
         onApiKeyChanged = viewModel::updateSettingsApiKey,
         onProviderChanged = viewModel::updateSettingsProvider,
@@ -107,6 +113,8 @@ fun SettingsScreen(
         onRequestContextPermissions = {
             contextPermissionLauncher.launch(contextPermissions())
         },
+        onHealthAutoSyncEnabledChanged = viewModel::setHealthAutoSyncEnabled,
+        onHealthSyncNow = viewModel::triggerHealthSyncNow,
         onOpenMcpSettings = onOpenMcpSettings,
         onBack = onBack,
     )
@@ -126,6 +134,9 @@ private fun SettingsScreenContent(
     connectivityResult: ConnectivityResult?,
     isCheckingConnectivity: Boolean,
     dreamLoopInterval: DreamLoopInterval,
+    healthSyncState: com.xiaoqi.companion.data.source.HealthSyncManager.SyncState,
+    healthAutoSyncEnabled: Boolean,
+    healthLastSyncAt: Long,
     onApiKeyChanged: (String) -> Unit,
     onProviderChanged: (LlmProvider) -> Unit,
     onModelNameChanged: (String) -> Unit,
@@ -141,6 +152,8 @@ private fun SettingsScreenContent(
     onDreamLoopIntervalChanged: (DreamLoopInterval) -> Unit,
     onTriggerDreamLoopNow: () -> Unit,
     onRequestContextPermissions: () -> Unit,
+    onHealthAutoSyncEnabledChanged: (Boolean) -> Unit,
+    onHealthSyncNow: () -> Unit,
     onOpenMcpSettings: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -256,6 +269,16 @@ private fun SettingsScreenContent(
                 )
             }
             item {
+                HealthDataSection(
+                    syncState = healthSyncState,
+                    autoSyncEnabled = healthAutoSyncEnabled,
+                    lastSyncAtMillis = healthLastSyncAt,
+                    onAutoSyncEnabledChanged = onHealthAutoSyncEnabledChanged,
+                    onSyncNow = onHealthSyncNow,
+                    healthConnectDataSource = viewModel.healthConnectDataSource,
+                )
+            }
+            item {
                 DataTransparencySection(viewModel = viewModel)
             }
             item {
@@ -330,7 +353,7 @@ private fun ModelPicker(
 }
 
 @Composable
-private fun SettingsSectionTitle(
+internal fun SettingsSectionTitle(
     title: String,
     subtitle: String? = null,
 ) {

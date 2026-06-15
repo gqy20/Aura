@@ -111,6 +111,8 @@ class ChatViewModelTest {
             every { notificationEnabled } returns flowOf(true)
             every { mcpServerName } returns flowOf("Local MCP")
             every { mcpHttpUrl } returns flowOf("https://old.example/mcp")
+            every { healthAutoSyncEnabled } returns flowOf(true)
+            every { healthLastSyncAt } returns flowOf(0L)
         }
 
     private class FakeToolCallRepository : ToolCallRepository {
@@ -219,6 +221,8 @@ class ChatViewModelTest {
             remoteMcpClient = remoteMcpClient,
             mcpServerListRepository = io.mockk.mockk(relaxed = true),
             dreamLoopScheduler = dreamLoopScheduler,
+            healthSyncManager = io.mockk.mockk(relaxed = true),
+            healthConnectDataSource = io.mockk.mockk(relaxed = true),
         )
     }
 
@@ -371,6 +375,8 @@ class ChatViewModelTest {
             remoteMcpClient = remoteMcpClient,
             mcpServerListRepository = io.mockk.mockk(relaxed = true),
             dreamLoopScheduler = io.mockk.mockk(relaxed = true),
+            healthSyncManager = io.mockk.mockk(relaxed = true),
+            healthConnectDataSource = io.mockk.mockk(relaxed = true),
         )
         advanceUntilIdle()
 

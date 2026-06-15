@@ -11,6 +11,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Health Connect: 读取小米运动健康国内版同步进来的步数/心率/睡眠 -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />

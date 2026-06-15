@@ -41,6 +41,8 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val userPatternsJson: Flow<String> = dataStore.data.map { it[Keys.userPatternsJson] ?: "[]" }
     val recurringTopicsJson: Flow<String> = dataStore.data.map { it[Keys.recurringTopicsJson] ?: "[]" }
     val onboardingCompletedAt: Flow<String> = dataStore.data.map { it[Keys.onboardingCompletedAt] ?: "" }
+    val healthLastSyncAt: Flow<Long> = dataStore.data.map { it[Keys.healthLastSyncAt] ?: 0L }
+    val healthAutoSyncEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.healthAutoSyncEnabled] ?: true }
 
     /**
      * Dream Loop 周期档位(分钟数)。缺失或未知值回退到 [DreamLoopInterval.DEFAULT]。
@@ -72,6 +74,8 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     suspend fun setUserPatternsJson(value: String) { dataStore.edit { it[Keys.userPatternsJson] = value } }
     suspend fun setRecurringTopicsJson(value: String) { dataStore.edit { it[Keys.recurringTopicsJson] = value } }
     suspend fun setOnboardingCompletedAt(value: String) { dataStore.edit { it[Keys.onboardingCompletedAt] = value } }
+    suspend fun setHealthLastSyncAt(value: Long) { dataStore.edit { it[Keys.healthLastSyncAt] = value } }
+    suspend fun setHealthAutoSyncEnabled(value: Boolean) { dataStore.edit { it[Keys.healthAutoSyncEnabled] = value } }
     suspend fun setDreamLoopInterval(value: DreamLoopInterval) {
         dataStore.edit { it[Keys.dreamLoopIntervalMinutes] = value.minutes.toInt() }
     }
@@ -98,6 +102,8 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val recurringTopicsJson = stringPreferencesKey("recurring_topics_json")
         val onboardingCompletedAt = stringPreferencesKey("onboarding_completed_at")
         val dreamLoopIntervalMinutes = intPreferencesKey("dream_loop_interval_minutes")
+        val healthLastSyncAt = androidx.datastore.preferences.core.longPreferencesKey("health_last_sync_at")
+        val healthAutoSyncEnabled = booleanPreferencesKey("health_auto_sync_enabled")
     }
 
     companion object {
