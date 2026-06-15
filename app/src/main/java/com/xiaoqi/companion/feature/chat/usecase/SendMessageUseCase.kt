@@ -13,6 +13,7 @@ import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.presence.PresenceEvent
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
+import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.feature.chat.ChatConfigStatus
 import com.xiaoqi.companion.feature.chat.ChatImageAttachment
 import com.xiaoqi.companion.feature.chat.ChatMessage
@@ -53,6 +54,7 @@ class SendMessageUseCase @Inject constructor(
     private val toolDisplayRegistry: ToolDisplayRegistry,
     private val presenceController: PresenceController,
     private val agentStateDao: com.xiaoqi.companion.data.db.dao.AgentStateDao,
+    private val memoryRepository: MemoryRepository,
 ) {
     companion object {
         private const val DEFAULT_SESSION_ID = "default"
@@ -206,6 +208,25 @@ class SendMessageUseCase @Inject constructor(
             }
 
             val userInput = if (pendingImage != null) {
+                // M4:vision memory 持久化（fire-and-forget,不阻塞消息发送)。
+                // 失败仅 log,不影响主流程 — 见 MemoryRepository.saveVisionMemory 注释。
+                scope.launch {
+                    try {
+                        memoryRepository.saveVisionMemory(
+                            summary = trimmed,
+                            imageBase64 = pendingImage.imageBase64,
+                            imageMediaType = pendingImage.mediaType,
+                            sourceMessageId = userMsg.id,
+                        )
+                    } catch (e: Exception) {
+                        AppLogger.warn(
+                            LogTags.Chat,
+                            "vision_memory_save_failed",
+                            "requestHash" to LogFieldSanitizer.hash(requestId),
+                            "cause" to (e.message ?: e::class.simpleName.orEmpty()),
+                        )
+                    }
+                }
                 UserInput.Vision(
                     text = userPrompt,
                     imageBase64 = pendingImage.imageBase64,

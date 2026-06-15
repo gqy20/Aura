@@ -34,7 +34,7 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         ReminderEntity::class,
         InsightEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -174,6 +174,14 @@ abstract class CompanionDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_insights_createdAt` ON `insights` (`createdAt`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_insights_category` ON `insights` (`category`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_insights_status` ON `insights` (`status`)")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // M4 Vision 视觉入 memory。imageBase64 文本可空(base64 字符串);imageMediaType 兜底 image/jpeg
+                db.execSQL("ALTER TABLE `memories` ADD COLUMN `imageBase64` TEXT")
+                db.execSQL("ALTER TABLE `memories` ADD COLUMN `imageMediaType` TEXT NOT NULL DEFAULT 'image/jpeg'")
             }
         }
     }

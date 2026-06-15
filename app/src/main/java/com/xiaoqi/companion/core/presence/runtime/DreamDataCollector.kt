@@ -23,6 +23,20 @@ class DreamDataCollector @Inject constructor(
     private val memoryDao: com.xiaoqi.companion.data.db.dao.MemoryDao,
 ) {
 
+    /**
+     * M4 跨模态 evidence:只暴露元数据(id/content/timestamp/importance),不含 base64。
+     *
+     * **绝不能**把 `imageBase64` / `imageMediaType` 加进 summary —— DreamPrompt 走的是本地 Qwen
+     * 纯文本路径,base64 进去会爆 token 预算,模型也看不懂。
+     * `render_doesNotLeakBase64` 测试是这个约束的安全护栏。
+     */
+    data class ImageMemorySummary(
+        val id: String,
+        val content: String,
+        val timestamp: Long,
+        val importance: Float,
+    )
+
     data class Snapshot(
         val rangeStart: Long,
         val rangeEnd: Long,
@@ -30,9 +44,13 @@ class DreamDataCollector @Inject constructor(
         val messages: List<MessageEntity>,
         val memoryCount: Int,
         val topKeywords: List<String>,
+        val imageMemories: List<ImageMemorySummary> = emptyList(),
     ) {
         val isEmpty: Boolean
-            get() = moodSnapshots.isEmpty() && messages.isEmpty() && memoryCount == 0
+            get() = moodSnapshots.isEmpty() &&
+                messages.isEmpty() &&
+                memoryCount == 0 &&
+                imageMemories.isEmpty()
     }
 
     suspend fun collectLast7Days(
@@ -50,6 +68,19 @@ class DreamDataCollector @Inject constructor(
         val memoryCount = memoryDao.countAll()
         val topKeywords = extractTopKeywords(msgs, KEYWORD_LIMIT)
 
+        // M4:近 N 张有图 memory,过滤 7 天窗口,只取元数据进 prompt。
+        // 内容原文本身就是 "[图片] 摘要" 形态,不需要再裁剪。
+        val imageMemories = memoryDao.getRecentImages(IMAGE_MEMORY_LIMIT)
+            .filter { it.timestamp in start..end }
+            .map {
+                ImageMemorySummary(
+                    id = it.id,
+                    content = it.content,
+                    timestamp = it.timestamp,
+                    importance = it.importance,
+                )
+            }
+
         Snapshot(
             rangeStart = start,
             rangeEnd = end,
@@ -57,6 +88,7 @@ class DreamDataCollector @Inject constructor(
             messages = msgs,
             memoryCount = memoryCount,
             topKeywords = topKeywords,
+            imageMemories = imageMemories,
         )
     }
 
@@ -86,6 +118,14 @@ class DreamDataCollector @Inject constructor(
         appendLine("## 长期记忆总数:${snapshot.memoryCount}")
         if (snapshot.topKeywords.isNotEmpty()) {
             appendLine("## 高频关键词:${snapshot.topKeywords.joinToString(", ")}")
+        }
+        // M4:视觉证据 — 本地 LLM 看不到图,但能从元数据推测用户的视觉节奏/兴趣。
+        if (snapshot.imageMemories.isNotEmpty()) {
+            appendLine()
+            appendLine("## 视觉证据(${snapshot.imageMemories.size} 张)")
+            snapshot.imageMemories.forEach { img ->
+                appendLine("- ${formatTimestamp(img.timestamp)} ${img.content}")
+            }
         }
     }
 
@@ -133,6 +173,8 @@ class DreamDataCollector @Inject constructor(
         const val DEFAULT_SESSION_ID = "default"
         const val RECENT_MESSAGE_LIMIT = 200
         const val KEYWORD_LIMIT = 10
+        // M4:视觉证据上限。防止 prompt 膨胀,5 张图 metadata ≈ 500 字符,可控。
+        const val IMAGE_MEMORY_LIMIT = 5
 
         private val STOPWORDS = setOf(
             "the", "a", "an", "is", "are", "was", "were", "be", "been",

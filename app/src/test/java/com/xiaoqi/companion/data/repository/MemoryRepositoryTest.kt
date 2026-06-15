@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -215,6 +216,47 @@ class MemoryRepositoryTest : BaseDaoTest() {
         repository.pinMemory("p1")
 
         assertTrue(memoryDao.getById("p1")!!.pinned)
+    }
+
+    @Test
+    fun saveVisionMemory_storesBase64AndMediaType() = runTest {
+        val entity = repository.saveVisionMemory(
+            summary = "看这夕阳",
+            imageBase64 = "aGVsbG8=",
+            imageMediaType = "image/jpeg",
+        )
+
+        val fetched = memoryDao.getById(entity.id)
+        assertNotNull(fetched)
+        assertEquals("aGVsbG8=", fetched!!.imageBase64)
+        assertEquals("image/jpeg", fetched.imageMediaType)
+        assertTrue(fetched.content.contains("看这夕阳"))
+        assertEquals("reflection:vision", fetched.source)
+    }
+
+    @Test
+    fun saveVisionMemory_blankSummary_usesDefaultLabel() = runTest {
+        val entity = repository.saveVisionMemory(
+            summary = "",
+            imageBase64 = "aGVsbG8=",
+        )
+
+        val fetched = memoryDao.getById(entity.id)
+        assertNotNull(fetched)
+        assertEquals("[图片]", fetched!!.content)
+    }
+
+    @Test
+    fun getRecentImages_returnsOnlyMemoriesWithImage() = runTest {
+        // 1 张图 + 1 张无图
+        repository.saveVisionMemory(summary = "图", imageBase64 = "img1")
+        memoryDao.insert(memory(id = "no-image-1", content = "无图文字记忆"))
+
+        val images = repository.getRecentImages(limit = 10)
+
+        assertEquals(1, images.size)
+        assertTrue(images[0].content.contains("图"))
+        assertEquals("img1", images[0].imageBase64)
     }
 
     @Test

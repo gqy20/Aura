@@ -87,4 +87,11 @@ interface MemoryDao {
 
     @Query("DELETE FROM memories")
     suspend fun clearAll()
+
+    // M4 视觉入 memory:取近 N 张有图 memory,供 DreamDataCollector 跨模态 evidence 注入
+    @Query("SELECT * FROM memories WHERE imageBase64 IS NOT NULL ORDER BY timestamp DESC LIMIT :limit")
+    fun observeImages(limit: Int = 20): Flow<List<MemoryEntity>>
+
+    @Query("SELECT * FROM memories WHERE imageBase64 IS NOT NULL ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentImages(limit: Int = 20): List<MemoryEntity>
 }

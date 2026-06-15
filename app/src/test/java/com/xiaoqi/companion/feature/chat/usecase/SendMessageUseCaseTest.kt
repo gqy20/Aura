@@ -193,6 +193,7 @@ class SendMessageUseCaseTest {
             toolDisplayRegistry = toolDisplayRegistry,
             presenceController = presenceController,
             agentStateDao = agentStateDao,
+            memoryRepository = memoryRepo,
         )
     }
 
@@ -242,6 +243,54 @@ class SendMessageUseCaseTest {
         assertEquals("看这个", input.text)
         assertEquals("prepared-base64", input.imageBase64)
         assertTrue(state.value.messages.any { it.imageUri == "content://image/1" })
+    }
+
+    @Test
+    fun sendMessage_visionInput_persistsVisionMemoryFireAndForget() = runTest {
+        val pending = ChatImageAttachment(
+            uriString = "content://image/1",
+            imageBase64 = "prepared-base64",
+            mediaType = "image/png",
+        )
+        sendMessageUseCase("看夕阳", pending, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        coVerify {
+            memoryRepo.saveVisionMemory(
+                summary = "看夕阳",
+                imageBase64 = "prepared-base64",
+                imageMediaType = "image/png",
+                importance = any(),
+                confidence = any(),
+                sourceMessageId = any(),
+            )
+        }
+    }
+
+    @Test
+    fun sendMessage_visionInput_visionMemoryFailureDoesNotBreakFlow() = runTest {
+        coEvery {
+            memoryRepo.saveVisionMemory(
+                summary = any(),
+                imageBase64 = any(),
+                imageMediaType = any(),
+                importance = any(),
+                confidence = any(),
+                sourceMessageId = any(),
+            )
+        } throws RuntimeException("db down")
+        val pending = ChatImageAttachment(
+            uriString = "content://image/1",
+            imageBase64 = "prepared-base64",
+            mediaType = "image/jpeg",
+        )
+        sendMessageUseCase("看这个", pending, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        // 主消息流照常完成 — assistant 仍在,无 error
+        assertTrue(fakeRuntime.sendCalled)
+        assertTrue(state.value.messages.any { it.role == "ASSISTANT" })
+        assertNull(state.value.error)
     }
 
     @Test

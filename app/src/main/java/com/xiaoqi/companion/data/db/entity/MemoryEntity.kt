@@ -30,4 +30,7 @@ data class MemoryEntity(
     val lastAccessed: Long = timestamp,
     @ColumnInfo(defaultValue = "0") val pinned: Boolean = false,
     @ColumnInfo(defaultValue = "0") val archived: Boolean = false,
+    // M4 视觉入 memory:base64 字符串(可空,大多数 memory 无图;有图时典型 50-200KB)
+    val imageBase64: String? = null,
+    @ColumnInfo(defaultValue = "image/jpeg") val imageMediaType: String = "image/jpeg",
 )

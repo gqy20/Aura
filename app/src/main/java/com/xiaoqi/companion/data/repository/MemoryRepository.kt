@@ -190,6 +190,62 @@ class MemoryRepository @Inject constructor(
         before
     }
 
+    // region M4 视觉入 memory
+
+    /**
+     * 把"用户发图"事件作为一条 FACT memory 写进 memories 表,base64 一起存。
+     *
+     * 触发点:`ChatViewModel.sendMessage` 看到 `pendingImage != null` 时调,失败仅 log。
+     * Validator 不走(这写路径已经明确可信 — base64 来自 system Photo Picker +
+     * `AndroidChatImageProcessor` 压缩,不存在幻觉)。
+     */
+    suspend fun saveVisionMemory(
+        summary: String,
+        imageBase64: String,
+        imageMediaType: String = "image/jpeg",
+        importance: Float = 0.6f,
+        confidence: Float = 0.85f,
+        sourceMessageId: String? = null,
+    ): MemoryEntity = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val sourceIds = if (sourceMessageId != null) "[\"$sourceMessageId\"]" else "[]"
+        val content = if (summary.isBlank()) "[图片]" else "[图片] $summary"
+        val entity = MemoryEntity(
+            id = java.util.UUID.randomUUID().toString(),
+            type = com.xiaoqi.companion.data.db.converter.MemoryType.FACT,
+            content = content,
+            source = "reflection:vision",
+            importance = importance.coerceIn(0f, 1f),
+            confidence = confidence.coerceIn(0f, 1f),
+            sourceMessageIds = sourceIds,
+            timestamp = now,
+            updatedAt = now,
+            expiresAt = null,
+            sensitivity = "normal",
+            lastAccessed = now,
+            imageBase64 = imageBase64,
+            imageMediaType = imageMediaType,
+        )
+        memoryDao.insert(entity)
+        AppLogger.info(
+            LogTags.Repo,
+            "vision_memory_save_completed",
+            "memoryId" to entity.id,
+            "mediaType" to imageMediaType,
+            "base64Bytes" to imageBase64.length,
+        )
+        entity
+    }
+
+    /** M4:有图 memory 列表(供 DreamDataCollector 跨模态 evidence 注入) */
+    fun observeImages(limit: Int = 20): Flow<List<MemoryEntity>> = memoryDao.observeImages(limit)
+
+    /** M4:一次性取近 N 张图(供 DreamDataCollector 90 天 collect 用) */
+    suspend fun getRecentImages(limit: Int = 20): List<MemoryEntity> =
+        withContext(Dispatchers.IO) { memoryDao.getRecentImages(limit) }
+
+    // endregion
+
     suspend fun pinMemory(id: String): Unit = withContext(Dispatchers.IO) {
         memoryDao.setPinned(id, true)
         AppLogger.info(LogTags.Repo, "memory_pinned", "memoryId" to id)
