@@ -91,3 +91,7 @@ error.log
 
 # Room schema (exported but tracked separately)
 # app/schemas/ is intentionally committed
+
+.vercel
+
+.vercel

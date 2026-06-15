@@ -1,79 +1,71 @@
-# Vercel 部署时排除 — 避免上传整个 Android 仓库（28.6 MB → 仅 web/）
+# Vercel 部署时排除 — 避免上传整个 Android 仓库
+# 注意：用精确文件路径，不用通配 app/、src/、test/ 等目录名，
+# 因为这些名字会和 web/apps/web/src/ 冲突
 
-# Android 项目
-app/
-build/
-gradle/
-gradlew
-gradlew.bat
-gradle.properties
-settings.gradle.kts
-local.properties
-*.apk
-*.aab
-*.dex
-*.class
-.kotlin/
-.cxx/
-.externalNativeBuild/
-captures/
-mobile/
-replay_pid*.log
-hs_err_pid*.log
+# Android 根目录文件
+/gradlew
+/gradlew.bat
+/gradle.properties
+/settings.gradle.kts
+/local.properties
+/maven-metadata.xml
+/plugin-metadata.xml
+/Makefile
+
+# Android 项目目录（精确到仓库根）
+/gradle/
+/app/build.gradle.kts
+/app/proguard-rules.pro
+/app/schemas/
+/app/src/
 
 # IDE / 系统
-.idea/
-*.iml
-*.iws
-*.ipr
-.DS_Store
-Thumbs.db
-Desktop.ini
-.claude/
-.playwright-mcp/
-tmp-adb-screens/
-tmp-adb-db/
+/.idea/
+/.kotlin/
+/.cxx/
+/.externalNativeBuild/
+/captures/
+/mobile/
+/.claude/
+/.playwright-mcp/
+/tmp-adb-screens/
+/tmp-adb-db/
 
 # 文档（Vercel 不需要，文档走 GitHub）
-docs/
-CHANGLOG.md
-README.md
-AGENTS.md
-PROFILE
+/docs/
+/CHANGLOG.md
+/README.md
+/AGENTS.md
+/PROFILE
 
-# 已生成的产物
-maven-metadata.xml
-plugin-metadata.xml
-error.log
-full_log.txt
-ui*.xml
-*-metadata.xml
-Makefile
-screenshot_*.png
-screen_*.png
-linear-hero.png
-aura-p0-*.png
-screenshot_release.png
+# 临时文件 / 截图
+/error.log
+/full_log.txt
+/ui*.xml
+/*-metadata.xml
+/screenshot_*.png
+/screen_*.png
+/linear-hero.png
+/aura-p0-*.png
+/screenshot_release.png
 
-# Vercel 自己
-.vercel/
-node_modules/
-.next/
-.turbo/
-out/
-dist/
-build/
-*.tsbuildinfo
-.env*.local
-.env
+# Vercel / Node
+/.vercel/
+/node_modules/
+/.next/
+/.turbo/
+/out/
+/dist/
+/build/
+/*.tsbuildinfo
+/.env*.local
+/.env
 
-# 测试 / 报告
-app/build/
-build/test-run.log
-app/build/reports/
-app/build/test-results/
-app/schemas/
+# 测试产物
+/app/build/
+/build/test-run.log
+/app/build/reports/
+/app/build/test-results/
 
-# 自动生成
-AGENTS.md
-PROFILE
+# 工具脚本（不需要部署）
+/scripts/
