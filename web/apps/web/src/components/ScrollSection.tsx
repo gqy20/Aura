@@ -7,21 +7,14 @@ interface ScrollSectionProps {
   number: string
   title: string
   description: string
-  /** 视差方向 */
-  direction?: 'up' | 'down'
 }
 
 /**
- * 通用滚动叙事段落
- * - 标题/数字入场：上滑 + 渐入
- * - 视差：description 略慢于 scroll，制造层次
+ * 滚动叙事段落
+ * - 进入视口即显示（不依赖 scroll 进度控制 opacity，避免 fullPage 截图看不见）
+ * - 视差：标题/数字略向上位移，制造层次
  */
-export function ScrollSection({
-  number,
-  title,
-  description,
-  direction = 'up',
-}: ScrollSectionProps) {
+export function ScrollSection({ number, title, description }: ScrollSectionProps) {
   const ref = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
   const { scrollYProgress } = useScroll({
@@ -29,32 +22,32 @@ export function ScrollSection({
     offset: ['start end', 'end start'],
   })
 
+  // 仅做视差位移，opacity 保持 1
   const yParallax = useTransform(
     scrollYProgress,
     [0, 1],
-    direction === 'up' ? [60, -60] : [-40, 40],
+    [40, -40],
   )
-  const opacity = useTransform(scrollYProgress, [0, 0.3, 0.7, 1], [0, 1, 1, 0])
 
   return (
     <section
       ref={ref}
-      className="relative flex min-h-[80vh] items-center py-32"
+      className="relative flex min-h-[70vh] items-center py-24"
     >
-      <div className="mx-auto w-full max-w-6xl px-8 sm:px-12">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-15%' }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="mx-auto w-full max-w-6xl px-8 sm:px-12"
+      >
         <motion.div
-          style={{
-            y: reduced ? 0 : yParallax,
-            opacity: reduced ? 1 : opacity,
-          }}
+          style={{ y: reduced ? 0 : yParallax }}
           className="grid grid-cols-1 items-center gap-8 md:grid-cols-12"
         >
-          {/* 序号 */}
           <div className="md:col-span-2">
             <span className="font-mono text-sm text-muted">{number}</span>
           </div>
-
-          {/* 标题 + 描述 */}
           <div className="md:col-span-10">
             <h2 className="text-balance text-4xl font-medium leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
               {title}
@@ -64,7 +57,7 @@ export function ScrollSection({
             </p>
           </div>
         </motion.div>
-      </div>
+      </motion.div>
     </section>
   )
 }
