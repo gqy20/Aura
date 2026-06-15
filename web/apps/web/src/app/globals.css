@@ -166,3 +166,37 @@ html.cursor-hidden button,
 html.cursor-hidden [data-cursor='hover'] {
   cursor: none !important;
 }
+
+/* 圆点 — 1:1 跟手，mix-blend-difference 保证深浅底都可见 */
+.magnetic-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: white;
+  mix-blend-mode: difference;
+  will-change: transform;
+  transform: translate3d(-100px, -100px, 0) translate(-50%, -50%);
+}
+
+/* 圆环 — rAF lerp 跟随 + hover 放大 */
+.magnetic-ring {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  will-change: transform, width, height, background-color, border-color;
+  transform: translate3d(-100px, -100px, 0) translate(-50%, -50%) scale(1);
+  transition:
+    width 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 200ms ease,
+    border-color 200ms ease;
+}
+
+.magnetic-ring.is-hovering {
+  width: 32px;
+  height: 32px;
+  border-color: rgba(124, 92, 255, 0.8);
+  background: rgba(124, 92, 255, 0.1);
+}

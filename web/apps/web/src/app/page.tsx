@@ -39,7 +39,7 @@ export default function Home() {
           style={{ background: '#08090a' }}
         />
 
-        <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-8 sm:px-12">
+        <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col px-6 sm:px-10 lg:px-16">
           {/* ─── Nav ─── */}
           <motion.nav
             initial={{ opacity: 0, y: -20 }}

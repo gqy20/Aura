@@ -1,94 +1,102 @@
 'use client'
 
-import { motion, useMotionValue, useSpring, useReducedMotion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
- * 磁性光标
- * - 小圆点：精确跟随
- * - 外环：spring 弹性跟随
- * - hover 链接/按钮：外环放大 + 变色
+ * 磁性光标（高性能版）
+ *
+ * 性能优化：
+ * - 圆点：rAF + 直接操作 transform（translate3d），不走 React 渲染
+ * - 圆环：rAF + lerp 平滑跟随（更轻量于 motion spring）
+ * - hover 状态：仅触发一次 className 切换
+ *
+ * - hover 链接/按钮：圆环放大 + 变 accent 色
  * - 桌面端启用，移动端 / 触摸设备 / 减少动效偏好禁用
  * - 隐藏原生光标
  */
 export function MagneticCursor() {
-  const reduced = useReducedMotion()
+  const dotRef = useRef<HTMLDivElement>(null)
+  const ringRef = useRef<HTMLDivElement>(null)
   const [enabled, setEnabled] = useState(false)
-  const [hovering, setHovering] = useState(false)
-
-  const dotX = useMotionValue(-100)
-  const dotY = useMotionValue(-100)
-  const ringX = useSpring(-100, { stiffness: 200, damping: 22, mass: 0.6 })
-  const ringY = useSpring(-100, { stiffness: 200, damping: 22, mass: 0.6 })
 
   useEffect(() => {
     // 桌面端 + 非减少动效
     const isCoarse = window.matchMedia('(pointer: coarse)').matches
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (isCoarse || reduced) return
     setEnabled(true)
 
     // 隐藏原生光标
     document.documentElement.classList.add('cursor-hidden')
 
+    let mouseX = -100
+    let mouseY = -100
+    let ringX = -100
+    let ringY = -100
+    let hovering = false
+    let rafId = 0
+
     const onMove = (e: MouseEvent) => {
-      dotX.set(e.clientX)
-      dotY.set(e.clientY)
-      ringX.set(e.clientX)
-      ringY.set(e.clientY)
+      mouseX = e.clientX
+      mouseY = e.clientY
+      // 圆点：1:1 跟手，立即更新（无插值）
+      if (dotRef.current) {
+        dotRef.current.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0) translate(-50%, -50%)`
+      }
     }
 
     const onOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       const isInteractive = target.closest('a, button, [data-cursor="hover"]')
-      setHovering(!!isInteractive)
+      const next = !!isInteractive
+      if (next !== hovering) {
+        hovering = next
+        if (ringRef.current) {
+          ringRef.current.classList.toggle('is-hovering', hovering)
+        }
+      }
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseover', onOver)
+    // rAF 循环：圆环 lerp 跟随
+    const tick = () => {
+      // lerp 系数 0.35（响应快且平滑）
+      ringX += (mouseX - ringX) * 0.35
+      ringY += (mouseY - ringY) * 0.35
+      if (ringRef.current) {
+        ringRef.current.style.transform = `translate3d(${ringX}px, ${ringY}px, 0) translate(-50%, -50%) scale(${hovering ? 2.4 : 1})`
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+
+    window.addEventListener('mousemove', onMove, { passive: true })
+    window.addEventListener('mouseover', onOver, { passive: true })
+
     return () => {
+      cancelAnimationFrame(rafId)
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseover', onOver)
       document.documentElement.classList.remove('cursor-hidden')
     }
-  }, [dotX, dotY, ringX, ringY, reduced])
+  }, [])
 
   if (!enabled) return null
 
   return (
     <>
-      {/* 圆点 — 精确跟随 */}
-      <motion.div
+      {/* 圆点 — 1:1 跟手 */}
+      <div
+        ref={dotRef}
         aria-hidden
-        className="pointer-events-none fixed left-0 top-0 z-[9999] hidden -translate-x-1/2 -translate-y-1/2 md:block"
-        style={{ x: dotX, y: dotY }}
-      >
-        <div
-          className="h-1.5 w-1.5 rounded-full bg-white mix-blend-difference"
-          style={{ willChange: 'transform' }}
-        />
-      </motion.div>
+        className="magnetic-dot pointer-events-none fixed left-0 top-0 z-[9999] hidden md:block"
+      />
 
-      {/* 圆环 — spring 弹性跟随 */}
-      <motion.div
+      {/* 圆环 — rAF lerp 跟随 */}
+      <div
+        ref={ringRef}
         aria-hidden
-        className="pointer-events-none fixed left-0 top-0 z-[9998] hidden -translate-x-1/2 -translate-y-1/2 md:block"
-        style={{ x: ringX, y: ringY }}
-        animate={{
-          scale: hovering ? 2.4 : 1,
-          opacity: hovering ? 0.9 : 0.5,
-        }}
-        transition={{ type: 'spring', stiffness: 220, damping: 20 }}
-      >
-        <div
-          className="h-8 w-8 rounded-full border"
-          style={{
-            borderColor: hovering ? 'rgba(124, 92, 255, 0.8)' : 'rgba(255,255,255,0.4)',
-            backgroundColor: hovering ? 'rgba(124, 92, 255, 0.1)' : 'transparent',
-            willChange: 'transform, width, height',
-            transition: 'border-color 200ms, background-color 200ms',
-          }}
-        />
-      </motion.div>
+        className="magnetic-ring pointer-events-none fixed left-0 top-0 z-[9998] hidden md:block"
+      />
     </>
   )
 }
