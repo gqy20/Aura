@@ -243,9 +243,9 @@ edge(nodeFinalReply forwardTo nodeFinish onAssistantMessage { true })
 
 ### P0：文档与日志
 
-- [ ] 在 `docs/roadmap.md` 标记 Photo Picker Vision MVP 已实现。
-- [ ] 在 Koog 集成文档记录：Vision MVP 默认禁用 tools。
-- [ ] 在 `KoogAgentFactoryImpl` 增加日志字段：`hasImage`、`toolRegistryMode`。
+- [x] 在 `docs/roadmap.md` 标记 Photo Picker Vision MVP 已实现。（`roadmap.md` 2026-06-15 更新 + `architecture.md` 当前实现状态 M4 段）
+- [x] 在 Koog 集成文档记录：Vision MVP 默认禁用 tools。（`koog-android-integration.md` 5.1 节 + 7 节）
+- [x] 在 `KoogAgentFactoryImpl` 增加日志字段：`hasImage`、`toolRegistryMode`。
 
 验收：
 
@@ -254,14 +254,30 @@ edge(nodeFinalReply forwardTo nodeFinish onAssistantMessage { true })
 
 ### P1：回复后状态更新
 
-- [ ] 保持 Vision 主回复无工具。
-- [ ] 在 `CompanionRuntime` 完成回复后，根据 parsed output 更新 emotion / relationship。
-- [ ] 将 `save_memory` 类任务改成可选后置任务，失败只记录日志。
+- [x] 保持 Vision 主回复无工具。✅（`KoogAgentFactoryImpl` 在 `prompt.hasImage` 时 `toolRegistry = ToolRegistry.EMPTY`）
+- [x] 在 `CompanionRuntime` 完成回复后，根据 parsed output 更新 emotion / relationship。✅（`SendMessageUseCase.Complete` 事件后 `persistStatus` 写 `agent_state`）
+- [x] 将 `save_memory` 类任务改成可选后置任务，失败只记录日志。✅（M4 落地：vision 消息 fire-and-forget 调 `MemoryRepository.saveVisionMemory`，try/catch 兜底仅 log；详见 commit `1b826d1`）
 
 验收：
 
-- 图片回复不会因状态更新失败而失败。
-- 情绪/关系仍能随图片对话更新。
+- 图片回复不会因状态更新失败而失败。✅
+- 情绪/关系仍能随图片对话更新。✅
+
+### P1.5：Vision→Memory→Dream 闭环（2026-06-15 落地）
+
+> 不在原 P0-P3 路线内，源自新叙事主轴"Aura 记得你看见了什么"。
+
+- [x] `MemoryEntity` 加 `imageBase64 TEXT` + `imageMediaType TEXT DEFAULT 'image/jpeg'` + `MIGRATION_7_8`（Room v8）。
+- [x] `MemoryDao.getRecentImages/observeImages` 按 `imageBase64 IS NOT NULL` 过滤。
+- [x] `MemoryRepository.saveVisionMemory` 把"用户发图"作为 `type=FACT, source=reflection:vision` 记忆写入。
+- [x] `SendMessageUseCase` 注入 `MemoryRepository`，发送带图消息时 fire-and-forget 调 `saveVisionMemory`。
+- [x] `DreamDataCollector.Snapshot.imageMemories`（metadata-only，不含 base64）+ `render` 新增 `## 视觉证据(N 张)` section。
+- [x] 11 个新单测覆盖：窗口过滤 / limit 透传 / base64 隔离 / section 输出 / 无图省略 / 防泄漏 / 自动落库 / 失败不影响主流程。
+
+设计约束：
+
+- **base64 永远不进 DreamPrompt**（本地 Qwen 纯文本路径，模型看不到图），仅 metadata 进 prompt 让 LLM 推测用户视觉节奏。
+- **`render_doesNotLeakBase64` 测试作为安全护栏**，防止后续维护者误把 `imageBase64` 加进 `ImageMemorySummary`。
 
 ### P2：只读记忆注入
 
@@ -303,9 +319,19 @@ edge(nodeFinalReply forwardTo nodeFinish onAssistantMessage { true })
 
 ```text
 Vision 主回复 no-tools
-  -> 后置状态/记忆任务
-  -> 只读记忆预注入
-  -> 自定义 Koog Vision Strategy
+  -> 后置状态/记忆任务     ✅ P1 已落(save_memory 后置、emotion/relationship 写后)
+  -> 只读记忆预注入         ⏳ P2 未做
+  -> 自定义 Koog Vision Strategy  ⏳ P3 未做
 ```
 
 这样既能保持图片聊天的稳定性，又能逐步恢复智能体工具能力。
+
+### 2026-06-15 更新
+
+P1 + P1.5（vision→memory→dream 闭环，commit `1b826d1`）已落地。`docs/roadmap.md` 标记 M4 部分完成。
+
+- **P1**：Vision 主回复无工具 / 后置状态更新 / `save_memory` 后置 fire-and-forget — 全 ✅
+- **P1.5**（新增）：视觉内容进入 `memories` 表 + DreamDataCollector 跨模态 evidence 注入（metadata-only，**base64 不进 DreamPrompt**）— 全 ✅
+- **P2**：Vision 输入时预注入相关 memory 片段到 prompt — 未做（M4 PoC 阶段未跑通前，避免引入额外 LLM 延迟）
+- **P3**：自定义 Vision Strategy（白名单工具 + 强制 final no-tools）— 未做（依赖 P2 的 tool decision 抽象）
+- **M4 余下**：CameraX UI（当前走 Photo Picker 选图满足 MVP）、Connection 类 insight 端到端、Pattern 跨 mood+memory+图片三种数据源的真机验证。

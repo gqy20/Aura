@@ -56,7 +56,19 @@
 - Save 按钮从 LazyColumn 末尾提到 TopAppBar actions 永久可见（之前被 DataTransparencySection 推到屏外）
 - `api_key` 字段实时保存（`updateSettingsApiKey` 直接调 `configRepository.setApiKey`，不依赖 Save 按钮）
 
-**测试**：303 单测全绿（0 失败）。`assembleDebug` 通过。
+**M4 vision→memory→dream 闭环（`1b826d1`）**：
+- `MemoryEntity` 升级到 v8：`MIGRATION_7_8` 新增 `imageBase64 TEXT` + `imageMediaType TEXT DEFAULT 'image/jpeg'` 两列（Room 已 export schema v8）
+- `MemoryDao.getRecentImages/observeImages`：按 `imageBase64 IS NOT NULL` 过滤 + `ORDER BY timestamp DESC LIMIT :limit`
+- `MemoryRepository.saveVisionMemory`：把"用户发图"事件作为 `type=FACT, source=reflection:vision` 记忆写入（content 形如 `"[图片] 摘要"`）
+- `SendMessageUseCase`：注入 `MemoryRepository`，发送带图消息时 fire-and-forget 调 `saveVisionMemory`，失败仅 log 不阻塞主流程
+- `DreamDataCollector`：
+  - `Snapshot.imageMemories: List<ImageMemorySummary>`（**仅 metadata**，id/content/timestamp/importance，**不含 base64**）
+  - `collectLast7Days` 调 `memoryDao.getRecentImages(IMAGE_MEMORY_LIMIT=5)`，过滤 7 天窗口
+  - `render` 新增 `## 视觉证据(N 张)` section
+  - `isEmpty` 判定把 imageMemories 也纳入（无图无文本无 mood 算空）
+  - 注释里把"base64 永远不进 DreamPrompt"作为安全护栏写死；`render_doesNotLeakBase64` 测试做硬约束
+
+**测试**：372 单测全绿（0 失败），含 11 个 M4 vision memory 用例。`assembleDebug` 通过。
 
 **架构当前已完整闭环**：
 - Compose 聊天页 + `ChatViewModel` + `CompanionRuntime` + Koog `AIAgent` 流式调用
@@ -69,13 +81,13 @@
 
 仍处于规划或部分实现状态的模块：
 
-- CameraX 拍照/选图 UI（图片接收 + 压缩已实现，UI 待）
+- CameraX 拍照/选图 UI（图片接收 + 压缩已实现，UI 待 — 当前走 Photo Picker 选图满足 MVP）
 - SpeechRecognizer/TextToSpeech 语音 I/O
 - Rive/Lottie 状态机动画（Aura 角色用 Compose Canvas 临时替代）
 - 远端 Agent Server / `RemoteAgentRuntime` / MCP Gateway / Browser Worker（plan §8 收窄到"信息回写"主轴）
 - WorkManager Pulse worker（除 DreamLoop 之外的离线衰减/回归反应/主动通知）
 - Weekly Insight 自动汇总（M5） + 用户反馈回路（InsightLog）
-- Connection 类 insight + 视觉内容进 memory（M4）
+- M4 余下：Connection 类 insight 端到端、Pattern 跨 mood+memory+图片三种数据源的真机验证（PoC 待 Qwen 模型下载后跑通）
 
 ## 一、基础技术栈
 

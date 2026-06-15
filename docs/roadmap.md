@@ -1,6 +1,6 @@
 # Aura Roadmap
 
-> 最后核对：2026-06-14
+> 最后核对：2026-06-15
 >
 > 本文档用于跟踪当前实现进度，并把 `README.md` / `docs/architecture.md` 中的产品愿景拆成可执行里程碑。
 
@@ -12,6 +12,8 @@
 
 **2026-06-15 叙事主轴更新**：Aura 的产品定位从"AI 陪伴 App"调整为"**第二大脑 / 数字孪生**"——一个长期认识你的 AI。云端对话体（Responsive Mind）负责"对外办事"，本地陪伴体（Continuous Awareness）负责"对内懂事"。详细方案见 `docs/plan/dual-mind-architecture.md` §1.4 与 `docs/plan/insight-driven-product.md`。M2-M5 的 KPI 已按本叙事调整（见各里程碑详情）。
 
+**2026-06-15 M4 部分落地**：vision→memory→dream 闭环已通。`UserInput.Vision` 触发时自动写一条 `type=FACT, source=reflection:vision` 的记忆（含 base64 + mediaType），Dream Loop 7 天窗口里把最近 5 张图的 metadata 注入 `## 视觉证据` section 作为跨模态 evidence（**base64 永远不进 DreamPrompt**——本地 Qwen 纯文本路径，模型看不到图）。M4 余下：CameraX UI、Connection insight 端到端。
+
 已验证命令：
 
 ```bash
@@ -19,7 +21,7 @@
 ./gradlew.bat assembleDebug
 ```
 
-以上命令均已在 2026-06-14 验证通过（`testDebugUnitTest` 41 个测试全绿）。
+以上命令均已在 2026-06-15 验证通过（`testDebugUnitTest` **372 个测试全绿**；commit `1b826d1`）。
 
 ## 已实现
 
@@ -32,7 +34,7 @@
 - **`ReactiveCompanion`（dual-mind Phase 0 命名清理）**：原 `LocalQwenAgentWrapper` 重命名，体现"对用户消息的本地觉察响应"语义；Phase 1 拆云端对话体/本地觉察面后此实现将替换为独立接口。
 - **`core/presence/runtime/` 目录（dual-mind 觉察面前驱）**：
   - `LocalQwenExecutor`（包装 MNN 引擎 + Request(maxTokens/temperature) + parsePatternDetectOutput）
-  - `DreamDataCollector`（7 天 mood/message/memory 聚合 + 简易词频 top 10 + render prompt）
+  - `DreamDataCollector`（7 天 mood/message/memory 聚合 + 简易词频 top 10 + **跨模态 evidence**：`Snapshot.imageMemories` 取最近 5 张图 metadata，render 输出 `## 视觉证据` section；**base64 不进 prompt**）
   - `DreamLoopWorker`（@HiltWorker + @AssistedInject 模式）
   - `DreamLoopScheduler`（PeriodicWorkRequest 6h + 电量约束 + enqueueUniquePeriodicWork KEEP）
   - `BatteryHelper`（API 29+ / sticky broadcast 兜底）
@@ -54,17 +56,18 @@
 - **MoodTrendChart Canvas（M3）**：4 根周柱状图（高/中/低 3 档配色），按周聚合近 28 天 mood_snapshots。
 - **Insight "和 Aura 聊聊" prefill 路由（M3）**：`pendingPrefill` 字段 + `consumePrefillPrompt` + ChatScreen `LaunchedEffect(pendingPrefill)` 消费。
 - Reminder 模块：`AndroidReminderScheduler`（AlarmManager）+ `ReminderAlarmReceiver` + `ReminderNotificationWorker`（WorkManager OneTime）+ `ReminderNotificationPoster`（NotificationManagerCompat），含 `SCHEDULE_EXACT_ALARM` / `POST_NOTIFICATIONS` 权限。
+- **M4 Vision→Memory 闭环**：`MemoryEntity` 升级到 v8（`MIGRATION_7_8` 新增 `imageBase64 TEXT + imageMediaType TEXT DEFAULT 'image/jpeg'` 两列）；`MemoryDao.getRecentImages/observeImages` 按 `imageBase64 IS NOT NULL` 过滤；`MemoryRepository.saveVisionMemory` 把"用户发图"事件作为 FACT 记忆写入；`SendMessageUseCase` 注入 `MemoryRepository`，发送带图消息时 fire-and-forget 调 `saveVisionMemory`（失败仅 log 不阻塞主流程）；`DreamDataCollector.collectLast7Days` 拉最近 5 张图 metadata（**不含 base64**）进 `Snapshot.imageMemories` 注入 DreamPrompt `## 视觉证据` section。
 - Presence 状态控制层：`PresenceController`（mood / relationship / streaming / tool / error → 状态推导）+ `PresenceReactionPolicy`（用户点击、应用回前台、记忆保存等事件 → 反应策略）+ `PresenceModels`，状态已覆盖 idle / listening / thinking / speaking / searching / remembering / happy / sad / tired / error 等。
 - **Onboarding 5 问（M2 收尾）**：plan §5.2 种子期问题（挂心事/重要日期/称呼/关系人/作息）— 全部可选可跳过，模板表单不入 LLM。
 - **隐私"看见感"面板（M2 收尾）**：`DataTransparencySection`（设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + Bipass 二次确认）。
-- 单元测试覆盖：303 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、DreamDataCollector 4、AutoMemoryStore 4、ReactiveCompanion 4 等）。
+- 单元测试覆盖：372 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、ReactiveCompanion 4、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）** 等）。
 - Debug APK 构建链路。
 - `docs/plan` 规划文档：已新增端云智能体能力整体方案与 Vision/tools 协同计划、Promise System 设计、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）。
 
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页与 MCP 设置页已落地；仍缺少模型连通性检查动作。
-- **Vision**：`UserInput.Vision` 和 LLM client 图片 content 支持已存在，但 CameraX 预览/拍照/选图 UI 仍未实现（manifest 已声明 `CAMERA` 权限）。
+- **Vision**：`UserInput.Vision` + LLM client 图片 content + **M4 vision memory 闭环已落**（base64 存 `memories.imageBase64`，Dream Loop 跨模态 evidence 注入）。CameraX 预览/拍照 UI 仍未实现（manifest 已声明 `CAMERA` 权限，**当前用 Photo Picker 选图满足 MVP**）。
 - **情绪与关系**：核心状态更新、持久化恢复、聊天页可视化与 Presence 反应已接入；头像/表情层由 Compose Canvas 临时替代，Rive/Lottie 动画资源尚未接入。
 - **记忆**：LLM reflection 后置保存、工具搜索、prompt 注入、聊天页只读展示与 `MemoryRoomScreen` 已实现，但还没有完整编辑管理能力（删除 / 置顶 / 归档仍缺）。
 - **Release 构建**：ProGuard 与 debug 签名 fallback 已有，真实 release keystore 仍需验证。
@@ -153,18 +156,20 @@
 
 > 调整说明（2026-06-15）：Vision 在新叙事下不是孤立能力，而是"Aura 记得你看见了什么"——图片作为 evidence 进入 memory，进而可被 Pattern 跨模态引用。
 > 详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §9。
+> **M4 部分落地**（commit `1b826d1`）：vision→memory→dream 闭环已通。CameraX UI、Connection insight 端到端、Pattern 跨 mood+memory+图片三种数据源生成仍未做。
 
 目标：让 Aura 看见的不只是文字，还有你看见的世界。
 
-- 添加 CameraX 预览与拍照。
-- 视需要添加图库/图片选择。
-- 发送前压缩图片 payload。
-- 通过现有 runtime 路径发送 `UserInput.Vision`。
-- 权限拒绝时优雅退回纯文本聊天。
-- 补充图片大小限制与 prompt 构建测试。
-- **【新增，叙事主轴】** 视觉内容进入 memory 表（"你在 2026-06-15 拍了张夕阳"），并能作为 Pattern / Connection insight 的 evidence。
-- **【新增，叙事主轴】** Pattern insight 可跨 mood + memory + 图片三种数据源生成。
-- **【新增，叙事主轴】** Connection 类 insight 第一版可触发（找到 2 条不相关数据的潜在联系，confidence 必须 < 0.5，宁缺毋滥）。`core/insight/InsightPrompts.connectionDetect` 字面量已定义，M4 复用 `LocalQwenExecutor.execute()` 即可落地。
+- 添加 CameraX 预览与拍照。（未做 — 当前走 Photo Picker 选图）
+- 视需要添加图库/图片选择。✅（Photo Picker 已支持）
+- 发送前压缩图片 payload。✅（`ChatImageProcessor` JPEG/质量压缩已落）
+- 通过现有 runtime 路径发送 `UserInput.Vision`。✅（`SendMessageUseCase` 触发 `UserInput.Vision`）
+- 权限拒绝时优雅退回纯文本聊天。（Photo Picker 路径无需运行时权限）
+- 补充图片大小限制与 prompt 构建测试。✅（SendMessageUseCaseTest 含 vision input 用例）
+- **【新增，叙事主轴】** ✅ 视觉内容进入 memory 表（"你在 2026-06-15 拍了张夕阳"）。`MemoryEntity.imageBase64/imageMediaType` + `MIGRATION_7_8` + `MemoryRepository.saveVisionMemory` + `SendMessageUseCase` 自动落库，全链路 11 个测试覆盖。
+- **【新增，叙事主轴】** ✅ DreamDataCollector 把 image memory metadata（**不含 base64**）注入 `## 视觉证据` section，作为 Pattern insight 的跨模态 evidence。
+- **【新增，叙事主轴】** Pattern insight 可跨 mood + memory + 图片三种数据源生成。（Dream Prompt section 结构已就绪，待 `patternDetect` 跑通后真机验证）
+- **【新增，叙事主轴】** Connection 类 insight 第一版可触发（找到 2 条不相关数据的潜在联系，confidence 必须 < 0.5，宁缺毋滥）。`core/insight/InsightPrompts.connectionDetect` 字面量已定义，M4 复用 `LocalQwenExecutor.execute()` 即可落地。（待 PoC Qwen 模型下载后端到端跑通）
 - **MCP Gateway 准备**（plan §8 收窄到"信息回写"主轴）：`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 两个 Key + Flow + setter，M4 起可直接对接。
 
 ### M5：Pulse + Insight 主线化
@@ -220,7 +225,7 @@
 3. ~~M2 记忆 + Insight 框架 MVP。~~（已完成，`insights` 表 + Validator + Onboarding 5 问 + 主页 Insight 卡片 + 数据透明面板全落）
 4. ~~M3 情绪 + Insight Pattern MVP。~~（已完成，DreamLoop pipeline + Mood Trend Chart + Prefill 路由打通；PoC 阶段待 Qwen 模型下载后端到端可跑通）
 5. **M3 PoC 完善：用户在真机触发 Qwen 模型下载 → DreamLoop 跑出第一条 LLM 真实生成的 insight**（已写好 `LocalQwenModelDownloader` UI 入口，仅需用户操作 + 等待下载完成）。
-6. **M4 Vision + Insight 增强**：CameraX 单张图片发送（`UserInput.Vision` 路径 + 压缩 + 权限兜底已就位），图片入 memory + Pattern 跨模态生成；Connection 类 insight 复用 `LocalQwenExecutor.execute(InsightPrompts.connectionDetect)` 落地。
+6. **M4 Vision + Insight 增强**：**vision→memory→dream 闭环已落（commit `1b826d1`）**；余下 CameraX UI、Connection insight 端到端、Pattern 跨 mood+memory+图片三种数据源生成验证。
 7. **M5 Pulse + Weekly Insight**：离线衰减 / 回归反应 Worker、AnniversaryScanner 周期任务、Weekly Insight 自动汇总 + 通知、InsightLog 用户反馈回路（👍/👎/文字 → 训练样本）。
 8. **dual-mind Phase 1**：拆云端对话体 / 本地觉察面。`ReactiveCompanion` 替换为独立接口（不再 `KoogAgentWrapper`），`KoogAgentFactory` 删二选一分支；新建 `AuraMemoryStore` 文件系统实现（`user_patterns.md` / `recurring_topics.md`）。
 9. **抽象 `AgentRuntime`**：为本地 `CompanionRuntime` 和远程 `RemoteAgentRuntime` 留出切换入口；`@Inject` ChatViewModel 改用接口，便于真机 / 远端双模调试。
