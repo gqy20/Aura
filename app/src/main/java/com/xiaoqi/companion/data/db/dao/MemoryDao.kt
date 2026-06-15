@@ -13,6 +13,18 @@ interface MemoryDao {
     @Query("SELECT * FROM memories ORDER BY importance DESC, lastAccessed DESC")
     fun observeAll(): Flow<List<MemoryEntity>>
 
+    @Query("SELECT * FROM memories ORDER BY pinned DESC, importance DESC, lastAccessed DESC")
+    fun observeAllPinnedFirst(): Flow<List<MemoryEntity>>
+
+    @Query("UPDATE memories SET pinned = :pinned WHERE id = :id")
+    suspend fun setPinned(id: String, pinned: Boolean)
+
+    @Query("UPDATE memories SET archived = :archived WHERE id = :id")
+    suspend fun setArchived(id: String, archived: Boolean)
+
+    @Query("SELECT COUNT(*) FROM memories WHERE archived = 1")
+    suspend fun countArchived(): Int
+
     @Query("SELECT * FROM memories WHERE type = :type ORDER BY importance DESC")
     fun observeByType(type: com.xiaoqi.companion.data.db.converter.MemoryType): Flow<List<MemoryEntity>>
 

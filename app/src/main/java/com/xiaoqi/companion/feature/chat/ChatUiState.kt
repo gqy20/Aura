@@ -1,6 +1,7 @@
 package com.xiaoqi.companion.feature.chat
 
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
+import com.xiaoqi.companion.core.llm.ConnectivityResult
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -50,6 +51,8 @@ data class ChatMemory(
     val importance: Float,
     val source: String = "",
     val timestamp: Long = 0L,
+    val pinned: Boolean = false,
+    val archived: Boolean = false,
 )
 
 data class ChatReminder(
@@ -133,4 +136,7 @@ data class ChatUiState(
     val inputText: String = "",
     val permissionPrompt: ChatPermissionPrompt? = null,
     val error: String? = null,
+    val connectivityResult: ConnectivityResult? = null,
+    val mcpConnectivityResult: ConnectivityResult? = null,
+    val isCheckingConnectivity: Boolean = false,
 )

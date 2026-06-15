@@ -70,6 +70,7 @@ object DataModule {
                 CompanionDatabase.MIGRATION_2_3,
                 CompanionDatabase.MIGRATION_3_4,
                 CompanionDatabase.MIGRATION_4_5,
+                CompanionDatabase.MIGRATION_5_6,
             )
             .build()
 

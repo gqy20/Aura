@@ -13,12 +13,13 @@ import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
-import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
+import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
+import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
@@ -62,9 +63,10 @@ class ChatViewModelTest {
     private lateinit var imageProcessor: FakeChatImageProcessor
     private lateinit var toolCallRepository: FakeToolCallRepository
     private lateinit var reminderRepository: FakeReminderRepository
-    private lateinit var memoryDao: MemoryDao
+    private lateinit var memoryRepository: MemoryRepository
     private lateinit var agentStateDao: AgentStateDao
     private lateinit var appPreferences: AppPreferences
+    private lateinit var remoteMcpClient: RemoteMcpClient
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val configRepo: ConfigRepository = mockk(relaxed = true) {
@@ -165,9 +167,10 @@ class ChatViewModelTest {
         imageProcessor = FakeChatImageProcessor()
         toolCallRepository = FakeToolCallRepository()
         reminderRepository = FakeReminderRepository()
-        memoryDao = mockk(relaxed = true) {
-            every { observeAll() } returns flowOf(emptyList())
+        memoryRepository = mockk(relaxed = true) {
+            every { observeMemoriesPinnedFirst() } returns flowOf(emptyList())
         }
+        remoteMcpClient = mockk(relaxed = true)
         agentStateDao = mockk(relaxed = true) {
             every { observeByCompanionId("default") } returns flowOf(null)
         }
@@ -179,13 +182,14 @@ class ChatViewModelTest {
             toolCallRepository = toolCallRepository,
             configRepository = configRepo,
             messageRepository = messageRepo,
-            memoryDao = memoryDao,
+            memoryRepository = memoryRepository,
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,
             appPreferences = appPreferences,
             reminderRepository = reminderRepository,
             toolDisplayRegistry = ToolDisplayRegistry(),
+            remoteMcpClient = remoteMcpClient,
         )
     }
 
@@ -239,7 +243,7 @@ class ChatViewModelTest {
     fun deleteMemory_removesMemoryById() = runTest {
         viewModel.deleteMemory("memory-1")
         advanceUntilIdle()
-        coVerify { memoryDao.deleteById("memory-1") }
+        coVerify { memoryRepository.deleteMemory("memory-1") }
     }
 
     @Test
@@ -325,13 +329,14 @@ class ChatViewModelTest {
             toolCallRepository = toolCallRepository,
             configRepository = configRepo,
             messageRepository = imageMessageRepo,
-            memoryDao = memoryDao,
+            memoryRepository = memoryRepository,
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,
             appPreferences = appPreferences,
             reminderRepository = reminderRepository,
             toolDisplayRegistry = ToolDisplayRegistry(),
+            remoteMcpClient = remoteMcpClient,
         )
         advanceUntilIdle()
 

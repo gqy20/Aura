@@ -1,6 +1,8 @@
 package com.xiaoqi.companion.data.repository
 
 import app.cash.turbine.test
+import com.xiaoqi.companion.core.llm.ConnectivityResult
+import com.xiaoqi.companion.core.llm.LlmConnectivityChecker
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.ThemeMode
@@ -11,9 +13,15 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class ConfigRepositoryTest {
+
+    private fun buildRepo(
+        prefs: AppPreferences,
+        checker: LlmConnectivityChecker = mockk(relaxed = true),
+    ): ConfigRepositoryImpl = ConfigRepositoryImpl(prefs, checker)
 
     @Test
     fun getCurrentLlmConfig_returnsCombinedConfig() = runTest {
@@ -24,7 +32,7 @@ class ConfigRepositoryTest {
             every { baseUrl } returns flowOf("https://example.test/v1")
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
 
         repo.getCurrentLlmConfig().test {
             val config = awaitItem()
@@ -45,7 +53,7 @@ class ConfigRepositoryTest {
             every { baseUrl } returns flowOf("")
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
 
         repo.getCurrentLlmConfig().test {
             val config = awaitItem()
@@ -65,7 +73,7 @@ class ConfigRepositoryTest {
             every { baseUrl } returns flowOf("")
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
 
         repo.getCurrentLlmConfig().test {
             val config = awaitItem()
@@ -86,7 +94,7 @@ class ConfigRepositoryTest {
             every { baseUrl } returns flowOf("")
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
 
         repo.observeLlmConfigStatus().test {
             val status = awaitItem()
@@ -106,7 +114,7 @@ class ConfigRepositoryTest {
             every { themeMode } returns flowOf(ThemeMode.DARK)
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
         repo.themeMode.test {
             assertEquals(ThemeMode.DARK, awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -119,7 +127,7 @@ class ConfigRepositoryTest {
             coEvery { setApiKey(any()) } returns Unit
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
         repo.setApiKey("new-key")
     }
 
@@ -129,7 +137,7 @@ class ConfigRepositoryTest {
             coEvery { setLlmProvider(any()) } returns Unit
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
         repo.setLlmProvider(LlmProvider.KIMI)
     }
 
@@ -139,7 +147,7 @@ class ConfigRepositoryTest {
             coEvery { setModelName(any()) } returns Unit
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
         repo.setModelName("kimi-latest")
     }
 
@@ -149,9 +157,48 @@ class ConfigRepositoryTest {
             coEvery { setBaseUrl(any()) } returns Unit
         }
 
-        val repo = ConfigRepositoryImpl(prefs)
+        val repo = buildRepo(prefs)
         repo.setBaseUrl("https://example.test/v1")
 
         coVerify { prefs.setBaseUrl("https://example.test/v1") }
     }
+
+    @Test
+    fun checkConnectivity_delegatesToChecker() = runTest {
+        val prefs: AppPreferences = mockk {
+            every { apiKey } returns flowOf("key-abc")
+            every { llmProvider } returns flowOf(LlmProvider.GLM)
+            every { modelName } returns flowOf("glm-5v-turbo")
+            every { baseUrl } returns flowOf("")
+        }
+        val expected = ConnectivityResult.Success(latencyMs = 123L, modelName = "glm-5v-turbo")
+        val checker: LlmConnectivityChecker = mockk {
+            coEvery { check(any()) } returns expected
+        }
+        val repo = buildRepo(prefs, checker)
+
+        val actual = repo.checkConnectivity()
+
+        assertSame(expected, actual)
+    }
+
+    @Test
+    fun checkConnectivity_propagatesUnreachable() = runTest {
+        val prefs: AppPreferences = mockk {
+            every { apiKey } returns flowOf("k")
+            every { llmProvider } returns flowOf(LlmProvider.GLM)
+            every { modelName } returns flowOf("glm-5v-turbo")
+            every { baseUrl } returns flowOf("")
+        }
+        val expected = ConnectivityResult.Unreachable("timeout")
+        val checker: LlmConnectivityChecker = mockk {
+            coEvery { check(any()) } returns expected
+        }
+        val repo = buildRepo(prefs, checker)
+
+        val actual = repo.checkConnectivity()
+
+        assertSame(expected, actual)
+    }
 }
+

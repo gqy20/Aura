@@ -9,14 +9,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Button
@@ -54,6 +62,10 @@ fun MemoryRoomScreen(
     MemoryRoomScreenContent(
         memories = uiState.memories,
         onDeleteMemory = viewModel::deleteMemory,
+        onPinMemory = viewModel::pinMemory,
+        onUnpinMemory = viewModel::unpinMemory,
+        onArchiveMemory = viewModel::archiveMemory,
+        onUnarchiveMemory = viewModel::unarchiveMemory,
         onBack = onBack,
     )
 }
@@ -63,11 +75,16 @@ fun MemoryRoomScreen(
 private fun MemoryRoomScreenContent(
     memories: List<ChatMemory>,
     onDeleteMemory: (String) -> Unit,
+    onPinMemory: (String) -> Unit,
+    onUnpinMemory: (String) -> Unit,
+    onArchiveMemory: (String) -> Unit,
+    onUnarchiveMemory: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     var selectedType by remember { mutableStateOf<String?>(null) }
     var selectedMemory by remember { mutableStateOf<ChatMemory?>(null) }
     var pendingDelete by remember { mutableStateOf<ChatMemory?>(null) }
+    var actionMemory by remember { mutableStateOf<ChatMemory?>(null) }
     val visibleMemories = remember(memories, selectedType) {
         selectedType?.let { type -> memories.filter { it.type == type } } ?: memories
     }
@@ -133,6 +150,7 @@ private fun MemoryRoomScreenContent(
                         MemoryRoomItemCard(
                             memory = memory,
                             onOpen = { selectedMemory = memory },
+                            onLongPress = { actionMemory = memory },
                             onDelete = { pendingDelete = memory },
                         )
                     }
@@ -178,6 +196,21 @@ private fun MemoryRoomScreenContent(
                     Text("Cancel")
                 }
             },
+        )
+    }
+
+    actionMemory?.let { memory ->
+        MemoryActionDialog(
+            memory = memory,
+            onPin = { onPinMemory(memory.id); actionMemory = null },
+            onUnpin = { onUnpinMemory(memory.id); actionMemory = null },
+            onArchive = { onArchiveMemory(memory.id); actionMemory = null },
+            onUnarchive = { onUnarchiveMemory(memory.id); actionMemory = null },
+            onDelete = {
+                actionMemory = null
+                pendingDelete = memory
+            },
+            onDismiss = { actionMemory = null },
         )
     }
 }
@@ -247,17 +280,22 @@ private fun MemoryTypeFilters(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MemoryRoomItemCard(
     memory: ChatMemory,
     onOpen: () -> Unit,
+    onLongPress: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = Color(0xFFF7F2EA),
         tonalElevation = 0.dp,
-        modifier = Modifier.clickable(onClick = onOpen),
+        modifier = Modifier.combinedClickable(
+            onClick = onOpen,
+            onLongClick = onLongPress,
+        ),
     ) {
         Row(
             modifier = Modifier
@@ -275,6 +313,22 @@ private fun MemoryRoomItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CapabilityMetaPill(text = memory.type.memoryTypeLabel())
+                    if (memory.pinned) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "Pinned",
+                            tint = Color(0xFFE5A100),
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                    if (memory.archived) {
+                        Icon(
+                            imageVector = Icons.Filled.Archive,
+                            contentDescription = "Archived",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                     Text(
                         text = memory.source.memorySourceLabel(),
                         style = MaterialTheme.typography.labelSmall,
@@ -316,6 +370,95 @@ private fun MemoryRoomItemCard(
             }
         }
     }
+}
+
+@Composable
+private fun MemoryActionDialog(
+    memory: ChatMemory,
+    onPin: () -> Unit,
+    onUnpin: () -> Unit,
+    onArchive: () -> Unit,
+    onUnarchive: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(memory.type.memoryTypeLabel()) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = memory.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        confirmButton = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (memory.pinned) {
+                    TextButton(onClick = onUnpin) {
+                        Icon(
+                            imageVector = Icons.Outlined.StarOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Unpin")
+                    }
+                } else {
+                    TextButton(onClick = onPin) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Pin")
+                    }
+                }
+                if (memory.archived) {
+                    TextButton(onClick = onUnarchive) {
+                        Icon(
+                            imageVector = Icons.Outlined.Archive,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Unarchive")
+                    }
+                } else {
+                    TextButton(onClick = onArchive) {
+                        Icon(
+                            imageVector = Icons.Filled.Archive,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Archive")
+                    }
+                }
+                TextButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Delete")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        },
+    )
 }
 
 @Composable

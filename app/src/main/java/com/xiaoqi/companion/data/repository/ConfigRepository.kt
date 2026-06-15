@@ -1,10 +1,13 @@
 package com.xiaoqi.companion.data.repository
 
+import com.xiaoqi.companion.core.llm.ConnectivityResult
+import com.xiaoqi.companion.core.llm.LlmConnectivityChecker
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 data class LlmConfig(
@@ -91,9 +94,13 @@ interface ConfigRepository {
     suspend fun setBaseUrl(url: String)
     suspend fun setLlmProvider(provider: LlmProvider)
     suspend fun setModelName(name: String)
+    suspend fun checkConnectivity(): ConnectivityResult
 }
 
-class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences) : ConfigRepository {
+class ConfigRepositoryImpl @Inject constructor(
+    private val prefs: AppPreferences,
+    private val connectivityChecker: LlmConnectivityChecker,
+) : ConfigRepository {
 
     override val apiKey get() = prefs.apiKey
     override val baseUrl get() = prefs.baseUrl
@@ -139,5 +146,10 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
 
     override suspend fun setModelName(name: String) {
         prefs.setModelName(name)
+    }
+
+    override suspend fun checkConnectivity(): ConnectivityResult {
+        val config = getCurrentLlmConfig().first()
+        return connectivityChecker.check(config)
     }
 }

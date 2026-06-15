@@ -50,6 +50,8 @@ internal fun MemoryEntity.toChatMemory(): ChatMemory =
         importance = importance,
         source = source,
         timestamp = timestamp,
+        pinned = pinned,
+        archived = archived,
     )
 
 internal fun ReminderEntity.toChatReminder(): ChatReminder =

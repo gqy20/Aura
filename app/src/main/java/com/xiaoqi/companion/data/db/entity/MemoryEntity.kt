@@ -11,6 +11,8 @@ import com.xiaoqi.companion.data.db.converter.MemoryType
     indices = [
         Index(value = ["type"]),
         Index(value = ["lastAccessed"]),
+        Index(value = ["pinned"]),
+        Index(value = ["archived"]),
     ],
 )
 data class MemoryEntity(
@@ -26,4 +28,6 @@ data class MemoryEntity(
     val expiresAt: Long? = null,
     @ColumnInfo(defaultValue = "normal") val sensitivity: String = "normal",
     val lastAccessed: Long = timestamp,
+    @ColumnInfo(defaultValue = "0") val pinned: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val archived: Boolean = false,
 )

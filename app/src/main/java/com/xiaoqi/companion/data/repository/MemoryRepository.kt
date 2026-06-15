@@ -10,6 +10,7 @@ import com.xiaoqi.companion.core.logging.LogTags
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -168,6 +169,33 @@ class MemoryRepository @Inject constructor(
                 )
             }
         }
+
+    fun observeMemoriesPinnedFirst(): Flow<List<MemoryEntity>> = memoryDao.observeAllPinnedFirst()
+
+    suspend fun pinMemory(id: String): Unit = withContext(Dispatchers.IO) {
+        memoryDao.setPinned(id, true)
+        AppLogger.info(LogTags.Repo, "memory_pinned", "memoryId" to id)
+    }
+
+    suspend fun unpinMemory(id: String): Unit = withContext(Dispatchers.IO) {
+        memoryDao.setPinned(id, false)
+        AppLogger.info(LogTags.Repo, "memory_unpinned", "memoryId" to id)
+    }
+
+    suspend fun archiveMemory(id: String): Unit = withContext(Dispatchers.IO) {
+        memoryDao.setArchived(id, true)
+        AppLogger.info(LogTags.Repo, "memory_archived", "memoryId" to id)
+    }
+
+    suspend fun unarchiveMemory(id: String): Unit = withContext(Dispatchers.IO) {
+        memoryDao.setArchived(id, false)
+        AppLogger.info(LogTags.Repo, "memory_unarchived", "memoryId" to id)
+    }
+
+    suspend fun deleteMemory(id: String): Unit = withContext(Dispatchers.IO) {
+        memoryDao.deleteById(id)
+        AppLogger.info(LogTags.Repo, "memory_deleted_via_repo", "memoryId" to id)
+    }
 
     private suspend fun findMergeTarget(content: String, type: MemoryType): MemoryEntity? {
         val keyTerms = content.keyTerms()

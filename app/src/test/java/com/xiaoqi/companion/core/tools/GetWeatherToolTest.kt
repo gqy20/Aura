@@ -28,7 +28,7 @@ class GetWeatherToolTest {
         assertTrue(result.contains(""""status":"ok""""))
         assertTrue(result.contains(""""locationName":"Shanghai""""))
         assertTrue(result.contains(""""temperatureCelsius":25.5"""))
-        assertTrue(result.contains(""""weatherLabel":"clear""""))
+        assertTrue(result.contains(""""weatherLabel":"晴""""))
     }
 
     @Test
@@ -103,7 +103,7 @@ class GetWeatherToolTest {
         rainMm = 0.0,
         windSpeedKmh = 12.0,
         weatherCode = 0,
-        weatherLabel = "clear",
+        weatherLabel = "晴",
         isDay = true,
         observedAt = "2026-05-16T12:00",
     )

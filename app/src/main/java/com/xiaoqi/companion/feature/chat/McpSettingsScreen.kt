@@ -8,15 +8,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -31,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xiaoqi.companion.core.llm.ConnectivityResult
 
 @Composable
 fun McpSettingsScreen(
@@ -45,9 +49,12 @@ fun McpSettingsScreen(
         currentMcpServerName = uiState.toolCapabilitySettings.mcpServerName,
         currentMcpHttpUrl = uiState.toolCapabilitySettings.mcpHttpUrl,
         message = uiState.mcpSettingsMessage,
+        mcpConnectivityResult = uiState.mcpConnectivityResult,
+        isCheckingMcp = uiState.isCheckingConnectivity,
         onMcpServerNameChanged = viewModel::updateMcpSettingsName,
         onMcpHttpUrlChanged = viewModel::updateMcpSettingsUrl,
         onSave = viewModel::saveMcpSettings,
+        onTestConnection = viewModel::checkMcpConnectivity,
         onBack = onBack,
     )
 }
@@ -60,9 +67,12 @@ private fun McpSettingsScreenContent(
     currentMcpServerName: String,
     currentMcpHttpUrl: String,
     message: String?,
+    mcpConnectivityResult: ConnectivityResult?,
+    isCheckingMcp: Boolean,
     onMcpServerNameChanged: (String) -> Unit,
     onMcpHttpUrlChanged: (String) -> Unit,
     onSave: () -> Unit,
+    onTestConnection: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -118,6 +128,46 @@ private fun McpSettingsScreenContent(
                     placeholder = { Text("https://example.com/mcp") },
                     singleLine = true,
                 )
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        onClick = onTestConnection,
+                        enabled = !isCheckingMcp,
+                    ) {
+                        Text("Test connection")
+                    }
+                    if (isCheckingMcp) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                    val (text, color) = when (mcpConnectivityResult) {
+                        null -> "" to MaterialTheme.colorScheme.onSurfaceVariant
+                        is ConnectivityResult.Success -> {
+                            "OK · ${mcpConnectivityResult.modelName}" to Color(0xFF2E7D32)
+                        }
+                        is ConnectivityResult.AuthFailure -> {
+                            "鉴权失败" to MaterialTheme.colorScheme.error
+                        }
+                        is ConnectivityResult.Unreachable -> {
+                            "不可达: ${mcpConnectivityResult.cause}" to MaterialTheme.colorScheme.error
+                        }
+                    }
+                    if (text.isNotEmpty()) {
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = color,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
             item {
                 Surface(

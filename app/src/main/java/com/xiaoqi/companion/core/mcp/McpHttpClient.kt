@@ -36,6 +36,7 @@ data class McpToolSpec(
 interface RemoteMcpClient {
     suspend fun listTools(serverUrl: String): List<McpToolSpec>
     suspend fun callTool(serverUrl: String, toolName: String, arguments: JsonObject): String
+    suspend fun ping(serverUrl: String): Boolean
 }
 
 @Singleton
@@ -137,6 +138,44 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                 throw e
             }
         }
+
+    /**
+     * 轻量连通性探测:对 `serverUrl` 发一个 HEAD 请求,只要服务端有响应(任意状态码)即视为可达。
+     *
+     * - 200/204:可作为 MCP server 使用
+     * - 404/405/415 等:端点可达,但 URL 可能不是 MCP 端点 — 仍视为"网络可达"
+     * - IOException/timeout:不可达
+     *
+     * 不抛异常,只用 boolean 表示。
+     */
+    override suspend fun ping(serverUrl: String): Boolean = withContext(Dispatchers.IO) {
+        if (serverUrl.isBlank()) return@withContext false
+        val startedAt = System.currentTimeMillis()
+        val request = Request.Builder()
+            .url(serverUrl)
+            .head()
+            .build()
+        try {
+            httpClient.newCall(request).execute().use { response ->
+                AppLogger.info(
+                    LogTags.Tools,
+                    "mcp_ping_completed",
+                    "serverHost" to serverUrl.hostForLog(),
+                    "statusCode" to response.code,
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                )
+                true
+            }
+        } catch (e: Exception) {
+            AppLogger.warn(
+                LogTags.Tools,
+                "mcp_ping_unreachable",
+                "serverHost" to serverUrl.hostForLog(),
+                "cause" to (e.message ?: e::class.simpleName.orEmpty()),
+            )
+            false
+        }
+    }
 
     private fun ensureInitialized(serverUrl: String) {
         if (sessions.containsKey(serverUrl)) return

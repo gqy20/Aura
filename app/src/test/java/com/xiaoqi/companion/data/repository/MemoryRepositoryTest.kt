@@ -7,6 +7,7 @@ import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MemorySummaryEntity
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -205,6 +206,55 @@ class MemoryRepositoryTest : BaseDaoTest() {
 
         assertFalse(unrelated.memoryIds.contains("private"))
         assertTrue(related.memoryIds.contains("private"))
+    }
+
+    @Test
+    fun pinMemory_setsPinnedTrue() = runTest {
+        memoryDao.insert(memory(id = "p1", content = "Fact A", importance = 0.5f))
+
+        repository.pinMemory("p1")
+
+        assertTrue(memoryDao.getById("p1")!!.pinned)
+    }
+
+    @Test
+    fun unpinMemory_setsPinnedFalse() = runTest {
+        memoryDao.insert(memory(id = "p1", content = "Fact A", importance = 0.5f))
+        repository.pinMemory("p1")
+
+        repository.unpinMemory("p1")
+
+        assertEquals(false, memoryDao.getById("p1")!!.pinned)
+    }
+
+    @Test
+    fun archiveMemory_setsArchivedTrue() = runTest {
+        memoryDao.insert(memory(id = "a1", content = "Old fact", importance = 0.4f))
+
+        repository.archiveMemory("a1")
+
+        assertTrue(memoryDao.getById("a1")!!.archived)
+    }
+
+    @Test
+    fun unarchiveMemory_setsArchivedFalse() = runTest {
+        memoryDao.insert(memory(id = "a1", content = "Old fact", importance = 0.4f))
+        repository.archiveMemory("a1")
+
+        repository.unarchiveMemory("a1")
+
+        assertEquals(false, memoryDao.getById("a1")!!.archived)
+    }
+
+    @Test
+    fun observeMemoriesPinnedFirst_returnsPinnedMemoriesFirst() = runTest {
+        memoryDao.insert(memory(id = "m-normal", content = "Normal", importance = 0.9f, lastAccessed = 9_000L))
+        memoryDao.insert(memory(id = "m-pinned", content = "Pinned", importance = 0.3f, lastAccessed = 1_000L))
+
+        repository.pinMemory("m-pinned")
+
+        val first = memoryDao.observeAllPinnedFirst().first()
+        assertEquals("m-pinned", first[0].id)
     }
 
     private fun memory(

@@ -13,18 +13,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -44,6 +47,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xiaoqi.companion.core.llm.ConnectivityResult
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import java.util.Locale
@@ -67,11 +71,14 @@ fun SettingsScreen(
         message = uiState.settingsMessage,
         localQwenDownload = uiState.localQwenDownload,
         toolSettings = uiState.toolCapabilitySettings,
+        connectivityResult = uiState.connectivityResult,
+        isCheckingConnectivity = uiState.isCheckingConnectivity,
         onApiKeyChanged = viewModel::updateSettingsApiKey,
         onProviderChanged = viewModel::updateSettingsProvider,
         onModelNameChanged = viewModel::updateSettingsModelName,
         onBaseUrlChanged = viewModel::updateSettingsBaseUrl,
         onSave = viewModel::saveSettings,
+        onTestConnection = viewModel::checkLlmConnectivity,
         onDownloadLocalQwenModel = viewModel::downloadSelectedLocalQwenModel,
         onDeviceStatusEnabledChanged = viewModel::setDeviceStatusContextEnabled,
         onLocationContextEnabledChanged = viewModel::setLocationContextEnabled,
@@ -96,11 +103,14 @@ private fun SettingsScreenContent(
     message: String?,
     localQwenDownload: LocalQwenDownloadUiState,
     toolSettings: ChatToolCapabilitySettings,
+    connectivityResult: ConnectivityResult?,
+    isCheckingConnectivity: Boolean,
     onApiKeyChanged: (String) -> Unit,
     onProviderChanged: (LlmProvider) -> Unit,
     onModelNameChanged: (String) -> Unit,
     onBaseUrlChanged: (String) -> Unit,
     onSave: () -> Unit,
+    onTestConnection: () -> Unit,
     onDownloadLocalQwenModel: () -> Unit,
     onDeviceStatusEnabledChanged: (Boolean) -> Unit,
     onLocationContextEnabledChanged: (Boolean) -> Unit,
@@ -189,6 +199,13 @@ private fun SettingsScreenContent(
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    )
+                }
+                item {
+                    ConnectivityCheckRow(
+                        result = connectivityResult,
+                        isChecking = isCheckingConnectivity,
+                        onTest = onTestConnection,
                     )
                 }
             }
@@ -569,3 +586,54 @@ private fun contextPermissions(): Array<String> =
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
     }.toTypedArray()
+
+@Composable
+private fun ConnectivityCheckRow(
+    result: ConnectivityResult?,
+    isChecking: Boolean,
+    onTest: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedButton(
+            onClick = onTest,
+            enabled = !isChecking,
+        ) {
+            Text("Test connection")
+        }
+        if (isChecking) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+            )
+        }
+        ConnectivityResultLabel(result)
+    }
+}
+
+@Composable
+private fun ConnectivityResultLabel(result: ConnectivityResult?) {
+    val (text, color) = when (result) {
+        null -> "" to MaterialTheme.colorScheme.onSurfaceVariant
+        is ConnectivityResult.Success -> {
+            "OK · ${result.latencyMs}ms" to Color(0xFF2E7D32)
+        }
+        is ConnectivityResult.AuthFailure -> {
+            "鉴权失败 (${result.statusCode})" to MaterialTheme.colorScheme.error
+        }
+        is ConnectivityResult.Unreachable -> {
+            "不可达: ${result.cause}" to MaterialTheme.colorScheme.error
+        }
+    }
+    if (text.isNotEmpty()) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1,
+        )
+    }
+}

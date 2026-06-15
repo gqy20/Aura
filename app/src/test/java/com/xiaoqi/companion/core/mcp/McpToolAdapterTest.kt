@@ -60,5 +60,7 @@ class McpToolAdapterTest {
             this.arguments = arguments
             return "ok"
         }
+
+        override suspend fun ping(serverUrl: String): Boolean = true
     }
 }

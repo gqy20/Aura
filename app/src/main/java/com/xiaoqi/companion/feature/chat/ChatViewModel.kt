@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.core.llm.ConnectivityResult
+import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.presence.PresenceEvent
 import com.xiaoqi.companion.core.presence.PresenceInputs
@@ -14,8 +16,8 @@ import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
-import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
@@ -35,6 +37,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -62,13 +65,14 @@ class ChatViewModel @Inject constructor(
     private val toolCallRepository: ToolCallRepository,
     private val configRepository: ConfigRepository,
     private val messageRepository: MessageRepository,
-    private val memoryDao: MemoryDao,
+    private val memoryRepository: MemoryRepository,
     private val agentStateDao: AgentStateDao,
     private val presenceController: PresenceController,
     private val presenceReactionPolicy: PresenceReactionPolicy,
     private val appPreferences: AppPreferences,
     private val reminderRepository: ReminderRepository,
     private val toolDisplayRegistry: ToolDisplayRegistry,
+    private val remoteMcpClient: RemoteMcpClient,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -149,9 +153,9 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 5. 记忆列表
+        // 5. 记忆列表(置顶优先,见 PR-A MIGRATION_5_6)
         viewModelScope.launch {
-            memoryDao.observeAll().collect { memories ->
+            memoryRepository.observeMemoriesPinnedFirst().collect { memories ->
                 _uiState.update { state ->
                     state.copy(memories = memories.take(24).map { it.toChatMemory() })
                 }
@@ -279,11 +283,131 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 AppLogger.info(LogTags.Repo, "ui_delete_memory_started", "memoryId" to memoryId)
-                memoryDao.deleteById(memoryId)
+                memoryRepository.deleteMemory(memoryId)
                 AppLogger.info(LogTags.Repo, "ui_delete_memory_completed", "memoryId" to memoryId)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_delete_memory_failed", "memoryId" to memoryId)
                 _uiState.update { it.copy(error = "Delete memory failed. Please try again.") }
+            }
+        }
+    }
+
+    fun pinMemory(memoryId: String) {
+        viewModelScope.launch {
+            try {
+                memoryRepository.pinMemory(memoryId)
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_pin_memory_failed", "memoryId" to memoryId)
+                _uiState.update { it.copy(error = "Pin memory failed. Please try again.") }
+            }
+        }
+    }
+
+    fun unpinMemory(memoryId: String) {
+        viewModelScope.launch {
+            try {
+                memoryRepository.unpinMemory(memoryId)
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_unpin_memory_failed", "memoryId" to memoryId)
+                _uiState.update { it.copy(error = "Unpin memory failed. Please try again.") }
+            }
+        }
+    }
+
+    fun archiveMemory(memoryId: String) {
+        viewModelScope.launch {
+            try {
+                memoryRepository.archiveMemory(memoryId)
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_archive_memory_failed", "memoryId" to memoryId)
+                _uiState.update { it.copy(error = "Archive memory failed. Please try again.") }
+            }
+        }
+    }
+
+    fun unarchiveMemory(memoryId: String) {
+        viewModelScope.launch {
+            try {
+                memoryRepository.unarchiveMemory(memoryId)
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_unarchive_memory_failed", "memoryId" to memoryId)
+                _uiState.update { it.copy(error = "Unarchive memory failed. Please try again.") }
+            }
+        }
+    }
+
+    fun checkLlmConnectivity() {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isCheckingConnectivity = true,
+                    connectivityResult = null,
+                )
+            }
+            try {
+                val result = configRepository.checkConnectivity()
+                _uiState.update {
+                    it.copy(
+                        connectivityResult = result,
+                        isCheckingConnectivity = false,
+                    )
+                }
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Config, e, "ui_llm_connectivity_check_failed")
+                _uiState.update {
+                    it.copy(
+                        connectivityResult = ConnectivityResult.Unreachable(
+                            cause = e.message ?: e::class.simpleName.orEmpty(),
+                        ),
+                        isCheckingConnectivity = false,
+                    )
+                }
+            }
+        }
+    }
+
+    fun checkMcpConnectivity() {
+        viewModelScope.launch {
+            val url = appPreferences.mcpHttpUrl
+            val current = appPreferences.mcpServerName
+            _uiState.update {
+                it.copy(
+                    isCheckingConnectivity = true,
+                    mcpConnectivityResult = null,
+                )
+            }
+            try {
+                val firstUrl: String = url.first()
+                val serverName: String = current.first()
+                val result: ConnectivityResult = if (firstUrl.isBlank()) {
+                    ConnectivityResult.Unreachable("MCP URL 未配置")
+                } else {
+                    val ok: Boolean = remoteMcpClient.ping(firstUrl)
+                    if (ok) {
+                        ConnectivityResult.Success(
+                            latencyMs = 0L,
+                            modelName = if (serverName.isBlank()) firstUrl else serverName,
+                        )
+                    } else {
+                        ConnectivityResult.Unreachable("MCP 端点不可达")
+                    }
+                }
+                _uiState.update {
+                    it.copy(
+                        mcpConnectivityResult = result,
+                        isCheckingConnectivity = false,
+                    )
+                }
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Config, e, "ui_mcp_connectivity_check_failed")
+                _uiState.update {
+                    it.copy(
+                        mcpConnectivityResult = ConnectivityResult.Unreachable(
+                            cause = e.message ?: e::class.simpleName.orEmpty(),
+                        ),
+                        isCheckingConnectivity = false,
+                    )
+                }
             }
         }
     }
