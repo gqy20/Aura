@@ -141,7 +141,7 @@ MultiLLMPromptExecutor(AnthropicMessagesLLMClient(apiKey, baseUrl))
 - ✅ 视觉输入经 `LLMCapability.Vision.Image` + `ContentPart.Image(AttachmentContent.Binary.Base64)` 完整跑通
 - ✅ LLM 连通性检查（`LlmConnectivityChecker`）能在设置页 "Test connection" 按钮里区分 200 / 401 / 网络失败
 - ✅ 本地模型分流（`LlmProvider.LOCAL_QWEN` 走 `ReactiveCompanion`，不进 Koog）
-- ✅ `./gradlew.bat testDebugUnitTest` 于 2026-06-14 通过（41 测试 / 0 失败）
+- ✅ `./gradlew.bat testDebugUnitTest` 于 2026-06-15 通过（**372 测试 / 0 失败**；含 11 个 M4 vision memory 用例）
 
 ### 2.4 仍待补
 
@@ -483,7 +483,7 @@ public abstract kotlinx.coroutines.flow.Flow<ai.koog.prompt.streaming.StreamFram
 - [x] `runStructured` 用于 memory reflection
 - [x] LLM 连通性检查区分 200/401/网络失败
 - [x] 本地模型（`LlmProvider.LOCAL_QWEN`）走 `ReactiveCompanion` 不进 Koog
-- [x] `./gradlew.bat testDebugUnitTest` 于 2026-06-14 通过（41 测试 / 0 失败）
+- [x] `./gradlew.bat testDebugUnitTest` 于 2026-06-15 通过（**372 测试 / 0 失败**；含 11 个 M4 vision memory 用例）
 
 ### 7.3 后续待补
 

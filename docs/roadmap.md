@@ -38,9 +38,9 @@
   - `DreamLoopWorker`（@HiltWorker + @AssistedInject 模式）
   - `DreamLoopScheduler`（**7 档可配置周期** OFF / 15min / 30min / 1h / 3h / 6h(默认) / 12h + **立即跑一次按钮**；`WorkScheduler` 接口 + `WorkManagerScheduler` 实现解耦 WorkManager 静态；Hilt 注入 `@ApplicationScope` CoroutineScope 跑 collector；改档位走 `ExistingPeriodicWorkPolicy.UPDATE`；默认 6h 向后兼容）
   - `BatteryHelper`（API 29+ / sticky broadcast 兜底）
-- Room 持久化：messages、memories、memory_summaries、agent_state、mood_snapshots、tool_calls、reminders、**insights**（M2 新增）。
+- Room 持久化：messages、memories、memory_summaries、agent_state、mood_snapshots、tool_calls、reminders、**insights**、**health_snapshots**（DB schema v9）。
 - DataStore 配置仓库：API key（实时写）、provider、model name、theme mode、**onboarding 相关 3 key**（user_patterns_json / recurring_topics_json / onboarding_completed_at）、**模型连通性检查 3 key**（PR-A）、`llm_provider` / `model_name` / `base_url` / `mcp_*`。
-- Agent tools：只读上下文工具、`search_memory`、`search_records`、`search_summaries`、时间/设备/天气/提醒与远程 MCP 工具；记忆、情绪、关系写入改为回复完成后的系统阶段。
+- Agent tools：只读上下文工具、`search_memory`、`search_records`、`search_summaries`、时间/设备/天气/健康数据/提醒与远程 MCP 工具；记忆、情绪、关系写入改为回复完成后的系统阶段。
 - App 启动时恢复 Room 中的聊天历史。
 - 聊天页顶部展示当前情绪和关系状态。
 - 情绪/关系状态写入 `agent_state`，App 重启后可恢复。
@@ -61,16 +61,17 @@
 - **Dream Loop 周期可配置 + 立即触发**：7 档周期（OFF / 15min / 30min / 1h / 3h / 6h(默认) / 12h）经 `AppPreferences.dreamLoopInterval` 暴露给 Settings UI；`DreamLoopScheduler` 注入 `@ApplicationScope` CoroutineScope 跑长生命周期 collector，改档位走 `ExistingPeriodicWorkPolicy.UPDATE` 立即生效；`WorkScheduler` 接口 + `WorkManagerScheduler` 实现解耦 WorkManager 静态；`triggerNow()` 走 OneTimeWorkRequest 唯一名 `"dream_loop_now"`，适合用户主动验证或调参；选 15min/30min 时 UI 显示耗电警告文案。默认 6h 向后兼容历史行为。
 - **Onboarding 5 问（M2 收尾）**：plan §5.2 种子期问题（挂心事/重要日期/称呼/关系人/作息）— 全部可选可跳过，模板表单不入 LLM。
 - **隐私"看见感"面板（M2 收尾）**：`DataTransparencySection`（设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + Bipass 二次确认）。
+- **Health 多源链雏形**：`HealthSnapshotEntity` + `HealthSnapshotDao` + `HealthConnectDataSource` + `SensorManagerHealthSource` + `HealthSyncManager` + `HealthDataSection` + `QueryHealthDataTool`，支持健康数据同步、展示与工具查询。
 - 单元测试覆盖：372 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、ReactiveCompanion 4、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）**、**DreamLoopIntervalTest 6 + DreamLoopSchedulerTest 9** 等）。
 - Debug APK 构建链路。
-- `docs/plan` 规划文档：已新增端云智能体能力整体方案与 Vision/tools 协同计划、Promise System 设计、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）。
+- `docs/plan` 当前保留端云智能体能力整体方案、Vision/tools 协同计划、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）；已完成/阶段性过期方案归档到 `docs/archive/plan`。
 
 ## 部分实现
 
-- **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页与 MCP 设置页已落地；仍缺少模型连通性检查动作。
+- **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。
 - **Vision**：`UserInput.Vision` + LLM client 图片 content + **M4 vision memory 闭环已落**（base64 存 `memories.imageBase64`，Dream Loop 跨模态 evidence 注入）。CameraX 预览/拍照 UI 仍未实现（manifest 已声明 `CAMERA` 权限，**当前用 Photo Picker 选图满足 MVP**）。
 - **情绪与关系**：核心状态更新、持久化恢复、聊天页可视化与 Presence 反应已接入；头像/表情层由 Compose Canvas 临时替代，Rive/Lottie 动画资源尚未接入。
-- **记忆**：LLM reflection 后置保存、工具搜索、prompt 注入、聊天页只读展示与 `MemoryRoomScreen` 已实现，但还没有完整编辑管理能力（删除 / 置顶 / 归档仍缺）。
+- **记忆**：LLM reflection 后置保存、工具搜索、prompt 注入、聊天页只读展示、`MemoryRoomScreen`、删除、置顶、归档已实现；完整编辑内容/合并/批量管理仍待补。
 - **Release 构建**：ProGuard 与 debug 签名 fallback 已有，真实 release keystore 仍需验证。
 - **端云智能体能力**：总体方案已整理到 `docs/plan/agent-capability-server-plan.md`，但 Android 远程 runtime、Agent Server、MCP Gateway、Browser Worker、云端记忆、长期任务和 Skills 系统尚未实现。
 - **Presence Layer**：状态控制器与反应策略已落地；动画资源（Rive / Lottie 状态机）、触摸互动、回归反应动画、连续动作编排尚未实现。
@@ -78,17 +79,17 @@
 
 ## 尚未实现
 
-- CameraX 预览、拍照、图库选择流程。
+- CameraX 预览、拍照流程；图库选择已由 Photo Picker 覆盖。
 - Android 运行时权限 UX（权限已声明，运行时申请 UX 缺）。
 - `SpeechRecognizer` / `TextToSpeech` 语音输入输出（`RECORD_AUDIO` 已声明）。
 - WorkManager Pulse worker：离线衰减、回归反应、主动通知调度（目前仅 Reminder 用 OneTimeWorkRequest）。
 - Rive / Presence Layer 角色状态机、思考/说话/记忆/搜索等状态动画、触摸互动和回归反应动画。
-- 隐私、导出、删除数据等用户控制能力。
+- 更完整的隐私控制（当前已有设置页条数展示、JSON 导出和清空入口；仍缺细粒度策略、权限 UX 和长期产品化说明）。
 - Instrumented UI 测试套件和 CI 工作流验证。
 - 远程 Agent Server 与 Android `RemoteAgentRuntime`。
 - MCP Gateway、Browser Worker、云端长期记忆、长期任务调度和 Skill Registry。
-- **Insight 流水线（叙事主轴）**：`insights` 表 / InsightValidator / Pattern Detect / Weekly Insight / 用户反馈回路。详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §3。
-- **陪伴体运行时（叙事主轴）**：`core/presence/runtime/`（Heartbeat / DreamPipeline / ReactiveResponder / CompanionKVCacheStore / MoodDrift）。详见 [`plan/dual-mind-architecture.md`](./plan/dual-mind-architecture.md) §4.2。
+- **Insight 后续流水线（叙事主轴）**：Weekly Insight、InsightLog 用户反馈回路、Connection insight 端到端。`insights` 表 / Validator / Pattern Detect PoC 已落地。详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §3。
+- **陪伴体运行时后续（叙事主轴）**：Heartbeat / ReactiveResponder / CompanionKVCacheStore / MoodDrift。`core/presence/runtime/` 中 DreamLoop 前驱已落地。详见 [`plan/dual-mind-architecture.md`](./plan/dual-mind-architecture.md) §4.2。
 
 ## 里程碑
 
@@ -111,7 +112,7 @@
 - 添加 API key 输入与本地持久化。（已完成）
 - 添加 GLM/Kimi provider 与 model selector。（已完成）
 - 聊天页设置弹层。（已完成）
-- 添加模型连通性检查动作。
+- 添加模型连通性检查动作。（已完成）
 - 聊天页配置状态提示。（已完成）
 - 补充配置写入与 ViewModel 行为测试。（已完成）
 
@@ -124,7 +125,7 @@
 
 - 如果 DAO 继续外溢到 runtime/UI，补一个 memory repository facade。
 - 添加只读版记忆房间。（`MemoryRoomScreen` 已落地）
-- 按需要添加删除、置顶、归档动作。
+- 按需要添加删除、置顶、归档动作。（已完成）
 - 在聊天 UI 中更清楚地展示保存/搜索记忆的过程。
 - 补充记忆排序、prompt 注入数量限制、工具结果展示测试。
 - **【新增，叙事主轴】** 落地 `insights` 表 / Entity / DAO / Repository。
@@ -196,7 +197,7 @@
 
 目标：准备更长时间的日常使用。
 
-- 添加隐私控制、数据删除、数据导出。
+- 扩展隐私控制、数据删除、数据导出。（基础面板已完成，细粒度策略待补）
 - 扩展聊天、设置、记忆、权限等 instrumented tests。
 - 添加或验证 CI 工作流。
 - 验证 release signing 和 shrinker 行为。

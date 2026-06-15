@@ -694,7 +694,7 @@ val error = when (e) {
 
 ## 11. 已验证约束
 
-> 来源：`./gradlew.bat testDebugUnitTest` 于 2026-06-14 通过（41 个测试，0 失败）
+> 来源：`./gradlew.bat testDebugUnitTest` 于 2026-06-15 通过（**372 个测试，0 失败**；含 11 个 M4 vision memory 用例）
 
 | 约束 | 验证方式 | 状态 |
 |------|---------|------|

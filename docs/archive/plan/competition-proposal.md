@@ -1,5 +1,7 @@
 # Aura · 奥拉 — 手机上的创意 AI 挑战赛 · 创意方案
 
+> Archived on 2026-06-15. Kept for historical design context; no longer a current planning entry.
+>
 > **赛道**：手机上的创意 AI 挑战赛（TONGYI LAB × Arm）
 >
 > **作品名称**：Aura · 奥拉 —— 住在你手机里的第二大脑

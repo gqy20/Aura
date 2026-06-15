@@ -502,7 +502,7 @@ Insight 只**指出观察**，不**下达指令**。可以说"你最近 3 周都
 
 - [`dual-mind-architecture.md`](./dual-mind-architecture.md) — §1.4 产品叙事与差异化是本方案的上位说明
 - [`agent-capability-server-plan.md`](./agent-capability-server-plan.md) — 远端 agent 在新叙事下被收窄为"信息回写"
-- [`promise-system-design.md`](./promise-system-design.md) — Promise 系统可视为 insight 的一种特殊类型
+- [`archive/plan/promise-system-design.md`](../archive/plan/promise-system-design.md) — Promise 系统可视为 insight 的一种特殊类型（历史方案）
 - [`roadmap.md`](../roadmap.md) — M2-M5 的 KPI 已按本方案调整
 
 ---

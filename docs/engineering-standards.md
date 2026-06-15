@@ -3,7 +3,7 @@
 > 本文档定义项目的 CI/CD 流水线、测试策略、代码规范和质量门禁。
 > 与 [architecture.md](./architecture.md) 配合使用：架构文档管"用什么"，本文档管"怎么写/怎么测/怎么发"。
 >
-> 当前状态（2026-05-15）：本地已验证 `testDebugUnitTest` 与 `assembleDebug` 通过；CI、ktlint、完整 instrumented tests 仍按本文档作为目标规范推进。
+> 当前状态（2026-06-15）：本地已验证 `testDebugUnitTest`（372 个测试全绿）与 `assembleDebug` 通过；CI、ktlint、完整 instrumented tests 仍按本文档作为目标规范推进。
 
 ---
 
@@ -542,7 +542,7 @@ main (受保护)
 | 版本号 | `versionName` 和 `versionCode` 已递增 |
 | 签名 | Release APK 已正确签名 |
 | ProGuard | `minifyEnabled = true`，无警告遗漏 |
-| 多模态 | CameraX 权限声明完整 |
+| 多模态 | 按当前入口验证 Photo Picker / Vision；CameraX 权限与拍照 UI 在启用 CameraX 时补齐 |
 | 隐私政策 | 数据采集说明已更新（如有变更） |
 | 模型配置 | 默认 GLM-5v-turbo，Kimi 可切换正常 |
 | 崩溃分析 | Crashlytics / Sentry SDK 已集成 |

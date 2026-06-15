@@ -4,11 +4,11 @@
 
 - 项目名称：Aura · 奥拉（Android AI 陪伴应用）
 - 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形
-- 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系）；NavHost 五条路由（Home/Chat/Settings/McpSettings/MemoryRoom）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）
-- 部分实现：模型配置（设置页已落地，连通性检查仍缺）、Vision（输入结构已支持，CameraX UI 仍缺）、情绪与关系（持久化与可视化已接入，头像层由 Compose Canvas 临时替代）、记忆（完整页面与 prompt 注入已实现，编辑/归档动作仍缺）、Presence Layer（状态控制器已落地，Rive/Lottie 动画资源仍缺）
-- 尚未实现：CameraX 预览/拍照/选图流程、`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest，缺少离线衰减 / 回归反应 / 主动通知）、Rive/Lottie 状态机动画、Instrumented UI 测试、隐私/导出/删除控制、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
+- 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系/Health/Insight/Reminder）；NavHost 六条路由（Home/Chat/Settings/McpSettings/MemoryRoom/Onboarding）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`OnboardingScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）；`LlmConnectivityChecker`；`DataTransparencySection`；`HealthSyncManager` / `HealthDataSection`
+- 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪与关系的头像/表情层由 Compose Canvas 临时替代；Presence Layer 的 Rive/Lottie 动画资源仍缺；Pulse 的离线衰减/回归反应/主动通知仍缺
+- 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest）、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
-- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-06-14 通过（41 个测试，0 失败）
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-06-15 通过（**372 个测试，0 失败**；含 11 个 M4 vision memory 用例）
 
 ## 常用验证命令
 
@@ -36,7 +36,7 @@ make check
 ./gradlew.bat build
 ```
 
-以上 Gradle 命令已在 2026-06-14 验证通过（`testDebugUnitTest` 41 个测试全绿）。
+以上 Gradle 命令已在 2026-06-15 验证通过（`testDebugUnitTest` **372 个测试全绿**）。
 
 ## 工具路径与运行时环境
 

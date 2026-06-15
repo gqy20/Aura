@@ -6,15 +6,16 @@
 
 ## 特性
 
-- **当前版本：0.1.3** — 发布与稳定性增强版本，聚焦响应链路稳定、结构化记忆写入、远程工具/定位/天气/提醒诊断日志和 release 发布流程
-- **已实现：文本聊天闭环** — Compose 聊天页 + ChatViewModel + CompanionRuntime + Koog Agent
+- **当前版本：0.1.3**
+- **已实现：文本聊天闭环** — Compose 聊天页 + `ChatViewModel` + `CompanionRuntime` + Koog Agent
 - **已实现：流式对话** — Anthropic Messages 兼容 SSE 流式输出，聊天气泡逐字渲染
-- **已实现：长期记忆体系增强** — Room 存储消息、记忆、摘要、情绪快照、工具调用记录；`MemoryRepository` 统一保存、搜索、prompt selection 和访问时间更新；回复完成后由 LLM reflection 判断是否写入记忆
-- **已实现：Agent 工具调用** — 只读上下文工具、记忆搜索、摘要搜索、设备/时间/天气/提醒与远程 MCP 工具；记忆/情绪/关系写入已从工具阶段移到后置系统阶段
+- **已实现：长期记忆体系增强** — Room 存储消息、记忆、摘要、情绪快照、工具调用、insight、reminder、health；`MemoryRepository` 统一保存、搜索、prompt selection 和访问时间更新
+- **已实现：Agent 工具调用** — 只读上下文工具、记忆搜索、摘要搜索、设备/时间/天气/提醒/Health/MCP 工具
 - **已实现：情绪与关系核心** — 情绪状态机和关系模型已接入 Agent 主循环
-- **已实现：模型与工具设置** — 设置弹层支持 provider、模型名、Base URL、API Key、MCP HTTP URL 与上下文工具开关
-- **部分实现：多模态** — 图片选择、Vision prompt 和底层图片输入已接入；Vision 主回复禁用 tools，但支持后置 reflection 记忆整理
-- **规划中：生命脉冲** — WorkManager 依赖已接入，后台 pulse/通知/主动关怀尚未实现
+- **已实现：设置与可观测性** — Provider、模型名、Base URL、API Key、MCP HTTP URL、连通性检查、Dream Loop 周期、Health 同步、数据导出/清空
+- **已实现：Insight / Onboarding / Presence** — Insight 卡片、Mood Trend、Onboarding、PresenceController、PresenceReactionPolicy
+- **已实现：Vision 闭环** — Photo Picker 选图 + `UserInput.Vision` + memory 落库 + Dream evidence 注入
+- **部分实现：主动陪伴与动画** — PulseWorker、Rive/Lottie 状态机、语音 I/O、CameraX 拍摄 UI、远端 Agent Server 仍未完成
 
 ## 技术栈
 
@@ -28,7 +29,7 @@
 | 架构 | MVVM + Repository |
 | 并发 | Coroutines + Flow |
 | Agent 框架 | [Koog](https://github.com/JetBrains/koog) 0.8.0 |
-| LLM | GLM-5v-turbo (智谱) / Kimi 2.6 (月之暗面) |
+| LLM | GLM-5v-turbo (智谱) / Kimi 2.6 (月之暗面) / ModelScope Inference (本地：MNN + Qwen) |
 | DI | Hilt |
 | 数据库 | Room |
 | 配置存储 | DataStore |
@@ -54,7 +55,7 @@ app/src/main/java/com/xiaoqi/companion/
 └── di/                       # Hilt 依赖注入模块
 ```
 
-> `platform/`、`feature/settings`、`feature/memory_room`、`core/pulse` 仍属于 roadmap 中的计划模块，当前源码目录尚未落地。
+> `platform/`、`core/pulse`、`RemoteAgentRuntime` 仍属于 roadmap 中的计划模块；当前已落地的 `feature/onboarding` / `feature/insight`、`core/presence/runtime/` / `core/insight/` / `data/source/` 等子包见 [`docs/architecture.md §2`](docs/architecture.md) 末段。
 
 ## 快速开始
 
@@ -131,6 +132,7 @@ data class LlmConfig(
 - [技术架构文档](docs/architecture.md) — 完整的分层设计、LLM 选型、Agent Core 流程
 - [工程化规范](docs/engineering-standards.md) — CI/CD、测试策略、代码规范、质量门禁
 - [Roadmap](docs/roadmap.md) — 当前进度、下一阶段任务和里程碑
+- [Archive](docs/archive/README.md) — 历史方案和已归档调研材料
 
 ## License
 

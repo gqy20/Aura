@@ -72,7 +72,7 @@
 
 **架构当前已完整闭环**：
 - Compose 聊天页 + `ChatViewModel` + `CompanionRuntime` + Koog `AIAgent` 流式调用
-- Room/DataStore/Hilt 基础设施（7 表 + 16 索引 + 7 DAO + 5 Repository）
+- Room/DataStore/Hilt 基础设施（9 个 Entity / 9 个 DAO，Room schema v9）
 - 只读上下文工具、记忆/摘要搜索、设备/时间/天气/提醒与远程 MCP 工具
 - 写路径严格走 Validator 守门（insight 写、memory 合并）
 - Agent 写操作在回复后系统阶段处理（不再作主对话工具）
@@ -81,7 +81,7 @@
 
 仍处于规划或部分实现状态的模块：
 
-- CameraX 拍照/选图 UI（图片接收 + 压缩已实现，UI 待 — 当前走 Photo Picker 选图满足 MVP）
+- CameraX 拍照 UI（图片接收 + 压缩已实现，当前走 Photo Picker 选图满足 MVP）
 - SpeechRecognizer/TextToSpeech 语音 I/O
 - Rive/Lottie 状态机动画（Aura 角色用 Compose Canvas 临时替代）
 - 远端 Agent Server / `RemoteAgentRuntime` / MCP Gateway / Browser Worker（plan §8 收窄到"信息回写"主轴）
@@ -111,7 +111,7 @@
 | 序列化 | kotlinx.serialization | 结构化 JSON 输入输出 |
 | 动画 | Lottie / Rive | 依赖已规划，角色表情层尚未实现 |
 | 语音 | Android TTS + SpeechRecognizer | 规划中 |
-| 相机 | CameraX | 依赖已接入，拍照/选图 UI 尚未实现 |
+| 相机 / 选图 | Photo Picker + CameraX | Photo Picker 已作为 MVP 入口；CameraX 依赖保留，拍照 UI 尚未实现 |
 | 图片加载 | Coil | Compose 原生图片加载 |
 | 日志 | Timber | 轻量日志库 |
 | 崩溃分析 | Firebase Crashlytics / Sentry | 生产级监控 |
@@ -136,10 +136,10 @@ app/
 │  │  ├─ McpSettingsScreen.kt  #     MCP 服务配置
 │  │  ├─ MemoryRoomScreen.kt   #     记忆房间
 │  │  └─ AuraHomeScreen.kt     #     角色主屏入口
-│  ├─ avatar/                  #   角色主屏（规划中）
-│  ├─ memory_room/             #   记忆房间（规划中）
-│  ├─ settings/                #   设置页（规划中）
-│  └─ onboarding/              #   新手引导（规划中）
+│  ├─ avatar/                  #   角色主屏（目标形态；当前在 feature/chat 内）
+│  ├─ memory_room/             #   记忆房间（目标形态；当前在 feature/chat 内）
+│  ├─ settings/                #   设置页（目标形态；当前在 feature/chat 内）
+│  └─ onboarding/              #   新手引导（已落地）
 │
 ├─ core/                       # 核心业务逻辑（自研 + Koog）
 │  ├─ companion/               #   ★ CompanionRuntime 主循环（自研）
@@ -166,7 +166,7 @@ app/
    └─ permissions/            #   权限管理
 ```
 
-> 上面包含目标形态。当前源码中已经落地 `feature/chat`（含 `presence` / `mapper` / `usecase` 三个子包）、`core/companion`、`core/llm`、`core/prompt`、`core/tools`、`core/logging`、`core/presence`、`core/local`、`core/reminder`、`data`、`di`；`platform` 与多数非聊天 feature 仍在 roadmap 中。
+> 上面包含目标形态。当前源码中已经落地 `feature/chat`（含 `presence` / `mapper` / `usecase` 三个子包）、`feature/onboarding`、`feature/insight`、`core/companion`、`core/llm`、`core/prompt`、`core/tools`、`core/logging`、`core/presence`、`core/presence/runtime`、`core/local`、`core/reminder`、`core/insight`、`data`、`data/source`、`di`；`platform` 与独立拆包后的多数非聊天 feature 仍在 roadmap 中。
 
 ### 2.1 核心调用链（聊天主路径）
 
@@ -256,10 +256,10 @@ Phase 0（重命名 + 注释）预计 2026-06 内完成；具体 PoC 入口和�
 ```kotlin
 // 模型配置（DataStore 存储，设置页切换）
 data class LlmConfig(
-    val provider: LlmProvider = LlmProvider.GLM,     // GLM 或 KIMI
+    val provider: LlmProvider = LlmProvider.GLM,     // GLM / KIMI / MODELSCOPE（云端），或 LOCAL_QWEN（本地）
     val baseUrl: String = "https://open.bigmodel.cn/api/paas/v1",
     val apiKey: String,
-    val modelName: String = "glm-5v-turbo",          // 或 "kimi-latest"
+    val modelName: String = "glm-5v-turbo",          // 或 "kimi-latest" / "Qwen/Qwen3.5-397B-A17B"
 )
 ```
 
@@ -332,10 +332,14 @@ Room 负责持久化的核心数据：
 | 表名 | 存储内容 |
 |------|----------|
 | messages | 聊天消息记录（已实现） |
-| memories | 长期记忆条目（已实现） |
+| memories | 长期记忆条目（已实现，含 vision image metadata/base64 字段） |
+| memory_summaries | 长期记忆摘要（已实现） |
 | agent_state | Agent 当前状态快照（已实现基础表） |
 | mood_snapshots | 情绪历史快照（已实现） |
 | tool_calls | Agent 工具调用记录（已实现） |
+| reminders | 本地提醒（已实现） |
+| insights | Insight 卡片与 evidence（已实现） |
+| health_snapshots | 每日健康数据聚合（已实现雏形） |
 | life_events | 生活事件时间线（规划中） |
 | agent_profile | 角色档案配置（规划中） |
 | memory_objects | 记忆物品（照片、地点等，规划中） |
@@ -663,7 +667,7 @@ override fun create(config: LlmConfig): KoogAgentWrapper {
 | 路由 | 走什么 | 说明 |
 |------|-------|------|
 | `LlmProvider.LOCAL_QWEN` | `ReactiveCompanion` | MNN 本地推理，不进 Koog，**不**支持流式 + tool |
-| `LlmProvider.GLM` / `KIMI` / 其他云端 | `KoogPromptExecutorWrapper` | 走 Anthropic Messages 兼容端点，支持流式 + tool + reflection |
+| `LlmProvider.GLM` / `KIMI` / `MODELSCOPE` / 其他云端 | `KoogPromptExecutorWrapper` | 走 Anthropic Messages 兼容端点（MODELSCOPE 默认 `api-inference.modelscope.cn` + `Qwen/Qwen3.5-397B-A17B`），支持流式 + tool + reflection |
 
 切换模型只需改 `ConfigRepository`（DataStore），下次 `send()` 自动用新模型。
 
@@ -1259,7 +1263,7 @@ androidx.test.ext:junit
 androidx.test.espresso:espresso-core
 ```
 
-> **不再需要的依赖：** Ktor Client（LLM 网络层由 Koog 内部处理）。如果后续有非 LLM 的网络需求（如 analytics 上报），按需单独引入。
+> **网络层说明：** 项目当前使用自研 `AnthropicMessagesLLMClient` + OkHttp 适配 Anthropic Messages 兼容 SSE；业务层通过 Koog executor/agent 消费，不直接接触 HTTP 细节。
 
 ---
 

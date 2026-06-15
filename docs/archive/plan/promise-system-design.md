@@ -1,5 +1,7 @@
 # 约定系统 (Promise System) — 详细设计文档
 
+> Archived on 2026-06-15. Kept for historical design context; no longer a current planning entry.
+>
 > 创建日期：2026-06-10
 >
 > 本文档定义 Aura 的"约定/未来意向"捕获、管理、触发与兑现的完整方案。

@@ -1,5 +1,7 @@
 # Aura 视觉审计报告 · P3
 
+> Archived on 2026-06-15. Kept for historical design context; no longer a current planning entry.
+>
 > 4 页 × 4 对标站 · 7 维度对比分析 · 改进方向
 > 起草：2026-06-15 / 桌面 1440×900 / Playwright 实测截图
 

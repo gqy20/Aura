@@ -1,5 +1,7 @@
 # Aura 项目网站方案
 
+> Archived on 2026-06-15. Kept for historical design context; no longer a current planning entry.
+>
 > 产品叙事旗舰 + 极致动效 + Vercel 部署 / 调研与决策文档
 > 起草：2026-06-15 / 待评审
 

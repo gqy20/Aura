@@ -1,5 +1,7 @@
 # Aura MNN 深度优化调研与差距分析
 
+> Archived on 2026-06-15. Kept for historical design context; no longer a current planning entry.
+>
 > 更新时间：2026-06-15
 >
 > 测试设备：Realme RMX3562 / Dimensity 8200 (MT6895) / 4×A78 + 4×A55 / Mali-G610 MC6 / 12GB RAM / Android 14

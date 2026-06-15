@@ -1,10 +1,12 @@
 # Aura LifeScore（人生积分）设计方案
 
+> Archived on 2026-06-15. Kept for historical design context; no longer a current planning entry.
+>
 > Last updated: 2026-06-15
 >
 > Scope: 为 Aura 引入"用户自身进步可量化、可视化"的轻量积分系统。让"我也在一点点变好"从感觉变成可触摸的数字、趋势与里程碑。
 >
-> 关联文档：[`insight-driven-product.md`](./insight-driven-product.md) · [`dual-mind-architecture.md`](./dual-mind-architecture.md) · [`roadmap.md`](../roadmap.md) · [`architecture.md`](../architecture.md)
+> 关联文档：[`insight-driven-product.md`](../../plan/insight-driven-product.md) · [`dual-mind-architecture.md`](../../plan/dual-mind-architecture.md) · [`roadmap.md`](../../roadmap.md) · [`architecture.md`](../../architecture.md)
 
 ---
 

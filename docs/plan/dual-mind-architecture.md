@@ -888,7 +888,7 @@ class DreamLoopWorker(
 - [`on-device-qwen-mnn-research.md`](../on-device-qwen-mnn-research.md) — 端侧 Qwen / MNN 可行性调研，本文是该结论的架构落地
 - [`plan/agent-capability-server-plan.md`](./agent-capability-server-plan.md) — 端云协同智能体的服务器端方案
 - [`plan/vision-tools-plan.md`](./vision-tools-plan.md) — Vision 与工具协同
-- [`plan/promise-system-design.md`](./promise-system-design.md) — 承诺系统设计
+- [`archive/plan/promise-system-design.md`](../archive/plan/promise-system-design.md) — 承诺系统设计（历史方案）
 
 ### 12.2 外部调研参考
 
