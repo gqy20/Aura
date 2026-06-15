@@ -22,6 +22,17 @@ class MnnLocalQwenEngine @Inject constructor(
     private val bridgeMutex = Mutex()
     private var bridge: MnnLlmBridge? = null
     private var loadedConfigPath: String? = null
+    private var loadedRuntimeConfig: String? = null
+
+    /**
+     * Active inference config. Set via [setInferenceConfig] before first [stream] call,
+     * or updated between calls (will trigger bridge reload on next request).
+     */
+    private var inferenceConfig: MnnInferenceConfig = MnnInferenceConfig.DEFAULT
+
+    fun setInferenceConfig(config: MnnInferenceConfig) {
+        inferenceConfig = config
+    }
 
     override fun stream(request: LocalQwenRequest): Flow<String> = callbackFlow {
         val job = launch(Dispatchers.IO) {
@@ -48,7 +59,8 @@ class MnnLocalQwenEngine @Inject constructor(
                 )
 
                 bridgeMutex.withLock {
-                    val activeBridge = ensureBridgeLoaded(configFile.absolutePath)
+                    val runtimeConfigJson = inferenceConfig.toJson()
+                    val activeBridge = ensureBridgeLoaded(configFile.absolutePath, runtimeConfigJson)
                     withContext(Dispatchers.Default) {
                         activeBridge.generate(
                             systemPrompt = request.systemPrompt,
@@ -83,9 +95,12 @@ class MnnLocalQwenEngine @Inject constructor(
         }
     }
 
-    private suspend fun ensureBridgeLoaded(configPath: String): MnnLlmBridge {
+    private suspend fun ensureBridgeLoaded(configPath: String, runtimeConfig: String): MnnLlmBridge {
         val currentBridge = bridge
-        if (currentBridge != null && loadedConfigPath == configPath) {
+        if (currentBridge != null &&
+            loadedConfigPath == configPath &&
+            loadedRuntimeConfig == runtimeConfig
+        ) {
             AppLogger.debug(
                 LogTags.LocalModel,
                 "mnn_bridge_reused",
@@ -96,10 +111,12 @@ class MnnLocalQwenEngine @Inject constructor(
         currentBridge?.release()
         bridge = null
         loadedConfigPath = null
+        loadedRuntimeConfig = null
         return bridgeFactory.create().also { newBridge ->
-            newBridge.load(configPath)
+            newBridge.load(configPath, runtimeConfig)
             bridge = newBridge
             loadedConfigPath = configPath
+            loadedRuntimeConfig = runtimeConfig
         }
     }
 

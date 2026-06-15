@@ -94,14 +94,16 @@ class MnnLocalQwenEngineTest {
         var released = false
         var loadCount = 0
         var loadedConfigPath: String? = null
+        var loadedRuntimeConfig: String? = null
         var systemPrompt: String? = null
         var userMessage: String? = null
         val prompts = mutableListOf<Pair<String, String>>()
 
-        override suspend fun load(configPath: String) {
+        override suspend fun load(configPath: String, runtimeConfig: String) {
             loaded = true
             loadCount++
             loadedConfigPath = configPath
+            loadedRuntimeConfig = runtimeConfig
         }
 
         override fun generate(

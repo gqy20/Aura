@@ -294,7 +294,8 @@ extern "C" JNIEXPORT jlong JNICALL
 Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
         JNIEnv* env,
         jobject /* thiz */,
-        jstring configPath) {
+        jstring configPath,
+        jstring runtimeConfig) {
 #ifndef AURA_MNN_LINKED
     throwIllegalState(env, "Aura MNN native stub is built, but MNN runtime is not linked yet.");
     return 0;
@@ -320,15 +321,38 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
         const std::string prefixCacheDir = tmpDir + "/prefixcache";
         mkdir(tmpDir.c_str(), 0700);
         mkdir(prefixCacheDir.c_str(), 0700);
+        const std::string runtimeJson = toString(env, runtimeConfig);
         const int effectiveMaxNewTokens = readMaxNewTokens(path);
-        llm->set_config(
+
+        // Build base config (paths + structural options that must always be set)
+        std::string baseConfig =
                 "{\"tmp_path\":\"" + tmpDir +
                 "\",\"prefix_cache_path\":\"" + prefixCacheDir +
                 "\",\"use_mmap\":true,\"kvcache_mmap\":true,"
                 "\"reuse_kv\":true,"
                 "\"prompt_cache\":true,"
                 "\"max_new_tokens\":" + std::to_string(effectiveMaxNewTokens) + ","
-                "\"jinja\":{\"context\":{\"enable_thinking\":false}}}");
+                "\"jinja\":{\"context\":{\"enable_thinking\":false}}}";
+
+        // If Kotlin passed a runtime config JSON, merge it into the base config.
+        // Runtime keys override base keys (except paths which are always base).
+        if (!runtimeJson.empty() && runtimeJson != "{}") {
+            // Simple merge: strip the trailing '}' from base, strip the leading '{'
+            // from runtime, and concatenate.  This works because MNN set_config
+            // accepts a flat JSON object.
+            std::string merged = baseConfig.substr(0, baseConfig.size() - 1);
+            const std::string runtimeBody = runtimeJson.substr(1);
+            if (!runtimeBody.empty() && runtimeBody != "}") {
+                merged += "," + runtimeBody;
+            } else {
+                merged += "}";
+            }
+            logInfo("mnn_runtime_config_merged baseLength=" + std::to_string(baseConfig.size()) +
+                    " runtimeLength=" + std::to_string(runtimeJson.size()));
+            llm->set_config(merged);
+        } else {
+            llm->set_config(baseConfig);
+        }
 
         if (!llm->load()) {
             throwIllegalState(env, "MNN model load failed: " + path);

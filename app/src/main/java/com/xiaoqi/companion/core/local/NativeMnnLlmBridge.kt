@@ -14,14 +14,15 @@ class NativeMnnLlmBridge(
 ) : MnnLlmBridge {
     private var instanceId: Long = 0L
 
-    override suspend fun load(configPath: String) {
+    override suspend fun load(configPath: String, runtimeConfig: String) {
         AppLogger.info(
             LogTags.LocalModel,
             "mnn_bridge_load_started",
             "configPath" to configPath,
+            "hasRuntimeConfig" to runtimeConfig.isNotEmpty(),
         )
         ensureNativeAvailable()
-        instanceId = native.init(configPath)
+        instanceId = native.init(configPath, runtimeConfig)
         if (instanceId == 0L) {
             throw IllegalStateException("MNN native session failed to load: $configPath")
         }
@@ -96,7 +97,7 @@ interface NativeMnnProgressListener {
 
 interface NativeMnnLlmApi {
     fun loadLibrary(): Boolean
-    fun init(configPath: String): Long
+    fun init(configPath: String, runtimeConfig: String = ""): Long
     fun submit(
         instanceId: Long,
         systemPrompt: String,
@@ -138,8 +139,8 @@ private object JniNativeMnnLlmApi : NativeMnnLlmApi {
         return libraryLoaded
     }
 
-    override fun init(configPath: String): Long =
-        initNative(configPath)
+    override fun init(configPath: String, runtimeConfig: String): Long =
+        initNative(configPath, runtimeConfig)
 
     override fun submit(
         instanceId: Long,
@@ -153,7 +154,7 @@ private object JniNativeMnnLlmApi : NativeMnnLlmApi {
         releaseNative(instanceId)
     }
 
-    private external fun initNative(configPath: String): Long
+    private external fun initNative(configPath: String, runtimeConfig: String): Long
     private external fun submitNative(
         instanceId: Long,
         systemPrompt: String,

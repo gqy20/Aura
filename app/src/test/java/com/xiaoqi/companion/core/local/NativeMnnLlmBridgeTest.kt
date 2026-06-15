@@ -19,7 +19,7 @@ class NativeMnnLlmBridgeTest {
         val bridge = NativeMnnLlmBridge(
             native = object : NativeMnnLlmApi {
                 override fun loadLibrary(): Boolean = false
-                override fun init(configPath: String): Long = 0
+                override fun init(configPath: String, runtimeConfig: String): Long = 0
                 override fun submit(
                     instanceId: Long,
                     systemPrompt: String,
@@ -53,7 +53,7 @@ class NativeMnnLlmBridgeTest {
         var userMessage: String? = null
 
         override fun loadLibrary(): Boolean = true
-        override fun init(configPath: String): Long = 1L
+        override fun init(configPath: String, runtimeConfig: String): Long = 1L
 
         override fun submit(
             instanceId: Long,
