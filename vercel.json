@@ -4,7 +4,7 @@
   "installCommand": "cd web && pnpm install --frozen-lockfile",
   "outputDirectory": "web/apps/web/.next",
   "framework": "nextjs",
-  "regions": ["hkg1", "sin1"],
+  "regions": ["hkg1"],
   "git": {
     "deploymentEnabled": {
       "main": true,
