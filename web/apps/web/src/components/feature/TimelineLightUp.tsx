@@ -44,7 +44,7 @@ export function TimelineLightUp({ points, axisColor = 'rgba(255,255,255,0.2)' }:
     if (reduced) return
 
     const ctx = gsap.context(() => {
-      // 横轴线展开
+      // 横轴线展开（scrub，跟随 scroll 进度）
       if (axisRef.current) {
         gsap.fromTo(
           axisRef.current,
@@ -63,34 +63,38 @@ export function TimelineLightUp({ points, axisColor = 'rgba(255,255,255,0.2)' }:
       }
 
       // 每个节点单独一个 ScrollTrigger，按时间顺序点亮
+      // 注意：节点默认已经可见（opacity:1），GSAP 只附加"glow + scale-up"效果，
+      // 避免 fullPage 截图或搜索引擎爬虫看不到内容
       dotsRef.current.forEach((dot, i) => {
         if (!dot) return
         const meta = metaRef.current[i]
+        const targetColor = points[i].color
 
+        // 用 fromTo 的 from 设一个"未亮起"状态，to 直接到当前静态状态
+        // 这样如果 GSAP 没触发（无 scroll），元素仍显示为静态可见
         gsap
           .timeline({
             scrollTrigger: {
               trigger: containerRef.current,
-              start: `top+=${i * 8}% center`,
+              start: `top+=${i * 6}% center`,
               once: true,
             },
           })
           .fromTo(
             dot,
-            { scale: 0.3, opacity: 0.3, backgroundColor: axisColor },
+            { scale: 0.4, backgroundColor: axisColor, boxShadow: '0 0 0 transparent' },
             {
               scale: 1,
-              opacity: 1,
-              backgroundColor: points[i].color,
-              boxShadow: `0 0 16px ${points[i].color}80`,
+              backgroundColor: targetColor,
+              boxShadow: `0 0 16px ${targetColor}80`,
               duration: 0.5,
               ease: 'power2.out',
             },
           )
           .fromTo(
             meta,
-            { opacity: 0, y: 6 },
-            { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' },
+            { y: 6 },
+            { y: 0, duration: 0.4, ease: 'power2.out' },
             '-=0.2',
           )
       })
@@ -118,13 +122,12 @@ export function TimelineLightUp({ points, axisColor = 'rgba(255,255,255,0.2)' }:
               className="block h-3.5 w-3.5 rounded-full"
               style={{ backgroundColor: axisColor }}
             />
-            {/* 时间 + 标签 + 备注（GSAP stagger 后才显现） */}
+            {/* 时间 + 标签 + 备注 — 默认就可见，GSAP 仅做轻量位移 */}
             <div
               ref={(el) => {
                 metaRef.current[i] = el
               }}
               className="mt-2"
-              style={{ opacity: 0 }}
             >
               <span className="font-mono text-[10px] text-muted">{p.time}</span>
               <p className="mt-1 text-xs font-medium text-foreground">{p.label}</p>

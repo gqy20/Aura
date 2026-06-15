@@ -213,13 +213,9 @@ export default function PresencePage() {
               </tr>
             </thead>
             <tbody>
-              {REACTIONS.map((r, i) => (
-                <motion.tr
+              {REACTIONS.map((r) => (
+                <tr
                   key={r.name}
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: i * 0.05 }}
                   className="border-b border-border/50"
                 >
                   <td className="py-4 pr-6 font-mono text-xs">
@@ -253,7 +249,7 @@ export default function PresencePage() {
                     {r.duration}
                   </td>
                   <td className="py-4 text-muted">{r.desc}</td>
-                </motion.tr>
+                </tr>
               ))}
             </tbody>
           </table>
