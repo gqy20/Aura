@@ -52,8 +52,18 @@ class SettingsUseCase @Inject constructor(
         refreshLocalQwenModelStatus(state.configStatus.modelName, scope, update)
     }
 
+    /**
+     * 用户输入即写 DataStore — 不依赖 Save 按钮(Save 按钮之前被推到屏外时
+     * 用户根本点不到,导致 api_key 等字段从没真写入)。key 非空才 setApiKey,
+     * 沿用 "value 不空就持久化" 的契约。
+     */
     fun updateSettingsApiKey(value: String, update: (ChatUiState.() -> ChatUiState) -> Unit) {
         update { copy(settingsApiKey = value, settingsMessage = null) }
+        kotlinx.coroutines.GlobalScope.launch {  // 写路径不需要 viewModel scope
+            if (value.isNotBlank()) {
+                configRepository.setApiKey(value.trim())
+            }
+        }
     }
 
     fun updateSettingsProvider(

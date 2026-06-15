@@ -144,6 +144,11 @@ private fun SettingsScreenContent(
                     IconButton(onClick = onOpenMcpSettings) {
                         Icon(Icons.Default.Build, contentDescription = "MCP settings")
                     }
+                    // Save 按钮提到 TopAppBar — 之前放在 LazyColumn 末尾会被数据透明 Section
+                    // 推到屏外,用户根本点不到,导致 api_key 等字段没真正写进 DataStore。
+                    androidx.compose.material3.TextButton(onClick = onSave) {
+                        Text("Save")
+                    }
                 },
             )
         },
@@ -239,19 +244,6 @@ private fun SettingsScreenContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = onBack) {
-                        Text("Cancel")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = onSave) {
-                        Text("Save")
-                    }
                 }
             }
         }
