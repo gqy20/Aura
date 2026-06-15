@@ -10,21 +10,72 @@
 
 ## 当前实现状态
 
-> Last verified: 2026-05-15. 详细里程碑见 [roadmap.md](./roadmap.md)。
+> Last verified: 2026-06-15. 详细里程碑见 [roadmap.md](./roadmap.md)。
 
-当前代码已经达到 **文本聊天技术闭环 / Phase 1 agent tools** 阶段：
+当前代码已经达到 **M3 端到端阶段**（Pattern Detect 端到端 PoC + Mood Trend Chart）：
 
-- 已实现 Compose 聊天页、`ChatViewModel`、`CompanionRuntime` 和 Koog `AIAgent` 流式调用链路。
-- 已实现 Room/DataStore/Hilt 基础设施，消息、记忆、情绪快照、工具调用记录可持久化。
-- 已实现只读上下文工具、记忆/摘要搜索、设备/时间/天气/提醒与远程 MCP 工具；记忆、情绪、关系写入由回复完成后的系统阶段处理，不再作为主对话工具暴露。
-- 已通过 `testDebugUnitTest` 与 `assembleDebug` 验证。
+**M1 收尾（`1bad958`）**：
+- 模型连通性检查（`LlmConnectivityChecker` + SettingsScreen/McpSettingsScreen "Test connection" 按钮）
+- 记忆编辑/置顶/归档（`MemoryRoomScreen` 长按弹层 + 4 个动作 + ⭐/Archive 图标）
+- MIGRATION_5_6（`pinned` / `archived` 字段 + 2 索引）
+
+**M2 核心（`5b77241`）**：
+- `insights` 表 14 字段 + 3 索引 + MIGRATION_6_7
+- `InsightValidator` 4 道校验（缺 evidence / 50% 真实存在 / confidence < 0.6 / 30 天 heading Jaccard > 0.8）
+- `InsightPrompts` 3 个 prompt 字面量（patternDetect / anniversaryScan / connectionDetect）
+- `InsightRepository.saveIfValid`（写路径必须过 Validator，4 道守门）
+- `InsightCard` / `InsightCardList` / `InsightLongPressDialog`（主页 Section 集成 + 长按"本周不再说 X 类"/"知道了"/"查看依据"/"和 Aura 聊聊"）
+- AuraHomeScreen 改 LazyColumn 集成
+
+**M2 收尾（`4ee7758`）**：
+- 5 步 Onboarding（plan §5.2 种子期，挂心事/重要日期/称呼/关系人/作息）— 全部可选可跳过
+- `AutoMemoryStore`（DataStore-backed 雏形，userPatterns/recurringTopics/onboardingCompletedAt 三个 key）
+- DataTransparencySection（设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + Bipass 二次确认）
+- AuraHomeScreen 与 SettingsScreen 都加隐私面板
+
+**M3 端到端（`ba6ebad`）**：
+- dual-mind Phase 0 命名清理：`LocalQwenAgentWrapper` → `ReactiveCompanion` + 二选一逻辑标 `@Suppress`
+- `core/presence/runtime/` 目录新建（dual-mind 觉察面前驱）：
+  - `LocalQwenExecutor`（包装 MNN 引擎 + Request(maxTokens/temperature) + parsePatternDetectOutput 6 case 单测）
+  - `DreamDataCollector`（7 天 mood/message/memory 聚合 + 简易词频 top 10 + render prompt）
+  - `DreamLoopWorker`（@HiltWorker + @AssistedInject 模式，参照 `ReminderNotificationWorker`）
+  - `DreamLoopScheduler`（PeriodicWorkRequest 6h + 电量约束 + enqueueUniquePeriodicWork KEEP）
+  - `BatteryHelper`（API 29+ BATTERY_PROPERTY_CAPACITY + sticky broadcast 兜底）
+- `CompanionApplication.onCreate` 注入 scheduler + 调度
+- `feature/insight/MoodTrendChart` Compose Canvas 4 根周柱状图（3 档配色）
+- ChatViewModel 第 9 个 collector 推近 28 天 mood_snapshots 到 uiState.moodTrend
+- "和 Aura 聊聊" prefill 路由打通（`pendingPrefill` 字段 + `consumePrefillPrompt` 命令 + ChatScreen `LaunchedEffect(pendingPrefill)` 消费）
+
+**M3 PoC 修复（`9fa58ab`）**：
+- `seedDemoInsights` evidence 真实化（saveIfValid **前**先插真实 mock 行）
+- `MemoryRepository.insertMemoryWithId`（固定 id 供 evidence 引用）
+- `MoodSnapshotEntity` 外键需 `agent_state` parent row（先 `agentStateDao.insert`）
+- Onboarding 5 问全部改为可选（plan §5.2 强调"不强迫"产品调性）
+
+**M3 PoC UX 修复（`85cb87c`）**：
+- Save 按钮从 LazyColumn 末尾提到 TopAppBar actions 永久可见（之前被 DataTransparencySection 推到屏外）
+- `api_key` 字段实时保存（`updateSettingsApiKey` 直接调 `configRepository.setApiKey`，不依赖 Save 按钮）
+
+**测试**：303 单测全绿（0 失败）。`assembleDebug` 通过。
+
+**架构当前已完整闭环**：
+- Compose 聊天页 + `ChatViewModel` + `CompanionRuntime` + Koog `AIAgent` 流式调用
+- Room/DataStore/Hilt 基础设施（7 表 + 16 索引 + 7 DAO + 5 Repository）
+- 只读上下文工具、记忆/摘要搜索、设备/时间/天气/提醒与远程 MCP 工具
+- 写路径严格走 Validator 守门（insight 写、memory 合并）
+- Agent 写操作在回复后系统阶段处理（不再作主对话工具）
+- WorkManager 周期任务（DreamLoop 6h + Reminder OneTime）
+- 本地 LLM 引擎在位（`LocalQwenEngine` + MNN 桥），通过 `ReactiveCompanion` 暴露为 Koog Wrapper
 
 仍处于规划或部分实现状态的模块：
 
-- 设置页、导航、记忆房间 UI、角色主屏、Lottie 表情层。
-- CameraX 拍照/选图、多模态 UI、运行时权限 UX。
-- SpeechRecognizer/TextToSpeech 语音能力。
-- WorkManager pulse、通知、离线衰减、主动关怀。
+- CameraX 拍照/选图 UI（图片接收 + 压缩已实现，UI 待）
+- SpeechRecognizer/TextToSpeech 语音 I/O
+- Rive/Lottie 状态机动画（Aura 角色用 Compose Canvas 临时替代）
+- 远端 Agent Server / `RemoteAgentRuntime` / MCP Gateway / Browser Worker（plan §8 收窄到"信息回写"主轴）
+- WorkManager Pulse worker（除 DreamLoop 之外的离线衰减/回归反应/主动通知）
+- Weekly Insight 自动汇总（M5） + 用户反馈回路（InsightLog）
+- Connection 类 insight + 视觉内容进 memory（M4）
 
 ## 一、基础技术栈
 

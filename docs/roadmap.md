@@ -29,21 +29,35 @@
 - Koog `AIAgent` 真实集成，支持流式文本事件。
 - Anthropic Messages 兼容 LLM client，支持 SSE streaming、tool schema 序列化、底层图片 content 组装。
 - 本地 Qwen / MNN 链路：`core/local/*`（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader` / `LocalQwenModelCatalog` / `LocalQwenModelLocator`），含 ModelScope 下载与 MNN 推理桥。
-- Room 持久化：messages、memories、memory_summaries、agent_state、mood_snapshots、tool_calls、reminders。
-- DataStore 配置仓库：API key、provider、model name、theme mode。
+- **`ReactiveCompanion`（dual-mind Phase 0 命名清理）**：原 `LocalQwenAgentWrapper` 重命名，体现"对用户消息的本地觉察响应"语义；Phase 1 拆云端对话体/本地觉察面后此实现将替换为独立接口。
+- **`core/presence/runtime/` 目录（dual-mind 觉察面前驱）**：
+  - `LocalQwenExecutor`（包装 MNN 引擎 + Request(maxTokens/temperature) + parsePatternDetectOutput）
+  - `DreamDataCollector`（7 天 mood/message/memory 聚合 + 简易词频 top 10 + render prompt）
+  - `DreamLoopWorker`（@HiltWorker + @AssistedInject 模式）
+  - `DreamLoopScheduler`（PeriodicWorkRequest 6h + 电量约束 + enqueueUniquePeriodicWork KEEP）
+  - `BatteryHelper`（API 29+ / sticky broadcast 兜底）
+- Room 持久化：messages、memories、memory_summaries、agent_state、mood_snapshots、tool_calls、reminders、**insights**（M2 新增）。
+- DataStore 配置仓库：API key（实时写）、provider、model name、theme mode、**onboarding 相关 3 key**（user_patterns_json / recurring_topics_json / onboarding_completed_at）、**模型连通性检查 3 key**（PR-A）、`llm_provider` / `model_name` / `base_url` / `mcp_*`。
 - Agent tools：只读上下文工具、`search_memory`、`search_records`、`search_summaries`、时间/设备/天气/提醒与远程 MCP 工具；记忆、情绪、关系写入改为回复完成后的系统阶段。
 - App 启动时恢复 Room 中的聊天历史。
 - 聊天页顶部展示当前情绪和关系状态。
 - 情绪/关系状态写入 `agent_state`，App 重启后可恢复。
 - 聊天页展示最近的长期记忆，只读可见。
-- 记忆房间：完整页面 `MemoryRoomScreen`，可浏览全部记忆。
+- 记忆房间：完整页面 `MemoryRoomScreen`，可浏览全部记忆 + **长按弹层（PR-A 增）：置顶/取消置顶/归档/取消归档/删除**。
 - 聊天页显示模型配置状态；缺少 API Key/Base URL/model 时会禁用发送并给出明确提示。
 - 聊天页提供模型设置弹层，可编辑 Provider、模型名称和本机 API Key。
-- 多页导航：`androidx.navigation.compose.NavHost`，5 条路由（Home / Chat / Settings / McpSettings / MemoryRoom），设置页与 MCP 设置页已落地。
-- 角色主屏 `AuraHomeScreen`：Compose Canvas 绘制的 `AuraPetAvatar` + `PresenceAvatar`，作为应用入口。
+- **模型连通性检查**（PR-A）：`LlmConnectivityChecker` + SettingsScreen/McpSettingsScreen "Test connection" 按钮 + 实时结果展示（OK · 534ms / 鉴权失败 / 不可达）。
+- **Save 按钮永久可见**（PR-C + M3 PoC UX 修复）：TopAppBar actions 永久显示；api_key 字段实时保存（不依赖 Save 按钮）。
+- 多页导航：`androidx.navigation.compose.NavHost`，6 条路由（Home / Chat / Settings / McpSettings / MemoryRoom / **Onboarding**）。
+- 角色主屏 `AuraHomeScreen`：Compose Canvas 绘制的 `AuraPetAvatar` + `PresenceAvatar` + **LazyColumn 集成（M2/M3 改）**。
+- **Insight 主页卡片（M2）**：`InsightCard` / `InsightCardList` / `InsightLongPressDialog`（4 动作：本周不再说 X 类/知道了/查看依据/和 Aura 聊聊）；接入 Validator 守门。
+- **MoodTrendChart Canvas（M3）**：4 根周柱状图（高/中/低 3 档配色），按周聚合近 28 天 mood_snapshots。
+- **Insight "和 Aura 聊聊" prefill 路由（M3）**：`pendingPrefill` 字段 + `consumePrefillPrompt` + ChatScreen `LaunchedEffect(pendingPrefill)` 消费。
 - Reminder 模块：`AndroidReminderScheduler`（AlarmManager）+ `ReminderAlarmReceiver` + `ReminderNotificationWorker`（WorkManager OneTime）+ `ReminderNotificationPoster`（NotificationManagerCompat），含 `SCHEDULE_EXACT_ALARM` / `POST_NOTIFICATIONS` 权限。
 - Presence 状态控制层：`PresenceController`（mood / relationship / streaming / tool / error → 状态推导）+ `PresenceReactionPolicy`（用户点击、应用回前台、记忆保存等事件 → 反应策略）+ `PresenceModels`，状态已覆盖 idle / listening / thinking / speaking / searching / remembering / happy / sad / tired / error 等。
-- 单元测试覆盖 core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略等。
+- **Onboarding 5 问（M2 收尾）**：plan §5.2 种子期问题（挂心事/重要日期/称呼/关系人/作息）— 全部可选可跳过，模板表单不入 LLM。
+- **隐私"看见感"面板（M2 收尾）**：`DataTransparencySection`（设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + Bipass 二次确认）。
+- 单元测试覆盖：303 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、DreamDataCollector 4、AutoMemoryStore 4、ReactiveCompanion 4 等）。
 - Debug APK 构建链路。
 - `docs/plan` 规划文档：已新增端云智能体能力整体方案与 Vision/tools 协同计划、Promise System 设计、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）。
 
@@ -119,21 +133,21 @@
 ### M3：情绪 + Insight Pattern MVP
 
 > 调整说明（2026-06-15）：情绪层不再只是"角色表现状态"，而是 Insight Pattern 类的核心数据源。mood trend 同时服务 Presence 和 Insight。
-> 详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §3 + §9。
+> **M3 已落地**（commits `ba6ebad` / `9fa58ab` / `85cb87c`）。详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §3 + §9 + [architecture.md "当前实现状态"](./architecture.md)。
 
 目标：让 Aura 第一次主动说出"我注意到了一件事"。
 
-- 持久化情绪和关系快照，支持重启恢复。（已完成）
-- 在聊天页或独立主页增加紧凑状态/头像展示。（状态持久化、聊天页状态条、`AuraHomeScreen` 头像已完成；Rive/Lottie 动画层待做）
-- 将 parsed mood/intensity 映射到可见 UI 状态。（已通过 `PresenceController` 映射）
-- 新增 `PresenceController` 雏形，把 mood、relationshipLevel、streaming/tool 状态映射为统一的角色表现状态。（已完成）
-- 优先用 Rive 状态机验证 idle、listening、thinking、speaking、happy、sad、tired 等基础状态。（逻辑层已覆盖，动画资源待做）
+- 持久化情绪和关系快照，支持重启恢复。✅（已完成）
+- 在聊天页或独立主页增加紧凑状态/头像展示。✅（状态持久化、聊天页状态条、`AuraHomeScreen` 头像已完成；Rive/Lottie 动画层待做）
+- 将 parsed mood/intensity 映射到可见 UI 状态。✅（已通过 `PresenceController` 映射）
+- 新增 `PresenceController` 雏形，把 mood、relationshipLevel、streaming/tool 状态映射为统一的角色表现状态。✅（已完成）
+- 优先用 Rive 状态机验证 idle、listening、thinking、speaking、happy、sad、tired 等基础状态。✅（逻辑层已覆盖，动画资源待做）
 - App 回到前台时补算时间衰减。
-- 补充持久化、衰减、关系阈值变化测试。（`PresenceReactionPolicy` 测试已落地）
-- **【新增，叙事主轴】** `patternDetect` prompt 端到端跑通（Dream Loop → InsightValidator → insights 表）。
-- **【新增，叙事主轴】** 用户能在主页看到第一条真实 Pattern insight（"你过去 3 周都周日下午情绪偏低"）。
-- **【新增，叙事主轴】** mood trend 按周 / 月可视化上线（用 mood_snapshots 现有数据，无需新表）。
-- **【新增，叙事主轴】** Insight 与对话体打通：点"和 Aura 聊聊"→ prefill prompt → 进入对话体上下文。
+- 补充持久化、衰减、关系阈值变化测试。✅（`PresenceReactionPolicy` 测试已落地）
+- **【新增，叙事主轴】** `patternDetect` prompt 端到端跑通（Dream Loop → InsightValidator → insights 表）。✅（pipeline 跑通；**PoC 阶段**：本地 Qwen 模型未下载，`LocalQwenEngine.stream()` 58ms 返回空 → `dream_loop_empty_model_output` 后 `Result.retry()`；待用户在 SettingsScreen 触发模型下载后端到端可跑通）
+- **【新增，叙事主轴】** 用户能在主页看到第一条真实 Pattern insight。✅（3 张 hardcoded seed 卡片真机显示；M3 PoC 修复 `9fa58ab` 后 `Validator` 全部 `insight_save_completed` 通过）
+- **【新增，叙事主轴】** mood trend 按周 / 月可视化上线。✅（`MoodTrendChart` Compose Canvas 4 根周柱状图；W22/W23/W24 真机渲染与 seed mood_snapshots 数据匹配）
+- **【新增，叙事主轴】** Insight 与对话体打通：点"和 Aura 聊聊"→ prefill prompt → 进入对话体上下文。✅（`pendingPrefill` 字段 + `consumePrefillPrompt` + ChatScreen `LaunchedEffect(pendingPrefill)` 消费）
 
 ### M4：Vision + Insight 增强
 
@@ -150,7 +164,8 @@
 - 补充图片大小限制与 prompt 构建测试。
 - **【新增，叙事主轴】** 视觉内容进入 memory 表（"你在 2026-06-15 拍了张夕阳"），并能作为 Pattern / Connection insight 的 evidence。
 - **【新增，叙事主轴】** Pattern insight 可跨 mood + memory + 图片三种数据源生成。
-- **【新增，叙事主轴】** Connection 类 insight 第一版可触发（找到 2 条不相关数据的潜在联系，confidence 必须 < 0.5，宁缺毋滥）。
+- **【新增，叙事主轴】** Connection 类 insight 第一版可触发（找到 2 条不相关数据的潜在联系，confidence 必须 < 0.5，宁缺毋滥）。`core/insight/InsightPrompts.connectionDetect` 字面量已定义，M4 复用 `LocalQwenExecutor.execute()` 即可落地。
+- **MCP Gateway 准备**（plan §8 收窄到"信息回写"主轴）：`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 两个 Key + Flow + setter，M4 起可直接对接。
 
 ### M5：Pulse + Insight 主线化
 
@@ -159,7 +174,7 @@
 
 目标：让 Aura 在你不在时也真的在"为你工作"。
 
-- 添加 WorkManager pulse worker。
+- 添加 WorkManager pulse worker（DreamLoop 周期任务已落（6h + 电量约束），剩离线衰减/回归反应/主动通知 Worker 未做）。
 - 实现离线情绪衰减和回归反应。
 - 添加通知权限流程。
 - 添加用户可选择的主动通知。
@@ -198,22 +213,16 @@
 
 ## 近期建议顺序
 
-> 调整说明（2026-06-15）：近期顺序按"第二大脑"叙事重新排序——Insight 框架（数据底座）优先于 Vision/动画等表现层能力。
+> 调整说明（2026-06-15）：M0-M3 全部落地（commits `1bad958` / `5b77241` / `4ee7758` / `ba6ebad` / `9fa58ab` / `85cb87c`）。下一阶段 M4+ 优先级按"长期认识你"主线推进 — Vision（图片 evidence）→ Pulse/Weekly（持续在场）→ 双轨拆分（云端对话体 / 本地觉察面正式分离）→ 远端 Agent Server（信息回写主轴）。
 
-1. ~~设置页与 API key/model 配置。~~（已完成，缺模型连通性检查）
-2. ~~聊天历史恢复。~~（已完成）
-3. ~~只读版记忆房间。~~（已完成，缺编辑/归档动作）
-4. ~~情绪/关系持久化 + Presence 状态控制器。~~（已完成，缺动画资源）
-5. **Insight 框架 MVP（新版优先项）**：`insights` 表 / Validator / Onboarding 5 问 / 主页 Insight 卡片占位 / 一键删除静音。详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §9 M2。
-6. **dual-mind Phase 0-2**：重命名 + `core/presence/runtime/` 目录 + PoC（Heartbeat + KV-cache + MoodDrift）。详见 [`plan/dual-mind-architecture.md`](./plan/dual-mind-architecture.md) §11。
-7. **Pattern Detect 端到端**：Dream Loop → 第一条真实 Pattern insight。详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §9 M3。
-8. CameraX 单张图片发送（重排到 M4，依赖 Vision 后可触发 Connection insight）。
-9. WorkManager Pulse worker + Weekly Insight：离线衰减、回归反应、Weekly 自动汇总通知。详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §9 M5。
-10. Presence Layer 动画资源：Rive/Lottie 状态机、触摸互动、回归反应动画。
-11. 抽象 `AgentRuntime`，为后续远程 Agent / 外部信息回写预留接入点（远端 agent 收窄为"信息回写到记忆"主轴）。
-
-## 维护规则
-
-- 架构文档可以保留目标形态，但必须明确标注当前实现状态。
-- 每当里程碑从 planned 进入 implemented，都同步更新本文档。
-- 每个功能里程碑尽量让测试和行为一起落地。
+1. ~~M0 稳住当前文本 Demo。~~（已完成）
+2. ~~M1 设置与配置 MVP。~~（已完成，连通性检查 + Save 按钮 + api_key 实时保存全已落）
+3. ~~M2 记忆 + Insight 框架 MVP。~~（已完成，`insights` 表 + Validator + Onboarding 5 问 + 主页 Insight 卡片 + 数据透明面板全落）
+4. ~~M3 情绪 + Insight Pattern MVP。~~（已完成，DreamLoop pipeline + Mood Trend Chart + Prefill 路由打通；PoC 阶段待 Qwen 模型下载后端到端可跑通）
+5. **M3 PoC 完善：用户在真机触发 Qwen 模型下载 → DreamLoop 跑出第一条 LLM 真实生成的 insight**（已写好 `LocalQwenModelDownloader` UI 入口，仅需用户操作 + 等待下载完成）。
+6. **M4 Vision + Insight 增强**：CameraX 单张图片发送（`UserInput.Vision` 路径 + 压缩 + 权限兜底已就位），图片入 memory + Pattern 跨模态生成；Connection 类 insight 复用 `LocalQwenExecutor.execute(InsightPrompts.connectionDetect)` 落地。
+7. **M5 Pulse + Weekly Insight**：离线衰减 / 回归反应 Worker、AnniversaryScanner 周期任务、Weekly Insight 自动汇总 + 通知、InsightLog 用户反馈回路（👍/👎/文字 → 训练样本）。
+8. **dual-mind Phase 1**：拆云端对话体 / 本地觉察面。`ReactiveCompanion` 替换为独立接口（不再 `KoogAgentWrapper`），`KoogAgentFactory` 删二选一分支；新建 `AuraMemoryStore` 文件系统实现（`user_patterns.md` / `recurring_topics.md`）。
+9. **抽象 `AgentRuntime`**：为本地 `CompanionRuntime` 和远程 `RemoteAgentRuntime` 留出切换入口；`@Inject` ChatViewModel 改用接口，便于真机 / 远端双模调试。
+10. **M6 产品化加固**：扩展 instrumented tests（CameraX / WorkManager 真实场景）+ CI 工作流（GitHub Actions）+ release signing 验证。
+11. **M7 远端 Agent Server**（plan §8 收窄到"信息回写"主轴）：最小 Aura Agent Server 先支持文本输入 / 流式输出 / 只读远程工具；`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 字段，M4 起可对接。
