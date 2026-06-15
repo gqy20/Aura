@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd web/apps/web && corepack pnpm build",
-  "installCommand": "corepack enable && corepack prepare pnpm@10.13.1 --activate && cd web && corepack pnpm install --frozen-lockfile",
-  "outputDirectory": "web/apps/web/.next",
+  "buildCommand": "cd ../.. && cd web && corepack pnpm install --frozen-lockfile && corepack pnpm turbo build --filter=web",
+  "installCommand": "corepack enable && corepack prepare pnpm@10.13.1 --activate && cd ../.. && cd web && corepack pnpm install --frozen-lockfile",
+  "outputDirectory": ".next",
   "framework": "nextjs",
   "regions": ["hkg1"],
   "git": {
