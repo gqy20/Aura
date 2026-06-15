@@ -1,0 +1,156 @@
+@import 'tailwindcss';
+
+/* ============================================================
+ * Design Tokens — Aura
+ *
+ * 主舞台：深色旗舰（参考 Linear）
+ * 文档站：米色 Anthropic 风（独立 layout）
+ *
+ * 配色策略：单源真相，所有 token 通过 @theme 暴露给 Tailwind v4
+ * ============================================================ */
+
+@theme {
+  /* 颜色 — 深色舞台 */
+  --color-background: #08090a;
+  --color-foreground: #f7f8f8;
+  --color-muted: rgba(247, 248, 248, 0.6);
+  --color-subtle: rgba(247, 248, 248, 0.08);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* 强调色（占位 — 等待用户提供） */
+  --color-accent: #7c5cff;
+  --color-accent-foreground: #ffffff;
+  --color-accent-muted: rgba(124, 92, 255, 0.16);
+
+  /* 状态色 */
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+
+  /* 字体 */
+  --font-sans: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
+  --font-mono: var(--font-mono, ui-monospace), 'SF Mono', monospace;
+
+  /* 排版比例（基于 1.25 major third） */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.75rem;
+  --text-5xl: 3.75rem;
+  --text-6xl: 5rem;
+  --text-7xl: 7rem;
+  --text-8xl: 9rem;
+  --text-9xl: 12rem;
+
+  /* 行高 */
+  --leading-tight: 1.05;
+  --leading-snug: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* 字间距 */
+  --tracking-tighter: -0.04em;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+
+  /* 圆角 */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* 容器 */
+  --container-3xs: 16rem;
+  --container-2xs: 18rem;
+  --container-xs: 20rem;
+  --container-sm: 24rem;
+  --container-md: 28rem;
+  --container-lg: 32rem;
+  --container-xl: 36rem;
+  --container-2xl: 42rem;
+  --container-3xl: 48rem;
+  --container-4xl: 56rem;
+  --container-5xl: 64rem;
+  --container-6xl: 72rem;
+  --container-7xl: 80rem;
+
+  /* 缓动曲线（动效用） */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-expo: cubic-bezier(0.87, 0, 0.13, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* ============================================================
+ * 基础样式
+ * ============================================================ */
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-feature-settings:
+    'rlig' 1,
+    'calt' 1,
+    'ss01' 1;
+  font-variant-ligatures: contextual;
+}
+
+/* 文本选区 */
+::selection {
+  background-color: var(--color-accent-muted);
+  color: var(--color-accent-foreground);
+}
+
+/* 焦点环（无障碍） */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}
+
+/* 减少动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

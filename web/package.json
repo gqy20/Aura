@@ -1,0 +1,25 @@
+{
+  "name": "aura-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Aura 项目网站 - 落地页与产品叙事",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "start": "turbo start",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "prettier": "^3.6.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.13.1"
+}
