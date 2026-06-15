@@ -66,6 +66,10 @@ build/test-run.log
 screenshot_*.png
 screen_*.png
 
+# Website visual audit screenshots (Playwright fullPage, hero, zoomed, etc.)
+# 4.5MB/17 张，全是临时工作产物，不入库
+docs/plan/visual-audit-assets/
+
 # ADB debug screenshots / database dumps
 tmp-adb-screens/
 tmp-adb-db/

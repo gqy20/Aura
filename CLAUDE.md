@@ -204,3 +204,29 @@ grep -oh 'tests="[0-9]*"' app/build/test-results/testDebugUnitTest/TEST-*.xml | 
 
 - 用 `tee` 保存完整日志，从日志和 XML 报告中提取所有信息
 - 首次构建较慢（~40s），缓存命中后仅需 ~6s（已开启 configuration-cache）
+
+## 网站截图规范
+
+所有网站（`web/apps/web`）相关截图、视觉审计素材、参考站对比图都放在**固定目录**：
+
+```
+docs/plan/visual-audit-assets/
+```
+
+约定：
+
+- **不入库**：已在 `.gitignore` 显式忽略，纯本地工作产物（避免仓库膨胀 4-5MB）
+- **不 commit**：截图不参与版本控制；本地用完即可
+- **不要**在别的目录零散放截图（`tmp-*.png`、`screenshot_*.png` 根目录等），统一到这里
+- **命名规范**（建议）：
+  - `<page>-hero.png` / `<page>-full.png` — 视口 / fullPage 截图
+  - `<page>-<section>.png` — 某段特写（如 `t2-reaction-zoomed.png`）
+  - `ref-<site>.png` — 参考站对比（ref-vercel、ref-stripe、ref-linear、ref-apple）
+  - 前缀按任务/批次命名（`t2-`、`p1-`、`audit-`），方便后续清理
+- **新引用**：在 `docs/plan/visual-audit-p*.md` 审计文档里通过相对路径 `![](../../visual-audit-assets/...)` 引用
+
+清理命令（截图不再需要时）：
+
+```bash
+rm -rf docs/plan/visual-audit-assets/   # 整目录清空
+```
