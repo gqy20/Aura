@@ -9,9 +9,9 @@ import { FeatureNav } from './FeatureNav'
 import { cn } from '@/lib/utils'
 
 interface FeatureShellProps {
-  /** 编号 — 01/02/03 */
+  /** 编号 — 01/02/03（不渲染当 hideMeta=true） */
   number: string
-  /** 分类 — Capability / System / Runtime */
+  /** 分类 — Capability / System / Runtime（不渲染当 hideMeta=true） */
   category: string
   /** 大标题 — 80px */
   title: string
@@ -31,6 +31,10 @@ interface FeatureShellProps {
    * 默认走深色底 #08090a
    */
   bgGradient?: string
+  /** 隐藏标题区上方 "01 — CAPABILITY" meta chip */
+  hideMeta?: boolean
+  /** 隐藏顶部 AnnouncementBar（v0.4 / 测试数 / 更新日志） */
+  hideAnnouncement?: boolean
 }
 
 /**
@@ -50,11 +54,13 @@ export function FeatureShell({
   children,
   className,
   bgGradient,
+  hideMeta = false,
+  hideAnnouncement = false,
 }: FeatureShellProps) {
   return (
     <SmoothScroll>
       <MagneticCursor />
-      <main className="relative min-h-screen overflow-hidden">
+      <main className="relative min-h-screen overflow-x-clip">
         {/* 全局深色底 + 页面渐变（中心光晕） */}
         <div
           aria-hidden
@@ -64,8 +70,12 @@ export function FeatureShell({
           }}
         />
 
-        <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col px-6 sm:px-10 lg:px-16">
-          <AnnouncementBar />
+        {/* 沉浸式 sub-page：nav / 内容 / footer 都铺满视口（不再被 max-w 容器限制）
+            - 文字区保留 px-6 sm:px-10 lg:px-16 让阅读舒适
+            - 背景渐变 / 3D 通过 HeroStage 内的 left:50% + 100vw 黑魔法撑到视口边
+        */}
+        {!hideAnnouncement && <AnnouncementBar />}
+        <div className="px-6 sm:px-10 lg:px-16">
           <FeatureNav active={active} />
 
           {/* ─── 大标题区 ─── */}
@@ -77,11 +87,13 @@ export function FeatureShell({
                 transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                 className="md:col-span-8"
               >
-                <div className="mb-6 flex items-center gap-4 font-mono text-xs uppercase tracking-[0.2em] text-muted">
-                  <span className="text-accent">{number}</span>
-                  <span className="h-px w-8 bg-border-strong" />
-                  <span>{category}</span>
-                </div>
+                {!hideMeta && (
+                  <div className="mb-6 flex items-center gap-4 font-mono text-xs uppercase tracking-[0.2em] text-muted">
+                    <span className="text-accent">{number}</span>
+                    <span className="h-px w-8 bg-border-strong" />
+                    <span>{category}</span>
+                  </div>
+                )}
                 <h1 className="text-balance text-5xl font-medium leading-[1.05] tracking-tight sm:text-6xl md:text-7xl lg:text-[5.5rem]">
                   {title}
                 </h1>
@@ -91,18 +103,18 @@ export function FeatureShell({
               </motion.div>
             </div>
           </section>
-
-          {/* ─── 主内容 ─── */}
-          <div className={cn('flex-1 pb-24', className)}>{children}</div>
-
-          {/* ─── Footer ─── */}
-          <footer className="flex items-center justify-between border-t border-border py-8 font-mono text-xs text-muted">
-            <span>© 2026 Aura · 开源</span>
-            <span>
-              <span className="text-accent">{number}</span> · {category}
-            </span>
-          </footer>
         </div>
+
+        {/* ─── 主内容 — 交给 HeroStage / 子页自行控制 padding ─── */}
+        <div className={cn('flex-1 pb-24', className)}>{children}</div>
+
+        {/* ─── Footer ─── */}
+        <footer className="flex items-center justify-between border-t border-border px-6 py-8 font-mono text-xs text-muted sm:px-10 lg:px-16">
+          <span>© 2026 Aura · 开源</span>
+          <span>
+            <span className="text-accent">{number}</span> · {category}
+          </span>
+        </footer>
       </main>
     </SmoothScroll>
   )

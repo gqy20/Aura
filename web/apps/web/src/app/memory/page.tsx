@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { FeatureShell } from '@/components/feature/FeatureShell'
+import { HeroStage } from '@/components/feature/HeroStage'
 import { Reveal } from '@/components/Reveal'
 
 // 3D 客户端渲染
@@ -60,85 +61,100 @@ export default function MemoryPage() {
       subtitle="每一次对话都被结构化地保存，不是简单日志，而是可被 LLM 调用的记忆图谱。Aura 记得你今天穿的衬衫，也记得你三年前的梦想。"
       active="memory"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 255, 176, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(92, 239, 255, 0.10), transparent 60%), #08090a"
+      hideMeta
+      hideAnnouncement
     >
-      {/* ─── 3D 主体 + Type 分类 ─── */}
-      <section className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">
-        {/* 左：3D Canvas */}
-        <div className="relative md:col-span-7">
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-border bg-subtle/30">
+      {/* ─── 第一屏：3D 沉浸 + 数字速记 ─── */}
+      <HeroStage
+        variant="memory"
+        three={
+          <>
             <MemoryNetworkDynamic />
-
-            {/* 图例 */}
-            <div className="absolute left-4 top-4 flex flex-col gap-1.5 font-mono text-[10px]">
+            {/* 图例（已无边框，浮在 3D 左上） */}
+            <div className="pointer-events-none absolute left-6 top-6 flex flex-col gap-1.5 font-mono text-[10px]">
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-white" />
                 <span className="text-muted">中枢</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
-                <span className="text-muted">记忆（3 类）</span>
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: '#7c5cff' }}
+                />
+                <span className="text-muted">记忆 · 3 类</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#5cefff' }} />
-                <span className="text-muted">摘要（5 类）</span>
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: '#5cefff' }}
+                />
+                <span className="text-muted">摘要 · 5 类</span>
               </div>
             </div>
-          </div>
+          </>
+        }
+        stats={[
+          { n: '3', label: '记忆类', desc: 'MemoryType · FACT/EPISODE/PROCEDURAL' },
+          { n: '5', label: '摘要类', desc: 'SummaryType · DAILY/SESSION/TOPIC/PROJECT/RELATIONSHIP' },
+          { n: '9', label: '核心列', desc: 'type / importance / confidence / pinned / archived / expiresAt / sensitivity / lastAccessed / sourceMessageIds' },
+        ]}
+        caption="3 MemoryType × 5 SummaryType · Room SQLite + indices on type/lastAccessed/pinned/archived"
+      />
 
-          <p className="mt-4 font-mono text-xs text-muted">
-            3 MemoryType × 5 SummaryType · Room SQLite + indices on
-            type/lastAccessed/pinned/archived
-          </p>
-        </div>
-
-        {/* 右：MemoryType 详解 */}
-        <div className="md:col-span-5">
+      {/* ─── MemoryType 详解 ─── */}
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
+        <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             三层记忆
           </h2>
-          <p className="mt-4 text-pretty leading-relaxed text-muted">
-            Memory 不是黑盒。Room 数据库中每条记忆都有 type / importance /
-            confidence / pinned / archived 字段，Agent
-            通过结构化检索调用，绝不靠"模糊匹配"。
-          </p>
+          <span className="font-mono text-xs text-muted">
+            MemoryType · 3 类
+          </span>
+        </div>
+        <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
+          Memory 不是黑盒。Room 数据库中每条记忆都有 type / importance /
+          confidence / pinned / archived 字段，Agent
+          通过结构化检索调用，绝不靠"模糊匹配"。
+        </p>
 
-          <div className="mt-8 space-y-4">
-            {MEMORY_TYPES.map((t, i) => (
-              <Reveal
-                key={t.name}
-                direction="x"
-                delay={i * 100}
-                className="rounded-xl border border-border p-5"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: t.color }}
-                  />
-                  <span className="font-mono text-xs uppercase tracking-wider text-foreground">
-                    {t.name}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-muted">{t.desc}</p>
-                <ul className="mt-3 space-y-1.5">
-                  {t.examples.map((ex) => (
-                    <li
-                      key={ex}
-                      className="flex items-baseline gap-2 text-xs text-muted"
-                    >
-                      <span className="text-accent">·</span>
-                      <span className="italic">「{ex}」</span>
-                    </li>
-                  ))}
-                </ul>
-              </Reveal>
-            ))}
-          </div>
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {MEMORY_TYPES.map((t, i) => (
+            <Reveal
+              key={t.name}
+              direction="y"
+              delay={i * 100}
+              className="rounded-xl border border-border p-6"
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: t.color }}
+                />
+                <span className="font-mono text-xs uppercase tracking-wider text-foreground">
+                  {t.name}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                {t.desc}
+              </p>
+              <ul className="mt-4 space-y-1.5">
+                {t.examples.map((ex) => (
+                  <li
+                    key={ex}
+                    className="flex items-baseline gap-2 text-xs text-muted"
+                  >
+                    <span className="text-accent">·</span>
+                    <span className="italic">「{ex}」</span>
+                  </li>
+                ))}
+              </ul>
+            </Reveal>
+          ))}
         </div>
       </section>
 
       {/* ─── Summary 类型 5 卡片网格 ─── */}
-      <section className="mt-32">
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             摘要类型
@@ -169,7 +185,7 @@ export default function MemoryPage() {
       </section>
 
       {/* ─── 存储容量分布 ─── */}
-      <section className="mt-32">
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             存储分布
@@ -250,7 +266,7 @@ export default function MemoryPage() {
       </section>
 
       {/* ─── 字段语义 ─── */}
-      <section className="mt-32">
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             每个字段都有意义
@@ -291,7 +307,7 @@ export default function MemoryPage() {
       </section>
 
       {/* ─── 相关链接 ─── */}
-      <section className="mt-32">
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             相关

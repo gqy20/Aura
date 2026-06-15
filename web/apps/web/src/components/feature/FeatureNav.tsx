@@ -34,7 +34,7 @@ export function FeatureNav({ active = 'home' }: FeatureNavProps) {
       <Link href="/" className="flex items-center gap-2" aria-label="Aura home">
         <AuraLogo size={28} />
         <span className="font-mono text-sm font-medium tracking-tight">
-          aura<span className="text-accent">.</span>
+          Aura<span className="text-accent">.</span>
         </span>
       </Link>
 

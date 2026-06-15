@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { FeatureShell } from '@/components/feature/FeatureShell'
+import { HeroStage } from '@/components/feature/HeroStage'
 import { Reveal } from '@/components/Reveal'
 
 // 3D 客户端渲染
@@ -68,87 +69,107 @@ export default function AgentPage() {
       subtitle="Aura 的灵魂是 Koog AIAgent：内置 10 个结构化工具、4 套大模型 Provider（3 个云端 + 1 个本地）、流式响应、可观测事件流——它不是大模型，是大模型之上的编排者。"
       active="agent"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 124, 156, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(160, 92, 255, 0.10), transparent 60%), #08090a"
+      hideMeta
+      hideAnnouncement
     >
-      {/* ─── 3D 主体 + 工具分类 ─── */}
-      <section className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">
-        {/* 左：3D Canvas */}
-        <div className="relative md:col-span-7">
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-border bg-subtle/30">
+      {/* ─── 第一屏：3D 沉浸 + 数字速记 ─── */}
+      <HeroStage
+        variant="agent"
+        three={
+          <>
             <AgentGraphDynamic />
 
-            {/* 图例 */}
-            <div className="absolute left-4 top-4 flex flex-col gap-1.5 font-mono text-[10px]">
+            {/* 图例（已无边框，浮在 3D 左上） */}
+            <div className="pointer-events-none absolute left-6 top-6 flex flex-col gap-1.5 font-mono text-[10px]">
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-white" />
                 <span className="text-muted">智能体核心</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
-                <span className="text-muted">10 个工具（5 类）</span>
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: '#7c5cff' }}
+                />
+                <span className="text-muted">10 个工具 · 5 类</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rotate-45" style={{ background: 'transparent', border: '1px solid #9090a8' }} />
-                <span className="text-muted">4 个 LLM Provider（3 远程 + 1 本地）</span>
+                <span
+                  className="h-1.5 w-1.5 rotate-45"
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #9090a8',
+                  }}
+                />
+                <span className="text-muted">4 LLM Provider（3 远程 + 1 本地）</span>
               </div>
             </div>
-          </div>
+          </>
+        }
+        stats={[
+          { n: '10', label: '工具', desc: '5 类 · 记忆/上下文/设备/健康/动作' },
+          { n: '4', label: 'Provider', desc: 'GLM / KIMI / MODELSCOPE / LOCAL_QWEN' },
+          { n: '12', label: '迭代上限', desc: 'maxIterations=12 · 有界防失控' },
+        ]}
+        caption="Koog AIAgent.builder() · graphStrategy(streamingSingleRunStrategy()) · maxIterations=12"
+      />
 
-          <p className="mt-4 font-mono text-xs text-muted">
-            Koog AIAgent.builder() · graphStrategy(streamingSingleRunStrategy()) · maxIterations=12
-          </p>
-        </div>
-
-        {/* 右：5 类工具 */}
-        <div className="md:col-span-5">
+      {/* ─── 5 类工具详解 ─── */}
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
+        <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             十个工具，五类划分
           </h2>
-          <p className="mt-4 text-pretty leading-relaxed text-muted">
-            10 个内置工具 + 动态加载的远程 MCP 工具。AuraAgent 不会"调用 API"——它调度
-            ToolRegistry，把世界变成可执行的指令集。
-          </p>
+          <span className="font-mono text-xs text-muted">
+            ToolRegistry · 5 类
+          </span>
+        </div>
+        <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
+          10 个内置工具 + 动态加载的远程 MCP 工具。AuraAgent 不会"调用 API"——它调度
+          ToolRegistry，把世界变成可执行的指令集。
+        </p>
 
-          <div className="mt-8 space-y-4">
-            {TOOL_CATEGORIES.map((cat, i) => (
-              <Reveal
-                key={cat.name}
-                direction="x"
-                delay={i * 100}
-                className="rounded-xl border border-border p-5"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: cat.color }}
-                    />
-                    <span className="font-mono text-xs uppercase tracking-wider text-foreground">
-                      {cat.name}
-                    </span>
-                  </div>
-                  <span className="font-mono text-[10px] text-muted">
-                    {cat.tools.length} tools
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {TOOL_CATEGORIES.map((cat, i) => (
+            <Reveal
+              key={cat.name}
+              direction="y"
+              delay={i * 80}
+              className="rounded-xl border border-border p-6"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: cat.color }}
+                  />
+                  <span className="font-mono text-xs uppercase tracking-wider text-foreground">
+                    {cat.name}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-muted">{cat.desc}</p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {cat.tools.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded-full border border-border bg-subtle/40 px-2.5 py-0.5 font-mono text-[10px] text-foreground"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </Reveal>
-            ))}
-          </div>
+                <span className="font-mono text-[10px] text-muted">
+                  {cat.tools.length} tools
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                {cat.desc}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {cat.tools.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full border border-border bg-subtle/40 px-2.5 py-0.5 font-mono text-[10px] text-foreground"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 
       {/* ─── 推理 Pipeline 6 阶段 ─── */}
-      <section className="mt-32">
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             流式管线
@@ -198,7 +219,7 @@ export default function AgentPage() {
       </section>
 
       {/* ─── 双模路由：云端 / 本地 ─── */}
-      <section className="mt-32">
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             双模路由
@@ -262,7 +283,7 @@ export default function AgentPage() {
       </section>
 
       {/* ─── 关键设计原则 ─── */}
-      <section className="mt-32">
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             设计原则
@@ -319,7 +340,7 @@ export default function AgentPage() {
       </section>
 
       {/* ─── 相关链接 ─── */}
-      <section className="mt-32">
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
             相关

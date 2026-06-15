@@ -218,6 +218,7 @@ function Satellite({
 
 function PresenceScene({ stateKey }: { stateKey: StateKey }) {
   const group = useRef<THREE.Group>(null)
+  const glowRef = useRef<THREE.Mesh>(null)
   const state = STATES[stateKey]
 
   useFrame((s) => {
@@ -233,6 +234,12 @@ function PresenceScene({ stateKey }: { stateKey: StateKey }) {
         -y * 0.25,
         0.05,
       )
+    }
+    // 环境辉光底色 — 仅作为 orb 周围一圈软光（不形成可见轮廓）
+    if (glowRef.current) {
+      const t = s.clock.elapsedTime
+      const breath = 0.04 + Math.sin(t * 0.8) * 0.015
+      glowRef.current.scale.setScalar(1.25 + breath)
     }
   })
 
@@ -251,6 +258,17 @@ function PresenceScene({ stateKey }: { stateKey: StateKey }) {
 
   return (
     <group ref={group} scale={0.85}>
+      {/* 环境辉光底色 — 紧贴 orb 的小光晕（不再撑满画面） */}
+      <mesh ref={glowRef} scale={1.25}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshBasicMaterial
+          color={state.color}
+          transparent
+          opacity={0.22}
+          depthWrite={false}
+        />
+      </mesh>
+
       <Float speed={1.2} rotationIntensity={0.2} floatIntensity={0.5}>
         <PresenceCore state={state} />
       </Float>
