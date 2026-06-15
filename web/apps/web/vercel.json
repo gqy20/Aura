@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd ../.. && corepack pnpm install --frozen-lockfile && corepack pnpm turbo build --filter=web",
+  "installCommand": "corepack enable && corepack prepare pnpm@10.13.1 --activate && cd ../.. && corepack pnpm install --frozen-lockfile",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "regions": ["hkg1"],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "master": true
+    }
+  },
+  "github": {
+    "silent": false,
+    "autoAlias": true
+  }
+}
