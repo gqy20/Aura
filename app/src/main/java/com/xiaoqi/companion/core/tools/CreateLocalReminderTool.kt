@@ -74,7 +74,10 @@ class CreateLocalReminderTool(
 
             val now = nowProvider()
             val triggerAt = args.triggerAtEpochMillis
-                ?: args.delayMinutes?.let { now + it.coerceAtLeast(1L) * MILLIS_PER_MINUTE }
+                ?: args.delayMinutes?.let {
+                    if (it < MIN_DELAY_MINUTES) return@withContext disabled("delay_too_small_minute")
+                    now + it * MILLIS_PER_MINUTE
+                }
                 ?: return@withContext disabled("missing_trigger_time")
             if (triggerAt <= now) return@withContext disabled("trigger_time_must_be_future")
             if (args.exact && !reminderRepository.canScheduleExactReminders()) {
@@ -115,5 +118,6 @@ class CreateLocalReminderTool(
 
     private companion object {
         const val MILLIS_PER_MINUTE = 60_000L
+        const val MIN_DELAY_MINUTES = 1L
     }
 }

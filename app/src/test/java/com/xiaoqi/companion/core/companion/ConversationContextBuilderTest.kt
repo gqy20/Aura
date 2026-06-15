@@ -56,9 +56,13 @@ class ConversationContextBuilderTest {
         val context = builder.build("default")
 
         assertEquals(1, context.recentMessages.size)
-        assertTrue(context.recentMessages.single().startsWith("..."))
+        val truncated = context.recentMessages.single()
+        // Center-crop keeps head and tail joined by an ellipsis, not just the tail.
+        assertTrue("expected center-crop with ellipsis, was '$truncated'", truncated.contains(" ... "))
         assertEquals(1, context.omittedOlderMessageCount)
-        assertTrue(context.estimatedTokens <= 11)
+        // Center-crop produces ~headChars + " ... " + tailChars = 35 chars here,
+        // which estimates to 12 tokens at 3 chars/token.
+        assertTrue(context.estimatedTokens <= 12)
     }
 
     private fun message(

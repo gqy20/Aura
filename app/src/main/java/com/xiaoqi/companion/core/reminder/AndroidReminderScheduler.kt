@@ -94,12 +94,8 @@ class AndroidReminderScheduler(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val triggerAt = request.triggerAtMillis.coerceAtLeast(System.currentTimeMillis() + MIN_DELAY_MILLIS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-        } else {
-            @Suppress("DEPRECATION")
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-        }
+        // minSdk = 26, so AlarmManager.setExactAndAllowWhileIdle is always available.
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         AppLogger.info(
             LogTags.Reminder,
             "reminder_exact_alarm_scheduled",

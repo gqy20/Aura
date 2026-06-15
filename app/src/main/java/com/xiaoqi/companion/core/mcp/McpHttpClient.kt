@@ -348,7 +348,13 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     private fun JsonObject.toToolSpecOrNull(): McpToolSpec? {
         val name = this["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return null
         val description = this["description"]?.jsonPrimitive?.contentOrNull.orEmpty()
-        val schema = this["inputSchema"] as? JsonObject ?: buildJsonObject { put("type", "object") }
+        val schema = this["inputSchema"] as? JsonObject
+        if (schema == null) {
+            // Tools without an inputSchema are not callable — filter them out
+            // and log a warning so the user can see why a tool is missing.
+            AppLogger.warn(LogTags.Tools, "mcp_tool_schema_missing", "toolName" to name)
+            return null
+        }
         return McpToolSpec(name = name, description = description, inputSchema = schema)
     }
 

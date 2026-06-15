@@ -1,7 +1,5 @@
 package com.xiaoqi.companion.data.repository
 
-import com.xiaoqi.companion.core.logging.AppLogger
-import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import javax.inject.Inject
@@ -76,18 +74,9 @@ data class LlmConfigStatus(
         }
 }
 
-private fun missingText(subject: String): String =
-    String(charArrayOf(0x7f3a.toChar(), 0x5c11.toChar())) + " " + subject
+private fun missingText(subject: String): String = "缺失 $subject"
 
-private fun modelNameText(): String =
-    String(
-        charArrayOf(
-            0x6a21.toChar(),
-            0x578b.toChar(),
-            0x540d.toChar(),
-            0x79f0.toChar(),
-        )
-    )
+private fun modelNameText(): String = "模型名称"
 
 interface ConfigRepository {
     val apiKey: Flow<String?>
@@ -118,14 +107,6 @@ class ConfigRepositoryImpl @Inject constructor(private val prefs: AppPreferences
                 ?: DefaultLlmValues.defaultModel(provider)
             val resolvedKey = key?.takeIf { it.isNotBlank() }.orEmpty()
             val resolvedBaseUrl = DefaultLlmValues.defaultBaseUrl(provider)
-            if (resolvedKey.isEmpty() && provider != LlmProvider.LOCAL_QWEN) {
-                AppLogger.warn(
-                    LogTags.Config,
-                    "api_key_missing",
-                    "provider" to provider,
-                    "model" to resolvedModel,
-                )
-            }
             LlmConfig(
                 provider = provider,
                 baseUrl = resolvedBaseUrl,
