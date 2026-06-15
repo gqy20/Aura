@@ -4,7 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.ThemeMode
@@ -40,6 +42,16 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val recurringTopicsJson: Flow<String> = dataStore.data.map { it[Keys.recurringTopicsJson] ?: "[]" }
     val onboardingCompletedAt: Flow<String> = dataStore.data.map { it[Keys.onboardingCompletedAt] ?: "" }
 
+    /**
+     * Dream Loop 周期档位(分钟数)。缺失或未知值回退到 [DreamLoopInterval.DEFAULT]。
+     * 存储为 Long minutes,OFF 用 0L 显式表示,落库数据可通过 [DreamLoopInterval.fromMinutesOrDefault] 反解。
+     */
+    val dreamLoopInterval: Flow<DreamLoopInterval> = dataStore.data.map {
+        DreamLoopInterval.fromMinutesOrDefault(
+            (it[Keys.dreamLoopIntervalMinutes]?.toLong()) ?: DreamLoopInterval.DEFAULT.minutes,
+        )
+    }
+
     suspend fun setApiKey(value: String?) { dataStore.edit { if (value != null) it[Keys.apiKey] = value else it.remove(Keys.apiKey) } }
     suspend fun setBaseUrl(value: String) { dataStore.edit { it[Keys.baseUrl] = value } }
     suspend fun setCurrentCompanionId(value: String) { dataStore.edit { it[Keys.currentCompanionId] = value } }
@@ -60,6 +72,9 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     suspend fun setUserPatternsJson(value: String) { dataStore.edit { it[Keys.userPatternsJson] = value } }
     suspend fun setRecurringTopicsJson(value: String) { dataStore.edit { it[Keys.recurringTopicsJson] = value } }
     suspend fun setOnboardingCompletedAt(value: String) { dataStore.edit { it[Keys.onboardingCompletedAt] = value } }
+    suspend fun setDreamLoopInterval(value: DreamLoopInterval) {
+        dataStore.edit { it[Keys.dreamLoopIntervalMinutes] = value.minutes.toInt() }
+    }
 
     object Keys {
         val apiKey = stringPreferencesKey("api_key")
@@ -82,6 +97,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val userPatternsJson = stringPreferencesKey("user_patterns_json")
         val recurringTopicsJson = stringPreferencesKey("recurring_topics_json")
         val onboardingCompletedAt = stringPreferencesKey("onboarding_completed_at")
+        val dreamLoopIntervalMinutes = intPreferencesKey("dream_loop_interval_minutes")
     }
 
     companion object {

@@ -39,7 +39,7 @@
   - `LocalQwenExecutor`（包装 MNN 引擎 + Request(maxTokens/temperature) + parsePatternDetectOutput 6 case 单测）
   - `DreamDataCollector`（7 天 mood/message/memory 聚合 + 简易词频 top 10 + render prompt）
   - `DreamLoopWorker`（@HiltWorker + @AssistedInject 模式，参照 `ReminderNotificationWorker`）
-  - `DreamLoopScheduler`（PeriodicWorkRequest 6h + 电量约束 + enqueueUniquePeriodicWork KEEP）
+  - `DreamLoopScheduler`（**7 档可配置周期** OFF / 15min / 30min / 1h / 3h / 6h(默认) / 12h + **立即跑一次按钮**；`WorkScheduler` 接口 + `WorkManagerScheduler` 实现解耦 WorkManager 静态；Hilt 注入 `@ApplicationScope` CoroutineScope 跑 collector；改档位走 `ExistingPeriodicWorkPolicy.UPDATE`；默认 6h 向后兼容）
   - `BatteryHelper`（API 29+ BATTERY_PROPERTY_CAPACITY + sticky broadcast 兜底）
 - `CompanionApplication.onCreate` 注入 scheduler + 调度
 - `feature/insight/MoodTrendChart` Compose Canvas 4 根周柱状图（3 档配色）
@@ -700,7 +700,7 @@ override fun create(config: LlmConfig): KoogAgentWrapper {
 | 错误重试 / 容错 | **当前以错误事件 + UI 提示为主** | 规划中；`AgentError` 已分 4 类（NetworkTimeout/RateLimited/ApiError/ParseError） |
 | JSON 解析 | `kotlinx.serialization` 1.7.3 | `ReflectionResponse` 等 `@Serializable` 数据类 |
 | 数据库 ORM | Room 2.8.4 | `MessageDao` / `ToolCallDao` / `AgentStateDao` 等 |
-| 后台调度 | WorkManager 2.10.0 + hilt-work 1.3.0 | `DreamLoopWorker` (PeriodicWorkRequest 6h) + `ReminderNotificationWorker` (OneTimeWorkRequest) |
+| 后台调度 | WorkManager 2.10.0 + hilt-work 1.3.0 | `DreamLoopWorker` (PeriodicWorkRequest **7 档可配置 + 立即触发**) + `ReminderNotificationWorker` (OneTimeWorkRequest) |
 | DI 容器 | Hilt 2.59.2 | `@HiltViewModel` / `@AndroidEntryPoint` / `@HiltWorker` |
 | 日志系统 | Timber 5.0.1 + 自研 `AppLogger` / `LogTags` | 走 Timber `Tree`，自研 `LogFieldSanitizer` 防 PII |
 | 精确闹钟权限 | **自研**（`ChatPermissionPrompt` + `ChatPermissionType.EXACT_ALARM`） | 不用 Accompanist Permissions |

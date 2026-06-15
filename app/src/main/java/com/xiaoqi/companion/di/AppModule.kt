@@ -26,6 +26,8 @@ import com.xiaoqi.companion.core.local.ModelScopeLocalQwenModelDownloader
 import com.xiaoqi.companion.core.local.NativeMnnLlmBridgeFactory
 import com.xiaoqi.companion.core.mcp.McpHttpClient
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
+import com.xiaoqi.companion.core.presence.runtime.WorkManagerScheduler
+import com.xiaoqi.companion.core.presence.runtime.WorkScheduler
 import com.xiaoqi.companion.core.reminder.AndroidReminderScheduler
 import com.xiaoqi.companion.core.reminder.ReminderScheduler
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
@@ -137,4 +139,8 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindReminderScheduler(scheduler: AndroidReminderScheduler): ReminderScheduler
+
+    @Binds
+    @Singleton
+    abstract fun bindWorkScheduler(impl: WorkManagerScheduler): WorkScheduler
 }

@@ -8,6 +8,7 @@ import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceReactionPolicy
+import com.xiaoqi.companion.core.presence.runtime.DreamLoopScheduler
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -73,6 +74,7 @@ class ChatViewModelTest {
     private lateinit var agentStateDao: AgentStateDao
     private lateinit var appPreferences: AppPreferences
     private lateinit var remoteMcpClient: RemoteMcpClient
+    private lateinit var dreamLoopScheduler: DreamLoopScheduler
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val configRepo: ConfigRepository = mockk(relaxed = true) {
@@ -196,6 +198,7 @@ class ChatViewModelTest {
             every { observeByCompanionId("default") } returns flowOf(null)
         }
         appPreferences = mockAppPreferences()
+        dreamLoopScheduler = io.mockk.mockk(relaxed = true)
         viewModel = ChatViewModel(
             sendMessageUseCase = sendMessageUseCase,
             settingsUseCase = settingsUseCase,
@@ -215,6 +218,7 @@ class ChatViewModelTest {
             toolDisplayRegistry = ToolDisplayRegistry(),
             remoteMcpClient = remoteMcpClient,
             mcpServerListRepository = io.mockk.mockk(relaxed = true),
+            dreamLoopScheduler = dreamLoopScheduler,
         )
     }
 
@@ -366,6 +370,7 @@ class ChatViewModelTest {
             toolDisplayRegistry = ToolDisplayRegistry(),
             remoteMcpClient = remoteMcpClient,
             mcpServerListRepository = io.mockk.mockk(relaxed = true),
+            dreamLoopScheduler = io.mockk.mockk(relaxed = true),
         )
         advanceUntilIdle()
 

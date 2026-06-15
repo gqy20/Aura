@@ -36,7 +36,7 @@
   - `LocalQwenExecutor`（包装 MNN 引擎 + Request(maxTokens/temperature) + parsePatternDetectOutput）
   - `DreamDataCollector`（7 天 mood/message/memory 聚合 + 简易词频 top 10 + **跨模态 evidence**：`Snapshot.imageMemories` 取最近 5 张图 metadata，render 输出 `## 视觉证据` section；**base64 不进 prompt**）
   - `DreamLoopWorker`（@HiltWorker + @AssistedInject 模式）
-  - `DreamLoopScheduler`（PeriodicWorkRequest 6h + 电量约束 + enqueueUniquePeriodicWork KEEP）
+  - `DreamLoopScheduler`（**7 档可配置周期** OFF / 15min / 30min / 1h / 3h / 6h(默认) / 12h + **立即跑一次按钮**；`WorkScheduler` 接口 + `WorkManagerScheduler` 实现解耦 WorkManager 静态；Hilt 注入 `@ApplicationScope` CoroutineScope 跑 collector；改档位走 `ExistingPeriodicWorkPolicy.UPDATE`；默认 6h 向后兼容）
   - `BatteryHelper`（API 29+ / sticky broadcast 兜底）
 - Room 持久化：messages、memories、memory_summaries、agent_state、mood_snapshots、tool_calls、reminders、**insights**（M2 新增）。
 - DataStore 配置仓库：API key（实时写）、provider、model name、theme mode、**onboarding 相关 3 key**（user_patterns_json / recurring_topics_json / onboarding_completed_at）、**模型连通性检查 3 key**（PR-A）、`llm_provider` / `model_name` / `base_url` / `mcp_*`。
@@ -58,9 +58,10 @@
 - Reminder 模块：`AndroidReminderScheduler`（AlarmManager）+ `ReminderAlarmReceiver` + `ReminderNotificationWorker`（WorkManager OneTime）+ `ReminderNotificationPoster`（NotificationManagerCompat），含 `SCHEDULE_EXACT_ALARM` / `POST_NOTIFICATIONS` 权限。
 - **M4 Vision→Memory 闭环**：`MemoryEntity` 升级到 v8（`MIGRATION_7_8` 新增 `imageBase64 TEXT + imageMediaType TEXT DEFAULT 'image/jpeg'` 两列）；`MemoryDao.getRecentImages/observeImages` 按 `imageBase64 IS NOT NULL` 过滤；`MemoryRepository.saveVisionMemory` 把"用户发图"事件作为 FACT 记忆写入；`SendMessageUseCase` 注入 `MemoryRepository`，发送带图消息时 fire-and-forget 调 `saveVisionMemory`（失败仅 log 不阻塞主流程）；`DreamDataCollector.collectLast7Days` 拉最近 5 张图 metadata（**不含 base64**）进 `Snapshot.imageMemories` 注入 DreamPrompt `## 视觉证据` section。
 - Presence 状态控制层：`PresenceController`（mood / relationship / streaming / tool / error → 状态推导）+ `PresenceReactionPolicy`（用户点击、应用回前台、记忆保存等事件 → 反应策略）+ `PresenceModels`，状态已覆盖 idle / listening / thinking / speaking / searching / remembering / happy / sad / tired / error 等。
+- **Dream Loop 周期可配置 + 立即触发**：7 档周期（OFF / 15min / 30min / 1h / 3h / 6h(默认) / 12h）经 `AppPreferences.dreamLoopInterval` 暴露给 Settings UI；`DreamLoopScheduler` 注入 `@ApplicationScope` CoroutineScope 跑长生命周期 collector，改档位走 `ExistingPeriodicWorkPolicy.UPDATE` 立即生效；`WorkScheduler` 接口 + `WorkManagerScheduler` 实现解耦 WorkManager 静态；`triggerNow()` 走 OneTimeWorkRequest 唯一名 `"dream_loop_now"`，适合用户主动验证或调参；选 15min/30min 时 UI 显示耗电警告文案。默认 6h 向后兼容历史行为。
 - **Onboarding 5 问（M2 收尾）**：plan §5.2 种子期问题（挂心事/重要日期/称呼/关系人/作息）— 全部可选可跳过，模板表单不入 LLM。
 - **隐私"看见感"面板（M2 收尾）**：`DataTransparencySection`（设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + Bipass 二次确认）。
-- 单元测试覆盖：372 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、ReactiveCompanion 4、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）** 等）。
+- 单元测试覆盖：372 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、ReactiveCompanion 4、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）**、**DreamLoopIntervalTest 6 + DreamLoopSchedulerTest 9** 等）。
 - Debug APK 构建链路。
 - `docs/plan` 规划文档：已新增端云智能体能力整体方案与 Vision/tools 协同计划、Promise System 设计、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）。
 

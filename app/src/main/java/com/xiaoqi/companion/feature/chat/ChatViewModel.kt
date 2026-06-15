@@ -12,6 +12,8 @@ import com.xiaoqi.companion.core.presence.PresenceEvent
 import com.xiaoqi.companion.core.presence.PresenceInputs
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceReactionPolicy
+import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
+import com.xiaoqi.companion.core.presence.runtime.DreamLoopScheduler
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -82,10 +84,22 @@ class ChatViewModel @Inject constructor(
     private val toolDisplayRegistry: ToolDisplayRegistry,
     private val remoteMcpClient: RemoteMcpClient,
     private val mcpServerListRepository: McpServerListRepository,
+    private val dreamLoopScheduler: DreamLoopScheduler,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     private val lastPresenceReactionAtMillis = mutableMapOf<PresenceReaction, Long>()
+
+    /**
+     * 当前 Dream Loop 周期档位(供 Settings UI 显示/写入)。
+     * 数据源 = [AppPreferences.dreamLoopInterval],走 viewModelScope 持续订阅,默认值为 H6。
+     */
+    val dreamLoopInterval: StateFlow<DreamLoopInterval> = appPreferences.dreamLoopInterval
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = DreamLoopInterval.DEFAULT,
+        )
 
     val uiState: StateFlow<ChatUiState> = _uiState
         .map { it.withPresence() }
@@ -710,6 +724,24 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             settingsUseCase.setNotificationEnabled(value) { reducer -> _uiState.update(reducer) }
         }
+    }
+
+    /**
+     * 改 Dream Loop 周期档位。写入 DataStore 后由 [DreamLoopScheduler.start] 内部
+     * collect flow 自动 UPDATE / cancelUniqueWork,UI 不用关心调度细节。
+     */
+    fun setDreamLoopInterval(value: DreamLoopInterval) {
+        viewModelScope.launch {
+            appPreferences.setDreamLoopInterval(value)
+        }
+    }
+
+    /**
+     * 用户在 Settings 主动点"立即跑一次",调 [DreamLoopScheduler.triggerNow] 走
+     * OneTimeWorkRequest,与周期任务并行,不会取消下一次周期触发。
+     */
+    fun triggerDreamLoopNow() {
+        dreamLoopScheduler.triggerNow()
     }
 
     //endregion

@@ -1,4 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Companion</string>
+
+    <!-- Dream Loop 周期档位 (Settings → Presence Layer) -->
+    <string name="dream_loop_section_title">后台觉察 (Dream Loop)</string>
+    <string name="dream_loop_section_subtitle">Aura 在后台做模式识别的频率</string>
+    <string name="dream_loop_warning_freq">⚠ 频繁触发会增加耗电与算力占用</string>
+    <string name="dream_loop_trigger_now">立即跑一次</string>
+    <string name="dream_loop_off">已关闭</string>
+    <string name="dream_loop_15min">15 分钟</string>
+    <string name="dream_loop_30min">30 分钟</string>
+    <string name="dream_loop_1h">1 小时</string>
+    <string name="dream_loop_3h">3 小时</string>
+    <string name="dream_loop_6h">6 小时(默认)</string>
+    <string name="dream_loop_12h">12 小时</string>
 </resources>

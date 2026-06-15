@@ -22,12 +22,16 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -46,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -53,7 +58,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xiaoqi.companion.R
 import com.xiaoqi.companion.core.llm.ConnectivityResult
+import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
 import kotlinx.coroutines.launch
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
@@ -66,6 +73,7 @@ fun SettingsScreen(
     onOpenMcpSettings: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val dreamLoopInterval by viewModel.dreamLoopInterval.collectAsStateWithLifecycle()
     val contextPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
@@ -80,6 +88,7 @@ fun SettingsScreen(
         toolSettings = uiState.toolCapabilitySettings,
         connectivityResult = uiState.connectivityResult,
         isCheckingConnectivity = uiState.isCheckingConnectivity,
+        dreamLoopInterval = dreamLoopInterval,
         viewModel = viewModel,
         onApiKeyChanged = viewModel::updateSettingsApiKey,
         onProviderChanged = viewModel::updateSettingsProvider,
@@ -93,6 +102,8 @@ fun SettingsScreen(
         onWeatherContextEnabledChanged = viewModel::setWeatherContextEnabled,
         onReminderToolEnabledChanged = viewModel::setReminderToolEnabled,
         onNotificationEnabledChanged = viewModel::setNotificationEnabled,
+        onDreamLoopIntervalChanged = viewModel::setDreamLoopInterval,
+        onTriggerDreamLoopNow = viewModel::triggerDreamLoopNow,
         onRequestContextPermissions = {
             contextPermissionLauncher.launch(contextPermissions())
         },
@@ -114,6 +125,7 @@ private fun SettingsScreenContent(
     toolSettings: ChatToolCapabilitySettings,
     connectivityResult: ConnectivityResult?,
     isCheckingConnectivity: Boolean,
+    dreamLoopInterval: DreamLoopInterval,
     onApiKeyChanged: (String) -> Unit,
     onProviderChanged: (LlmProvider) -> Unit,
     onModelNameChanged: (String) -> Unit,
@@ -126,6 +138,8 @@ private fun SettingsScreenContent(
     onWeatherContextEnabledChanged: (Boolean) -> Unit,
     onReminderToolEnabledChanged: (Boolean) -> Unit,
     onNotificationEnabledChanged: (Boolean) -> Unit,
+    onDreamLoopIntervalChanged: (DreamLoopInterval) -> Unit,
+    onTriggerDreamLoopNow: () -> Unit,
     onRequestContextPermissions: () -> Unit,
     onOpenMcpSettings: () -> Unit,
     onBack: () -> Unit,
@@ -232,6 +246,13 @@ private fun SettingsScreenContent(
                     onReminderToolEnabledChanged = onReminderToolEnabledChanged,
                     onNotificationEnabledChanged = onNotificationEnabledChanged,
                     onRequestContextPermissions = onRequestContextPermissions,
+                )
+            }
+            item {
+                DreamLoopSection(
+                    current = dreamLoopInterval,
+                    onIntervalChanged = onDreamLoopIntervalChanged,
+                    onTriggerNow = onTriggerDreamLoopNow,
                 )
             }
             item {
@@ -553,6 +574,82 @@ private fun ToolCapabilityRow(
                     checked = enabled,
                     onCheckedChange = onEnabledChanged,
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DreamLoopSection(
+    current: DreamLoopInterval,
+    onIntervalChanged: (DreamLoopInterval) -> Unit,
+    onTriggerNow: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val showFreqWarning = current == DreamLoopInterval.M15 || current == DreamLoopInterval.M30
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SettingsSectionTitle(
+            title = stringResource(R.string.dream_loop_section_title),
+            subtitle = stringResource(R.string.dream_loop_section_subtitle),
+        )
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = Color(0xFFF7F2EA),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = stringResource(current.labelRes),
+                        onValueChange = {},
+                        readOnly = true,
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.dream_loop_section_title)) },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                    ) {
+                        DreamLoopInterval.entries.forEach { interval ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(interval.labelRes)) },
+                                onClick = {
+                                    onIntervalChanged(interval)
+                                    expanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                if (showFreqWarning) {
+                    Text(
+                        text = stringResource(R.string.dream_loop_warning_freq),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onTriggerNow,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = current.isEnabled,
+                ) {
+                    Text(stringResource(R.string.dream_loop_trigger_now))
+                }
             }
         }
     }

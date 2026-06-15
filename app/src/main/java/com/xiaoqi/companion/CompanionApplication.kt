@@ -23,7 +23,9 @@ class CompanionApplication : Application(), Configuration.Provider {
 
         AppLogger.initialize(BuildConfig.DEBUG)
         SystemPersona.init(this)
-        dreamLoopScheduler.schedule(this)
+        // 启动偏好监听 — 周期可配置后,start() 内部读取 DataStore 当前值(默认 6h)enqueue 一次,
+        // 后续用户在 Settings 改档位会触发 UPDATE / cancel。
+        dreamLoopScheduler.start()
     }
 
     override val workManagerConfiguration: Configuration
