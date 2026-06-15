@@ -39,22 +39,24 @@ const SUMMARY_TYPES = [
   { name: 'RELATIONSHIP', color: '#ff7c9c', desc: '关系摘要 · 人物脉络' },
 ]
 
-// 容量演示
+// 容量演示（281 条 = 3 类记忆 + 5 类摘要，权重归一化到 100%）
 const STORAGE_BREAKDOWN = [
-  { type: 'memories · FACT', count: 124, weight: 0.4 },
-  { type: 'memories · EPISODE', count: 87, weight: 0.3 },
-  { type: 'memories · PROCEDURAL', count: 23, weight: 0.1 },
-  { type: 'summaries · DAILY', count: 31, weight: 0.12 },
-  { type: 'summaries · SESSION', count: 12, weight: 0.05 },
-  { type: 'summaries · TOPIC', count: 4, weight: 0.03 },
-]
+  { type: 'memories · FACT', count: 118, weight: 0.42 },
+  { type: 'memories · EPISODE', count: 84, weight: 0.3 },
+  { type: 'memories · PROCEDURAL', count: 23, weight: 0.08 },
+  { type: 'summaries · DAILY', count: 31, weight: 0.11 },
+  { type: 'summaries · SESSION', count: 11, weight: 0.04 },
+  { type: 'summaries · TOPIC', count: 6, weight: 0.02 },
+  { type: 'summaries · PROJECT', count: 6, weight: 0.02 },
+  { type: 'summaries · RELATIONSHIP', count: 2, weight: 0.01 },
+] // 118+84+23+31+11+6+6+2 = 281
 
 export default function MemoryPage() {
   return (
     <FeatureShell
       number="02"
       category="System"
-      title="Memory that grows with you."
+      title="与你一起成长的记忆。"
       subtitle="每一次对话都被结构化地保存，不是简单日志，而是可被 LLM 调用的记忆图谱。Aura 记得你今天穿的衬衫，也记得你三年前的梦想。"
       active="memory"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 255, 176, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(92, 239, 255, 0.10), transparent 60%), #08090a"
@@ -70,15 +72,15 @@ export default function MemoryPage() {
             <div className="absolute left-4 top-4 flex flex-col gap-1.5 font-mono text-[10px]">
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                <span className="text-muted">hub</span>
+                <span className="text-muted">中枢</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
-                <span className="text-muted">memory (3 types)</span>
+                <span className="text-muted">记忆（3 类）</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#5cefff' }} />
-                <span className="text-muted">summary (5 types)</span>
+                <span className="text-muted">摘要（5 类）</span>
               </div>
             </div>
           </div>
@@ -92,7 +94,7 @@ export default function MemoryPage() {
         {/* 右：MemoryType 详解 */}
         <div className="md:col-span-5">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Three layers of memory
+            三层记忆
           </h2>
           <p className="mt-4 text-pretty leading-relaxed text-muted">
             Memory 不是黑盒。Room 数据库中每条记忆都有 type / importance /
@@ -139,10 +141,10 @@ export default function MemoryPage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Summary types
+            摘要类型
           </h2>
           <span className="font-mono text-xs text-muted">
-            memory_summaries · 5 types
+            记忆摘要 · 5 类
           </span>
         </div>
 
@@ -170,17 +172,17 @@ export default function MemoryPage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Storage breakdown
+            存储分布
           </h2>
           <span className="font-mono text-xs text-muted">
-            local SQLite · 281 records · demo
+            本地 SQLite · 281 条记录 · 演示
           </span>
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-12">
           <div className="md:col-span-2">
             <p className="font-mono text-xs uppercase tracking-wider text-muted">
-              Distribution
+              分布
             </p>
             <p className="mt-2 text-sm text-muted">
               FACT 占主体，PROCEDURAL 靠日常积累。Summary 跨层索引，避免重复。
@@ -203,6 +205,8 @@ export default function MemoryPage() {
                       '#5cefff',
                       '#a07cff',
                       '#ff7c9c',
+                      '#9090a8',
+                      '#c9a96e',
                     ][i],
                   }}
                 />
@@ -226,6 +230,8 @@ export default function MemoryPage() {
                           '#5cefff',
                           '#a07cff',
                           '#ff7c9c',
+                          '#9090a8',
+                          '#c9a96e',
                         ][i],
                       }}
                     />
@@ -247,10 +253,10 @@ export default function MemoryPage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Every field, intentional
+            每个字段都有意义
           </h2>
           <span className="font-mono text-xs text-muted">
-            MemoryEntity · 15 columns
+            MemoryEntity · 9 核心列
           </span>
         </div>
 
@@ -288,14 +294,14 @@ export default function MemoryPage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Related
+            相关
           </h2>
         </div>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { href: '/presence', label: 'Presence', desc: 'How Aura shows up' },
-            { href: '/agent', label: 'Agent', desc: 'How Aura thinks' },
-            { href: '/', label: '← Back to home', desc: 'Aura overview' },
+            { href: '/presence', label: 'Presence', desc: 'Aura 如何呈现自己' },
+            { href: '/agent', label: 'Agent', desc: 'Aura 如何思考' },
+            { href: '/', label: '← 返回首页', desc: 'Aura 总览' },
           ].map((link) => (
             <a
               key={link.href}

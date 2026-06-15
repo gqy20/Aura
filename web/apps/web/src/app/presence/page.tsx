@@ -20,23 +20,23 @@ const PresenceOrbDynamic = dynamic(
 )
 
 const REACTIONS = [
-  { name: 'ERROR_RECOVER', priority: 50, cooldown: '0s', duration: '2.6s', desc: 'Highest priority · no cooldown', color: '#ff5c7c' },
-  { name: 'MEMORY_SPARK', priority: 40, cooldown: '1.5s', duration: '2.3s', desc: 'Save memory feedback', color: '#ffb85c' },
-  { name: 'SEARCH_SWEEP', priority: 30, cooldown: '1.5s', duration: '1.9s', desc: 'Search tool running', color: '#5cefff' },
-  { name: 'RETURN_BLINK', priority: 20, cooldown: '10 min', duration: '1.6s', desc: 'Ambient · 10 min lock', color: '#a07cff' },
-  { name: 'TOUCH_NUZZLE', priority: 10, cooldown: '0.9s', duration: '1.2s', desc: 'Ambient · tap reaction', color: '#5cffb0' },
+  { name: 'ERROR_RECOVER', priority: 50, cooldown: '0s', duration: '2.6s', desc: '最高优先级 · 无冷却', color: '#ff5c7c' },
+  { name: 'MEMORY_SPARK', priority: 40, cooldown: '1.5s', duration: '2.3s', desc: '保存记忆反馈', color: '#ffb85c' },
+  { name: 'SEARCH_SWEEP', priority: 30, cooldown: '1.5s', duration: '1.9s', desc: '搜索工具执行中', color: '#5cefff' },
+  { name: 'RETURN_BLINK', priority: 20, cooldown: '10 min', duration: '1.6s', desc: '环境态 · 10 分钟锁定', color: '#a07cff' },
+  { name: 'TOUCH_NUZZLE', priority: 10, cooldown: '0.9s', duration: '1.2s', desc: '环境态 · 点击反应', color: '#5cffb0' },
 ]
 
 // 24h 状态时间线（演示数据）
 const TIMELINE = [
-  { time: '07:30', state: 'IDLE' as StateKey, label: 'Wake-up' },
-  { time: '08:15', state: 'LISTENING' as StateKey, label: 'Morning check-in' },
-  { time: '09:40', state: 'THINKING' as StateKey, label: 'Plan day' },
-  { time: '12:00', state: 'IDLE' as StateKey, label: 'Noon' },
-  { time: '14:20', state: 'REMEMBERING' as StateKey, label: 'Recall old chat' },
-  { time: '17:45', state: 'SPEAKING' as StateKey, label: 'Recipe help' },
-  { time: '21:10', state: 'TIRED' as StateKey, label: 'Wind down' },
-  { time: '23:30', state: 'SLEEPING' as StateKey, label: 'Dim to sleep' },
+  { time: '07:30', state: 'IDLE' as StateKey, label: '唤醒' },
+  { time: '08:15', state: 'LISTENING' as StateKey, label: '早间问候' },
+  { time: '09:40', state: 'THINKING' as StateKey, label: '规划一天' },
+  { time: '12:00', state: 'IDLE' as StateKey, label: '午间' },
+  { time: '14:20', state: 'REMEMBERING' as StateKey, label: '回忆旧聊' },
+  { time: '17:45', state: 'SPEAKING' as StateKey, label: '帮忙看食谱' },
+  { time: '21:10', state: 'TIRED' as StateKey, label: '准备休息' },
+  { time: '23:30', state: 'SLEEPING' as StateKey, label: '渐渐入睡' },
 ]
 
 // 喂给 TimelineLightUp 的扁平化数据
@@ -55,8 +55,8 @@ export default function PresencePage() {
     <FeatureShell
       number="01"
       category="Capability"
-      title="Presence that lives with you."
-      subtitle="Aura 不只是一个 chat 工具，而是一个有「存在感」的陪伴体。它能感知你的设备状态、情绪、时间，适时地响应或沉默——而且不打扰你。"
+      title="始终在线的陪伴感。"
+      subtitle="Aura 不只是一个聊天工具，而是一个有「存在感」的陪伴体。它能感知你的设备状态、情绪、时间，适时地响应或沉默——而且不打扰你。"
       active="presence"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(124, 92, 255, 0.18), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(92, 167, 255, 0.10), transparent 60%), #08090a"
     >
@@ -73,7 +73,7 @@ export default function PresencePage() {
                 className="h-2 w-2 animate-pulse rounded-full"
                 style={{ backgroundColor: currentState.color }}
               />
-              <span className="text-muted">STATE</span>
+              <span className="text-muted">状态</span>
               <span className="font-medium text-foreground">
                 {currentState.label}
               </span>
@@ -97,46 +97,46 @@ export default function PresencePage() {
 
           <p className="mt-4 font-mono text-xs text-muted">
             {currentState.description} ·{' '}
-            <span style={{ color: currentState.color }}>live state</span>
+            <span style={{ color: currentState.color }}>实时状态</span>
           </p>
         </div>
 
         {/* 右：状态推导规则 */}
         <div className="md:col-span-5">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            How Aura decides what to feel
+            Aura 如何决定"该有何感受"
           </h2>
           <p className="mt-4 text-pretty leading-relaxed text-muted">
-            Presence 状态机从一组输入信号（mood · intensity · isStreaming · isLoading ·
-            tool status）推导当前模式，然后用 5 条规则决定该呈现什么反应。
+            Presence 状态机从一组输入信号（情绪 · 强度 · 是否流式 · 是否加载中 ·
+            工具状态）推导当前模式，然后用 5 条规则决定该呈现什么反应。
           </p>
 
           <ol className="mt-8 space-y-5">
             {[
               {
                 n: '01',
-                t: 'Derive mode from inputs',
-                d: '从 mood + intensity + streaming/loading 状态推出 PresenceMode（IDLE / LISTENING / THINKING / SPEAKING / REMEMBERING / TIRED …）',
+                t: '从输入推导模式',
+                d: '从情绪 + 强度 + 流式/加载状态推出 PresenceMode（IDLE / LISTENING / THINKING / SPEAKING / REMEMBERING / TIRED …）',
               },
               {
                 n: '02',
-                t: 'Filter reaction by cooldown',
-                d: '每个 reaction 有自己的冷却时间（900ms ~ 10min）。如果距离上次展示没过冷却，禁止再触发。',
+                t: '按冷却时间过滤反应',
+                d: '每个反应有自己的冷却时间（900ms ~ 10min）。如果距离上次展示没过冷却，禁止再触发。',
               },
               {
                 n: '03',
-                t: 'Resolve priority conflicts',
-                d: '如果当前 reaction 优先级（10 ~ 50）更高，新 reaction 顶替；否则丢弃。',
+                t: '解决优先级冲突',
+                d: '如果当前反应优先级（10 ~ 50）更高，新反应顶替；否则丢弃。',
               },
               {
                 n: '04',
-                t: 'Respect task vs ambient',
-                d: 'Ambient reaction（TOUCH_NUZZLE / RETURN_BLINK）只在非任务态展示，避免在 LLM 思考时打断。',
+                t: '区分任务态与环境态',
+                d: '环境态反应（TOUCH_NUZZLE / RETURN_BLINK）只在非任务态展示，避免在大模型思考时打断。',
               },
               {
                 n: '05',
-                t: 'Render with duration',
-                d: '展示时长 1.2s ~ 2.6s，独立于 cooldown 控制，避免视觉堆叠。',
+                t: '按时长渲染',
+                d: '展示时长 1.2s ~ 2.6s，独立于冷却时间控制，避免视觉堆叠。',
               },
             ].map((step, i) => (
               <Reveal
@@ -165,9 +165,9 @@ export default function PresencePage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            24h presence timeline
+            24 小时状态时间线
           </h2>
-          <span className="font-mono text-xs text-muted">demo · synthetic data</span>
+          <span className="font-mono text-xs text-muted">示例 · 模拟数据</span>
         </div>
 
         <div className="mt-12">
@@ -175,7 +175,7 @@ export default function PresencePage() {
             {/* 时间刻度 */}
             <div className="md:col-span-2">
               <p className="font-mono text-xs uppercase tracking-wider text-muted">
-                Timeline
+                时间线
               </p>
               <p className="mt-2 text-sm text-muted">
                 一天 8 个关键时刻的状态切换
@@ -194,10 +194,10 @@ export default function PresencePage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Reaction throttling
+            反应节流策略
           </h2>
           <span className="font-mono text-xs text-muted">
-            PresenceReactionPolicy · 5 rules
+            反应策略 · 5 条规则
           </span>
         </div>
 
@@ -205,11 +205,11 @@ export default function PresencePage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border text-xs font-mono uppercase tracking-wider text-muted">
-                <th className="py-3 pr-6">Reaction</th>
-                <th className="py-3 pr-6">Priority</th>
-                <th className="py-3 pr-6">Cooldown</th>
-                <th className="py-3 pr-6">Duration</th>
-                <th className="py-3">Trigger</th>
+                <th className="py-3 pr-6">反应</th>
+                <th className="py-3 pr-6">优先级</th>
+                <th className="py-3 pr-6">冷却时长</th>
+                <th className="py-3 pr-6">持续时长</th>
+                <th className="py-3">触发条件</th>
               </tr>
             </thead>
             <tbody>
@@ -260,14 +260,14 @@ export default function PresencePage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Related
+            相关
           </h2>
         </div>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { href: '/memory', label: 'Memory System', desc: 'How Aura remembers' },
-            { href: '/local-llm', label: 'Local LLM', desc: 'On-device inference' },
-            { href: '/', label: '← Back to home', desc: 'Aura overview' },
+            { href: '/memory', label: '记忆系统', desc: 'Aura 如何记住你' },
+            { href: '/local-llm', label: '本地大模型', desc: '端侧推理' },
+            { href: '/', label: '← 返回首页', desc: 'Aura 总览' },
           ].map((link) => (
             <a
               key={link.href}

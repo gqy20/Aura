@@ -16,23 +16,23 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Aura — AI companion that lives with you',
+    default: 'Aura — 与你同行的 AI 陪伴',
     template: '%s · Aura',
   },
   description:
-    'Aura is an open-source AI companion for Android — presence, memory, and local LLM, designed to live alongside you.',
+    'Aura 是一款 Android 上的 AI 陪伴应用，把存在感、记忆和本地大模型装进你的口袋。',
   applicationName: 'Aura',
-  authors: [{ name: 'Aura Project' }],
-  keywords: ['AI', 'companion', 'Android', 'open-source', 'Koog', 'LLM'],
+  authors: [{ name: 'Aura 团队' }],
+  keywords: ['Aura', 'AI 陪伴', 'Android', 'Koog', 'LLM', '本地大模型', '记忆系统'],
   openGraph: {
-    title: 'Aura — AI companion that lives with you',
-    description: 'Presence, memory, and local LLM in your pocket.',
+    title: 'Aura — 与你同行的 AI 陪伴',
+    description: '存在感、记忆与本地大模型，融于掌心。',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Aura — AI companion that lives with you',
-    description: 'Presence, memory, and local LLM in your pocket.',
+    title: 'Aura — 与你同行的 AI 陪伴',
+    description: '存在感、记忆与本地大模型，融于掌心。',
   },
   icons: {
     icon: '/favicon.svg',
@@ -53,7 +53,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
-      lang="en"
+      lang="zh-CN"
       className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >

@@ -42,4 +42,4 @@ pnpm format
 
 Vercel 部署：`apps/web` 子目录为根目录，Framework Preset: Next.js。
 
-详见 [docs/plan/website-proposal.md](../docs/plan/website-proposal.md)。
+详见 [docs/archive/plan/website-proposal.md](../docs/archive/plan/website-proposal.md)。

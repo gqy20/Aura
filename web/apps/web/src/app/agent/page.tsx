@@ -44,12 +44,12 @@ const PROVIDERS = [
 ]
 
 const PIPELINE_STAGES = [
-  { stage: 'Input', desc: 'User 消息 + 历史 context + memory hit', color: '#7c5cff' },
+  { stage: 'Input', desc: '用户消息 + 历史上下文 + 命中的记忆', color: '#7c5cff' },
   { stage: 'Assemble', desc: 'Prompt 组装 · 工具描述 + 系统提示', color: '#a07cff' },
   { stage: 'LLM Call', desc: 'Koog PromptExecutor → 云端 / 本地', color: '#5cefff' },
-  { stage: 'Tool Decide', desc: 'LLM 输出 tool_call → 注册到 ToolRegistry', color: '#ffb85c' },
+  { stage: 'Tool Decide', desc: '大模型输出工具调用 → 注册到 ToolRegistry', color: '#ffb85c' },
   { stage: 'Tool Run', desc: '执行本地 / 远程 MCP 工具 · 收集结果', color: '#5cffb0' },
-  { stage: 'Stream', desc: 'EventHandler → flow 推回 UI（流式）', color: '#ff7c9c' },
+  { stage: 'Stream', desc: 'EventHandler → 流式推回 UI', color: '#ff7c9c' },
 ]
 
 export default function AgentPage() {
@@ -57,8 +57,8 @@ export default function AgentPage() {
     <FeatureShell
       number="03"
       category="Runtime"
-      title="Agent that orchestrates everything."
-      subtitle="Aura 的灵魂是 Koog AIAgent：内置 9 个结构化工具、3 套 LLM Provider、流式响应、可观测事件流——它不是 LLM，是 LLM 之上的编排者。"
+      title="协调一切的智能体。"
+      subtitle="Aura 的灵魂是 Koog AIAgent：内置 9 个结构化工具、3 套大模型 Provider、流式响应、可观测事件流——它不是大模型，是大模型之上的编排者。"
       active="agent"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 124, 156, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(160, 92, 255, 0.10), transparent 60%), #08090a"
     >
@@ -73,15 +73,15 @@ export default function AgentPage() {
             <div className="absolute left-4 top-4 flex flex-col gap-1.5 font-mono text-[10px]">
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                <span className="text-muted">agent core</span>
+                <span className="text-muted">智能体核心</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
-                <span className="text-muted">9 tools (4 categories)</span>
+                <span className="text-muted">9 个工具（4 类）</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rotate-45" style={{ background: 'transparent', border: '1px solid #9090a8' }} />
-                <span className="text-muted">3 LLM providers</span>
+                <span className="text-muted">3 个 LLM 提供方</span>
               </div>
             </div>
           </div>
@@ -94,7 +94,7 @@ export default function AgentPage() {
         {/* 右：4 类工具 */}
         <div className="md:col-span-5">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Nine tools, four categories
+            九个工具，四类划分
           </h2>
           <p className="mt-4 text-pretty leading-relaxed text-muted">
             9 个内置工具 + 动态加载的远程 MCP 工具。AuraAgent 不会"调用 API"——它调度
@@ -144,10 +144,10 @@ export default function AgentPage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Streaming pipeline
+            流式管线
           </h2>
           <span className="font-mono text-xs text-muted">
-            EventHandler · 6 stages
+            事件处理器 · 6 个阶段
           </span>
         </div>
 
@@ -194,16 +194,16 @@ export default function AgentPage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Dual-mode routing
+            双模路由
           </h2>
           <span className="font-mono text-xs text-muted">
-            Cloud first · Local fallback
+            云端优先 · 本地兜底
           </span>
         </div>
 
         <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
-          Aura 永远先尝试云端 Qwen（推理快、质量高）。当网络不通时，自动 fallback 到
-          本地 MNN 推理，确保对话不中断。两个 provider 共享同一个 Koog
+          Aura 永远先尝试云端 Qwen（推理快、质量高）。当网络不通时，自动回退到
+          本地 MNN 推理，确保对话不中断。两个提供方共享同一个 Koog
           Agent 接口，UI 层无感。
         </p>
 
@@ -226,7 +226,7 @@ export default function AgentPage() {
                 </div>
                 {p.fallback && (
                   <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">
-                    fallback
+                    兜底
                   </span>
                 )}
               </div>
@@ -256,7 +256,7 @@ export default function AgentPage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Design principles
+            设计原则
           </h2>
         </div>
 
@@ -264,32 +264,32 @@ export default function AgentPage() {
           {[
             {
               n: '01',
-              t: 'No black box',
-              d: '所有工具调用都有 structured recorder（toolCallRecorder）：tool name / arguments / result / status 全可追溯。',
+              t: '拒绝黑盒',
+              d: '所有工具调用都有结构化记录器（toolCallRecorder）：工具名 / 参数 / 结果 / 状态全可追溯。',
             },
             {
               n: '02',
-              t: 'Streaming first',
+              t: '流式优先',
               d: 'AIAgent 用 streamingSingleRunStrategy + EventHandler，token 级别的流式推回 UI，无整段等待。',
             },
             {
               n: '03',
-              t: 'Bounded iterations',
-              d: 'maxIterations=20。LLM 死循环不消耗资源，到上限自动停。',
+              t: '有界迭代',
+              d: 'maxIterations=20。大模型死循环不消耗资源，到上限自动停。',
             },
             {
               n: '04',
-              t: 'MCP as a first-class citizen',
+              t: 'MCP 是一等公民',
               d: '远程 MCP server 动态加入 ToolRegistry，列表来自 McpServerListRepository，UI 软开关。',
             },
             {
               n: '05',
-              t: 'Empty tool registry by default',
-              d: '当 prompt 含图片或关闭工具时，ToolRegistry.EMPTY——减少无关工具对 LLM 的干扰。',
+              t: '默认清空工具注册表',
+              d: '当 prompt 含图片或关闭工具时，ToolRegistry.EMPTY——减少无关工具对大模型的干扰。',
             },
             {
               n: '06',
-              t: 'Failure visibility',
+              t: '失败可见',
               d: 'onToolCallFailed / agent_run_failed 都走 AppLogger，logcat 可追。',
             },
           ].map((p, i) => (
@@ -313,14 +313,14 @@ export default function AgentPage() {
       <section className="mt-32">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Related
+            相关
           </h2>
         </div>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { href: '/presence', label: 'Presence', desc: 'How Aura shows up' },
-            { href: '/memory', label: 'Memory', desc: 'How Aura remembers' },
-            { href: '/', label: '← Back to home', desc: 'Aura overview' },
+            { href: '/presence', label: 'Presence', desc: 'Aura 如何呈现自己' },
+            { href: '/memory', label: 'Memory', desc: 'Aura 如何记住你' },
+            { href: '/', label: '← 返回首页', desc: 'Aura 总览' },
           ].map((link) => (
             <a
               key={link.href}

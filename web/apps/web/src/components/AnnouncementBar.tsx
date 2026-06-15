@@ -46,7 +46,7 @@ export function AnnouncementBar() {
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
             <span className="text-foreground">v0.4</span>
             <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">41 tests pass · dual-mind Presence</span>
+            <span className="hidden sm:inline">372 项测试通过 · 双模态存在感</span>
           </span>
           <a
             href="https://github.com/gqy20/Aura/releases"
@@ -54,14 +54,14 @@ export function AnnouncementBar() {
             rel="noopener"
             className="group inline-flex items-center gap-1 text-foreground transition-colors hover:text-accent"
           >
-            See changelog
+            查看更新日志
             <span className="transition-transform group-hover:translate-x-0.5">
               →
             </span>
           </a>
           <button
             onClick={dismiss}
-            aria-label="Dismiss announcement"
+            aria-label="关闭公告"
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted transition-colors hover:text-foreground"
           >
             <svg

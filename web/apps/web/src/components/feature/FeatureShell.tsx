@@ -97,7 +97,7 @@ export function FeatureShell({
 
           {/* ─── Footer ─── */}
           <footer className="flex items-center justify-between border-t border-border py-8 font-mono text-xs text-muted">
-            <span>© 2026 Aura · Open Source</span>
+            <span>© 2026 Aura · 开源</span>
             <span>
               <span className="text-accent">{number}</span> · {category}
             </span>
