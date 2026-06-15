@@ -22,7 +22,14 @@ class SearchRecordsTool @Inject constructor(
 ) : SimpleTool<SearchRecordsTool.Args>(
     typeToken<Args>(),
     name = "search_records",
-    description = "Search raw chat records and return original message snippets with nearby context.",
+    description = """
+        Find RAW CHAT MESSAGES with before/after context from past conversations.
+        Use this when the user asks 'what did I/we say about X', 'when did I mention Y', or wants to recall a specific conversation or message.
+        Each hit includes 1 message before and 1 after by default for context.
+        Do NOT use for distilled knowledge about the user (preferences, facts) — call search_memory instead.
+        Do NOT use for high-level time-windowed digests — call search_summaries instead.
+        Call only ONE of search_memory / search_records / search_summaries per question; pick the most specific.
+    """.trimIndent(),
 ) {
 
     @Serializable

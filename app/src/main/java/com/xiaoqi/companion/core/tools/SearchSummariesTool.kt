@@ -20,7 +20,14 @@ class SearchSummariesTool @Inject constructor(
 ) : SimpleTool<SearchSummariesTool.Args>(
     typeToken<Args>(),
     name = "search_summaries",
-    description = "Search condensed summaries separately from raw records and long-term memories.",
+    description = """
+        Find TIME-WINDOWED DIGESTS (DAILY / SESSION / TOPIC / PROJECT / RELATIONSHIP summary types).
+        Use this for high-level queries like 'summarize the past week', 'main themes of last month', or 'what projects did we discuss'.
+        Returns condensed digests covering a time range — not single messages.
+        Do NOT use for a specific message or quote — call search_records instead.
+        Do NOT use for user facts or preferences — call search_memory instead.
+        Call only ONE of search_memory / search_records / search_summaries per question; pick the most specific.
+    """.trimIndent(),
 ) {
 
     @Serializable

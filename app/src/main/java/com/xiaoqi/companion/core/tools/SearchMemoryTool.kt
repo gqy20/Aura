@@ -19,7 +19,14 @@ class SearchMemoryTool @Inject constructor(
 ) : SimpleTool<SearchMemoryTool.Args>(
     typeToken<Args>(),
     name = "search_memory",
-    description = "Search stored memories by keyword, optionally filtered by type and limited in count.",
+    description = """
+        Recall the user's long-term FACTS, PREFERENCES, and PROFILE attributes (FACT/PROCEDURAL memory type).
+        Use this when the user asks about themselves, their habits, traits, or 'what do you know about me'.
+        Returns concise single-line entries (no surrounding chat context).
+        Do NOT use for 'what did I say about X' or 'find a specific past message' — call search_records instead.
+        Do NOT use for high-level time-windowed digests — call search_summaries instead.
+        Call only ONE of search_memory / search_records / search_summaries per question; pick the most specific.
+    """.trimIndent(),
 ) {
 
     @Serializable

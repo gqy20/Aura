@@ -87,4 +87,24 @@ class SearchMemoryToolTest {
         val desc = tool.descriptor.description
         assertTrue("Expected descriptor to contain 'search' or 'memory' but got: '$desc'", desc.contains("search", ignoreCase = true) || desc.contains("memory", ignoreCase = true))
     }
+
+    // --- description 包含 disambiguation 段,防回归 ---
+
+    @Test
+    fun descriptor_distinguishesFromOtherSearchTools() {
+        val tool = SearchMemoryTool(mockk())
+        val desc = tool.descriptor.description
+
+        // 自己的语义
+        assertTrue("description 应提到 long-term / fact / preference 等关键词之一, got: '$desc'",
+            desc.contains("FACT", ignoreCase = true) ||
+                desc.contains("preference", ignoreCase = true) ||
+                desc.contains("profile", ignoreCase = true))
+        // 引导 LLM 选 search_records 替代
+        assertTrue("description 应引导 'specific message' 用 search_records 替代, got: '$desc'",
+            desc.contains("search_records"))
+        // 引导 LLM 选 search_summaries 替代
+        assertTrue("description 应引导 'time-windowed' 用 search_summaries 替代, got: '$desc'",
+            desc.contains("search_summaries"))
+    }
 }

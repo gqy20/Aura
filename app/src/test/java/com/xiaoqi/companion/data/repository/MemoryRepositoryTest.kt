@@ -218,6 +218,83 @@ class MemoryRepositoryTest : BaseDaoTest() {
         assertTrue(memoryDao.getById("p1")!!.pinned)
     }
 
+    // --- Onboarding 种子写入 ---
+
+    @Test
+    fun saveOnboardingMemories_writesAllAnswersAsSeparateMemories() = runTest {
+        val written = repository.saveOnboardingMemories(
+            concerns = "换工作面试 + 下周体检",
+            upcomingDates = "6/22 妈妈生日, 6/30 论文截止",
+            addressStyle = "叫我小蓝,语气放松",
+            friends = listOf("旺财", "小米"),
+            scheduleChoice = "晚睡晚起",
+        )
+
+        // 3 个独立字段(挂心事/日期/称呼/作息) + 2 个朋友 = 6 条
+        assertEquals(6, written)
+        val all = memoryDao.getPromptMemories(10)
+        assertEquals(6, all.size)
+
+        val byType = all.groupBy { it.type }
+        // 4 个 FACT(称呼/朋友×2/作息) + 2 个 EPISODE(挂心事/日期)
+        assertEquals(4, byType[MemoryType.FACT]?.size)
+        assertEquals(2, byType[MemoryType.EPISODE]?.size)
+
+        val contents = all.map { it.content }
+        assertTrue(contents.any { it.contains("小蓝") })
+        assertTrue(contents.any { it.contains("旺财") })
+        assertTrue(contents.any { it.contains("小米") })
+        assertTrue(contents.any { it.contains("换工作") })
+        assertTrue(contents.any { it.contains("妈妈生日") })
+        assertTrue(all.all { it.source == "onboarding" })
+        assertTrue(all.all { it.importance == 0.8f })
+    }
+
+    @Test
+    fun saveOnboardingMemories_skipsBlankAnswers() = runTest {
+        val written = repository.saveOnboardingMemories(
+            concerns = "",                       // 空,跳过
+            upcomingDates = "  ",                // 空白,跳过
+            addressStyle = "叫我小蓝",
+            friends = listOf("", "旺财", "  "),  // 只保留非空
+            scheduleChoice = "",                 // 空,跳过
+        )
+
+        assertEquals(2, written)
+        val all = memoryDao.getPromptMemories(10)
+        assertEquals(2, all.size)
+        val contents = all.map { it.content }
+        assertTrue(contents.any { it.contains("小蓝") })
+        assertTrue(contents.any { it.contains("旺财") })
+    }
+
+    @Test
+    fun saveOnboardingMemories_mergesDuplicateFriends() = runTest {
+        // 第一次:旺财
+        repository.saveOnboardingMemories(
+            concerns = "",
+            upcomingDates = "",
+            addressStyle = "",
+            friends = listOf("旺财"),
+            scheduleChoice = "",
+        )
+        // 第二次:旺财(用户多设备或重做 onboarding)
+        repository.saveOnboardingMemories(
+            concerns = "",
+            upcomingDates = "",
+            addressStyle = "",
+            friends = listOf("旺财"),
+            scheduleChoice = "",
+        )
+
+        val all = memoryDao.getPromptMemories(10)
+        // merge 路径应当把"高频联系人: 旺财"合并成 1 条
+        assertEquals(1, all.size)
+        assertTrue(all.single().content.contains("旺财"))
+    }
+
+    // --- Vision memory ---
+
     @Test
     fun saveVisionMemory_storesBase64AndMediaType() = runTest {
         val entity = repository.saveVisionMemory(

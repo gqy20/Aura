@@ -190,6 +190,103 @@ class MemoryRepository @Inject constructor(
         before
     }
 
+    // region Onboarding 种子写入
+
+    /**
+     * Onboarding 5 问落入 LTM。
+     *
+     * 每条答案作为独立 memory 写入,按语义分 type:
+     * - `concerns` (q1 挂心事) / `upcomingDates` (q2 重要日期) → EPISODE(近期事件)
+     * - `addressStyle` (q3 称呼+语气) / `friends` (q4 朋友,每人一笔) /
+     *   `scheduleChoice` (q5 作息) → FACT(用户属性)
+     *
+     * 空字符串 / 空 list 跳过,不写空 memory。`source = "onboarding"`,
+     * `importance = 0.8` `confidence = 0.9`(用户主动告知,信度极高)。
+     *
+     * 写入走 `saveMemory` 走 merge 路径 — 同一朋友再次告知会**升级 importance
+     * 合并**,而不是写新行。
+     */
+    suspend fun saveOnboardingMemories(
+        concerns: String,
+        upcomingDates: String,
+        addressStyle: String,
+        friends: List<String>,
+        scheduleChoice: String,
+    ): Int = withContext(Dispatchers.IO) {
+        val requests = buildList {
+            if (concerns.isNotBlank()) add(
+                SaveMemoryRequest(
+                    content = "近期挂心事: $concerns",
+                    type = MemoryType.EPISODE,
+                    importance = 0.8f,
+                    confidence = 0.9f,
+                    source = "onboarding",
+                )
+            )
+            if (upcomingDates.isNotBlank()) add(
+                SaveMemoryRequest(
+                    content = "未来重要日期: $upcomingDates",
+                    type = MemoryType.EPISODE,
+                    importance = 0.8f,
+                    confidence = 0.9f,
+                    source = "onboarding",
+                )
+            )
+            if (addressStyle.isNotBlank()) add(
+                SaveMemoryRequest(
+                    content = "称呼 / 说话风格: $addressStyle",
+                    type = MemoryType.FACT,
+                    importance = 0.8f,
+                    confidence = 0.9f,
+                    source = "onboarding",
+                )
+            )
+            friends.filter { it.isNotBlank() }.forEach { name ->
+                add(
+                    SaveMemoryRequest(
+                        content = "高频联系人: $name",
+                        type = MemoryType.FACT,
+                        importance = 0.8f,
+                        confidence = 0.9f,
+                        source = "onboarding",
+                    )
+                )
+            }
+            if (scheduleChoice.isNotBlank()) add(
+                SaveMemoryRequest(
+                    content = "作息节奏: $scheduleChoice",
+                    type = MemoryType.FACT,
+                    importance = 0.8f,
+                    confidence = 0.9f,
+                    source = "onboarding",
+                )
+            )
+        }
+        var written = 0
+        requests.forEach { request ->
+            runCatching { saveMemory(request) }
+                .onSuccess { written++ }
+                .onFailure { error ->
+                    AppLogger.warn(
+                        LogTags.Repo,
+                        "onboarding_memory_save_failed",
+                        "contentLength" to request.content.length,
+                        "type" to request.type,
+                        "message" to (error.message ?: error::class.simpleName.orEmpty()),
+                    )
+                }
+        }
+        AppLogger.info(
+            LogTags.Repo,
+            "onboarding_memories_saved",
+            "written" to written,
+            "total" to requests.size,
+        )
+        written
+    }
+
+    // endregion
+
     // region M4 视觉入 memory
 
     /**

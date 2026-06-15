@@ -224,15 +224,12 @@ fun OnboardingScreen(
                 Button(
                     onClick = {
                         if (isLast) {
-                            val patterns = listOf(q1, q5Choice).filter { it.isNotBlank() }
-                            val topics = buildList {
-                                add(q3)
-                                q2.takeIf { it.isNotBlank() }?.let { add(it) }
-                                q4Friends.value.filter { it.isNotBlank() }.forEach { add(it) }
-                            }
                             viewModel.saveAnswers(
-                                userPatterns = patterns,
-                                recurringTopics = topics,
+                                concerns = q1,
+                                upcomingDates = q2,
+                                addressStyle = q3,
+                                friends = q4Friends.value,
+                                scheduleChoice = q5Choice,
                                 onDone = onComplete,
                             )
                         } else {
