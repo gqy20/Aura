@@ -16,6 +16,7 @@ import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.InsightRepository
@@ -71,6 +72,7 @@ class ChatViewModel @Inject constructor(
     private val memoryRepository: MemoryRepository,
     private val insightRepository: InsightRepository,
     private val moodSnapshotDao: MoodSnapshotDao,
+    private val messageDao: MessageDao,
     private val agentStateDao: AgentStateDao,
     private val presenceController: PresenceController,
     private val presenceReactionPolicy: PresenceReactionPolicy,
@@ -221,14 +223,20 @@ class ChatViewModel @Inject constructor(
 
         // 9. 首次启动:种 2-3 条占位 insight(仅当 DB 为空)
         viewModelScope.launch {
-            runCatching { insightRepository.seedDemoInsights() }
-                .onFailure {
-                    AppLogger.warn(
-                        LogTags.Repo,
-                        "insight_seed_failed",
-                        "cause" to (it.message ?: it::class.simpleName.orEmpty()),
-                    )
-                }
+            runCatching {
+                insightRepository.seedDemoInsights(
+                    memoryRepository = memoryRepository,
+                    moodSnapshotDao = moodSnapshotDao,
+                    messageDao = messageDao,
+                    agentStateDao = agentStateDao,
+                )
+            }.onFailure {
+                AppLogger.warn(
+                    LogTags.Repo,
+                    "insight_seed_failed",
+                    "cause" to (it.message ?: it::class.simpleName.orEmpty()),
+                )
+            }
         }
 
         // 10. 近 28 天 mood trend(M3 Chart 用)

@@ -66,14 +66,8 @@ fun OnboardingScreen(
     val q4Friends = remember { mutableStateOf(listOf("", "", "")) }
     var q5Choice by rememberSaveable { mutableStateOf("") }
 
-    val canAdvance = when (step) {
-        0 -> q1.isNotBlank()
-        1 -> q2.isNotBlank()
-        2 -> q3.isNotBlank()
-        3 -> q4Friends.value.count { it.isNotBlank() } >= 1
-        4 -> q5Choice.isNotBlank()
-        else -> false
-    }
+    // 5 问全部可选 — 用户可以快速跳过,plan §5.2 强调"不强迫"产品调性
+    val canAdvance = true
 
     val isLast = step == 4
     val progress = (step + 1) / 5f

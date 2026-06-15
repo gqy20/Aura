@@ -13,6 +13,7 @@ import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
@@ -68,6 +69,7 @@ class ChatViewModelTest {
     private lateinit var memoryRepository: MemoryRepository
     private lateinit var insightRepository: InsightRepository
     private lateinit var moodSnapshotDao: MoodSnapshotDao
+    private lateinit var messageDao: MessageDao
     private lateinit var agentStateDao: AgentStateDao
     private lateinit var appPreferences: AppPreferences
     private lateinit var remoteMcpClient: RemoteMcpClient
@@ -175,14 +177,15 @@ class ChatViewModelTest {
             every { observeMemoriesPinnedFirst() } returns flowOf(emptyList())
             coEvery { countAll() } returns 0
         }
-        insightRepository = mockk(relaxed = true) {
+        insightRepository = mockk<com.xiaoqi.companion.data.repository.InsightRepository>(relaxed = true) {
             every { observeVisibleNotMuted(any()) } returns flowOf(emptyList())
-            coEvery { seedDemoInsights() } returns 0
+            coEvery { seedDemoInsights(any(), any(), any(), any()) } returns 0
             coEvery { countAll() } returns 0
         }
-        moodSnapshotDao = mockk(relaxed = true) {
+        moodSnapshotDao = mockk<MoodSnapshotDao>(relaxed = true) {
             coEvery { countAll() } returns 0
         }
+        messageDao = mockk<MessageDao>(relaxed = true)
         remoteMcpClient = mockk(relaxed = true)
         agentStateDao = mockk(relaxed = true) {
             every { observeByCompanionId("default") } returns flowOf(null)
@@ -198,6 +201,7 @@ class ChatViewModelTest {
             memoryRepository = memoryRepository,
             insightRepository = insightRepository,
             moodSnapshotDao = moodSnapshotDao,
+            messageDao = mockk(relaxed = true),
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,
@@ -347,6 +351,7 @@ class ChatViewModelTest {
             memoryRepository = memoryRepository,
             insightRepository = insightRepository,
             moodSnapshotDao = moodSnapshotDao,
+            messageDao = mockk(relaxed = true),
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,

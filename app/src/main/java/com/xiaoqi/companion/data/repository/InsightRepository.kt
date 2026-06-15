@@ -125,10 +125,99 @@ class InsightRepository @Inject constructor(
     /**
      * 调试用:插 2-3 条占位 insight,状态 VISIBLE。
      * 仅在 ChatViewModel 启动时调用一次(检测 DB 为空时)。
+     *
+     * **PoC 真机发现**:evidence 必须引用真实存在的 mood_snapshot / memory / message id
+     * 否则 Validator 的"50% 真实存在"门槛会把 insight 全部拒掉。
+     * 这里在 saveIfValid **之前**先批量 insert 真实 mock 行,evidence 再引用这些 id。
      */
-    suspend fun seedDemoInsights(): Int = withContext(Dispatchers.IO) {
+    suspend fun seedDemoInsights(
+        memoryRepository: com.xiaoqi.companion.data.repository.MemoryRepository,
+        moodSnapshotDao: com.xiaoqi.companion.data.db.dao.MoodSnapshotDao,
+        messageDao: com.xiaoqi.companion.data.db.dao.MessageDao,
+        agentStateDao: com.xiaoqi.companion.data.db.dao.AgentStateDao,
+    ): Int = withContext(Dispatchers.IO) {
         if (insightDao.countAll() > 0) return@withContext 0
         val now = System.currentTimeMillis()
+        // mood_snapshots.companion_id 是外键引用 agent_state,先确保 parent row 存在
+        runCatching {
+            agentStateDao.insert(
+                com.xiaoqi.companion.data.db.entity.AgentStateEntity(
+                    id = "default",
+                    companionId = "default",
+                    mood = "neutral",
+                    emotionVector = "{}",
+                    relationshipLevel = 0f,
+                    lastInteractionAt = now,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+        }
+        val oneWeekAgo = now - 7L * 24L * 60L * 60L * 1000
+        val threeWeeksAgo = now - 21L * 24L * 60L * 60L * 1000
+        // 真实 mock 证据(让 Validator 通过) — 用 insertMemoryWithId 固定 id,evidence 引用
+        memoryRepository.insertMemoryWithId(
+            com.xiaoqi.companion.data.db.entity.MemoryEntity(
+                id = "seed-mom-bday",
+                type = com.xiaoqi.companion.data.db.converter.MemoryType.FACT,
+                content = "妈妈下个月生日",
+                source = "reflection:seed",
+                importance = 0.8f,
+                confidence = 0.9f,
+                sourceMessageIds = "[]",
+                timestamp = now,
+                updatedAt = now,
+                expiresAt = null,
+                sensitivity = "normal",
+                lastAccessed = now,
+            ),
+        )
+        moodSnapshotDao.insert(
+            com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity(
+                id = "seed-1",
+                companionId = "default",
+                mood = "sad",
+                intensity = 0.3f,
+                timestamp = threeWeeksAgo,
+            ),
+        )
+        moodSnapshotDao.insert(
+            com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity(
+                id = "seed-2",
+                companionId = "default",
+                mood = "sad",
+                intensity = 0.35f,
+                timestamp = threeWeeksAgo + 7L * 24L * 60L * 60L * 1000,
+            ),
+        )
+        moodSnapshotDao.insert(
+            com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity(
+                id = "seed-3",
+                companionId = "default",
+                mood = "sad",
+                intensity = 0.38f,
+                timestamp = threeWeeksAgo + 14L * 24L * 60L * 60L * 1000,
+            ),
+        )
+        messageDao.insert(
+            com.xiaoqi.companion.data.db.entity.MessageEntity(
+                id = "seed-sleep-1",
+                sessionId = "default",
+                role = com.xiaoqi.companion.data.db.converter.MessageRole.USER,
+                content = "最近睡不着,有点失眠",
+                timestamp = oneWeekAgo,
+            ),
+        )
+        messageDao.insert(
+            com.xiaoqi.companion.data.db.entity.MessageEntity(
+                id = "seed-sleep-2",
+                sessionId = "default",
+                role = com.xiaoqi.companion.data.db.converter.MessageRole.USER,
+                content = "睡眠质量不好,想改善",
+                timestamp = now - 2L * 24L * 60L * 60L * 1000,
+            ),
+        )
+
         val seeds = listOf(
             InsightDraft(
                 triggerType = "PATTERN_DETECT",

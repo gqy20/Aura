@@ -172,6 +172,15 @@ class MemoryRepository @Inject constructor(
 
     fun observeMemoriesPinnedFirst(): Flow<List<MemoryEntity>> = memoryDao.observeAllPinnedFirst()
 
+    /**
+     * 给定固定 id 插入一条 memory(供 debug seedDemoInsights 等需要固定 evidence id 的场景)。
+     * 不走 merge / 重复检测 — **只用于 seed/migration**,不走用户主流程。
+     */
+    suspend fun insertMemoryWithId(entity: MemoryEntity) = withContext(Dispatchers.IO) {
+        memoryDao.insert(entity)
+        AppLogger.info(LogTags.Repo, "memory_insert_with_id", "memoryId" to entity.id)
+    }
+
     suspend fun countAll(): Int = withContext(Dispatchers.IO) { memoryDao.countAll() }
 
     suspend fun clearAll(): Int = withContext(Dispatchers.IO) {
