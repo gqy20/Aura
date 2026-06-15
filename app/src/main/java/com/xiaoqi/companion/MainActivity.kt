@@ -13,6 +13,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,6 +27,8 @@ import com.xiaoqi.companion.feature.chat.ChatViewModel
 import com.xiaoqi.companion.feature.chat.McpSettingsScreen
 import com.xiaoqi.companion.feature.chat.MemoryRoomScreen
 import com.xiaoqi.companion.feature.chat.SettingsScreen
+import com.xiaoqi.companion.feature.onboarding.OnboardingScreen
+import com.xiaoqi.companion.feature.onboarding.OnboardingViewModel
 import com.xiaoqi.companion.ui.theme.CompanionTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -49,6 +55,7 @@ private object AuraRoutes {
     const val Settings = "settings"
     const val McpSettings = "settings/mcp"
     const val MemoryRoom = "memory-room"
+    const val Onboarding = "onboarding"
 }
 
 @Composable
@@ -137,6 +144,24 @@ private fun AuraAppNavHost(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
             )
+        }
+        composable(AuraRoutes.Onboarding) {
+            OnboardingScreen(
+                onComplete = {
+                    navController.navigate(AuraRoutes.Home) {
+                        popUpTo(AuraRoutes.Onboarding) { inclusive = true }
+                    }
+                },
+            )
+        }
+    }
+
+    // 启动判断:未完成 onboarding → 跳 Onboarding(走一次性,避免堆栈污染)
+    val onboardingViewModel: OnboardingViewModel = hiltViewModel()
+    val isCompleted by onboardingViewModel.isOnboardingCompleted.collectAsStateWithLifecycle()
+    LaunchedEffect(isCompleted) {
+        if (!isCompleted) {
+            navController.navigate(AuraRoutes.Onboarding)
         }
     }
 }

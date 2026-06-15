@@ -136,4 +136,7 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE session_id = :sessionId")
     suspend fun deleteBySession(sessionId: String)
+
+    @Query("SELECT COUNT(*) FROM messages")
+    suspend fun countAll(): Int
 }

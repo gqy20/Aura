@@ -27,4 +27,10 @@ interface MoodSnapshotDao {
 
     @Query("DELETE FROM mood_snapshots WHERE companion_id = :companionId")
     suspend fun deleteByCompanionId(companionId: String)
+
+    @Query("SELECT COUNT(*) FROM mood_snapshots")
+    suspend fun countAll(): Int
+
+    @Query("DELETE FROM mood_snapshots")
+    suspend fun clearAll()
 }

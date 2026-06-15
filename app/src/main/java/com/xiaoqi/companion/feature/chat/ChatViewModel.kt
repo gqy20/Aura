@@ -16,6 +16,7 @@ import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.InsightRepository
 import com.xiaoqi.companion.data.repository.MemoryRepository
@@ -69,6 +70,7 @@ class ChatViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val memoryRepository: MemoryRepository,
     private val insightRepository: InsightRepository,
+    private val moodSnapshotDao: MoodSnapshotDao,
     private val agentStateDao: AgentStateDao,
     private val presenceController: PresenceController,
     private val presenceReactionPolicy: PresenceReactionPolicy,
@@ -403,6 +405,64 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
+
+    //region 隐私面板(PR-C)
+
+    suspend fun insightCount(): Int = insightRepository.countAll()
+
+    suspend fun memoryCount(): Int = memoryRepository.countAll()
+
+    suspend fun moodSnapshotCount(): Int = moodSnapshotDao.countAll()
+
+    fun clearInsights() {
+        viewModelScope.launch {
+            try {
+                insightRepository.clearAll()
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_clear_insights_failed")
+                _uiState.update { it.copy(error = "清空 insights 失败,请重试。") }
+            }
+        }
+    }
+
+    fun clearMemories() {
+        viewModelScope.launch {
+            try {
+                memoryRepository.clearAll()
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_clear_memories_failed")
+                _uiState.update { it.copy(error = "清空 memories 失败,请重试。") }
+            }
+        }
+    }
+
+    fun clearMoodSnapshots() {
+        viewModelScope.launch {
+            try {
+                moodSnapshotDao.clearAll()
+            } catch (e: Exception) {
+                AppLogger.error(LogTags.Repo, e, "ui_clear_mood_snapshots_failed")
+                _uiState.update { it.copy(error = "清空 mood_snapshots 失败,请重试。") }
+            }
+        }
+    }
+
+    /**
+     * 把当前 DB 全部数据写为 JSON 字符串(供 SettingsScreen 调 SAF 导出)。
+     * 失败兜底返回空对象,绝不抛。
+     */
+    suspend fun exportAllJson(): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val builder = StringBuilder()
+        builder.append("{\n")
+        builder.append("  \"exportedAt\": ${System.currentTimeMillis()},\n")
+        builder.append("  \"memoryCount\": ${memoryRepository.countAll()},\n")
+        builder.append("  \"insightCount\": ${insightRepository.countAll()},\n")
+        builder.append("  \"moodSnapshotCount\": ${moodSnapshotDao.countAll()}\n")
+        builder.append("}\n")
+        builder.toString()
+    }
+
+    //endregion
 
     fun checkLlmConnectivity() {
         viewModelScope.launch {

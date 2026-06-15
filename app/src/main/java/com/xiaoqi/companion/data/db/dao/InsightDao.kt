@@ -83,4 +83,7 @@ interface InsightDao {
 
     @Query("SELECT * FROM insights WHERE id = :id")
     suspend fun getById(id: Long): InsightEntity?
+
+    @Query("DELETE FROM insights")
+    suspend fun clearAll()
 }

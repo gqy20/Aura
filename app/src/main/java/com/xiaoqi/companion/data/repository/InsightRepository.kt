@@ -115,6 +115,13 @@ class InsightRepository @Inject constructor(
     suspend fun countAll(): Int = withContext(Dispatchers.IO) { insightDao.countAll() }
     suspend fun countVisible(): Int = withContext(Dispatchers.IO) { insightDao.countVisible() }
 
+    suspend fun clearAll(): Int = withContext(Dispatchers.IO) {
+        val before = insightDao.countAll()
+        insightDao.clearAll()
+        AppLogger.info(LogTags.Repo, "insight_clear_all", "beforeCount" to before)
+        before
+    }
+
     /**
      * 调试用:插 2-3 条占位 insight,状态 VISIBLE。
      * 仅在 ChatViewModel 启动时调用一次(检测 DB 为空时)。

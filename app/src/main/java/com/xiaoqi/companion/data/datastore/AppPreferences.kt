@@ -32,6 +32,9 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         LlmProvider.valueOf(it[Keys.llmProvider] ?: defaultLlmProvider.name)
     }
     val modelName: Flow<String> = dataStore.data.map { it[Keys.modelName] ?: DefaultLlmValues.GLM_MODEL }
+    val userPatternsJson: Flow<String> = dataStore.data.map { it[Keys.userPatternsJson] ?: "[]" }
+    val recurringTopicsJson: Flow<String> = dataStore.data.map { it[Keys.recurringTopicsJson] ?: "[]" }
+    val onboardingCompletedAt: Flow<String> = dataStore.data.map { it[Keys.onboardingCompletedAt] ?: "" }
 
     suspend fun setApiKey(value: String?) { dataStore.edit { if (value != null) it[Keys.apiKey] = value else it.remove(Keys.apiKey) } }
     suspend fun setBaseUrl(value: String) { dataStore.edit { it[Keys.baseUrl] = value } }
@@ -47,6 +50,9 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     suspend fun setMcpHttpUrl(value: String) { dataStore.edit { it[Keys.mcpHttpUrl] = value } }
     suspend fun setLlmProvider(value: LlmProvider) { dataStore.edit { it[Keys.llmProvider] = value.name } }
     suspend fun setModelName(value: String) { dataStore.edit { it[Keys.modelName] = value } }
+    suspend fun setUserPatternsJson(value: String) { dataStore.edit { it[Keys.userPatternsJson] = value } }
+    suspend fun setRecurringTopicsJson(value: String) { dataStore.edit { it[Keys.recurringTopicsJson] = value } }
+    suspend fun setOnboardingCompletedAt(value: String) { dataStore.edit { it[Keys.onboardingCompletedAt] = value } }
 
     object Keys {
         val apiKey = stringPreferencesKey("api_key")
@@ -63,6 +69,9 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val mcpHttpUrl = stringPreferencesKey("mcp_http_url")
         val llmProvider = stringPreferencesKey("llm_provider")
         val modelName = stringPreferencesKey("model_name")
+        val userPatternsJson = stringPreferencesKey("user_patterns_json")
+        val recurringTopicsJson = stringPreferencesKey("recurring_topics_json")
+        val onboardingCompletedAt = stringPreferencesKey("onboarding_completed_at")
     }
 
     companion object {

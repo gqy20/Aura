@@ -172,6 +172,15 @@ class MemoryRepository @Inject constructor(
 
     fun observeMemoriesPinnedFirst(): Flow<List<MemoryEntity>> = memoryDao.observeAllPinnedFirst()
 
+    suspend fun countAll(): Int = withContext(Dispatchers.IO) { memoryDao.countAll() }
+
+    suspend fun clearAll(): Int = withContext(Dispatchers.IO) {
+        val before = memoryDao.countAll()
+        memoryDao.clearAll()
+        AppLogger.info(LogTags.Repo, "memory_clear_all", "beforeCount" to before)
+        before
+    }
+
     suspend fun pinMemory(id: String): Unit = withContext(Dispatchers.IO) {
         memoryDao.setPinned(id, true)
         AppLogger.info(LogTags.Repo, "memory_pinned", "memoryId" to id)

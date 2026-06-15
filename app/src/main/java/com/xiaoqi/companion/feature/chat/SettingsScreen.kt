@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,7 +37,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.core.llm.ConnectivityResult
+import kotlinx.coroutines.launch
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import java.util.Locale
@@ -73,6 +80,7 @@ fun SettingsScreen(
         toolSettings = uiState.toolCapabilitySettings,
         connectivityResult = uiState.connectivityResult,
         isCheckingConnectivity = uiState.isCheckingConnectivity,
+        viewModel = viewModel,
         onApiKeyChanged = viewModel::updateSettingsApiKey,
         onProviderChanged = viewModel::updateSettingsProvider,
         onModelNameChanged = viewModel::updateSettingsModelName,
@@ -96,6 +104,7 @@ fun SettingsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScreenContent(
+    viewModel: ChatViewModel,
     apiKey: String,
     provider: LlmProvider,
     modelName: String,
@@ -219,6 +228,9 @@ private fun SettingsScreenContent(
                     onNotificationEnabledChanged = onNotificationEnabledChanged,
                     onRequestContextPermissions = onRequestContextPermissions,
                 )
+            }
+            item {
+                DataTransparencySection(viewModel = viewModel)
             }
             item {
                 message?.let {
@@ -636,4 +648,155 @@ private fun ConnectivityResultLabel(result: ConnectivityResult?) {
             maxLines = 1,
         )
     }
+}
+
+@Composable
+private fun DataTransparencySection(viewModel: ChatViewModel) {
+    var insightCount by remember { mutableStateOf(0) }
+    var memoryCount by remember { mutableStateOf(0) }
+    var moodCount by remember { mutableStateOf(0) }
+    var pendingClear by remember { mutableStateOf<ClearTarget?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val json = viewModel.exportAllJson()
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(json.toByteArray(Charsets.UTF_8))
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("DataTransparency", "export failed", e)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        insightCount = viewModel.insightCount()
+        memoryCount = viewModel.memoryCount()
+        moodCount = viewModel.moodSnapshotCount()
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SettingsSectionTitle(
+            title = "数据透明",
+            subtitle = "本地存储 · 你随时可查可改可删",
+        )
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = Color(0xFFF7F2EA),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CountRow("insights", insightCount)
+                CountRow("mood_snapshots", moodCount)
+                CountRow("memories", memoryCount)
+                Spacer(Modifier.height(4.dp))
+                androidx.compose.material3.OutlinedButton(
+                    onClick = {
+                        val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+                            .format(java.util.Date())
+                        exportLauncher.launch("aura_export_$timestamp.json")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("导出全部为 JSON")
+                }
+                Spacer(Modifier.height(4.dp))
+                androidx.compose.material3.Text(
+                    text = "清空(二次确认)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                )
+                ClearButton("清空 insights", ClearTarget.Insights) { pendingClear = it }
+                ClearButton("清空 mood_snapshots", ClearTarget.MoodSnapshots) { pendingClear = it }
+                ClearButton("清空 memories", ClearTarget.Memories) { pendingClear = it }
+            }
+        }
+    }
+
+    pendingClear?.let { target ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingClear = null },
+            title = { Text("确认清空?") },
+            text = {
+                Text(
+                    "将永久删除所有 ${target.label} 数据,无法恢复。",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.Button(
+                    onClick = {
+                        when (target) {
+                            ClearTarget.Insights -> viewModel.clearInsights()
+                            ClearTarget.MoodSnapshots -> viewModel.clearMoodSnapshots()
+                            ClearTarget.Memories -> viewModel.clearMemories()
+                        }
+                        pendingClear = null
+                        // 同步本地 count
+                        scope.launch {
+                            insightCount = viewModel.insightCount()
+                            memoryCount = viewModel.memoryCount()
+                            moodCount = viewModel.moodSnapshotCount()
+                        }
+                    },
+                ) { Text("确认清空") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { pendingClear = null }) {
+                    Text("取消")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun CountRow(label: String, count: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "• $label",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ClearButton(
+    label: String,
+    target: ClearTarget,
+    onClick: (ClearTarget) -> Unit,
+) {
+    androidx.compose.material3.TextButton(
+        onClick = { onClick(target) },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+private enum class ClearTarget(val label: String) {
+    Insights("insights"),
+    MoodSnapshots("mood_snapshots"),
+    Memories("memories"),
 }
