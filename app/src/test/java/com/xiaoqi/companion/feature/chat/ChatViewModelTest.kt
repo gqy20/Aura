@@ -334,7 +334,7 @@ class ChatViewModelTest {
 
         val calls = viewModel.uiState.value.toolCalls
         assertEquals(3, calls.size)
-        assertEquals("已保存记忆", calls[0].label)
+        assertEquals("已保存", calls[0].label)
         assertEquals("Done", calls[0].status)
         assertEquals(100L, calls[0].durationMs)
         assertEquals("Failed", calls[2].status)

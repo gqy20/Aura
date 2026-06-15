@@ -290,12 +290,20 @@ private fun hasActivityRecognitionGranted(context: android.content.Context): Boo
     ) == PackageManager.PERMISSION_GRANTED
 }
 
+/**
+ * 通用状态行 — 左侧 label,右侧彩色圆点 + 文字。
+ * 颜色即唯一信号(绿=好, 灰=未知/进行中, 红=失败);文字短促,不堆叠符号。
+ */
 @Composable
-private fun SensorRow(label: String, statusText: String, ok: Boolean, error: Boolean) {
-    val color = when {
-        ok -> Color(0xFF2E7D32)
-        error -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+private fun StatusRow(
+    label: String,
+    statusText: String,
+    state: RowState,
+) {
+    val dotColor = when (state) {
+        RowState.OK -> Color(0xFF3FA86B)
+        RowState.UNKNOWN -> Color(0xFFB7B0A4)
+        RowState.ERROR -> MaterialTheme.colorScheme.error
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -303,13 +311,33 @@ private fun SensorRow(label: String, statusText: String, ok: Boolean, error: Boo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            text = statusText,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.size(7.dp)) {
+                drawCircle(color = dotColor)
+            }
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
+}
+
+private enum class RowState { OK, UNKNOWN, ERROR }
+
+@Composable
+private fun SensorRow(label: String, statusText: String, ok: Boolean, error: Boolean) {
+    val state = when {
+        ok -> RowState.OK
+        error -> RowState.ERROR
+        else -> RowState.UNKNOWN
+    }
+    StatusRow(label = label, statusText = statusText, state = state)
 }
 
 @Composable
@@ -319,24 +347,12 @@ private fun TextButtonCompat(onClick: () -> Unit, modifier: Modifier = Modifier,
 
 @Composable
 private fun PermissionRow(label: String, perm: String, granted: Boolean?) {
-    val (text, color) = when (granted) {
-        null -> "…" to MaterialTheme.colorScheme.onSurfaceVariant
-        true -> "✓ 已授权" to Color(0xFF2E7D32)
-        false -> "✗ 未授权" to MaterialTheme.colorScheme.error
+    val (text, state) = when (granted) {
+        null -> "检测中" to RowState.UNKNOWN
+        true -> "已授权" to RowState.OK
+        false -> "未授权" to RowState.ERROR
     }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
+    StatusRow(label = label, statusText = text, state = state)
 }
 
 @Composable

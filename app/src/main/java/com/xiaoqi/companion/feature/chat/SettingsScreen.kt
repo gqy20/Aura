@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -20,6 +21,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -50,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -479,6 +486,7 @@ private fun ToolCapabilitiesSection(
             title = "设备",
             detail = "电量与网络",
             meta = "本机",
+            metaIcon = Icons.Outlined.Smartphone,
             tools = "",
             enabled = settings.deviceStatusEnabled,
             onEnabledChanged = onDeviceStatusEnabledChanged,
@@ -487,6 +495,7 @@ private fun ToolCapabilitiesSection(
             title = "位置",
             detail = "上次授权位置",
             meta = "需授权",
+            metaIcon = Icons.Outlined.Lock,
             tools = "",
             enabled = settings.locationContextEnabled,
             onEnabledChanged = onLocationContextEnabledChanged,
@@ -495,6 +504,7 @@ private fun ToolCapabilitiesSection(
             title = "天气",
             detail = "当前天气",
             meta = "需联网",
+            metaIcon = Icons.Outlined.Wifi,
             tools = "",
             enabled = settings.weatherContextEnabled,
             onEnabledChanged = onWeatherContextEnabledChanged,
@@ -511,15 +521,22 @@ private fun ToolCapabilitiesSection(
             title = "MCP",
             detail = settings.mcpServers.firstOrNull { it.isReady }?.resolvedName ?: "未配置（缺密钥/地址）",
             meta = "高级",
+            metaIcon = Icons.Outlined.Bolt,
             tools = "",
             enabled = settings.mcpServers.any { it.isReady },
             locked = true,
             onEnabledChanged = {},
+            statusDotColor = if (settings.mcpServers.any { it.enabled && it.isReady }) {
+                Color(0xFF3FA86B)
+            } else {
+                Color(0xFFB7B0A4)
+            },
         )
         ToolCapabilityRow(
             title = "通知",
             detail = "提醒推送",
             meta = "需通知",
+            metaIcon = Icons.Outlined.NotificationsOff,
             tools = "",
             enabled = settings.notificationEnabled,
             onEnabledChanged = onNotificationEnabledChanged,
@@ -541,10 +558,12 @@ private fun ToolCapabilityRow(
     title: String,
     detail: String,
     meta: String,
+    metaIcon: ImageVector? = null,
     tools: String,
     enabled: Boolean,
     locked: Boolean = false,
     onEnabledChanged: (Boolean) -> Unit,
+    statusDotColor: Color? = null,
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
@@ -567,7 +586,21 @@ private fun ToolCapabilityRow(
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    CapabilityMetaPill(text = meta)
+                    if (metaIcon != null) {
+                        Icon(
+                            imageVector = metaIcon,
+                            contentDescription = meta,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                    if (statusDotColor != null) {
+                        Canvas(
+                            modifier = Modifier.size(8.dp),
+                        ) {
+                            drawCircle(color = statusDotColor)
+                        }
+                    }
                 }
                 Text(
                     text = detail,

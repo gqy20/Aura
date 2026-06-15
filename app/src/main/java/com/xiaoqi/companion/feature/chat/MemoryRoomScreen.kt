@@ -345,11 +345,25 @@ private fun MemoryRoomItemCard(
                     maxLines = 5,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = memory.importance.memoryImportanceLabel(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(7.dp)) {
+                        drawCircle(
+                            color = when {
+                                memory.importance >= 0.82f -> Color(0xFF3FA86B)
+                                memory.importance >= 0.58f -> Color(0xFFE5A100)
+                                else -> Color(0xFFB7B0A4)
+                            },
+                        )
+                    }
+                    Text(
+                        text = memory.importance.memoryImportanceLabel(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    )
+                }
             }
             Surface(
                 shape = CircleShape,

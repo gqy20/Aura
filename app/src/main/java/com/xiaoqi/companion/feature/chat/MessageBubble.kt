@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -160,7 +161,7 @@ private fun MessageBubbleContent(
         }
         if (!isUser && message.toolStatus != null) {
             Spacer(modifier = Modifier.size(6.dp))
-            ToolStatusPill(text = message.toolStatus)
+            ToolStatusPill(text = message.toolStatus, status = message.toolStatusType)
         }
     }
 }
@@ -195,7 +196,13 @@ private fun StreamingMessageText(message: ChatMessage, color: androidx.compose.u
 }
 
 @Composable
-private fun ToolStatusPill(text: String) {
+private fun ToolStatusPill(text: String, status: ToolCallStatus? = null) {
+    val dotColor = when (status) {
+        ToolCallStatus.SUCCEEDED -> Color(0xFF3FA86B)
+        ToolCallStatus.FAILED -> MaterialTheme.colorScheme.error
+        ToolCallStatus.STARTED -> Color(0xFFE5A100)
+        null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
+    }
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
@@ -207,7 +214,7 @@ private fun ToolStatusPill(text: String) {
             modifier = Modifier
                 .size(6.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)),
+                .background(dotColor),
         )
         Spacer(modifier = Modifier.size(6.dp))
         Text(

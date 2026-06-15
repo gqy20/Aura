@@ -175,6 +175,7 @@ class SendMessageUseCase @Inject constructor(
                                 renderDraft = "",
                                 isRenderDraftCode = false,
                                 toolStatus = "回复未完整完成",
+                                toolStatusType = ToolCallStatus.FAILED,
                             )
                         } else {
                             msg
@@ -191,8 +192,8 @@ class SendMessageUseCase @Inject constructor(
             }
         }
 
-        fun updateAssistantToolStatus(status: String) {
-            updateAssistantMessage(assistantId, update) { it.copy(toolStatus = status) }
+        fun updateAssistantToolStatus(status: String, type: ToolCallStatus? = null) {
+            updateAssistantMessage(assistantId, update) { it.copy(toolStatus = status, toolStatusType = type) }
         }
 
         try {
@@ -249,21 +250,25 @@ class SendMessageUseCase @Inject constructor(
                         maybeShowPermissionPrompt(event.call, update)
                         updateAssistantToolStatus(
                             toolDisplayRegistry.label(event.call.name, event.call.status),
+                            event.call.status,
                         )
                     }
                     is AgentEvent.ToolStarted -> {
                         updateAssistantToolStatus(
                             toolDisplayRegistry.label(event.name, ToolCallStatus.STARTED),
+                            ToolCallStatus.STARTED,
                         )
                     }
                     is AgentEvent.ToolFinished -> {
                         updateAssistantToolStatus(
                             toolDisplayRegistry.label(event.name, ToolCallStatus.SUCCEEDED),
+                            ToolCallStatus.SUCCEEDED,
                         )
                     }
                     is AgentEvent.MemorySaved -> {
                         updateAssistantToolStatus(
                             if (event.count == 1) "已记住 1 条" else "已记住 ${event.count} 条",
+                            ToolCallStatus.SUCCEEDED,
                         )
                         scope.launch {
                             presenceController.reactionFor(PresenceEvent.MemorySaved(event.count))

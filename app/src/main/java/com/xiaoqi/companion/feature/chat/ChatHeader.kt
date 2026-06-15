@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -115,14 +117,14 @@ internal fun CompanionHeader(
                 imageVector = Icons.Default.Favorite,
                 onClick = onOpenMemoryRoom,
                 contentDescription = "打开记忆",
-                badge = memories.size.takeIf { it > 0 }?.toString(),
+                badge = memories.size,
             )
             if (scheduledReminderCount > 0) {
                 HeaderActionIcon(
                     imageVector = Icons.Default.Notifications,
                     onClick = onOpenReminders,
                     contentDescription = "打开提醒",
-                    badge = scheduledReminderCount.toString(),
+                    badge = scheduledReminderCount,
                 )
             }
             HeaderActionIcon(
@@ -149,11 +151,18 @@ private fun HeaderActionIcon(
     imageVector: ImageVector,
     onClick: () -> Unit,
     contentDescription: String,
-    badge: String? = null,
+    badge: Int? = null,
     active: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.size(40.dp)) {
+    BadgedBox(
+        badge = {
+            badge?.takeIf { it > 0 }?.let {
+                Badge { Text(it.toString()) }
+            }
+        },
+        modifier = modifier.size(40.dp),
+    ) {
         IconButton(
             onClick = onClick,
             modifier = Modifier
@@ -170,24 +179,6 @@ private fun HeaderActionIcon(
                 },
                 modifier = Modifier.size(20.dp),
             )
-        }
-        badge?.let {
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFFDDE8D9),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(16.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF496B5E),
-                        maxLines = 1,
-                    )
-                }
-            }
         }
     }
 }
@@ -213,35 +204,34 @@ private fun ConfigStatusCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "模型",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = status.label,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = status.label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (status.detail.isNotBlank()) {
                 Text(
                     text = status.detail,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
+                    maxLines = 1,
                 )
-                TextButton(onClick = onOpenSettings) {
-                    Text("去设置")
-                }
+            }
+            TextButton(onClick = onOpenSettings) {
+                Text("去设置")
             }
         }
     }

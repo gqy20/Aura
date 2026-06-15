@@ -407,7 +407,7 @@ class SendMessageUseCaseTest {
         advanceUntilIdle()
 
         val assistant = state.value.messages.first { it.role == "ASSISTANT" }
-        assertEquals("已保存记忆", assistant.toolStatus)
+        assertEquals("已保存", assistant.toolStatus)
     }
 
     @Test

@@ -268,19 +268,19 @@ private fun McpServerCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = server.resolvedName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    McpStatusDot(server = server, discoveredTools = discoveredTools)
+                }
                 Text(
-                    text = server.resolvedName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = when {
-                        !server.enabled -> "已停用"
-                        !server.isReady -> "未配置（缺 ${if (server.providerId == "amap") "API Key" else "URL"}）"
-                        discoveredTools == null -> "已配置 · 未发现工具，点测试连接"
-                        discoveredTools.isEmpty() -> "已连接 · 0 个工具"
-                        else -> "已连接 · ${discoveredTools.size} 个工具（${discoveredTools.take(3).joinToString(", ")}${if (discoveredTools.size > 3) ", …" else ""}）"
-                    },
+                    text = mcpStatusLabel(server = server, discoveredTools = discoveredTools),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -294,6 +294,46 @@ private fun McpServerCard(
                 Icon(Icons.Filled.Edit, contentDescription = "编辑")
             }
         }
+    }
+}
+
+//endregion
+
+//region Status helpers
+
+private enum class McpStatus { DISABLED, NOT_READY, NOT_TESTED, EMPTY, READY }
+
+/**
+ * 计算一个 server 的当前状态。UI 端只读 `McpServerConfig` + `discoveredTools`,
+ * 不依赖网络往返,失败态由 NOT_TESTED(尚未探测)覆盖 — 真连不上的话
+ * `discoveredTools == null` + 切到编辑态后用户主动重试才会更新。
+ */
+private fun mcpStatusOf(server: McpServerConfig, discoveredTools: List<String>?): McpStatus = when {
+    !server.enabled -> McpStatus.DISABLED
+    !server.isReady -> McpStatus.NOT_READY
+    discoveredTools == null -> McpStatus.NOT_TESTED
+    discoveredTools.isEmpty() -> McpStatus.EMPTY
+    else -> McpStatus.READY
+}
+
+private fun mcpStatusLabel(server: McpServerConfig, discoveredTools: List<String>?): String =
+    when (mcpStatusOf(server, discoveredTools)) {
+        McpStatus.DISABLED -> "已停用"
+        McpStatus.NOT_READY -> "缺 ${if (server.providerId == "amap") "API Key" else "URL"}"
+        McpStatus.NOT_TESTED -> "未测试"
+        McpStatus.EMPTY -> "0 个工具"
+        McpStatus.READY -> "已连接 · ${discoveredTools!!.size} 工具"
+    }
+
+@Composable
+private fun McpStatusDot(server: McpServerConfig, discoveredTools: List<String>?) {
+    val color = when (mcpStatusOf(server, discoveredTools)) {
+        McpStatus.READY -> Color(0xFF3FA86B)
+        McpStatus.DISABLED -> Color(0xFFB7B0A4)
+        McpStatus.NOT_READY, McpStatus.NOT_TESTED, McpStatus.EMPTY -> Color(0xFFE5A100)
+    }
+    androidx.compose.foundation.Canvas(modifier = Modifier.size(8.dp)) {
+        drawCircle(color = color)
     }
 }
 
