@@ -79,7 +79,6 @@ import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.SensorManagerHealthSource
 import com.xiaoqi.companion.ui.components.CompanionTopAppBar
-import com.xiaoqi.companion.ui.components.LegacyTopAppBar
 import com.xiaoqi.companion.ui.theme.ChatCardSurface
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
@@ -286,21 +285,16 @@ private fun SettingsScreenContent(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            LegacyTopAppBar(
-                title = { Text("设置") },
-                navigationIcon = {
-                    IconButton(onClick = actions.onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                actions = {
+            CompanionTopAppBar(
+                title = "??",
+                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                navigationContentDescription = "??",
+                onNavigationClick = actions.onBack,
+                actionText = "??",
+                onActionClick = actions.onSave,
+                extraActions = {
                     IconButton(onClick = actions.onOpenMcpSettings) {
-                        Icon(Icons.Default.Build, contentDescription = "MCP 设置")
-                    }
-                    // 保存按钮提到 TopAppBar — 之前放在 LazyColumn 末尾会被数据透明 Section
-                    // 推到屏外,用户根本点不到,导致 api_key 等字段没真正写进 DataStore。
-                    androidx.compose.material3.TextButton(onClick = actions.onSave) {
-                        Text("保存")
+                        Icon(Icons.Default.Build, contentDescription = "MCP ??")
                     }
                 },
             )

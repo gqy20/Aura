@@ -55,7 +55,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.ui.components.CompanionTopAppBar
-import com.xiaoqi.companion.ui.components.LegacyTopAppBar
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
 import com.xiaoqi.companion.ui.theme.LocalCompanionSpacing
@@ -101,13 +100,11 @@ private fun MemoryRoomScreenContent(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LegacyTopAppBar(
-                title = { Text("记忆") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
+            CompanionTopAppBar(
+                title = "??",
+                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                navigationContentDescription = "??",
+                onNavigationClick = onBack,
             )
         },
     ) { padding ->
