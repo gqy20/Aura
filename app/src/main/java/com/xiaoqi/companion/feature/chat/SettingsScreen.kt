@@ -220,6 +220,8 @@ private fun SettingsScreenContent(
     actions: SettingsScreenActions,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var hasConsumedInitialDreamState by remember { mutableStateOf(false) }
+    var hasConsumedInitialHealthState by remember { mutableStateOf(false) }
 
     // 清空类操作完成时弹一次 snackbar:用 dataJustClearedAt 时间戳当 key,避免 count
     // 不变时(理论上不会,稳)重复弹。
@@ -237,6 +239,10 @@ private fun SettingsScreenContent(
     val completedEmptyMsg = stringResource(R.string.dream_loop_completed_empty)
     val failedMsg = stringResource(R.string.dream_loop_failed)
     LaunchedEffect(state.dreamRunState.status) {
+        if (!hasConsumedInitialDreamState) {
+            hasConsumedInitialDreamState = true
+            return@LaunchedEffect
+        }
         when (state.dreamRunState.status) {
             DreamRunObserver.Status.QUEUED -> snackbarHostState.showSnackbar(queuedMsg)
             DreamRunObserver.Status.SUCCEEDED -> {
@@ -258,6 +264,10 @@ private fun SettingsScreenContent(
     val healthFailureTemplate = stringResource(R.string.health_sync_failure)
     val healthSkippedTemplate = stringResource(R.string.health_sync_skipped)
     LaunchedEffect(state.healthSyncState) {
+        if (!hasConsumedInitialHealthState) {
+            hasConsumedInitialHealthState = true
+            return@LaunchedEffect
+        }
         when (val s = state.healthSyncState) {
             is com.xiaoqi.companion.data.source.HealthSyncManager.SyncState.Success ->
                 snackbarHostState.showSnackbar(healthSuccessTemplate.format(s.daysWithData))

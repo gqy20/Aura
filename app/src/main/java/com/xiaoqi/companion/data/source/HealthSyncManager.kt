@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Health 多源同步管理器 — 把多个 [HealthSource] 串成"HC 优先 + Sensor 兜底"的执行链,
@@ -89,7 +90,13 @@ class HealthSyncManager @Inject constructor(
                     }
                 }
                 _state.value = SyncState.Syncing
-                val result = runMultiSourceSync()
+                val result = withTimeoutOrNull(SYNC_TIMEOUT_MILLIS) {
+                    runMultiSourceSync()
+                } ?: MultiSourceSyncResult(
+                    totalDaysWithData = 0,
+                    succeededSources = emptyList(),
+                    failureReasons = listOf("sync timeout"),
+                )
                 _state.value = result.toSyncState(now)
                 if (result.totalDaysWithData > 0 || result.succeededSources.isNotEmpty()) {
                     appPreferences.setHealthLastSyncAt(System.currentTimeMillis())
@@ -176,5 +183,6 @@ class HealthSyncManager @Inject constructor(
     companion object {
         /** 30 分钟防抖 — 避免每次回前台都重新同步,减少 HC 配额消耗。 */
         const val DEBOUNCE_MILLIS: Long = 30L * 60L * 1000L
+        private const val SYNC_TIMEOUT_MILLIS: Long = 10_000L
     }
 }

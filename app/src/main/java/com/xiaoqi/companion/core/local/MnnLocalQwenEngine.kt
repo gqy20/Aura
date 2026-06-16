@@ -59,6 +59,7 @@ class MnnLocalQwenEngine @Inject constructor(
                     "configBytes" to configFile.length(),
                 )
 
+                var emittedTokenCount = 0
                 bridgeMutex.withLock {
                     val runtimeConfigJson = inferenceConfig.toJson()
                     val activeBridge = ensureBridgeLoaded(configFile.absolutePath, runtimeConfigJson)
@@ -75,6 +76,7 @@ class MnnLocalQwenEngine @Inject constructor(
                                 imageMediaType = request.imageMediaType ?: "image/jpeg",
                             ) { token ->
                                 if (token.isNotEmpty()) {
+                                    emittedTokenCount++
                                     trySend(token)
                                 }
                                 false
@@ -85,6 +87,7 @@ class MnnLocalQwenEngine @Inject constructor(
                                 userMessage = request.userMessage,
                             ) { token ->
                                 if (token.isNotEmpty()) {
+                                    emittedTokenCount++
                                     trySend(token)
                                 }
                                 false
@@ -92,10 +95,14 @@ class MnnLocalQwenEngine @Inject constructor(
                         }
                     }
                 }
+                if (emittedTokenCount == 0) {
+                    throw IllegalStateException("Local Qwen generated no tokens")
+                }
                 AppLogger.info(
                     LogTags.LocalModel,
                     "local_qwen_stream_completed",
                     "model" to request.modelName,
+                    "tokenCount" to emittedTokenCount,
                 )
                 close()
             } catch (e: Throwable) {
