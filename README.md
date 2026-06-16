@@ -214,6 +214,7 @@ app/src/main/java/com/xiaoqi/companion/
 ## 文档
 
 - [技术架构](docs/architecture.md) — 分层设计、Agent Core、数据流、模块清单
+- [Benchmark](docs/benchmark.md) — 本地 MNN benchmark 流程与实测数据
 - [Roadmap](docs/roadmap.md) — M0-M6 里程碑 + 当前进度
 - [工程化规范](docs/engineering-standards.md) — CI/CD、测试策略、代码规范、质量门禁
 - [Koog API 参考](docs/koog-api-reference.md) — Koog 0.8.0 完整 API 签名（从 Gradle 缓存 JAR 提取）

@@ -274,6 +274,18 @@ int readMaxNewTokens(const std::string& configPath) {
     return DEFAULT_MAX_NEW_TOKENS;
 }
 
+int readMaxNewTokensFromJson(const std::string& json) {
+    if (json.empty()) {
+        return -1;
+    }
+    std::smatch match;
+    static const std::regex pattern(R"("max_new_tokens"\s*:\s*([0-9]+))");
+    if (std::regex_search(json, match, pattern) && match.size() > 1) {
+        return std::min(MOBILE_MAX_NEW_TOKENS_CAP, std::max(1, std::stoi(match[1].str())));
+    }
+    return -1;
+}
+
 std::string statusName(MNN::Transformer::LlmStatus status) {
     switch (status) {
         case MNN::Transformer::LlmStatus::NOT_LOADED:
@@ -386,7 +398,9 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
         mkdir(tmpDir.c_str(), 0700);
         mkdir(prefixCacheDir.c_str(), 0700);
         const std::string runtimeJson = toString(env, runtimeConfig);
-        const int effectiveMaxNewTokens = readMaxNewTokens(path);
+        const int configMaxNewTokens = readMaxNewTokens(path);
+        const int runtimeMaxNewTokens = readMaxNewTokensFromJson(runtimeJson);
+        const int effectiveMaxNewTokens = runtimeMaxNewTokens > 0 ? runtimeMaxNewTokens : configMaxNewTokens;
 
         // Build base config (paths + structural options that must always be set)
         std::string baseConfig =
@@ -412,9 +426,14 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_initNative(
                 merged += "}";
             }
             logInfo("mnn_runtime_config_merged baseLength=" + std::to_string(baseConfig.size()) +
-                    " runtimeLength=" + std::to_string(runtimeJson.size()));
+                    " runtimeLength=" + std::to_string(runtimeJson.size()) +
+                    " configMaxNewTokens=" + std::to_string(configMaxNewTokens) +
+                    " runtimeMaxNewTokens=" + std::to_string(runtimeMaxNewTokens) +
+                    " effectiveMaxNewTokens=" + std::to_string(effectiveMaxNewTokens));
             llm->set_config(merged);
         } else {
+            logInfo("mnn_runtime_config_defaulted configMaxNewTokens=" + std::to_string(configMaxNewTokens) +
+                    " effectiveMaxNewTokens=" + std::to_string(effectiveMaxNewTokens));
             llm->set_config(baseConfig);
         }
 
