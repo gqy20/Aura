@@ -35,6 +35,41 @@ class LocalQwenExecutorTest {
         assertEquals("you are aura", engine.lastRequest?.systemPrompt)
         assertEquals("summarize", engine.lastRequest?.userMessage)
         assertEquals(false, engine.lastRequest?.allowTools ?: true)
+        assertNotNull(engine.lastRequest?.inferenceConfig)
+        assertEquals(100, engine.lastRequest?.inferenceConfig?.maxNewTokens)
+        assertEquals(0.5f, engine.lastRequest?.inferenceConfig?.temperature)
+    }
+
+    @Test
+    fun execute_passesScenarioSpecificInferenceOverrides() = runTest {
+        val engine = StubLocalQwenEngine(flowOf("done"))
+        val executor = LocalQwenExecutor(engine, fakeAppPreferences(), fakeDownloader())
+
+        executor.execute(
+            LocalQwenExecutor.Request(
+                systemPrompt = "detect",
+                userMessage = "snapshot",
+                maxTokens = 500,
+                temperature = 0.2f,
+                topK = 20,
+                topP = 0.85f,
+                minP = 0.03f,
+                repetitionPenalty = 1.1f,
+                threadNum = 3,
+                backendType = "cpu",
+            ),
+        )
+
+        val config = engine.lastRequest?.inferenceConfig
+        assertNotNull(config)
+        assertEquals(500, config?.maxNewTokens)
+        assertEquals(0.2f, config?.temperature)
+        assertEquals(20, config?.topK)
+        assertEquals(0.85f, config?.topP)
+        assertEquals(0.03f, config?.minP)
+        assertEquals(1.1f, config?.repetitionPenalty)
+        assertEquals(3, config?.threadNum)
+        assertEquals("cpu", config?.backendType)
     }
 
     @Test

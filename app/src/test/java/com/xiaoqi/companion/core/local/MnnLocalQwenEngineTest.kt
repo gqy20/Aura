@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -37,6 +38,8 @@ class MnnLocalQwenEngineTest {
         assertEquals("hi", bridge.userMessage)
         assertTrue(bridge.loaded)
         assertFalse(bridge.released)
+        assertNotNull(bridge.loadedRuntimeConfig)
+        assertTrue(bridge.loadedRuntimeConfig.orEmpty().startsWith("{"))
     }
 
     @Test
@@ -79,6 +82,35 @@ class MnnLocalQwenEngineTest {
         }
 
         assertFalse(bridge.loaded)
+    }
+
+    @Test
+    fun stream_requestInferenceConfigOverridesDefaultRuntimeConfig() = runTest {
+        val modelDir = temp.newFolder("Qwen3.5-2B-MNN")
+        File(modelDir, "config.json").writeText("{}")
+        val bridge = FakeMnnLlmBridge(listOf("ok"))
+        val engine = MnnLocalQwenEngine(
+            modelLocator = StaticModelLocator(modelDir),
+            bridgeFactory = StaticBridgeFactory(bridge),
+        )
+
+        engine.stream(
+            LocalQwenRequest(
+                systemPrompt = "system",
+                userMessage = "hi",
+                inferenceConfig = MnnInferenceConfig(
+                    threadNum = 2,
+                    backendType = "cpu",
+                    maxNewTokens = 64,
+                ),
+            ),
+        ).test {
+            assertEquals("ok", awaitItem())
+            awaitComplete()
+        }
+
+        assertTrue(bridge.loadedRuntimeConfig.orEmpty().contains("\"thread_num\":2"))
+        assertTrue(bridge.loadedRuntimeConfig.orEmpty().contains("\"max_new_tokens\":64"))
     }
 
     private class StaticModelLocator(

@@ -3,6 +3,7 @@ package com.xiaoqi.companion.core.presence.runtime
 import com.xiaoqi.companion.core.insight.InsightDraft
 import com.xiaoqi.companion.core.insight.InsightPrompts
 import com.xiaoqi.companion.core.local.LocalQwenEngine
+import com.xiaoqi.companion.core.local.MnnInferenceConfig
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.core.local.LocalQwenRequest
 import com.xiaoqi.companion.core.logging.AppLogger
@@ -47,6 +48,12 @@ class LocalQwenExecutor @Inject constructor(
         val userMessage: String,
         val maxTokens: Int = 300,
         val temperature: Float = 0.3f,
+        val topK: Int? = null,
+        val topP: Float? = null,
+        val minP: Float? = null,
+        val repetitionPenalty: Float? = null,
+        val threadNum: Int? = null,
+        val backendType: String? = null,
         /** null = 从 AppPreferences 读主对话选中的本地模型名 */
         val modelName: String? = null,
     )
@@ -62,6 +69,7 @@ class LocalQwenExecutor @Inject constructor(
     suspend fun execute(req: Request): ExecutionResult {
         val startedAt = System.currentTimeMillis()
         val resolvedModelName = req.modelName ?: resolveActiveLocalModelName()
+        val defaultConfig = MnnInferenceConfig.forCurrentDevice()
         return runCatching {
             val chunks = engine.stream(
                 LocalQwenRequest(
@@ -69,6 +77,16 @@ class LocalQwenExecutor @Inject constructor(
                     userMessage = req.userMessage,
                     modelName = resolvedModelName,
                     allowTools = false,
+                    inferenceConfig = defaultConfig.copy(
+                        temperature = req.temperature,
+                        topK = req.topK ?: defaultConfig.topK,
+                        topP = req.topP ?: defaultConfig.topP,
+                        minP = req.minP ?: defaultConfig.minP,
+                        repetitionPenalty = req.repetitionPenalty ?: defaultConfig.repetitionPenalty,
+                        maxNewTokens = req.maxTokens,
+                        threadNum = req.threadNum ?: defaultConfig.threadNum,
+                        backendType = req.backendType ?: defaultConfig.backendType,
+                    ),
                 ),
             ).toList()
             val joined = chunks.joinToString("")

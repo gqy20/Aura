@@ -9,6 +9,7 @@ data class LocalQwenRequest(
     val allowTools: Boolean = false,
     val imageBase64: String? = null,
     val imageMediaType: String? = null,
+    val inferenceConfig: MnnInferenceConfig? = null,
 )
 
 interface LocalQwenEngine {

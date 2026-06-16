@@ -28,7 +28,7 @@ class MnnLocalQwenEngine @Inject constructor(
      * Active inference config. Set via [setInferenceConfig] before first [stream] call,
      * or updated between calls (will trigger bridge reload on next request).
      */
-    private var inferenceConfig: MnnInferenceConfig = MnnInferenceConfig.DEFAULT
+    private var inferenceConfig: MnnInferenceConfig = MnnInferenceConfig.forCurrentDevice()
 
     fun setInferenceConfig(config: MnnInferenceConfig) {
         inferenceConfig = config
@@ -61,7 +61,14 @@ class MnnLocalQwenEngine @Inject constructor(
 
                 var emittedTokenCount = 0
                 bridgeMutex.withLock {
-                    val runtimeConfigJson = inferenceConfig.toJson()
+                    val activeConfig = request.inferenceConfig ?: inferenceConfig
+                    val runtimeConfigJson = activeConfig.toJson()
+                    AppLogger.debug(
+                        LogTags.LocalModel,
+                        "local_qwen_runtime_config_selected",
+                        "model" to request.modelName,
+                        "runtimeConfig" to runtimeConfigJson,
+                    )
                     val activeBridge = ensureBridgeLoaded(configFile.absolutePath, runtimeConfigJson)
                     withContext(Dispatchers.Default) {
                         if (request.imageBase64 != null) {

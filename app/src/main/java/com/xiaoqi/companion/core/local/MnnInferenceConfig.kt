@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.local
 
+import android.os.Build
+
 /**
  * MNN inference runtime configuration.
  *
@@ -85,5 +87,31 @@ data class MnnInferenceConfig(
             minP = 0.05f,
             repetitionPenalty = 1.05f,
         )
+
+        fun forCurrentDevice(): MnnInferenceConfig {
+            val hardware = runCatching { Build.HARDWARE }.getOrNull().orEmpty().lowercase()
+            val socModel = runCatching { Build.SOC_MODEL }.getOrNull().orEmpty().lowercase()
+            val supportedAbis = runCatching {
+                Build.SUPPORTED_ABIS?.joinToString(separator = ",").orEmpty()
+            }.getOrDefault("").lowercase()
+            return when {
+                "mt6895" in hardware || "mt6895" in socModel -> forDimensity8200()
+                "dimensity 9300" in socModel || "dimensity 9400" in socModel -> forFlagshipSoc()
+                "sm8650" in hardware || "sm8650" in socModel || "sm8750" in hardware || "sm8750" in socModel -> forFlagshipSoc()
+                "arm64-v8a" in supportedAbis -> MnnInferenceConfig(
+                    threadNum = 4,
+                    precision = "low",
+                    memory = "low",
+                    backendType = "cpu",
+                    samplerType = "mixed",
+                    temperature = 0.7f,
+                    topK = 40,
+                    topP = 0.9f,
+                    minP = 0.05f,
+                    repetitionPenalty = 1.05f,
+                )
+                else -> DEFAULT
+            }
+        }
     }
 }
