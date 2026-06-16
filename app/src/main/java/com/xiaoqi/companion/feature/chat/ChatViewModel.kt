@@ -12,6 +12,7 @@ import com.xiaoqi.companion.core.presence.PresenceEvent
 import com.xiaoqi.companion.core.presence.PresenceInputs
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceReactionPolicy
+import com.xiaoqi.companion.core.presence.animationState
 import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
 import com.xiaoqi.companion.core.presence.runtime.DreamLoopScheduler
 import com.xiaoqi.companion.core.presence.runtime.DreamRunObserver
@@ -842,25 +843,27 @@ class ChatViewModel @Inject constructor(
         val hasStreamingAssistant = messages.any {
             it.role == "ASSISTANT" && it.isStreaming && it.content.isNotBlank()
         }
-        return copy(
-            presence = presenceController.derive(
-                PresenceInputs(
-                    mood = status.mood,
-                    intensity = status.intensity,
-                    relationshipLevel = status.relationshipLevel,
-                    isLoading = isLoading || isPreparingImage,
-                    isStreaming = hasStreamingAssistant,
-                    latestToolName = latestTool?.toolName,
-                    latestToolStatus = latestTool?.toolStatus,
-                    reaction = presenceReaction,
-                    hasError = error != null,
-                    hasInputText = inputText.isNotBlank(),
-                    hasPendingImage = pendingImage != null,
-                    isConfigReady = configStatus.isReady,
-                    configDetail = configStatus.detail,
-                    recentMemoryCount = memories.size,
-                )
+        val derivedPresence = presenceController.derive(
+            PresenceInputs(
+                mood = status.mood,
+                intensity = status.intensity,
+                relationshipLevel = status.relationshipLevel,
+                isLoading = isLoading || isPreparingImage,
+                isStreaming = hasStreamingAssistant,
+                latestToolName = latestTool?.toolName,
+                latestToolStatus = latestTool?.toolStatus,
+                reaction = presenceReaction,
+                hasError = error != null,
+                hasInputText = inputText.isNotBlank(),
+                hasPendingImage = pendingImage != null,
+                isConfigReady = configStatus.isReady,
+                configDetail = configStatus.detail,
+                recentMemoryCount = memories.size,
             )
+        )
+        return copy(
+            presence = derivedPresence,
+            presenceAnimation = derivedPresence.animationState(),
         )
     }
 

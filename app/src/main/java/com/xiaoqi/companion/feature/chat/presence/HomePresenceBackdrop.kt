@@ -17,11 +17,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.feature.chat.HomePresencePalette
-import com.xiaoqi.companion.feature.chat.haloBoost
 import com.xiaoqi.companion.feature.chat.homePalette
 import kotlin.math.PI
 import kotlin.math.cos
@@ -41,8 +41,9 @@ import kotlin.math.sin
 @Composable
 internal fun PresenceBackdropAndHalo(
     palette: HomePresencePalette,
-    mode: PresenceMode,
-    reaction: PresenceReaction?,
+    animationState: PresenceAnimationState,
+    mode: PresenceMode = PresenceMode.IDLE,
+    reaction: PresenceReaction? = null,
     modifier: Modifier = Modifier,
 ) {
     val transition = rememberInfiniteTransition(label = "presence-bg-halo")
@@ -59,7 +60,7 @@ internal fun PresenceBackdropAndHalo(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = if (mode == PresenceMode.THINKING) 1800 else 2600),
+            animation = tween(durationMillis = animationState.pulseDurationMillis),
             repeatMode = RepeatMode.Restart,
         ),
         label = "pulse",
@@ -106,7 +107,7 @@ internal fun PresenceBackdropAndHalo(
         // --- Halo: glow + rings + reaction + orbiting particles ---
         // 居中对齐 Aura 角色本体(Avatar Canvas 中心在 w/2, h/2)。
         val haloCenter = Offset(w / 2f, h * 0.5f)
-        val reactionBoost = reaction.haloBoost()
+        val reactionBoost = animationState.haloBoost
         val baseRadius = w * (0.29f + pulse * (0.015f + reactionBoost * 0.012f))
 
         drawCircle(
@@ -141,14 +142,14 @@ internal fun PresenceBackdropAndHalo(
             )
         }
         if (mode == PresenceMode.THINKING || mode == PresenceMode.SEARCHING || mode == PresenceMode.REMEMBERING) {
-            repeat(3) { index ->
+            repeat(animationState.orbitParticleCount.coerceAtLeast(3)) { index ->
                 val angle = (pulse * 2f * PI + index * 2.09f).toFloat()
                 drawCircle(
                     color = palette.spark.copy(alpha = 0.38f),
                     radius = 4.2f,
                     center = Offset(
-                        x = haloCenter.x + cos(angle) * w * 0.21f,
-                        y = haloCenter.y + sin(angle) * h * 0.17f,
+                        x = haloCenter.x + cos(angle) * w * (0.21f * animationState.orbitRadiusScale),
+                        y = haloCenter.y + sin(angle) * h * (0.17f * animationState.orbitRadiusScale),
                     ),
                 )
             }

@@ -390,12 +390,14 @@ private fun PresenceStage(
             ) {
                 PresenceBackdropAndHalo(
                     palette = palette,
+                    animationState = uiState.presenceAnimation,
                     mode = uiState.presence.mode,
                     reaction = uiState.presence.reaction,
                     modifier = Modifier.fillMaxSize(),
                 )
                 LuminousAuraAvatar(
                     presence = uiState.presence,
+                    animationState = uiState.presenceAnimation,
                     size = avatarSize,
                     onClick = {
                         onPresenceTapped()

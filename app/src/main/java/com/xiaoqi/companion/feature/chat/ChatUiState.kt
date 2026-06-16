@@ -3,6 +3,7 @@ package com.xiaoqi.companion.feature.chat
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.llm.ConnectivityResult
 import com.xiaoqi.companion.core.mcp.McpServerConfig
+import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -147,6 +148,16 @@ data class ChatUiState(
     val status: CompanionStatus = CompanionStatus(),
     val presenceReaction: PresenceReaction? = null,
     val presence: PresenceUiState = PresenceUiState(),
+    val presenceAnimation: PresenceAnimationState = PresenceAnimationState(
+        pulseDurationMillis = 2600,
+        breathDurationMillis = 2600,
+        shimmerDurationMillis = 1900,
+        tapScaleTarget = 0.94f,
+        orbitParticleCount = 3,
+        orbitRadiusScale = 1f,
+        petFrameDurationScale = 1f,
+        haloBoost = 0f,
+    ),
     val configStatus: ChatConfigStatus = ChatConfigStatus(),
     val settingsApiKey: String = "",
     val settingsBaseUrl: String = "",

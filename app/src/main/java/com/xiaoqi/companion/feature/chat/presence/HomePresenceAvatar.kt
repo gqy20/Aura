@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
+import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
@@ -52,6 +53,7 @@ import kotlin.math.sin
 @Composable
 internal fun LuminousAuraAvatar(
     presence: PresenceUiState,
+    animationState: PresenceAnimationState,
     size: Dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -61,7 +63,7 @@ internal fun LuminousAuraAvatar(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2600),
+            animation = tween(durationMillis = animationState.breathDurationMillis),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "breath",
@@ -70,7 +72,7 @@ internal fun LuminousAuraAvatar(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1900),
+            animation = tween(durationMillis = animationState.shimmerDurationMillis),
             repeatMode = RepeatMode.Restart,
         ),
         label = "shimmer",
@@ -91,7 +93,7 @@ internal fun LuminousAuraAvatar(
                 detectTapGestures(
                     onPress = {
                         tapScale.animateTo(
-                            0.94f,
+                            animationState.tapScaleTarget,
                             spring(stiffness = Spring.StiffnessHigh),
                         )
                         tryAwaitRelease()
@@ -191,14 +193,14 @@ internal fun LuminousAuraAvatar(
             presence.reaction == PresenceReaction.MEMORY_SPARK ||
             presence.reaction == PresenceReaction.SEARCH_SWEEP
         ) {
-            repeat(5) { index ->
+            repeat(animationState.orbitParticleCount) { index ->
                 val angle = (shimmer * 2f * PI + index * 1.26f).toFloat()
                 drawCircle(
                     color = palette.spark.copy(alpha = 0.34f),
                     radius = w * (0.012f + index % 2 * 0.004f),
                     center = Offset(
-                        x = center.x + cos(angle) * w * (0.31f + index * 0.012f),
-                        y = center.y + sin(angle) * h * 0.28f,
+                        x = center.x + cos(angle) * w * ((0.31f + index * 0.012f) * animationState.orbitRadiusScale),
+                        y = center.y + sin(angle) * h * (0.28f * animationState.orbitRadiusScale),
                     ),
                 )
             }

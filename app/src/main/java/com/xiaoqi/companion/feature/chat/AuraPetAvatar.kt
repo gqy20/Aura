@@ -26,18 +26,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xiaoqi.companion.R
+import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceUiState
+import com.xiaoqi.companion.core.presence.animationState
 
 @Composable
 fun AuraPetAvatar(
     presence: PresenceUiState,
+    animationState: PresenceAnimationState = presence.animationState(),
     modifier: Modifier = Modifier,
     size: Dp = 54.dp,
     onClick: () -> Unit = {},
 ) {
     val sheet = ImageBitmap.imageResource(R.drawable.aura_pet_spritesheet)
-    val timeline = presence.mode.toPetTimeline()
+    val timeline = presence.mode.toPetTimeline(animationState)
     var timeMillis by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(timeline) {
@@ -87,54 +90,57 @@ private data class PetTimeline(
     }
 }
 
-private fun PresenceMode.toPetTimeline(): PetTimeline =
+private fun PresenceMode.toPetTimeline(animationState: PresenceAnimationState): PetTimeline =
     when (this) {
         PresenceMode.SPEAKING -> PetTimeline(
             listOf(
-                PetFrame(6, 160),
-                PetFrame(7, 160),
-                PetFrame(8, 160),
-                PetFrame(9, 200),
+                PetFrame(6, scaledDuration(160, animationState)),
+                PetFrame(7, scaledDuration(160, animationState)),
+                PetFrame(8, scaledDuration(160, animationState)),
+                PetFrame(9, scaledDuration(200, animationState)),
             )
         )
         PresenceMode.HAPPY -> PetTimeline(
             listOf(
-                PetFrame(10, 300),
-                PetFrame(11, 300),
+                PetFrame(10, scaledDuration(300, animationState)),
+                PetFrame(11, scaledDuration(300, animationState)),
             )
         )
-        PresenceMode.TIRED, PresenceMode.SLEEPING -> PetTimeline(listOf(PetFrame(18, 900)))
+        PresenceMode.TIRED, PresenceMode.SLEEPING -> PetTimeline(listOf(PetFrame(18, scaledDuration(900, animationState))))
         PresenceMode.THINKING -> PetTimeline(
             listOf(
-                PetFrame(12, 320),
-                PetFrame(13, 320),
+                PetFrame(12, scaledDuration(320, animationState)),
+                PetFrame(13, scaledDuration(320, animationState)),
             )
         )
         PresenceMode.SEARCHING -> PetTimeline(
             listOf(
-                PetFrame(14, 260),
-                PetFrame(15, 260),
+                PetFrame(14, scaledDuration(260, animationState)),
+                PetFrame(15, scaledDuration(260, animationState)),
             )
         )
-        PresenceMode.REMEMBERING -> PetTimeline(listOf(PetFrame(16, 700)))
-        PresenceMode.ERROR -> PetTimeline(listOf(PetFrame(19, 600)))
+        PresenceMode.REMEMBERING -> PetTimeline(listOf(PetFrame(16, scaledDuration(700, animationState))))
+        PresenceMode.ERROR -> PetTimeline(listOf(PetFrame(19, scaledDuration(600, animationState))))
         PresenceMode.LISTENING -> PetTimeline(
             listOf(
-                PetFrame(4, 420),
-                PetFrame(5, 420),
+                PetFrame(4, scaledDuration(420, animationState)),
+                PetFrame(5, scaledDuration(420, animationState)),
             )
         )
-        PresenceMode.SAD -> PetTimeline(listOf(PetFrame(17, 700)))
+        PresenceMode.SAD -> PetTimeline(listOf(PetFrame(17, scaledDuration(700, animationState))))
         PresenceMode.IDLE,
         -> PetTimeline(
             listOf(
-                PetFrame(0, 520),
-                PetFrame(1, 520),
-                PetFrame(2, 520),
-                PetFrame(3, 720),
+                PetFrame(0, scaledDuration(520, animationState)),
+                PetFrame(1, scaledDuration(520, animationState)),
+                PetFrame(2, scaledDuration(520, animationState)),
+                PetFrame(3, scaledDuration(720, animationState)),
             )
         )
     }
+
+private fun scaledDuration(baseDuration: Int, animationState: PresenceAnimationState): Int =
+    (baseDuration * animationState.petFrameDurationScale).toInt().coerceAtLeast(80)
 
 private fun DrawScope.drawSpriteFrame(
     sheet: ImageBitmap,
