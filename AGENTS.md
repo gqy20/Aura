@@ -54,6 +54,38 @@ make check
 - `docs/engineering-standards.md` — 测试、CI、代码规范
 - `docs/reference-android-ai-projects.md` — 同类 Android AI 聊天/陪伴开源项目调研（Operit / skydoves-chatgpt-android / gpt_mobile 等）
 
+## 注释规范
+
+> 与 [`CLAUDE.md`](CLAUDE.md) 同步：以下条目在两处都有，但权威定义以 CLAUDE.md 为准。修改时同时改两处。
+
+写代码注释的边界：**信息量 ≥ 1 行的非显然决策才写**，否则让代码自解释。
+
+### 不写
+
+- **步骤编号注释**：`// 1. xxx` / `// 2. yyy` 给 `init {}` 或函数体编号。代码顺序已自表达，直接删。
+- **复述字面代码**：`if (line.startsWith("#"))` 上不写 `// Skip comments`；`key == "sections"` 上不写 `// "sections:" opener`。条件表达式本身就是文档。
+- **考古/历史注释**：`// 方案 A` / `// 原行为只跑 markClicked` / `// 之前 dismissButton 放关闭` —— git blame 里有，删。
+- **空头 TODO**：`// 未来 v2 baseline 持久化后，会写 7 天的 diff` / `// Phase 1 拆开后这条分支应改` —— 应开 issue，不在源码里埋雷。
+- **过度解释防御性代码**：`runCatching { ... }` 上不写 3 行解释"为什么用 runCatching"。
+- **1 行废话**：`// 同步本地 count` / `// 1) 大段文本(>= 48 chars)→ 立即 flush` 紧跟字面代码。
+
+### 压到 1-2 行
+
+- 5 行布局解释 → 1 行（`// Text 显式 height(48.dp) + wrapContentHeight 让 glyph 视觉中心对齐外 Row`）。
+- 3 行英文注释 → 1 行中文（`// 中心裁剪：保留前 1/3 + 后 2/3，丢中间`）。
+- `when` 5 个分支每个加章节标签 → 全删，表达式自解释。
+
+### 保留
+
+- **跨文件协议/契约引用**：`CreateLocalReminderTool.kt:122 不走 envelope，直接 buildJsonObject` / `魔搭 (ModelScope) Inference 端点，兼容 Anthropic Messages 协议：鉴权用 x-api-key，请求路径 ${baseUrl}/v1/messages`。
+- **hack 原因**：`// contract 自身也走 enforceValidPackage，在 realme 上不可靠，需 fallback` —— 不写会让人重蹈覆辙。
+- **非显然决策**：`// Don't increment i; fall through to process lines[i] as normal` —— 解释为什么不 ++i，防止重写时误加。
+- **1 行简明信号**：`// 本地模型走 MNN，无网络依赖，直接视为可达` / `// 任何 source 跑成功 = 整体成功`。
+
+### 章节标题密度
+
+`// --- xxx ---` 风格密度太高（> 5 个）时合并：Converters.kt 10 个标题 → 1 个；`when` 5 个分支每个加标题 → 全删，表达式自解释。`//region xxx` 大块分隔（> 30 行）可保留作导航。
+
 ## ADB 日志与本地数据排查
 
 调试手机上“发了消息但 UI/记忆不对”时，优先确认当前前台包、进程、logcat 和 Room 数据库。debug 包名通常是 `com.xiaoqi.companion.debug`，release 包名是 `com.xiaoqi.companion`。
