@@ -5,7 +5,6 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.mcp.McpRemoteTool
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
-import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.McpServerListRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
@@ -27,7 +26,6 @@ class CompanionToolRegistry @Inject constructor(
     private val createLocalReminderTool: CreateLocalReminderTool,
     private val queryHealthDataTool: QueryHealthDataTool,
     private val updateStateTool: UpdateStateTool,
-    private val appPreferences: AppPreferences,
     private val remoteMcpClient: RemoteMcpClient,
     private val mcpServerListRepository: McpServerListRepository,
 ) : AgentToolRegistry {

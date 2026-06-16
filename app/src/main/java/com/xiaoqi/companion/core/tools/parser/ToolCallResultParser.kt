@@ -64,8 +64,6 @@ class ToolCallResultParser @Inject constructor() {
             "get_device_status" -> parseDeviceStatus(data)
             "get_weather" -> parseWeather(data)
             "get_user_context_settings" -> parseUserContextSettings(data)
-            "update_mood" -> parseMood(data)
-            "update_relationship" -> parseRelationship(data)
             "update_state" -> parseUpdateState(data)
             "query_health_data" -> parseHealthData(data)
             else -> ToolResultSummary.Unknown(raw = data.toString())
@@ -238,8 +236,6 @@ class ToolCallResultParser @Inject constructor() {
         "get_device_status" -> "设备状态"
         "get_weather" -> "天气"
         "get_user_context_settings" -> "上下文设置"
-        "update_mood" -> "更新情绪"
-        "update_relationship" -> "更新关系"
         "update_state" -> "状态更新"
         "query_health_data" -> "健康数据"
         else -> toolName

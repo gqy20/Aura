@@ -38,7 +38,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,8 +54,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.BuildConfig
+import com.xiaoqi.companion.ui.components.CompanionTopAppBar
+import com.xiaoqi.companion.ui.components.LegacyTopAppBar
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
+import com.xiaoqi.companion.ui.theme.LocalCompanionSpacing
 
 @Composable
 fun MemoryRoomScreen(
@@ -91,6 +93,7 @@ private fun MemoryRoomScreenContent(
     var selectedMemory by remember { mutableStateOf<ChatMemory?>(null) }
     var pendingDelete by remember { mutableStateOf<ChatMemory?>(null) }
     var actionMemory by remember { mutableStateOf<ChatMemory?>(null) }
+    val spacing = LocalCompanionSpacing.current
     val visibleMemories = remember(memories, selectedType) {
         selectedType?.let { type -> memories.filter { it.type == type } } ?: memories
     }
@@ -98,7 +101,7 @@ private fun MemoryRoomScreenContent(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            LegacyTopAppBar(
                 title = { Text("记忆") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

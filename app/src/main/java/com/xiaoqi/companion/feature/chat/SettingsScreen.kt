@@ -47,7 +47,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -79,9 +78,12 @@ import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.SensorManagerHealthSource
+import com.xiaoqi.companion.ui.components.CompanionTopAppBar
+import com.xiaoqi.companion.ui.components.LegacyTopAppBar
 import com.xiaoqi.companion.ui.theme.ChatCardSurface
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
+import com.xiaoqi.companion.ui.theme.LocalCompanionSpacing
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
@@ -222,6 +224,7 @@ private fun SettingsScreenContent(
     val snackbarHostState = remember { SnackbarHostState() }
     var hasConsumedInitialDreamState by remember { mutableStateOf(false) }
     var hasConsumedInitialHealthState by remember { mutableStateOf(false) }
+    val spacing = LocalCompanionSpacing.current
 
     // 清空类操作完成时弹一次 snackbar:用 dataJustClearedAt 时间戳当 key,避免 count
     // 不变时(理论上不会,稳)重复弹。
@@ -283,7 +286,7 @@ private fun SettingsScreenContent(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
+            LegacyTopAppBar(
                 title = { Text("设置") },
                 navigationIcon = {
                     IconButton(onClick = actions.onBack) {
@@ -307,8 +310,8 @@ private fun SettingsScreenContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            contentPadding = PaddingValues(spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.section),
         ) {
             item {
                 SettingsSectionTitle(

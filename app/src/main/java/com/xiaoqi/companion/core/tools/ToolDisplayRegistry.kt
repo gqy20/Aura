@@ -66,12 +66,6 @@ class ToolDisplayRegistry @Inject constructor(
             "get_device_status" -> ToolDisplayLabels("读取设备状态中", "已读取", "读取失败")
             "get_weather" -> ToolDisplayLabels("查询天气中", "已查询", "查询失败")
             "create_local_reminder" -> ToolDisplayLabels("创建提醒中", "已创建", "创建失败")
-            "update_mood" -> ToolDisplayLabels("更新情绪中", "已更新", "更新失败")
-            "update_relationship" -> ToolDisplayLabels(
-                "更新关系中",
-                "已更新",
-                "更新失败",
-            )
             "update_state" -> ToolDisplayLabels("更新状态中", "已更新", "更新失败")
             else -> if (toolName.startsWith("mcp__")) {
                 ToolDisplayLabels("调用远端 MCP", "MCP 已完成", "MCP 失败")

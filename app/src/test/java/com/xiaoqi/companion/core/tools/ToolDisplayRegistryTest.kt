@@ -23,8 +23,8 @@ class ToolDisplayRegistryTest {
         assertEquals("已读取", registry.label("get_device_status", ToolCallStatus.SUCCEEDED))
         assertEquals("已查询", registry.label("get_weather", ToolCallStatus.SUCCEEDED))
         assertEquals("已创建", registry.label("create_local_reminder", ToolCallStatus.SUCCEEDED))
-        assertEquals("已更新", registry.label("update_mood", ToolCallStatus.SUCCEEDED))
-        assertEquals("更新失败", registry.label("update_relationship", ToolCallStatus.FAILED))
+        assertEquals("已更新", registry.label("update_state", ToolCallStatus.SUCCEEDED))
+        assertEquals("更新失败", registry.label("update_state", ToolCallStatus.FAILED))
     }
 
     @Test

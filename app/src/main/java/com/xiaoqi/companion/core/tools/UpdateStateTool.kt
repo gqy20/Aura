@@ -13,7 +13,6 @@ import com.xiaoqi.companion.data.repository.SaveMemoryRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
@@ -61,8 +60,6 @@ class UpdateStateTool @Inject constructor(
     )
 
     override suspend fun execute(args: Args): String = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
-
         // — 情绪 —
         if (args.mood != null) {
             emotionMachine.record(
@@ -109,7 +106,4 @@ class UpdateStateTool @Inject constructor(
         encode(ToolEnvelopeFactory.ok(data))
     }
 
-    private companion object {
-        val json = Json { encodeDefaults = true }
-    }
 }
