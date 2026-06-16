@@ -148,8 +148,18 @@ make run    # 构建 + 安装 + 启动
 ./gradlew connectedDebugAndroidTest  # 仪器测试（需连真机）
 make run                              # 构建 + 安装 + 启动
 make logcat                           # 查看应用日志
+make benchmark-mnn                    # 按 scripts/mnn_benchmark.yml 跑本地模型 benchmark
+make benchmark-aura                   # 解析 Aura 本机 LLM 日志
 make help                             # 查看所有 make 命令
 ```
+
+`make benchmark-mnn` / `python scripts/mnn_benchmark.py --mode app` 的顺序是：
+1. `assembleDebug` 生成 `app-debug.apk`
+2. 用 `D:\tools\ADB_Cli\adb.exe install -r` 直接安装 APK
+3. 用 `adb shell am start` 启动主 App 进程 benchmark 入口
+4. 从 `files/benchmarks/` 拉回结果 JSON
+
+`scripts/mnn_benchmark.yml` 是 benchmark 的统一配置入口，常改参数如 `apk_path`、`app_package`、`model_name`、`prompt_len`、`decode_len`、`warmup_runs`、`measure_runs` 都放这里；命令行参数仍可临时覆盖。
 
 ### 技术栈
 

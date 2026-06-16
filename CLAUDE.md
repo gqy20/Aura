@@ -130,6 +130,16 @@ Inset 值在 **composition 之后、layout 之前** 更新。内置 Modifier 已
 - **版本**: ADB 1.0.41
 - **用途**: 与 Android 设备/模拟器交互（调试、刷机、安装应用）
 
+## MNN Benchmark 约定
+
+- `scripts/mnn_benchmark.py --mode app` / `make benchmark-mnn` 统一走 **主 App 进程 benchmark**，不走 instrumentation。
+- 固定顺序是：
+  1. `./gradlew.bat assembleDebug`
+  2. 用 `D:\tools\ADB_Cli\adb.exe install -r app/build/outputs/apk/debug/app-debug.apk` 直接安装 APK
+  3. 用 `adb shell am start` 触发 `MainActivity` 的 benchmark action
+  4. 用 `run-as com.xiaoqi.companion.debug` 从 `files/benchmarks/` 拉回结果
+- benchmark 统一配置文件是 `scripts/mnn_benchmark.yml`；`apk_path`、`app_package`、`model_name`、`prompt_len`、`decode_len`、`warmup_runs`、`measure_runs` 优先在这里维护。
+
 ### Android Studio — IDE
 - **路径**: `D:\tools\Android_Studio`
 - **入口**: `D:\tools\Android_Studio\bin\studio64.exe`

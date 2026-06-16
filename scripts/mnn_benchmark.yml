@@ -1,0 +1,29 @@
+general:
+  adb: D:\tools\ADB_Cli\adb.exe
+  out_dir: docs/plan/visual-audit-assets
+  apk_path: app/build/outputs/apk/debug/app-debug.apk
+  app_package: com.xiaoqi.companion.debug
+  app_activity: com.xiaoqi.companion.MainActivity
+  model_name: Qwen3.5-4B-MNN
+  prompt_len: 256
+  decode_len: 64
+  warmup_runs: 1
+  measure_runs: 2
+  timeout_s: 180
+
+modes:
+  app: {}
+
+  mnn:
+    llm_bench: ..\MNN\project\android\build_64\llm_bench
+    mnn_build_dir: ..\MNN\project\android\build_64
+    model_dir: D:\C\Desktop\ai\android\tmp-adb-model
+    backend: cpu
+    threads: 4
+    precision: 2
+    memory: 2
+    power: 0
+    repeat: 5
+    use_mmap: false
+
+  aura: {}

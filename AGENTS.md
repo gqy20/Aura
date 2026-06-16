@@ -38,6 +38,16 @@ make check
 
 以上 Gradle 命令已在 2026-06-15 验证通过（`testDebugUnitTest` **372 个测试全绿**）。
 
+## MNN Benchmark 流程
+
+- `make benchmark-mnn` 走主 App 进程 benchmark，不走 androidTest。
+- 标准顺序：
+  1. `./gradlew.bat assembleDebug`
+  2. `D:\tools\ADB_Cli\adb.exe install -r app/build/outputs/apk/debug/app-debug.apk`
+  3. `D:\tools\ADB_Cli\adb.exe shell am start ...` 触发 `MainActivity`
+  4. `run-as com.xiaoqi.companion.debug` 拉取 `files/benchmarks/local-qwen-benchmark.json`
+- `scripts/mnn_benchmark.yml` 维护 benchmark 默认参数，常改字段是 `apk_path`、`app_package`、`model_name`、`prompt_len`、`decode_len`、`warmup_runs`、`measure_runs`。
+
 ## 工具路径与运行时环境
 
 > 此节内容与 [`CLAUDE.md`](CLAUDE.md) 同步。**只在一处更新，然后同步到另一处**；如有冲突，以 CLAUDE.md 为准。

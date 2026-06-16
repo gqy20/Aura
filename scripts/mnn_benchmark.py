@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Standardized MNN benchmark runner for Aura.
+"""Standardized benchmark runner for Aura.
 
 Supports:
+  - Aura main-process benchmark runs via adb + activity intent
   - MNN llm_bench on-device runs via adb
   - Aura log parsing from mnn_bridge_* logs
 
 Usage:
+  python scripts/mnn_benchmark.py --mode app
   python scripts/mnn_benchmark.py --mode mnn --model-dir D:/path/to/model
-  python scripts/mnn_benchmark.py --mode aura --logcat-file out/logcat.txt
+  python scripts/mnn_benchmark.py --mode aura
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import re
 import shlex
 import statistics
@@ -23,9 +26,16 @@ import sys
 import time
 from pathlib import Path
 
+import yaml
+
 
 ADB_DEFAULT = r"D:\tools\ADB_Cli\adb.exe"
 MNN_TMP_DIR = "/data/local/tmp/mnn_benchmark"
+DEFAULT_CONFIG_PATH = Path("scripts/mnn_benchmark.yml")
+APP_PACKAGE_DEFAULT = "com.xiaoqi.companion.debug"
+APP_ACTIVITY_DEFAULT = "com.xiaoqi.companion.MainActivity"
+BENCHMARK_ACTION = "com.xiaoqi.companion.action.RUN_LOCAL_QWEN_BENCHMARK"
+DEBUG_APK_DEFAULT = Path("app/build/outputs/apk/debug/app-debug.apk")
 
 
 def run(cmd: list[str], *, check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
@@ -52,6 +62,33 @@ def adb_push(adb_path: str, src: str, dst: str) -> None:
     run([adb_path, "push", src, dst], capture=False)
 
 
+def build_debug_apk(args: argparse.Namespace, out_dir: Path) -> Path:
+    gradlew = "gradlew.bat" if platform.system() == "Windows" else "./gradlew"
+    proc = run([gradlew, "assembleDebug"], check=False, capture=True)
+    (out_dir / "assemble-debug.stdout.txt").write_text(proc.stdout or "", encoding="utf-8")
+    (out_dir / "assemble-debug.stderr.txt").write_text(proc.stderr or "", encoding="utf-8")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "assembleDebug failed. "
+            f"See {out_dir / 'assemble-debug.stdout.txt'} and {out_dir / 'assemble-debug.stderr.txt'}"
+        )
+    apk_path = Path(args.apk_path).expanduser().resolve()
+    if not apk_path.is_file():
+        raise FileNotFoundError(apk_path)
+    return apk_path
+
+
+def install_debug_apk(adb_path: str, apk_path: Path, out_dir: Path) -> None:
+    proc = run([adb_path, "install", "-r", str(apk_path)], check=False, capture=True)
+    (out_dir / "install-debug.stdout.txt").write_text(proc.stdout or "", encoding="utf-8")
+    (out_dir / "install-debug.stderr.txt").write_text(proc.stderr or "", encoding="utf-8")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "adb install failed. "
+            f"See {out_dir / 'install-debug.stdout.txt'} and {out_dir / 'install-debug.stderr.txt'}"
+        )
+
+
 def adb_exec_out(adb_path: str, command: str, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("wb") as f:
@@ -70,7 +107,7 @@ def pull_aura_model_dir(adb_path: str, model_name: str, local_root: Path) -> Pat
     local_dir.mkdir(parents=True, exist_ok=True)
     listing = adb_shell(
         adb_path,
-        f"run-as com.xiaoqi.companion.debug sh -c 'find files/models/{model_name} -maxdepth 1 -type f 2>/dev/null'",
+        f"run-as com.xiaoqi.companion.debug sh -c 'find ./files/models/{model_name} -maxdepth 1 -type f 2>/dev/null'",
     ).stdout.splitlines()
     if not listing:
         raise RuntimeError(f"Model files not found in app sandbox: {model_name}")
@@ -167,6 +204,46 @@ def summarize_runs(runs: list[dict]) -> dict:
         "prefill_tps_avg": mean([1e6 * p / u if p and u else None for p, u in zip(prompt, prefill)]),
         "decode_tps_avg": mean([1e6 * c / u if c and u else None for c, u in zip(comp, decode)]),
     }
+
+
+def load_yaml_config(path: Path) -> dict:
+    if not path.exists():
+        raise FileNotFoundError(path)
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Benchmark config must be a mapping: {path}")
+    return data
+
+
+def apply_yaml_defaults(args: argparse.Namespace) -> argparse.Namespace:
+    config_path = Path(args.config).expanduser().resolve()
+    args.config = str(config_path)
+    config = load_yaml_config(config_path)
+    cli_values = {
+        key.split("=", 1)[0]
+        for key in sys.argv[1:]
+        if key.startswith("--")
+    }
+
+    general = config.get("general", {})
+    if not isinstance(general, dict):
+        raise ValueError("general section in benchmark config must be a mapping")
+
+    mode_configs = config.get("modes", {})
+    if not isinstance(mode_configs, dict):
+        raise ValueError("modes section in benchmark config must be a mapping")
+    mode_config = mode_configs.get(args.mode, {})
+    if mode_config is None:
+        mode_config = {}
+    if not isinstance(mode_config, dict):
+        raise ValueError(f"modes.{args.mode} in benchmark config must be a mapping")
+
+    merged = {**general, **mode_config}
+    for key, value in merged.items():
+        flag = f"--{key.replace('_', '-')}"
+        if flag not in cli_values and hasattr(args, key):
+            setattr(args, key, value)
+    return args
 
 
 def run_mnn(args: argparse.Namespace) -> dict:
@@ -274,11 +351,114 @@ def run_aura(args: argparse.Namespace) -> dict:
     return out
 
 
+def wait_for_remote_file(adb_path: str, package_name: str, remote_path: str, timeout_s: int) -> bool:
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        proc = run(
+            [
+                adb_path,
+                "shell",
+                f"run-as {package_name} sh -c 'test -f {shlex.quote(remote_path)} && echo READY'",
+            ],
+            check=False,
+            capture=True,
+        )
+        if "READY" in (proc.stdout or ""):
+            return True
+        time.sleep(1.0)
+    return False
+
+
+def run_app(args: argparse.Namespace) -> dict:
+    out_dir = Path(args.out_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    adb_path = args.adb
+    ensure_device(adb_path)
+    if not args.skip_build_install:
+        apk_path = build_debug_apk(args, out_dir)
+        install_debug_apk(adb_path, apk_path, out_dir)
+    package_name = args.app_package
+    activity_name = args.app_activity
+    remote_json = "./files/benchmarks/local-qwen-benchmark.json"
+    remote_error = "./files/benchmarks/local-qwen-benchmark.error.txt"
+    adb_shell(
+        adb_path,
+        (
+            f"run-as {package_name} sh -c "
+            f"'rm -f {shlex.quote(remote_json)} {shlex.quote(remote_error)}'"
+        ),
+    )
+    start_cmd = [
+        adb_path,
+        "shell",
+        "am",
+        "start",
+        "-n",
+        f"{package_name}/{activity_name}",
+        "-a",
+        BENCHMARK_ACTION,
+        "--es",
+        "modelName",
+        args.model_name,
+        "--ei",
+        "promptTokens",
+        str(args.prompt_len),
+        "--ei",
+        "decodeTokens",
+        str(args.decode_len),
+        "--ei",
+        "warmupRuns",
+        str(args.warmup_runs),
+        "--ei",
+        "measureRuns",
+        str(args.measure_runs),
+    ]
+    proc = run(start_cmd, check=False, capture=True)
+    (out_dir / "app-benchmark.stdout.txt").write_text(proc.stdout or "", encoding="utf-8")
+    (out_dir / "app-benchmark.stderr.txt").write_text(proc.stderr or "", encoding="utf-8")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "App benchmark launch failed. "
+            f"See {out_dir / 'app-benchmark.stdout.txt'} and {out_dir / 'app-benchmark.stderr.txt'}"
+        )
+
+    json_ready = wait_for_remote_file(adb_path, package_name, remote_json, args.timeout_s)
+    error_ready = wait_for_remote_file(adb_path, package_name, remote_error, 1) if not json_ready else False
+    if not json_ready and not error_ready:
+        raise RuntimeError(f"Timed out waiting for benchmark result after {args.timeout_s}s")
+
+    local_json = out_dir / "local-qwen-benchmark.json"
+    if error_ready:
+        local_error = out_dir / "local-qwen-benchmark.error.txt"
+        adb_exec_out(
+            adb_path,
+            f"run-as {package_name} cat {remote_error}",
+            local_error,
+        )
+        raise RuntimeError(f"App benchmark failed. See {local_error}")
+    adb_exec_out(
+        adb_path,
+        f"run-as {package_name} cat {remote_json}",
+        local_json,
+    )
+    data = json.loads(local_json.read_text(encoding="utf-8"))
+    return {
+        "mode": "app",
+        "json_file": str(local_json),
+        "summary": data.get("averages"),
+        "model": data.get("modelName"),
+    }
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--mode", choices=["mnn", "aura"], required=True)
+    p.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
+    p.add_argument("--mode", choices=["app", "mnn", "aura"], required=True)
     p.add_argument("--adb", default=ADB_DEFAULT)
     p.add_argument("--out-dir", default="docs/plan/visual-audit-assets")
+    p.add_argument("--apk-path", default=str(DEBUG_APK_DEFAULT))
+    p.add_argument("--app-package", default=APP_PACKAGE_DEFAULT)
+    p.add_argument("--app-activity", default=APP_ACTIVITY_DEFAULT)
     p.add_argument("--llm-bench", default=r"..\MNN\project\android\build_64\llm_bench")
     p.add_argument("--mnn-build-dir", default=r"..\MNN\project\android\build_64")
     p.add_argument("--model-dir", default="")
@@ -286,18 +466,28 @@ def main() -> int:
     p.add_argument("--threads", type=int, default=4)
     p.add_argument("--prompt-len", type=int, default=512)
     p.add_argument("--decode-len", type=int, default=128)
+    p.add_argument("--warmup-runs", type=int, default=1)
+    p.add_argument("--measure-runs", type=int, default=3)
     p.add_argument("--precision", type=int, default=2)
     p.add_argument("--memory", type=int, default=2)
     p.add_argument("--power", type=int, default=0)
     p.add_argument("--use-mmap", action="store_true")
     p.add_argument("--repeat", type=int, default=5)
     p.add_argument("--model-name", default="Qwen3.5-0.8B-MNN")
+    p.add_argument("--timeout-s", type=int, default=180)
+    p.add_argument("--skip-build-install", action="store_true")
     args = p.parse_args()
+    args = apply_yaml_defaults(args)
 
     if args.mode == "mnn" and not args.model_dir:
         args.model_dir = r"D:\C\Desktop\ai\android\tmp-adb-model"
 
-    result = run_mnn(args) if args.mode == "mnn" else run_aura(args)
+    if args.mode == "app":
+        result = run_app(args)
+    elif args.mode == "mnn":
+        result = run_mnn(args)
+    else:
+        result = run_aura(args)
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0
 

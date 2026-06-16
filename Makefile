@@ -4,7 +4,8 @@
 # ============================================================
 
 .PHONY: help build clean install run test lint debug \
-        release check format devices logcat uninstall
+        release check format devices logcat uninstall \
+        benchmark-mnn benchmark-aura
 
 # --- 默认目标 ---
 help:
@@ -32,6 +33,8 @@ help:
 	@echo "  Device:"
 	@echo "    make devices     List connected devices/emulators"
 	@echo "    make logcat      Show device log (app filter)"
+	@echo "    make benchmark-mnn   Run benchmark using scripts/mnn_benchmark.yml"
+	@echo "    make benchmark-aura  Parse Aura runtime metrics from logcat"
 	@echo ""
 	@echo "  Project:"
 	@echo "    make deps        Download dependencies (first time)"
@@ -95,6 +98,12 @@ logcat:
 
 logcat-clear:
 	adb logcat -c
+
+benchmark-mnn:
+	python scripts/mnn_benchmark.py --mode app
+
+benchmark-aura:
+	python scripts/mnn_benchmark.py --mode aura
 
 screenshot:
 	adb exec-out screencap -p > screenshot_$(shell date +%Y%m%d_%H%M%S).png
