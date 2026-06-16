@@ -43,6 +43,7 @@ class MnnLocalQwenEngine @Inject constructor(
                     "model" to request.modelName,
                     "systemPromptLength" to request.systemPrompt.length,
                     "userMessageLength" to request.userMessage.length,
+                    "hasImage" to (request.imageBase64 != null),
                 )
                 val modelDir = modelLocator.findModelDir(request.modelName)
                     ?: throw IllegalStateException("Local Qwen model not found: ${request.modelName}")
@@ -62,14 +63,32 @@ class MnnLocalQwenEngine @Inject constructor(
                     val runtimeConfigJson = inferenceConfig.toJson()
                     val activeBridge = ensureBridgeLoaded(configFile.absolutePath, runtimeConfigJson)
                     withContext(Dispatchers.Default) {
-                        activeBridge.generate(
-                            systemPrompt = request.systemPrompt,
-                            userMessage = request.userMessage,
-                        ) { token ->
-                            if (token.isNotEmpty()) {
-                                trySend(token)
+                        if (request.imageBase64 != null) {
+                            val imageBytes = android.util.Base64.decode(
+                                request.imageBase64,
+                                android.util.Base64.DEFAULT,
+                            )
+                            activeBridge.generateWithImage(
+                                systemPrompt = request.systemPrompt,
+                                userMessage = request.userMessage,
+                                imageBytes = imageBytes,
+                                imageMediaType = request.imageMediaType ?: "image/jpeg",
+                            ) { token ->
+                                if (token.isNotEmpty()) {
+                                    trySend(token)
+                                }
+                                false
                             }
-                            false
+                        } else {
+                            activeBridge.generate(
+                                systemPrompt = request.systemPrompt,
+                                userMessage = request.userMessage,
+                            ) { token ->
+                                if (token.isNotEmpty()) {
+                                    trySend(token)
+                                }
+                                false
+                            }
                         }
                     }
                 }

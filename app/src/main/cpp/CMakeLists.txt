@@ -8,6 +8,23 @@ add_library(aura_mnn_llm SHARED
 
 target_compile_features(aura_mnn_llm PRIVATE cxx_std_17)
 
+# stb_image 用于 submitWithImageNative 内 JPEG/PNG 解码。
+# 优先走 AURA_MNN_HOME（绝对路径，与 libMNN.so 来源一致），
+# 否则回退到仓库相对路径 ../mnn/3rd_party/imageHelper（约定 mnn 仓库在项目外层）。
+if (DEFINED AURA_MNN_HOME AND NOT "${AURA_MNN_HOME}" STREQUAL "")
+    set(AURA_STB_DIR "${AURA_MNN_HOME}/3rd_party/imageHelper")
+else ()
+    set(AURA_STB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../mnn/3rd_party/imageHelper")
+endif ()
+if (EXISTS "${AURA_STB_DIR}/stb_image.h")
+    target_include_directories(aura_mnn_llm PRIVATE "${AURA_STB_DIR}")
+    message(STATUS "Aura MNN bridge using stb_image from ${AURA_STB_DIR}")
+else ()
+    message(WARNING
+        "stb_image.h not found at ${AURA_STB_DIR}; submitWithImageNative will fail to link. "
+        "Set AURA_MNN_HOME or place mnn repo at ../mnn relative to project root.")
+endif ()
+
 if (DEFINED AURA_MNN_HOME AND NOT "${AURA_MNN_HOME}" STREQUAL "")
     set(AURA_MNN_BUILD_DIR "${AURA_MNN_HOME}/project/android/build_64")
     set(AURA_MNN_LIB_DIR "${AURA_MNN_BUILD_DIR}/lib")

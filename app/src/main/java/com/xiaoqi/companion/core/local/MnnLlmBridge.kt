@@ -7,6 +7,13 @@ interface MnnLlmBridge {
         userMessage: String,
         onToken: (String) -> Boolean,
     ): Map<String, Any>
+    fun generateWithImage(
+        systemPrompt: String,
+        userMessage: String,
+        imageBytes: ByteArray,
+        imageMediaType: String,
+        onToken: (String) -> Boolean,
+    ): Map<String, Any>
     fun release()
 }
 

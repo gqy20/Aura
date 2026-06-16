@@ -8,15 +8,16 @@
 
 ---
 
-## 0. 一句话定位
+## 0. 范围
 
-> **Aura 是"住在你手机里的第二大脑"。**
-> 云端 LLM 是 Aura 与外部世界对话的"响应面"（Responsive Mind），本地 LLM 是 Aura 持续观察你、记住你的"觉察面"（Continuous Awareness）。
-> 响应面负责"办事"，觉察面负责"懂事"。
+本文档记录 Aura 把"云端对话体 / 本地陪伴体"分成两条子系统的设计。`KoogAgentFactoryImpl.create()` 仍是单一入口，按 `LlmConfig.provider` 路由到 `KoogPromptExecutorWrapper`（云端）或 `ReactiveCompanion`（本地）。
 
-两个 LLM 各管各的职能，**没有重叠职责**。云端永远在 Koog + Anthropic Messages / GLM / Kimi 的对话主路径上；本地永远在 MNN + Qwen 的觉察运行时里。本地不替代云的任何能力，云也不下放到本地的任何场景。
+- 云端走 Koog + Anthropic Messages 兼容接口（GLM / Kimi / Anthropic）。
+- 本地走 MNN + Qwen，支持文本与 Vision 多模态（2026-06-17 PR B 后）。
+- 工具调用、Vision、结构化反思、记忆召回等能力以**云端为主**；本地路径当前不支持工具调用（`BuiltPrompt.allowTools` 被读但本地走 `allowTools=false`，打 warn 日志）。
+- 陪伴体（`DreamLoopWorker` / `LocalQwenExecutor` / MoodDrift 等）由 `core/presence/runtime/` 独立承担，不在主对话路径上。
 
-**这条架构的真正价值，不只是工程清晰化，而是产品差异化**——它是"Aura 是一个长期认识你的 AI"这一定位的技术底座。详见 §1.4 产品叙事与差异化，以及 [`insight-driven-product.md`](./insight-driven-product.md)。
+> **2026-06-17 重新评估**：原 §1.4 把"本地 = 隐私差异化"作为产品叙事主轴的论证已撤掉。Reasoning：云端成本可控、隐私作为产品卖点缺乏可验证的差异化，且 `KoogAgentWrapper` 4 方法契约对齐后云端 / 本地已经是合理的 Provider 切换形态，不需要拆双子系统。Roadmap §8 / §9 标记"已重新评估"。
 
 ---
 
@@ -45,15 +46,16 @@
 
 参见 [`on-device-qwen-mnn-research.md`](../on-device-qwen-mnn-research.md) 第 1 节："不推荐把端侧 Qwen 直接替代现有 GLM/Kimi 云端模型"，本文是该结论的**架构落地**。
 
-#### 产品层面（2026-06-15 补充）
+#### 产品层面
 
-`dual-mind` 这个拆分除了让代码更好维护，**真正的产品价值是把"你的数据永远留在本机"做成了 Aura 的护城河**。
+本设计稿不预设产品叙事主轴。Aura 当前的差异化主要在**长期记忆 + 情绪 / 关系 / presence 层**这一组功能组合上（详见 [`insight-driven-product.md`](./insight-driven-product.md)），与本地 / 云端的拆分没有强绑定关系。
 
-当前云端 AI 产品（ChatGPT、Claude、Gemini、Replika 等）都不可避免地把用户对话上云。Aura 的对话体和它们一样需要云端能力（工具、Vision、深度反思），但**觉察面（mood、行为模式、insight、内在独白）只在本地 LLM 和本机存储里循环**。这让 Aura 拥有了"比你更了解你自己、但你的隐私数据从不出本机"的**反直觉**能力。
+云端 / 本地作为两条独立子系统，主要价值在工程层面：
+- **Provider 可切换**（GLM / Kimi / Anthropic / Local Qwen），用户自选。
+- **本地路径离线可用**、不依赖网络、不产生 token 成本。
+- **陪伴体**（Dream Loop / Inner Monologue / Reactive Respond）独立于主对话路径，不与云端 agent 强耦合。
 
-这一能力直接对应 Aura 的产品定位"**第二大脑 / 数字孪生**"（见 §1.4）——把生活数据全部留在本机、随时间积累、形成洞察，是 Aura 对云端 AI 唯一不可替代的差异化。
-
-如果不做这个拆分，Aura 就只能挤进"又一个云端对话 App"的红海，**没有任何用户必须选 Aura 的理由**。
+> **2026-06-17 重新评估**：早期本文档把"本地 = 隐私 moat"作为产品卖点写过，撤掉。云端 token 成本可控（实际在 M3 阶段验证过），隐私差异化论证缺乏可验证的对照实验。叙事主轴回到产品功能本身，参见 §1.2 注释。
 
 ### 1.2 核心判断
 
@@ -63,8 +65,6 @@
 | 何时在场 | 用户发消息时 | 永远在（包括用户不在时） |
 | 主要能力 | 工具调用 / Vision / 长上下文 / 结构化反思 | 持续心跳 / 即时闲聊 / dream loop / mood drift / insight 提取 |
 | 资源约束 | 按次计费、依赖网络 | 电池、续航、存储 |
-| 隐私边界 | 默认会上云（用户消息） | 默认全本地（mood/inner state/observation） |
-| 在"第二大脑"叙事中 | 办事面（你提问/查询/做决定时调用） | 懂事面（在你不在时整理、洞察、提醒） |
 | 类比 | "嘴和脑" | "心和身" |
 
 **本地不是云的降级版**。把本地当成"低配版云"会推出"按场景路由"这种伪命题。两个 LLM 各自有独立的 system prompt、输入数据、输出 schema，**不该共用 wrapper**。
@@ -85,53 +85,14 @@
 
 长期（Phase 5+）：
 - 用户感知到 Aura "在为他工作"（不只是被动响应）
-- 隐私敏感用户群体可用本地模式完成全部陪伴场景
 - 端侧 KV-cache 续写技术成熟，让 Aura 形成"自我感"延续
 - 远端 Agent Server 主要服务"信息回写到记忆"这条主轴
 
-### 1.4 产品叙事与差异化（2026-06-15 新增）
+
 
 > **Aura 不做"会聊天的 App"，做"长期认识你的 AI"。**
 
 #### 1.4.1 为什么"第二大脑 / 数字孪生"是 Aura 的最佳叙事
-
-候选叙事评估：
-
-| 候选 | 核心钩子 | 垂直深度 | 风险 | 结论 |
-|---|---|---|---|---|
-| A. 永远在场的 AI 朋友 | 本地 LLM 持续心跳、mood drift | ⭐⭐ 浅 | 情感阈值快速钝化、付费差 | 不做主叙事 |
-| B. 替你办事的 AI 代理 | Browser Worker、MCP、Task Scheduler | ⭐⭐⭐ 中 | 正面撞 Devin/Manus/ChatGPT Agent | 做能力扩展 |
-| **C. 你的第二大脑 / 数字孪生** | **Auto Memory、pattern、insight、weekly review** | **⭐⭐⭐⭐⭐** | **冷启动慢、隐私敏感** | **做主叙事** |
-
-**为什么 C 的垂直深度最高**：
-
-1. **产品每天都在变值钱** —— 记忆越积越多，用户切换成本指数级上升；这是云端 AI 无法提供的复利效应
-2. **本地 LLM 反而是核心壁垒** —— "你的人生数据全部留在本机"是云端玩家的根本性劣势
-3. **自研情绪 / 关系 / presence 层找到归宿** —— mood/rel 不是装饰，是 insight 的输入；为现有功能找到"为什么需要它"的回答
-4. **agent-capability-server-plan 自然收紧** —— 远端 agent 的价值不再是"通用执行"，而是"把外部信息回写到你的记忆"（看一篇好文章后 Aura 主动归档、关注商品降价时 Aura 主动记住）
-
-#### 1.4.2 叙事与架构的对应
-
-| 叙事层 | 用户感知 | 架构层 |
-|---|---|---|
-| "Aura 记得我" | 记忆可查看、可编辑、可删除 | Auto Memory 文件系统 + memory_summaries |
-| "Aura 注意到我" | mood trend、pattern、weekly review | 觉察面（L1/L2）+ mood_snapshots |
-| "Aura 在主动关心我" | proactive insight、pulse 通知 | Dream Pipeline + ObservationQueue |
-| "Aura 懂我又不窥探我" | 数据透明可见、不上云 | 觉察面永远在本地、对话体只消费 insight 摘要 |
-| "Aura 越来越像我" | 长周期个性化 | KV-cache 续写 + dream loop 长期记忆整合 |
-
-#### 1.4.3 三个必须克制的边界
-
-为避免 Aura 被错位成"虚拟恋人"或"通用 agent 套壳"：
-
-1. **克制的情感表达** —— Aura 不是"男朋友/女朋友"，是"最了解你的私人助理/知己"。情绪反应有，但不出戏
-2. **克制的工具堆叠** —— 不为了"看起来很强大"加 MCP / Browser。远端 agent 只服务"信息回写到记忆"这一条主轴
-3. **强可见的本地存储** —— Auto Memory 文件夹、observation 队列、mood history 全部对用户可见可改。**让隐私焦虑变成信任**
-
-#### 1.4.4 关联文档
-
-- [`insight-driven-product.md`](./insight-driven-product.md) — Insight 是什么、怎么生成、怎么呈现、怎么冷启动（M2-M5 的产品方向锚点）
-- [`roadmap.md`](../roadmap.md) — M2-M5 的 KPI 已按本叙事调整
 
 ---
 
@@ -218,10 +179,10 @@
 |------|------------|------------|------|
 | 用户消息 | L3 Reactive 尝试 | 接管 if 工具需求 / confidence 低 / Vision | 主对话路径 |
 | Dream Loop 跑完 | L2 本地写入 Auto Memory + ObservationQueue | confidence 低时跑深度 reflection | Dream 不直接发消息，沉淀到 observation 池 |
-| Pulse（主动关怀） | L3 本地生成文案 | 永远本地（涉及用户隐私） | 决定要不要推通知 |
+| Pulse（主动关怀） | L3 本地生成文案 | 永远本地（mood / inner state 不上云） | 决定要不要推通知 |
 | Weekly Insight | L2 汇总本周 mood/pattern/memory | 仅在生成精美总结时用 | 见 insight-driven-product.md §3 |
 | 用户说"认真想想" | L1 标记为深度思考 | **永远上调云端** | 深度思考必须用最强模型 |
-| 用户发图片 | 不参与 | Vision 永远云端 | 涉及图片理解 |
+| 用户发图片 | 2026-06-17 PR B 后本地可走 vision（`submitWithImageNative`） | 默认仍走云端 GLM-5v-turbo（tool 调用 + 质量） | 本地 vision 不挂 tools，云端走完整 tool loop |
 | 外部信息回写 | 接收 server 推回的总结 | server agent 拉取/总结 | 见 agent-capability-server-plan §3.4 |
 
 **关键不变量**：
@@ -316,7 +277,7 @@
 |------|------|------|
 | `KoogAgentFactoryImpl.create()` 二选一 | **拆掉** | 对话体不需要"选 provider" |
 | `LocalQwenAgentWrapper` 作为 `KoogAgentWrapper` | **重命名**为 `ReactiveResponder` 的一部分 | 不是 Koog agent 的替代，是陪伴体组件 |
-| `LocalQwenAgentWrapper.toLocalRequest()` 里两处 `throw UnsupportedOperationException` | **保留** | Vision / structured 本就是对话体职能 |
+| `LocalQwenAgentWrapper.toLocalRequest()` 两处 `throw UnsupportedOperationException` | **已删**（PR A + PR B） | structured 改 JSON 解析兜底（PR A），vision 接 MNN `submitWithImageNative`（PR B） |
 | `LlmConfig.provider` 字段语义 | **改为只描述对话体**（去掉 LOCAL_QWEN 选项） | 陪伴体不在用户配置里 |
 | `ConversationReflection` 每轮调一次 | **改为阈值触发 + 本地优先** | 当前是浪费 token 的过度反思 |
 | `AppPreferences.llmProvider` UI 切换 | **降级为只影响对话体** | 陪伴体无 UI 开关 |
@@ -793,7 +754,7 @@ class DreamLoopWorker(
 | **Phase 2 — 陪伴体骨架** | `PresenceHeartbeat` + `MoodDrift` + `DreamLoopWorker`（空跑） | 2 周 | 锁屏后 worker 能启动 |
 | **Phase 3 — Auto Memory** | `AuraMemoryStore` + `MEMORY.md` 索引 + Dream 写入 | 2 周 | dream run 能写文件 |
 | **Phase 4 — Reactive Companionship** | 用户消息先本地响应 + confidence 评估 + 上调云端 | 1 周 | 体验可接受 |
-| **Phase 5 — 产品化** | Settings UI / 数据导出 / 隐私控制 / dream 状态可见 UI | 持续 | 产品发布 |
+| **Phase 5 — 产品化** | Settings UI / 数据导出 / 数据可见可改 / dream 状态可见 UI | 持续 | 产品发布 |
 
 **总周期**：约 8–10 周出 v2 基础版。
 
@@ -835,7 +796,6 @@ class DreamLoopWorker(
 |------|------|
 | 用户不理解"为什么本地模型一直跑" | Settings 解释 + 电池用量透明 |
 | 用户觉得"我的对话怎么变了" | 数据导出功能让用户随时看到 Aura 记住了什么 |
-| 隐私敏感用户担心 Auto Memory 被读 | 文件在应用沙盒 `/data/data/...`；外部不可读 |
 | 用户担心 dream 偷听 | 明确告知：dream 只看持久化的 messages，不监听麦克风 |
 
 ### 10.4 未解问题（需 PoC 验证）

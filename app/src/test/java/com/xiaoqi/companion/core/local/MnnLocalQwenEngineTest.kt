@@ -97,6 +97,8 @@ class MnnLocalQwenEngineTest {
         var loadedRuntimeConfig: String? = null
         var systemPrompt: String? = null
         var userMessage: String? = null
+        var lastImageBytes: ByteArray? = null
+        var lastImageMediaType: String? = null
         val prompts = mutableListOf<Pair<String, String>>()
 
         override suspend fun load(configPath: String, runtimeConfig: String) {
@@ -114,6 +116,25 @@ class MnnLocalQwenEngineTest {
             this.systemPrompt = systemPrompt
             this.userMessage = userMessage
             prompts += systemPrompt to userMessage
+            chunks.forEach { chunk ->
+                if (onToken(chunk)) return mapOf("stopped" to true)
+            }
+            onToken("")
+            return mapOf("success" to true)
+        }
+
+        override fun generateWithImage(
+            systemPrompt: String,
+            userMessage: String,
+            imageBytes: ByteArray,
+            imageMediaType: String,
+            onToken: (String) -> Boolean,
+        ): Map<String, Any> {
+            this.systemPrompt = systemPrompt
+            this.userMessage = userMessage
+            prompts += systemPrompt to userMessage
+            lastImageBytes = imageBytes
+            lastImageMediaType = imageMediaType
             chunks.forEach { chunk ->
                 if (onToken(chunk)) return mapOf("stopped" to true)
             }

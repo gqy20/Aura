@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -48,8 +49,23 @@ class ReactiveCompanionTest {
     }
 
     @Test
-    fun runEvents_rejectsVisionPromptsForFirstTextOnlyMvp() = runTest {
-        val engine = FakeLocalQwenEngine(listOf("unused"))
+    fun runStreaming_routesThroughRunEvents() = runTest {
+        val engine = FakeLocalQwenEngine(listOf("a", "b", "c"))
+        val wrapper = ReactiveCompanion(engine)
+
+        val collected = mutableListOf<String>()
+        wrapper.runStreaming(BuiltPrompt(systemPrompt = "s", userMessage = "u")).collect {
+            collected += it
+        }
+
+        assertEquals(listOf("a", "b", "c"), collected)
+        assertEquals("s", engine.lastRequest?.systemPrompt)
+        assertEquals("u", engine.lastRequest?.userMessage)
+    }
+
+    @Test
+    fun runEvents_forwardsImageFieldsToLocalRequest() = runTest {
+        val engine = FakeLocalQwenEngine(listOf("ok"))
         val wrapper = ReactiveCompanion(engine)
 
         wrapper.runEvents(
@@ -57,27 +73,81 @@ class ReactiveCompanionTest {
                 systemPrompt = "system",
                 userMessage = "describe",
                 hasImage = true,
-                imageBase64 = "base64",
+                imageBase64 = "AAAA",
+                imageMediaType = "image/png",
             )
         ).test {
-            val error = awaitError()
-            assertTrue(error is UnsupportedOperationException)
-            assertTrue(error.message.orEmpty().contains("Vision"))
+            assertEquals(KoogAgentEvent.TextDelta("ok"), awaitItem())
+            awaitComplete()
         }
+
+        val req = engine.lastRequest
+        assertEquals("AAAA", req?.imageBase64)
+        assertEquals("image/png", req?.imageMediaType)
     }
 
-    @Test(expected = UnsupportedOperationException::class)
-    fun runStructured_isDisabledForLocalTextMvp() = runTest {
-        val wrapper = ReactiveCompanion(FakeLocalQwenEngine(listOf("unused")))
+    @Test
+    fun runStructured_parsesJsonFromTextCompletion() = runTest {
+        val engine = FakeLocalQwenEngine(
+            listOf("""{"value":"parsed"}"""),
+        )
+        val wrapper = ReactiveCompanion(engine)
+
+        val result = wrapper.runStructured(
+            prompt = BuiltPrompt(systemPrompt = "s", userMessage = "u"),
+            serializer = Dummy.serializer(),
+            examples = emptyList(),
+        )
+
+        assertEquals("parsed", result.value)
+    }
+
+    @Test
+    fun runStructured_stripsCodeFenceBeforeParsing() = runTest {
+        val engine = FakeLocalQwenEngine(
+            listOf("""```json
+                {"value":"fenced"}
+            ```"""),
+        )
+        val wrapper = ReactiveCompanion(engine)
+
+        val result = wrapper.runStructured(
+            prompt = BuiltPrompt(systemPrompt = "s", userMessage = "u"),
+            serializer = Dummy.serializer(),
+            examples = emptyList(),
+        )
+
+        assertEquals("fenced", result.value)
+    }
+
+    @Test
+    fun runStructured_fallsBackToFirstExampleWhenJsonMissing() = runTest {
+        val engine = FakeLocalQwenEngine(listOf("no json at all here"))
+        val fallback = Dummy("fallback")
+        val wrapper = ReactiveCompanion(engine)
+
+        val result = wrapper.runStructured(
+            prompt = BuiltPrompt(systemPrompt = "s", userMessage = "u"),
+            serializer = Dummy.serializer(),
+            examples = listOf(fallback),
+        )
+
+        assertEquals(fallback, result)
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun runStructured_throwsWhenNoJsonAndNoFallback() = runTest {
+        val engine = FakeLocalQwenEngine(listOf("still no json"))
+        val wrapper = ReactiveCompanion(engine)
 
         wrapper.runStructured(
-            prompt = BuiltPrompt(systemPrompt = "system", userMessage = "json"),
+            prompt = BuiltPrompt(systemPrompt = "s", userMessage = "u"),
             serializer = Dummy.serializer(),
             examples = emptyList(),
         )
     }
 
-    @kotlinx.serialization.Serializable
+    @Serializable
     private data class Dummy(val value: String = "")
 
     private class FakeLocalQwenEngine(

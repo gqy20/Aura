@@ -26,6 +26,14 @@ class NativeMnnLlmBridgeTest {
                     userMessage: String,
                     listener: NativeMnnProgressListener,
                 ): Map<String, Any> = emptyMap()
+                override fun submitWithImage(
+                    instanceId: Long,
+                    systemPrompt: String,
+                    userMessage: String,
+                    imageBytes: ByteArray,
+                    imageMediaType: String,
+                    listener: NativeMnnProgressListener,
+                ): Map<String, Any> = emptyMap()
                 override fun release(instanceId: Long) = Unit
             }
         )
@@ -51,6 +59,8 @@ class NativeMnnLlmBridgeTest {
     private class RecordingNativeMnnLlmApi : NativeMnnLlmApi {
         var systemPrompt: String? = null
         var userMessage: String? = null
+        var lastImageBytes: ByteArray? = null
+        var lastImageMediaType: String? = null
 
         override fun loadLibrary(): Boolean = true
         override fun init(configPath: String, runtimeConfig: String): Long = 1L
@@ -63,6 +73,21 @@ class NativeMnnLlmBridgeTest {
         ): Map<String, Any> {
             this.systemPrompt = systemPrompt
             this.userMessage = userMessage
+            return emptyMap()
+        }
+
+        override fun submitWithImage(
+            instanceId: Long,
+            systemPrompt: String,
+            userMessage: String,
+            imageBytes: ByteArray,
+            imageMediaType: String,
+            listener: NativeMnnProgressListener,
+        ): Map<String, Any> {
+            this.systemPrompt = systemPrompt
+            this.userMessage = userMessage
+            this.lastImageBytes = imageBytes
+            this.lastImageMediaType = imageMediaType
             return emptyMap()
         }
 

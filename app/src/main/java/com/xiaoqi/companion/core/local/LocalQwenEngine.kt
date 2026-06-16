@@ -7,6 +7,8 @@ data class LocalQwenRequest(
     val userMessage: String,
     val modelName: String = "",
     val allowTools: Boolean = false,
+    val imageBase64: String? = null,
+    val imageMediaType: String? = null,
 )
 
 interface LocalQwenEngine {

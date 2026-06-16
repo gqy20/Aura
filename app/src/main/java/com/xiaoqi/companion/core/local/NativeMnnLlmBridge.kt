@@ -63,6 +63,41 @@ class NativeMnnLlmBridge(
         }
     }
 
+    override fun generateWithImage(
+        systemPrompt: String,
+        userMessage: String,
+        imageBytes: ByteArray,
+        imageMediaType: String,
+        onToken: (String) -> Boolean,
+    ): Map<String, Any> {
+        ensureLoaded()
+        AppLogger.info(
+            LogTags.LocalModel,
+            "mnn_bridge_generate_with_image_started",
+            "systemPromptLength" to systemPrompt.length,
+            "userMessageLength" to userMessage.length,
+            "imageBytes" to imageBytes.size,
+            "imageMediaType" to imageMediaType,
+        )
+        return native.submitWithImage(
+            instanceId = instanceId,
+            systemPrompt = systemPrompt,
+            userMessage = userMessage,
+            imageBytes = imageBytes,
+            imageMediaType = imageMediaType,
+            listener = object : NativeMnnProgressListener {
+                override fun onProgress(token: String?): Boolean =
+                    token?.let(onToken) ?: false
+            },
+        ).also { stats ->
+            AppLogger.info(
+                LogTags.LocalModel,
+                "mnn_bridge_generate_with_image_completed",
+                "statKeys" to stats.keys.joinToString(separator = ","),
+            )
+        }
+    }
+
     override fun release() {
         if (instanceId != 0L && native.loadLibrary()) {
             AppLogger.debug(
@@ -102,6 +137,14 @@ interface NativeMnnLlmApi {
         instanceId: Long,
         systemPrompt: String,
         userMessage: String,
+        listener: NativeMnnProgressListener,
+    ): Map<String, Any>
+    fun submitWithImage(
+        instanceId: Long,
+        systemPrompt: String,
+        userMessage: String,
+        imageBytes: ByteArray,
+        imageMediaType: String,
         listener: NativeMnnProgressListener,
     ): Map<String, Any>
     fun release(instanceId: Long)
@@ -150,6 +193,16 @@ private object JniNativeMnnLlmApi : NativeMnnLlmApi {
     ): Map<String, Any> =
         submitNative(instanceId, systemPrompt, userMessage, listener)
 
+    override fun submitWithImage(
+        instanceId: Long,
+        systemPrompt: String,
+        userMessage: String,
+        imageBytes: ByteArray,
+        imageMediaType: String,
+        listener: NativeMnnProgressListener,
+    ): Map<String, Any> =
+        submitWithImageNative(instanceId, systemPrompt, userMessage, imageBytes, imageMediaType, listener)
+
     override fun release(instanceId: Long) {
         releaseNative(instanceId)
     }
@@ -159,6 +212,14 @@ private object JniNativeMnnLlmApi : NativeMnnLlmApi {
         instanceId: Long,
         systemPrompt: String,
         userMessage: String,
+        listener: NativeMnnProgressListener,
+    ): HashMap<String, Any>
+    private external fun submitWithImageNative(
+        instanceId: Long,
+        systemPrompt: String,
+        userMessage: String,
+        imageBytes: ByteArray,
+        imageMediaType: String,
         listener: NativeMnnProgressListener,
     ): HashMap<String, Any>
     private external fun releaseNative(instanceId: Long)

@@ -34,8 +34,8 @@ Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
 - **后台 Dream Loop** — 6h 周期的本地 Qwen 模式识别，把"近 7 天值得说的"生成 Insight 卡片
 - **图 + 工具** — 发图能记住画面；Health Connect 步数 / 心率 / 睡眠；定时提醒；MCP server 可配置
 
-云端走 Anthropic Messages 兼容接口（GLM / Kimi）；本地 Qwen 0.8B
-是独立子系统，聊天数据不出手机。
+云端走 Anthropic Messages 兼容接口（GLM / Kimi）；本地 Qwen（MNN 引擎）
+作为可选 Provider，离线 / 低延迟 / 无 token 成本场景下用。
 
 语音 I/O、主动 Pulse、动画角色 仍在路上。
 
@@ -65,14 +65,14 @@ Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
    - Photo Picker 选图 → GLM-5v-turbo vision → 图像以 base64 落库，Dream Loop 把视觉证据注入下一轮上下文
 5. **主动陪伴** — 到点提醒喝水、休息，偶尔主动发起对话
    - 已实现：Reminder（AlarmManager + Worker）；规划中：PulseWorker（按 Mood Trend 主动发消息）
-6. **本地可选** — 不想上云？可切换到本地 Qwen 模型，聊天数据不出手机
-   - MNN 推理引擎 + Qwen 0.8B 模型自动下载（首次约 1GB），适合隐私敏感场景
+6. **本地可选** — 不想上云？可切换到本地 Qwen 模型，离线 / 不消耗 token
+   - MNN 推理引擎 + Qwen 模型自动下载（0.8B/2B/4B，首次 0.6–3.2 GB），支持文本 + Vision 多模态（2026-06-17 PR B）
 
 ---
 
 ## 当前状态
 
-**最新版本：v0.1.3** · 372 个单元测试通过 · 0 失败 · CI: ✅ passing
+**最新版本：v0.1.3** · 483 个单元测试通过 · 0 失败 · CI: ✅ passing
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
@@ -102,7 +102,7 @@ Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
 - Android 6.0+ 设备（minSdk 26）
 - 至少一项 LLM 接入：
   - **云端**：[智谱 GLM](https://open.bigmodel.cn) 或 [Kimi](https://platform.moonshot.cn) 的 API Key
-  - **本地**：首次启动下载 Qwen 0.8B 模型（约 1GB，存到应用私有目录）
+  - **本地**：首次启动下载 Qwen 模型（0.8B/2B/4B 可选，0.6–3.2 GB，存到应用私有目录）
 
 ### 1. 安装
 
@@ -144,7 +144,7 @@ make run    # 构建 + 安装 + 启动
 
 ```bash
 ./gradlew assembleDebug              # 构建 Debug APK
-./gradlew testDebugUnitTest          # 跑 372 个单元测试
+./gradlew testDebugUnitTest          # 跑 483 个单元测试
 ./gradlew connectedDebugAndroidTest  # 仪器测试（需连真机）
 make run                              # 构建 + 安装 + 启动
 make logcat                           # 查看应用日志

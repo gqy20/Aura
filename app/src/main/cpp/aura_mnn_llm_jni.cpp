@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <android/log.h>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <fstream>
 #include <memory>
@@ -11,9 +12,17 @@
 #include <string>
 #include <streambuf>
 #include <sys/stat.h>
+#include <vector>
 
 #ifdef AURA_MNN_LINKED
 #include "llm/llm.hpp"
+#include "MNN/expr/Expr.hpp"
+#include "MNN/ImageProcess.hpp"
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_JPEG
+#define STBI_ONLY_PNG
+#include "stb_image.h"
 #endif
 
 namespace {
@@ -29,6 +38,61 @@ void logInfo(const std::string& message) {
 void logError(const std::string& message) {
     __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "%s", message.c_str());
 }
+
+#ifdef AURA_MNN_LINKED
+// 解码 JPEG/PNG bytes → RGBA8 bytes + 原始尺寸 (供 ImageProcess 转换到视觉编码器期望的 tensor)
+// 失败返回 false,bytes/RGBA 数组为 nullptr。
+bool decodeImageToRgba(const uint8_t* data, size_t size, std::vector<uint8_t>& rgba, int& width, int& height) {
+    int w = 0, h = 0, channels = 0;
+    uint8_t* decoded = stbi_load_from_memory(data, static_cast<int>(size), &w, &h, &channels, STBI_rgb_alpha);
+    if (decoded == nullptr || w <= 0 || h <= 0) {
+        logError(std::string("stbi_load_from_memory_failed: ") + (stbi_failure_reason() ? stbi_failure_reason() : "unknown"));
+        if (decoded != nullptr) {
+            stbi_image_free(decoded);
+        }
+        return false;
+    }
+    rgba.assign(decoded, decoded + (static_cast<size_t>(w) * h * 4));
+    stbi_image_free(decoded);
+    width = w;
+    height = h;
+    return true;
+}
+
+// Qwen3.5-VL/Qwen2-VL 视觉编码器期望 [1, 3, 448, 448] NCHW float
+MNN::Express::VARP buildVisionVarp(const uint8_t* rgba, int width, int height) {
+    constexpr int kTargetSide = 448;
+    // 1) 配 ImageProcess: source RGBA → dest RGB float, normalize [0,255] -> [0,1], bilinear resize
+    MNN::CV::ImageProcess::Config config;
+    config.sourceFormat = MNN::CV::RGBA;
+    config.destFormat   = MNN::CV::RGB;
+    config.filterType   = MNN::CV::BILINEAR;
+    float mean[3]   = {0.0f, 0.0f, 0.0f};
+    float normal[3] = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};  // dest = (src - mean) * normal
+    std::memcpy(config.mean, mean, sizeof(mean));
+    std::memcpy(config.normal, normal, sizeof(normal));
+
+    MNN::CV::Matrix transform;
+    transform.setScale(static_cast<float>(width) / kTargetSide,
+                       static_cast<float>(height) / kTargetSide);
+
+    std::vector<float> buffer(kTargetSide * kTargetSide * 3, 0.0f);
+    auto* proc = MNN::CV::ImageProcess::create(config);
+    proc->setMatrix(transform);
+    proc->convert(rgba, width, height, width * 4,
+                  buffer.data(), kTargetSide, kTargetSide, 3 * sizeof(float), 0,
+                  halide_type_of<float>());
+    MNN::CV::ImageProcess::destroy(proc);
+
+    // 2) 构造 dst VARP (NCHW float32) 并 copyFromHostTensor
+    auto dst = MNN::Express::_Input(
+        {1, 3, kTargetSide, kTargetSide},
+        MNN::Express::NCHW,
+        halide_type_of<float>());
+    std::memcpy(dst->writeMap<float>(), buffer.data(), buffer.size() * sizeof(float));
+    return dst;
+}
+#endif
 
 void throwIllegalState(JNIEnv* env, const std::string& message) {
     logError(message);
@@ -487,6 +551,148 @@ Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_submitNative(
         return hashMap;
     } catch (...) {
         throwIllegalState(env, "MNN native generation failed with an unknown error.");
+        return hashMap;
+    }
+#endif
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_xiaoqi_companion_core_local_JniNativeMnnLlmApi_submitWithImageNative(
+        JNIEnv* env,
+        jobject /* thiz */,
+        jlong instanceId,
+        jstring systemPrompt,
+        jstring userMessage,
+        jbyteArray imageBytes,
+        jstring imageMediaType,
+        jobject listener) {
+    jobject hashMap = newHashMap(env);
+#ifndef AURA_MNN_LINKED
+    (void) systemPrompt;
+    (void) userMessage;
+    (void) imageBytes;
+    (void) imageMediaType;
+    throwIllegalState(env, "Aura MNN native stub is built, but MNN runtime is not linked yet.");
+    return hashMap;
+#else
+    auto* session = reinterpret_cast<AuraMnnSession*>(instanceId);
+    if (session == nullptr || !session->llm) {
+        throwIllegalState(env, "MNN native session is not loaded.");
+        return hashMap;
+    }
+
+    const jsize imageLen = env->GetArrayLength(imageBytes);
+    jbyte* imageRaw = env->GetByteArrayElements(imageBytes, nullptr);
+    if (imageRaw == nullptr || imageLen <= 0) {
+        if (imageRaw != nullptr) env->ReleaseByteArrayElements(imageBytes, imageRaw, JNI_ABORT);
+        throwIllegalState(env, "Image byte array is empty.");
+        return hashMap;
+    }
+    const uint8_t* imageData = reinterpret_cast<const uint8_t*>(imageRaw);
+    const std::string mime = toString(env, imageMediaType);
+
+    std::vector<uint8_t> rgba;
+    int width = 0;
+    int height = 0;
+    if (!decodeImageToRgba(imageData, static_cast<size_t>(imageLen), rgba, width, height)) {
+        env->ReleaseByteArrayElements(imageBytes, imageRaw, JNI_ABORT);
+        throwIllegalState(env, "Failed to decode image: " + mime);
+        return hashMap;
+    }
+    env->ReleaseByteArrayElements(imageBytes, imageRaw, JNI_ABORT);
+
+    try {
+        const std::string system = toString(env, systemPrompt);
+        const std::string user = toString(env, userMessage);
+        logInfo(
+                "mnn_submit_with_image_started systemPromptLength=" + std::to_string(system.size()) +
+                " userMessageLength=" + std::to_string(user.size()) +
+                " imageBytes=" + std::to_string(imageLen) +
+                " mime=" + mime +
+                " decoded=" + std::to_string(width) + "x" + std::to_string(height));
+
+        JniTokenCallback tokenCallback(env, listener);
+        AndroidSteppingState steppingState;
+        std::string responseText;
+        Utf8StreamProcessor utf8([&tokenCallback, &steppingState](const std::string& token) {
+            return steppingState.processToken(token, [&tokenCallback](const std::string& value) {
+                return tokenCallback.emit(value);
+            });
+        });
+        CallbackStreamBuffer streamBuffer([&utf8, &responseText](const char* s, size_t n) {
+            const std::string chunk(s, n);
+            responseText += chunk;
+            return utf8.process(s, n);
+        });
+        std::ostream outputStream(&streamBuffer);
+
+        MNN::Transformer::MultimodalPrompt multimodalInput;
+        // Qwen3.5-VL 的 chat template 用 <|vision_start|>...<|vision_end|> 包图占位
+        // 这里仅作示意模板;实际 prompt 由 ChatMessages 之外的 user 文本拼接
+        multimodalInput.prompt_template = "<|vision_start|><|image_pad|><|vision_end|>" + user;
+        MNN::Transformer::PromptImagePart imagePart;
+        imagePart.image_data = buildVisionVarp(rgba.data(), width, height);
+        imagePart.width = width;
+        imagePart.height = height;
+        multimodalInput.images["image"] = imagePart;
+
+        logInfo("mnn_multimodal_prefill_started maxNewTokens=" + std::to_string(session->maxNewTokens));
+        session->llm->response(multimodalInput, &outputStream, "<eop>", 0);
+        steppingState.resolve(session->llm.get(), 0, session->maxNewTokens);
+        const auto* prefillContext = session->llm->getContext();
+        if (prefillContext != nullptr) {
+            logInfo(
+                    "mnn_multimodal_prefill_completed promptTokens=" + std::to_string(prefillContext->prompt_len) +
+                    " prefillUs=" + std::to_string(prefillContext->prefill_us) +
+                    " visionUs=" + std::to_string(prefillContext->vision_us) +
+                    " status=" + statusName(prefillContext->status));
+        }
+
+        int generated = 0;
+        while (!steppingState.stopRequested &&
+               !steppingState.generateTextEnd &&
+               generated < session->maxNewTokens) {
+            session->llm->generate(1);
+            generated++;
+            steppingState.resolve(session->llm.get(), generated, session->maxNewTokens);
+            if (generated == 1 || generated % 16 == 0) {
+                const auto* progressContext = session->llm->getContext();
+                if (progressContext != nullptr) {
+                    logInfo(
+                            "mnn_multimodal_decode_progress generated=" + std::to_string(generated) +
+                            " contextGenSeqLen=" + std::to_string(progressContext->gen_seq_len) +
+                            " decodeUs=" + std::to_string(progressContext->decode_us) +
+                            " status=" + statusName(progressContext->status));
+                }
+            }
+        }
+        if (env->ExceptionCheck()) {
+            return hashMap;
+        }
+        while (true) {
+            const auto eopPos = responseText.find("<eop>");
+            if (eopPos == std::string::npos) {
+                break;
+            }
+            responseText.erase(eopPos, std::string("<eop>").size());
+        }
+
+        const auto* context = session->llm->getContext();
+        if (context != nullptr) {
+            putLong(env, hashMap, "prompt_tokens", context->prompt_len);
+            putLong(env, hashMap, "completion_tokens", context->gen_seq_len);
+            putLong(env, hashMap, "prefill_us", context->prefill_us);
+            putLong(env, hashMap, "decode_us", context->decode_us);
+            putLong(env, hashMap, "vision_us", context->vision_us);
+            putLong(env, hashMap, "load_us", context->load_us);
+        }
+        logInfo("mnn_submit_with_image_completed");
+        return hashMap;
+    } catch (const std::exception& ex) {
+        throwIllegalState(env, std::string("MNN native multimodal generation failed: ") + ex.what());
+        return hashMap;
+    } catch (...) {
+        throwIllegalState(env, "MNN native multimodal generation failed with an unknown error.");
         return hashMap;
     }
 #endif

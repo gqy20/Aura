@@ -278,7 +278,7 @@ edge(nodeFinalReply forwardTo nodeFinish onAssistantMessage { true })
 
 设计约束：
 
-- **base64 永远不进 DreamPrompt**（本地 Qwen 纯文本路径，模型看不到图），仅 metadata 进 prompt 让 LLM 推测用户视觉节奏。
+- **base64 永远不进 DreamPrompt**（设计选择：Dream Loop 是 L2 闲时整合，不重新触发 vision 推理；本地 Qwen 2026-06-17 PR B 后已支持 vision，但 DreamPrompt 走 metadata-only 让模型推断用户视觉节奏），仅 metadata 进 prompt 让 LLM 推测用户视觉节奏。
 - **`render_doesNotLeakBase64` 测试作为安全护栏**，防止后续维护者误把 `imageBase64` 加进 `ImageMemorySummary`。
 
 ### P2：只读记忆注入

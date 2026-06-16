@@ -1,6 +1,6 @@
 # Aura Roadmap
 
-> 最后核对：2026-06-16
+> 最后核对：2026-06-17
 >
 > 本文档用于跟踪当前实现进度，并把 `README.md` / `docs/architecture.md` 中的产品愿景拆成可执行里程碑。
 
@@ -21,7 +21,7 @@
 ./gradlew.bat assembleDebug
 ```
 
-以上命令均已在 2026-06-15 验证通过（`testDebugUnitTest` **372 个测试全绿**；commit `1b826d1`）。
+以上命令均已在 2026-06-17 验证通过（`testDebugUnitTest` **483 个测试全绿**；PR A + PR B 之后）。
 
 ## 已实现
 
@@ -31,7 +31,7 @@
 - Koog `AIAgent` 真实集成，支持流式文本事件。
 - Anthropic Messages 兼容 LLM client，支持 SSE streaming、tool schema 序列化、底层图片 content 组装。
 - 本地 Qwen / MNN 链路：`core/local/*`（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader` / `LocalQwenModelCatalog` / `LocalQwenModelLocator`），含 ModelScope 下载与 MNN 推理桥。
-- **`ReactiveCompanion`（dual-mind Phase 0 命名清理）**：原 `LocalQwenAgentWrapper` 重命名，体现"对用户消息的本地觉察响应"语义；Phase 1 拆云端对话体/本地觉察面后此实现将替换为独立接口。
+- **`ReactiveCompanion`（dual-mind Phase 0 命名清理 + PR A 对齐）**：原 `LocalQwenAgentWrapper` 重命名；2026-06-17 PR A 后 `runStreaming`/`runEvents`/`runStructured`/`allowTools` 行为契约与云端 `KoogPromptExecutorWrapper` 对齐（不再硬抛 `UnsupportedOperationException`，`runStructured` 走 `Json.decodeFromString` 兜底 `examples[0]`）。
 - **`core/presence/runtime/` 目录（dual-mind 觉察面前驱）**：
   - `LocalQwenExecutor`（包装 MNN 引擎 + Request(maxTokens/temperature) + parsePatternDetectOutput）
   - `DreamDataCollector`（7 天 mood/message/memory 聚合 + 简易词频 top 10 + **跨模态 evidence**：`Snapshot.imageMemories` 取最近 5 张图 metadata，render 输出 `## 视觉证据` section；**base64 不进 prompt**）
@@ -62,13 +62,13 @@
 - **Onboarding 5 问（M2 收尾）**：plan §5.2 种子期问题（挂心事/重要日期/称呼/关系人/作息）— 全部可选可跳过，模板表单不入 LLM。
 - **隐私"看见感"面板（M2 收尾）**：`DataTransparencySection`（设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + Bipass 二次确认）。
 - **Health 多源链雏形**：`HealthSnapshotEntity` + `HealthSnapshotDao` + `HealthConnectDataSource` + `SensorManagerHealthSource` + `HealthSyncManager` + `HealthDataSection` + `QueryHealthDataTool`，支持健康数据同步、展示与工具查询。
-- 单元测试覆盖：372 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、ReactiveCompanion 4、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）**、**DreamLoopIntervalTest 6 + DreamLoopSchedulerTest 9** 等）。
+- 单元测试覆盖：483 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、**ReactiveCompanion 8（PR A 后从 4 → 8，新增 `runStreaming` 路径 / Json 结构化解析 / image 透传用例）**、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）**、**DreamLoopIntervalTest 6 + DreamLoopSchedulerTest 9** 等）。
 - Debug APK 构建链路。
 - `docs/plan` 当前保留端云智能体能力整体方案、Vision/tools 协同计划、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）；已完成/阶段性过期方案归档到 `docs/archive/plan`。
 
-### 近期打磨（2026-06-15 → 06-16，commit `1b826d1` 之后）
+### 近期打磨（2026-06-15 → 06-17，commit `1b826d1` 之后）
 
-无新功能模块上线，全部为**重构 / 优化 / 文档**类工作：
+无新功能模块上线（PR A + PR B 是对既有 2-way 分支的契约对齐 + vision 路径补齐，非产品功能新增）：
 
 - **注释规范文档化**（`4bc1f4b`）：AGENTS.md / CLAUDE.md 新增"注释规范"章节（不写什么 / 压到什么 / 保留什么）
 - **注释清理**（`5d1920b` 等）：A 类删 19 处（步骤编号、字面复述、考古注释、防御性解释），B 类合并（章节标题砍半、`when` 分支标签精简）
@@ -78,8 +78,10 @@
 - **中文 i18n**（`fe7b1df`）：settings + chat UI 文案本地化
 - **UI 打磨**（`68986c9` / `5f74e18` / `7bca3cf` / `2b6b458` / `0708baa`）：对齐优化 / 文案统一 / tool chip 动态文案 / 主页 Insight 短按弹层 / 颜色编码主信号
 - **DB 优化**（`1c639f0`）：拆 `MessageDao` → `MessageSearchDao`，删 LIKE fallback，加 androidTest 真 FTS5 验证
+- **PR A：2-way 分支契约对齐**（2026-06-17）：`ReactiveCompanion` 与 `KoogPromptExecutorWrapper` 接口 4 方法契约对齐 — `runStreaming` 走 `runEvents` 单一入口；`runStructured` 改 `Json.decodeFromString` 解析（不再硬抛）；`toLocalRequest` 读 `BuiltPrompt.allowTools` 并打 warn 日志；新增 `StructuredLocalParser` 做 JSON block 提取 + 围栏剥离 + 兜底示例。`ReactiveCompanionTest` 4 → 8 用例。
+- **PR B：本地 vision 支持**（2026-06-17）：`LocalQwenRequest` 加 `imageBase64/imageMediaType` 字段；`MnnLlmBridge` 加 `generateWithImage(imageBytes, mediaType)`；`NativeMnnLlmBridge` + JNI 加 `submitWithImageNative`；`aura_mnn_llm_jni.cpp` 用 stb_image 解码 JPEG/PNG → MNN `ImageProcess` 转 448x448 float tensor → 构造 `PromptImagePart` + `MultimodalPrompt` → 调 `llm->response(multimodal_prompt, ...)`。`CMakeLists.txt` 加 stb_image include 路径。ReactiveCompanionTest 新增 image 透传用例，FakeBridge/RecordingNativeApi 同步补 method。
 
-> 备注：上述 12 个 commit 期间未新增单元测试用例（仍为 372 全绿，commit `1b826d1` 时基线）；打磨以 UI/重构/文档为主，不影响测试覆盖范围。
+> 备注：上述打磨期间测试用例从 372 → 483（PR A +8、PR B 测试覆盖增加）；Kotlin 编译通过，native 端需真机 NDK 编译验证（CMake 路径与 MNN_HOME 假设 `../mnn/3rd_party/imageHelper` + MNN `libMNN.so` 链接）。
 
 ## 部分实现
 
@@ -173,7 +175,7 @@
 
 > 调整说明（2026-06-15）：Vision 在新叙事下不是孤立能力，而是"Aura 记得你看见了什么"——图片作为 evidence 进入 memory，进而可被 Pattern 跨模态引用。
 > 详见 [`plan/insight-driven-product.md`](./plan/insight-driven-product.md) §9。
-> **M4 部分落地**（commit `1b826d1`）：vision→memory→dream 闭环已通。CameraX UI、Connection insight 端到端、Pattern 跨 mood+memory+图片三种数据源生成仍未做。
+> **M4 部分落地**（commit `1b826d1` + 2026-06-17 PR B）：vision→memory→dream 闭环 + 本地 vision 路径已通。CameraX UI、Connection insight 端到端、Pattern 跨 mood+memory+图片三种数据源生成仍未做。
 
 目标：让 Aura 看见的不只是文字，还有你看见的世界。
 
@@ -185,6 +187,7 @@
 - 补充图片大小限制与 prompt 构建测试。✅（SendMessageUseCaseTest 含 vision input 用例）
 - **【新增，叙事主轴】** ✅ 视觉内容进入 memory 表（"你在 2026-06-15 拍了张夕阳"）。`MemoryEntity.imageBase64/imageMediaType` + `MIGRATION_7_8` + `MemoryRepository.saveVisionMemory` + `SendMessageUseCase` 自动落库，全链路 11 个测试覆盖。
 - **【新增，叙事主轴】** ✅ DreamDataCollector 把 image memory metadata（**不含 base64**）注入 `## 视觉证据` section，作为 Pattern insight 的跨模态 evidence。
+- **【新增，叙事主轴】** ✅ 本地 provider（`LlmProvider.LOCAL_QWEN`）也支持 vision（2026-06-17 PR B）。`LocalQwenRequest.imageBase64/imageMediaType` → `MnnLlmBridge.generateWithImage(imageBytes, mediaType)` → JNI `submitWithImageNative` → stb_image 解码 → MNN `ImageProcess` 448x448 float tensor → `MultimodalPrompt.images["image"]` → `llm->response(multimodal_prompt, ...)`。**真机 NDK 验证待补**（CMake 路径假设 `../mnn/3rd_party/imageHelper`）。
 - **【新增，叙事主轴】** Pattern insight 可跨 mood + memory + 图片三种数据源生成。（Dream Prompt section 结构已就绪，待 `patternDetect` 跑通后真机验证）
 - **【新增，叙事主轴】** Connection 类 insight 第一版可触发（找到 2 条不相关数据的潜在联系，confidence 必须 < 0.5，宁缺毋滥）。`core/insight/InsightPrompts.connectionDetect` 字面量已定义，M4 复用 `LocalQwenExecutor.execute()` 即可落地。（待 PoC Qwen 模型下载后端到端跑通）
 - **MCP Gateway 准备**（plan §8 收窄到"信息回写"主轴）：`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 两个 Key + Flow + setter，M4 起可直接对接。
@@ -242,9 +245,9 @@
 3. ~~M2 记忆 + Insight 框架 MVP。~~（已完成，`insights` 表 + Validator + Onboarding 5 问 + 主页 Insight 卡片 + 数据透明面板全落）
 4. ~~M3 情绪 + Insight Pattern MVP。~~（已完成，DreamLoop pipeline + Mood Trend Chart + Prefill 路由打通；PoC 阶段待 Qwen 模型下载后端到端可跑通）
 5. **M3 PoC 完善：用户在真机触发 Qwen 模型下载 → DreamLoop 跑出第一条 LLM 真实生成的 insight**（已写好 `LocalQwenModelDownloader` UI 入口，仅需用户操作 + 等待下载完成）。
-6. **M4 Vision + Insight 增强**：**vision→memory→dream 闭环已落（commit `1b826d1`）**；余下 CameraX UI、Connection insight 端到端、Pattern 跨 mood+memory+图片三种数据源生成验证。
-7. **M5 Pulse + Weekly Insight**：离线衰减 / 回归反应 Worker、AnniversaryScanner 周期任务、Weekly Insight 自动汇总 + 通知、InsightLog 用户反馈回路（👍/👎/文字 → 训练样本）。
-8. **dual-mind Phase 1**：拆云端对话体 / 本地觉察面。`ReactiveCompanion` 替换为独立接口（不再 `KoogAgentWrapper`），`KoogAgentFactory` 删二选一分支；新建 `AuraMemoryStore` 文件系统实现（`user_patterns.md` / `recurring_topics.md`）。
-9. **抽象 `AgentRuntime`**：为本地 `CompanionRuntime` 和远程 `RemoteAgentRuntime` 留出切换入口；`@Inject` ChatViewModel 改用接口，便于真机 / 远端双模调试。
+6. **M4 Vision + Insight 增强**：**vision→memory→dream 闭环已落（commit `1b826d1`）+ 本地 vision 路径已落（PR B）**；余下 CameraX UI、Connection insight 端到端、Pattern 跨 mood+memory+图片三种数据源生成验证。
+7. **M5 Pulse + Weekly Insight**：离线衰减 / 回归反应 Worker、AnniversaryScanner 周期任务、Weekly Insight 自动汇总 + 通知、InsightLog 用户反馈回路（👍/👎/文字 → 训练样本）。本地 vision 已就绪后 Pulse Worker 可复用 vision 元数据驱动"记得你拍过的照片"型通知。
+8. ~~**dual-mind Phase 1**：拆云端对话体 / 本地觉察面。~~ **已重新评估（2026-06-17）**：经核实，`KoogAgentFactoryImpl` 的 2-way 分支（云端 / 本地）已是合理的 Provider 切换形态；本地的"觉察面"职责由 `core/presence/runtime/` 下的 `DreamLoopWorker` / `LocalQwenExecutor` 等独立组件承担，不在 `KoogAgentWrapper` 主路径里。**不再需要拆 dual-mind Phase 1**，专注把 Pulse Worker（M5）和本地 vision 路径走通即可。AuraMemoryStore 文件系统层属于 M5+ 配套（auto memory PoC 验证后启动）。
+9. ~~**抽象 `AgentRuntime`**：~~ **已重新评估（2026-06-17）**：经讨论，`KoogAgentWrapper` 4 方法契约已能覆盖云端 / 本地两端（PR A 对齐后行为契约一致）。**不引入新接口层**；M7 远端 Agent Server 落地时如需切换入口，可在 `CompanionRuntime` 上做小范围重构，不应预先抽 `AgentRuntime` 接口。
 10. **M6 产品化加固**：扩展 instrumented tests（CameraX / WorkManager 真实场景）+ CI 工作流（GitHub Actions）+ release signing 验证。
 11. **M7 远端 Agent Server**（plan §8 收窄到"信息回写"主轴）：最小 Aura Agent Server 先支持文本输入 / 流式输出 / 只读远程工具；`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 字段，M4 起可对接。

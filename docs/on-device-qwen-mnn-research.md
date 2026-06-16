@@ -6,20 +6,17 @@
 
 ## 1. 结论摘要
 
-可以实现，但不建议把端侧 Qwen 直接替代现有 GLM/Kimi 云端模型。更稳妥的产品和工程路线是：
+可以实现。`KoogAgentFactoryImpl` 走 Provider 切换，云端 / 本地都是 `KoogAgentWrapper` 的同一份契约实现。两条路线的当前定位：
 
-- 云端 GLM/Kimi：继续作为高质量主模型，负责复杂推理、长上下文、Vision、工具调用和高稳定性回复。
-- 本地 Qwen 小模型：作为离线模式、隐私模式、低延迟短聊、后台轻任务的小模型后端。
-- 架构上采用“端云协同”，而不是二选一。
+- **云端 GLM / Kimi**：高质量主模型，负责复杂推理、长上下文、Vision（GLM-5v-turbo）、工具调用和高稳定性回复。
+- **本地 Qwen (MNN)**：可选 Provider，承担离线 / 低延迟 / 无 token 成本场景（短聊、后台 dream loop、insight 提取）。2026-06-17 PR B 后已支持 vision 多模态。
+- 架构上采用”Provider 切换”，云端 / 本地是同一个 `KoogAgentFactory.create()` 入口的两种实现，不是两个独立子系统。
 
-推荐第一阶段只做“本地文本聊天 MVP”：
+推荐阶段 1 范围（已落地）：
 
-- 支持文本输入。
-- 支持流式 token 输出。
-- 使用简化 prompt。
-- 暂不启用 tools。
-- 暂不启用 Vision。
-- 支持失败时 fallback 到云端模型。
+- 支持文本输入 + 流式 token 输出 + 简化 prompt。
+- 暂不挂 Koog tools（PR A 加 warn 日志）。
+- 失败 fallback 走 Provider 切换（用户主动）。
 
 ## 2. 当前项目适配性
 
@@ -243,19 +240,18 @@ PocketPal 路线与 MNN 路线对比：
 本地 Qwen 小模型最适合在 Aura 中承担这些角色：
 
 - 离线陪伴短聊。
-- 隐私模式。
-- 低成本后台反思或摘要。
+- 低成本后台反思或摘要（Dream Loop / Insight 提取）。
 - 记忆候选提取。
 - 情绪/主题分类。
 - 云端请求失败时的降级回复。
+- Vision 多模态本地走通后（2026-06-17 PR B）也可承接简单图片理解。
 
-不建议第一版承担：
+不建议本地承担（云端更适合）：
 
-- 完整 Koog tools agent。
+- 完整 Koog tools agent（tool loop 仍走云端）。
 - 长上下文多轮规划。
-- 高稳定 JSON function calling。
-- Vision 主链路。
-- 完整替代 GLM/Kimi。
+- 高稳定 JSON function calling（本地结构化用 `StructuredLocalParser` 兜底，复杂 schema 仍上云）。
+- 完整替代 GLM / Kimi。
 
 最终推荐架构：
 
@@ -264,15 +260,17 @@ PocketPal 路线与 MNN 路线对比：
 User / Chat UI -> CompanionRuntime      |
                 +----------+-----------+
                            |
-               +-----------+------------+
-               |                        |
-       RemoteKoogRuntime          LocalModelRuntime
-       GLM / Kimi API             Qwen on device
-       Koog tools                 MNN or llama.cpp
-       Vision / complex tasks     offline / privacy / short chat
+                +----------+----------+
+                |                     |
+        KoogAgentFactoryImpl  (Provider 切换)
+                |                     |
+       KoogPromptExecutorWrapper    ReactiveCompanion
+       GLM / Kimi API              MNN + Qwen
+       Koog tools                  离线 / 低延迟 / 无 token 成本
+       Vision / complex tasks      短聊 / Dream Loop / Insight 提取
 ```
 
-这条路线既保留现有云端 agent 能力，也为 Aura 增加真正的端侧生命感和隐私能力。
+`KoogAgentFactoryImpl.create()` 是单一入口，按 `LlmConfig.provider` 路由到云端或本地。两条路径接口契约一致（PR A 对齐），本地不复制云端的所有能力，只在"离线 / 低成本 / 多模态本地兜底"几个场景下提供选项。
 
 ---
 
@@ -309,21 +307,21 @@ User / Chat UI -> CompanionRuntime      |
 | 调研建议 | 实际落地 | 引用 |
 |---------|---------|------|
 | 本地摘要 / 分类 / 记忆候选提取 | ✅ `parsePatternDetectOutput` 走 `LocalQwenExecutor` | `core/presence/runtime/LocalQwenExecutor.kt` |
-| 少量只读工具调用 | ⏳ 未做（依赖 P2 tool decision 抽象） | — |
-| 更严格结构化输出 parser | ✅ `parsePatternDetectOutput` + `InsightValidator` 8 边界 | commit `5b77241` |
-| Vision 输入实验 | ❌ 未做（调研建议"放到文本 MVP 之后"，M4 已走云端 GLM Vision） | — |
+| 少量只读工具调用 | ⏳ 未做（依赖 vision-tools-plan P2 tool decision 抽象） | — |
+| 更严格结构化输出 parser | ✅ `StructuredLocalParser`（PR A）+ `InsightValidator` 8 边界 | commit `5b77241` |
+| Vision 输入实验 | ✅ 2026-06-17 PR B 落地：`submitWithImageNative` + MNN `MultimodalPrompt` | `core/local/NativeMnnLlmBridge.kt` + `aura_mnn_llm_jni.cpp` |
 
 ### 调研结论的验证
 
-- ✅ **"端云协同，而非二选一"**：Aura 实际采用 Provider 切换模型，云端 GLM/Kimi + 本地 Qwen 0.8B 并存。
-- ✅ **"MNN 是可行路线"**：`MnnLocalQwenEngine` + `NativeMnnLlmBridge` 跑通，本地文本生成可用。
-- ✅ **"Q4/Q5 量化后 GB 级"**：当前 Qwen 0.8B MNN 模型约 1GB，与调研判断一致。
+- ✅ **"Provider 切换，云端 / 本地并存"**：Aura `KoogAgentFactoryImpl` 按 `LlmConfig.provider` 路由，云端 GLM/Kimi + 本地 Qwen 0.8B/2B/4B 共享 `KoogAgentWrapper` 4 方法契约（PR A 对齐）。
+- ✅ **"MNN 是可行路线"**：`MnnLocalQwenEngine` + `NativeMnnLlmBridge` + `submitWithImageNative` 跑通，本地文本 + Vision 可用。
+- ✅ **"Q4/Q5 量化后 GB 级"**：0.8B 约 1GB / 2B 约 1.6GB / 4B 约 3.2GB（`LocalQwenCatalogSizes.estimatedTotalBytes`），与调研判断一致。
 - ✅ **"SME2 不是必要条件"**：当前未做 SME2 优化，普通 ARM CPU 跑通。
 
 ### 当前未做的项
 
 1. **SME2 / KleidiAI 优化路径**：调研时标注"2026 年新设备开始关注"，当前真机是 realme RMX3888 (ARMv8.2)，MNN 走普通 CPU 路径够用。
-2. **本地 LLM 替代 GLM Vision**：调研时标注"放到文本 MVP 之后"，目前 Vision 仍走云端 GLM-5v-turbo，本地仅服务 DreamLoop 文本分析。
+2. **本地 LLM 走完整 tool loop**：`allowTools` 仍走 `false`（PR A 加 warn 日志），需要等 vision-tools-plan P2 的 tool decision 抽象才能让本地参与 tool 循环。
 3. **PocketPal 风格的 llama.cpp/GGUF 路线**：选择 MNN 路线后未实施，作为未来备选。
 
 ### 后续建议
