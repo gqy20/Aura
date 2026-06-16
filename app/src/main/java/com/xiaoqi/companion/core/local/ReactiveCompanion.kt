@@ -5,6 +5,7 @@ import com.xiaoqi.companion.core.companion.KoogAgentWrapper
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
+import com.xiaoqi.companion.core.tools.LocalToolPromptResult
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
 import ai.koog.agents.core.tools.ToolRegistry
 import kotlinx.coroutines.flow.Flow
@@ -57,39 +58,51 @@ class ReactiveCompanion(
             return@flow
         }
 
-        val firstPassPrompt = prompt.copy(
+        val toolEnabledPrompt = prompt.copy(
             systemPrompt = buildString {
                 append(prompt.systemPrompt)
                 append("\n\n")
                 append(LocalToolProtocol.buildToolInstructionBlock(toolRegistry))
             }
         )
-        val firstPassText = engine.stream(firstPassPrompt.toLocalRequest())
-            .toList()
-            .joinToString("")
-        val toolCalls = LocalToolProtocol.parseToolCalls(firstPassText)
-        if (toolCalls.isEmpty()) {
-            emit(KoogAgentEvent.TextDelta(firstPassText))
-            return@flow
-        }
 
-        val execution = LocalToolExecutor(
-            registry = toolRegistry,
-            recorder = toolCallRecorder,
-            sessionId = DEFAULT_SESSION_ID,
-        ).execute(toolCalls)
-        execution.events.forEach { emit(it) }
-
-        val secondPassPrompt = prompt.copy(
-            userMessage = buildString {
-                append(prompt.userMessage)
-                append("\n\n")
-                append(execution.transcript)
+        var currentPrompt = toolEnabledPrompt
+        var round = 0
+        val allToolResults = mutableListOf<LocalToolPromptResult>()
+        while (round < MAX_TOOL_ROUNDS) {
+            round++
+            val responseText = engine.stream(currentPrompt.toLocalRequest())
+                .toList()
+                .joinToString("")
+            val toolCalls = LocalToolProtocol.parseToolCalls(responseText)
+            if (toolCalls.isEmpty()) {
+                emit(KoogAgentEvent.TextDelta(responseText))
+                return@flow
             }
-        )
-        engine.stream(secondPassPrompt.toLocalRequest()).collect {
-            emit(KoogAgentEvent.TextDelta(it))
+
+            val execution = LocalToolExecutor(
+                registry = toolRegistry,
+                recorder = toolCallRecorder,
+                sessionId = DEFAULT_SESSION_ID,
+            ).execute(toolCalls)
+            execution.events.forEach { emit(it) }
+            allToolResults += execution.transcripts
+
+            currentPrompt = toolEnabledPrompt.copy(
+                userMessage = buildString {
+                    append(prompt.userMessage)
+                    append("\n\n")
+                    append(LocalToolProtocol.buildToolContextBlock(allToolResults))
+                }
+            )
         }
+
+        AppLogger.warn(
+            LogTags.LocalModel,
+            "local_tool_round_limit_reached",
+            "maxRounds" to MAX_TOOL_ROUNDS,
+        )
+        emit(KoogAgentEvent.TextDelta(LocalToolProtocol.roundLimitFallbackMessage()))
     }
 
     private fun BuiltPrompt.toLocalRequest(): LocalQwenRequest {
@@ -112,6 +125,7 @@ class ReactiveCompanion(
 
     private companion object {
         const val DEFAULT_SESSION_ID = "default"
+        const val MAX_TOOL_ROUNDS = 4
     }
 }
 

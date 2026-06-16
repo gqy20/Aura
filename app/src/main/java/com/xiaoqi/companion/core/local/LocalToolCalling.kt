@@ -1,6 +1,5 @@
 package com.xiaoqi.companion.core.local
 
-import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.tools.annotations.InternalAgentToolsApi
 import ai.koog.serialization.JSONSerializer
@@ -11,7 +10,11 @@ import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.core.tools.LocalToolPromptResult
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
+import com.xiaoqi.companion.core.tools.ToolEnvelopeFactory
+import com.xiaoqi.companion.core.tools.ToolResultPromptComposer
+import com.xiaoqi.companion.core.tools.encode
 import java.util.UUID
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -19,9 +22,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 @Serializable
@@ -39,7 +39,7 @@ internal data class LocalToolCallBatch(
 
 internal data class LocalToolExecutionResult(
     val events: List<KoogAgentEvent>,
-    val transcript: String,
+    val transcripts: List<LocalToolPromptResult>,
 )
 
 internal object LocalToolProtocol {
@@ -91,24 +91,11 @@ internal object LocalToolProtocol {
         """.trimIndent()
     }
 
-    fun buildToolResultPrompt(results: List<LocalToolResultMessage>): String =
-        buildJsonObject {
-            put(
-                "tool_results",
-                buildJsonArray {
-                    results.forEach { result ->
-                        add(
-                            buildJsonObject {
-                                put("id", result.id)
-                                put("name", result.name)
-                                put("result", result.result)
-                            }
-                        )
-                    }
-                }
-            )
-            put("instruction", "Use the tool results above to answer the user naturally.")
-        }.toString()
+    fun buildToolContextBlock(results: List<LocalToolPromptResult>): String =
+        ToolResultPromptComposer.localToolContextBlock(results)
+
+    fun roundLimitFallbackMessage(): String =
+        "我已经拿到部分工具结果，但本地工具调用轮次已到上限。你可以换个问法，或减少一次请求里的任务数。"
 
     private fun extractJsonBlock(text: String): String? {
         val start = text.indexOfFirst { it == '{' }
@@ -143,12 +130,6 @@ internal object LocalToolProtocol {
     }
 }
 
-internal data class LocalToolResultMessage(
-    val id: String,
-    val name: String,
-    val result: String,
-)
-
 internal class LocalToolExecutor(
     private val registry: ToolRegistry,
     private val recorder: ToolCallRecorder?,
@@ -158,7 +139,7 @@ internal class LocalToolExecutor(
 
     suspend fun execute(toolCalls: List<LocalToolCall>): LocalToolExecutionResult {
         val events = mutableListOf<KoogAgentEvent>()
-        val transcripts = mutableListOf<LocalToolResultMessage>()
+        val transcripts = mutableListOf<LocalToolPromptResult>()
         toolCalls.forEach { call ->
             val callId = call.id?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
             val tool = registry.getToolOrNull(call.name)
@@ -172,10 +153,16 @@ internal class LocalToolExecutor(
                         errorMessage = "Tool not found",
                     )
                 )
-                transcripts += LocalToolResultMessage(
+                transcripts += LocalToolPromptResult(
                     id = callId,
                     name = call.name,
-                    result = """{"status":"error","reason":"tool_not_found"}""",
+                    result = encode(
+                        ToolEnvelopeFactory.err(
+                            reason = "tool_not_found",
+                            hint = "这个工具当前不可用，请换一种问法，或者稍后再试。",
+                        )
+                    ),
+                    isError = true,
                 )
                 return@forEach
             }
@@ -213,7 +200,7 @@ internal class LocalToolExecutor(
                         resultJson = result,
                     )
                 )
-                transcripts += LocalToolResultMessage(
+                transcripts += LocalToolPromptResult(
                     id = callId,
                     name = call.name,
                     result = result,
@@ -237,16 +224,23 @@ internal class LocalToolExecutor(
                         errorMessage = message,
                     )
                 )
-                transcripts += LocalToolResultMessage(
+                transcripts += LocalToolPromptResult(
                     id = callId,
                     name = call.name,
-                    result = """{"status":"error","reason":"$message"}""",
+                    result = encode(
+                        ToolEnvelopeFactory.err(
+                            reason = "tool_execution_failed",
+                            hint = "这个工具刚才执行失败了。请先基于已有信息回答，必要时提示用户稍后重试。",
+                            details = mapOf("message" to message),
+                        )
+                    ),
+                    isError = true,
                 )
             }
         }
         return LocalToolExecutionResult(
             events = events,
-            transcript = LocalToolProtocol.buildToolResultPrompt(transcripts),
+            transcripts = transcripts,
         )
     }
 

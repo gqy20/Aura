@@ -6,12 +6,17 @@ import ai.koog.serialization.typeToken
 import app.cash.turbine.test
 import com.xiaoqi.companion.core.companion.KoogAgentEvent
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
+import com.xiaoqi.companion.core.mcp.McpRemoteTool
+import com.xiaoqi.companion.core.mcp.McpToolSpec
+import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -187,6 +192,151 @@ class ReactiveCompanionTest {
         assertEquals(2, engine.requests.size)
         assertTrue(engine.requests.first().systemPrompt.contains("You may call tools"))
         assertTrue(engine.requests.last().userMessage.contains("tool_results"))
+    }
+
+    @Test
+    fun runEvents_whenSecondRoundStillNeedsTool_continuesUntilNaturalAnswer() = runTest {
+        val engine = SequencedLocalQwenEngine(
+            responses = listOf(
+                listOf("""{"tool_calls":[{"name":"test_note","arguments":{"content":"first"}}]}"""),
+                listOf("""{"tool_calls":[{"name":"test_note","arguments":{"content":"second"}}]}"""),
+                listOf("done after two tools"),
+            )
+        )
+        val wrapper = ReactiveCompanion(
+            engine = engine,
+            toolRegistry = ToolRegistry.builder().tool(TestNoteTool()).build(),
+        )
+
+        val events = mutableListOf<KoogAgentEvent>()
+        wrapper.runEvents(
+            BuiltPrompt(
+                systemPrompt = "system",
+                userMessage = "remember more",
+                allowTools = true,
+            )
+        ).collect { events += it }
+
+        val started = events.mapNotNull { (it as? KoogAgentEvent.ToolCallUpdated)?.call }
+            .count { it.status == ToolCallStatus.STARTED && it.name == "test_note" }
+        val succeeded = events.mapNotNull { (it as? KoogAgentEvent.ToolCallUpdated)?.call }
+            .count { it.status == ToolCallStatus.SUCCEEDED && it.name == "test_note" }
+        assertEquals(2, started)
+        assertEquals(2, succeeded)
+        assertTrue(events.contains(KoogAgentEvent.TextDelta("done after two tools")))
+        assertEquals(3, engine.requests.size)
+        assertTrue(engine.requests[1].userMessage.contains("tool_results"))
+    }
+
+    @Test
+    fun runEvents_whenToolRoundsReachLimit_emitsFallbackText() = runTest {
+        val engine = SequencedLocalQwenEngine(
+            responses = List(4) {
+                listOf("""{"tool_calls":[{"name":"test_note","arguments":{"content":"loop-$it"}}]}""")
+            }
+        )
+        val wrapper = ReactiveCompanion(
+            engine = engine,
+            toolRegistry = ToolRegistry.builder().tool(TestNoteTool()).build(),
+        )
+
+        val events = mutableListOf<KoogAgentEvent>()
+        wrapper.runEvents(
+            BuiltPrompt(
+                systemPrompt = "system",
+                userMessage = "loop forever",
+                allowTools = true,
+            )
+        ).collect { events += it }
+
+        assertTrue(
+            events.last() == KoogAgentEvent.TextDelta(
+                "我已经拿到部分工具结果，但本地工具调用轮次已到上限。你可以换个问法，或减少一次请求里的任务数。"
+            )
+        )
+        assertEquals(4, engine.requests.size)
+    }
+
+    @Test
+    fun localToolExecutor_executesRemoteMcpToolThroughAdapter() = runTest {
+        val client = RecordingMcpClient()
+        val tool = McpRemoteTool(
+            serverUrl = "https://mcp.example.com/mcp",
+            serverName = "example",
+            spec = McpToolSpec(
+                name = "search",
+                description = "Search docs",
+                inputSchema = buildJsonObject {
+                    put("type", "object")
+                    put(
+                        "properties",
+                        buildJsonObject {
+                            put(
+                                "query",
+                                buildJsonObject {
+                                    put("type", "string")
+                                },
+                            )
+                        },
+                    )
+                    put("required", kotlinx.serialization.json.buildJsonArray {
+                        add(kotlinx.serialization.json.JsonPrimitive("query"))
+                    })
+                },
+            ),
+            client = client,
+        )
+        val registry = ToolRegistry.builder().tool(tool).build()
+        val executor = LocalToolExecutor(registry, recorder = null, sessionId = "default")
+
+        val result = executor.execute(
+            listOf(
+                LocalToolCall(
+                    name = tool.descriptor.name,
+                    arguments = buildJsonObject { put("query", "android") },
+                )
+            )
+        )
+
+        assertEquals("search", client.calledToolName)
+        assertEquals("android", client.arguments?.get("query")?.toString()?.trim('"'))
+        assertTrue(result.events.any { (it as? KoogAgentEvent.ToolCallUpdated)?.call?.status == ToolCallStatus.SUCCEEDED })
+        assertTrue(result.transcripts.first().result.contains("mcp-result"))
+    }
+
+    @Test
+    fun localToolExecutor_marksMissingToolAsFailedTranscript() = runTest {
+        val executor = LocalToolExecutor(ToolRegistry.EMPTY, recorder = null, sessionId = "default")
+
+        val result = executor.execute(
+            listOf(
+                LocalToolCall(
+                    name = "missing_tool",
+                    arguments = buildJsonObject { put("value", "x") },
+                )
+            )
+        )
+
+        assertTrue(result.events.any {
+            val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
+            call?.name == "missing_tool" && call.status == ToolCallStatus.FAILED
+        })
+        assertTrue(result.transcripts.first().isError)
+    }
+
+    private class RecordingMcpClient : RemoteMcpClient {
+        var calledToolName: String? = null
+        var arguments: kotlinx.serialization.json.JsonObject? = null
+
+        override suspend fun listTools(serverUrl: String): List<McpToolSpec> = emptyList()
+
+        override suspend fun callTool(serverUrl: String, toolName: String, arguments: kotlinx.serialization.json.JsonObject): String {
+            calledToolName = toolName
+            this.arguments = arguments
+            return """{"content":[{"type":"text","text":"mcp-result"}]}"""
+        }
+
+        override suspend fun probe(serverUrl: String): List<McpToolSpec> = emptyList()
     }
 
     @Serializable

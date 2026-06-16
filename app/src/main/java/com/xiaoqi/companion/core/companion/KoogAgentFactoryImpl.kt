@@ -33,6 +33,8 @@ import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
+import com.xiaoqi.companion.core.tools.ToolResultPromptComposer
+import com.xiaoqi.companion.core.tools.isError
 import com.xiaoqi.companion.core.tools.withErrorResultKind
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.LlmConfig
@@ -261,6 +263,7 @@ private class KoogPromptExecutorWrapper(
         val nodeSendToolResult by node<List<ReceivedToolResult>, List<Message.Response>> { results ->
             // 翻 envelope 失败的 resultKind,让 Koog 标准的 Message.Tool.Result.isError 也被点亮
             val patchedResults = results.withErrorResultKind()
+            val hasErrors = results.any { isError(it.content) }
             llm.writeSession {
                 appendPrompt {
                     tool {
@@ -271,6 +274,9 @@ private class KoogPromptExecutorWrapper(
                     tool {
                         results.forEach { result(it) }
                     }
+                }
+                appendPrompt {
+                    user(ToolResultPromptComposer.followupInstruction(hasErrors))
                 }
 
                 AppLogger.info(

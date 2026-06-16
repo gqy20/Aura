@@ -73,16 +73,32 @@ private fun JsonObject.toParameterType(): ToolParameterType {
         "number" -> ToolParameterType.Float
         "boolean" -> ToolParameterType.Boolean
         "array" -> ToolParameterType.List(
-            (this["items"] as? JsonObject)?.toParameterType() ?: ToolParameterType.String
+            this["items"]?.jsonObject?.toParameterType() ?: ToolParameterType.String
         )
-        "object" -> ToolParameterType.Object(
-            properties = emptyList(),
-            requiredProperties = emptyList(),
-            additionalProperties = true,
-            additionalPropertiesType = ToolParameterType.String,
-        )
+        "object" -> toObjectParameterType()
         else -> ToolParameterType.String
     }
+}
+
+private fun JsonObject.toObjectParameterType(): ToolParameterType.Object {
+    val propertiesObject = this["properties"]?.jsonObject.orEmpty()
+    val requiredNames = this["required"]
+        ?.jsonArray
+        ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+        .orEmpty()
+    return ToolParameterType.Object(
+        properties = propertiesObject.map { (name, schema) ->
+            ToolParameterDescriptor(
+                name = name,
+                description = schema.jsonObject["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                type = schema.jsonObject.toParameterType(),
+            )
+        },
+        requiredProperties = requiredNames,
+        additionalProperties = (this["additionalProperties"] as? JsonObject)?.let { true } ?: true,
+        additionalPropertiesType = (this["additionalProperties"] as? JsonObject)?.toParameterType()
+            ?: ToolParameterType.String,
+    )
 }
 
 private fun String.hostSlug(): String =
