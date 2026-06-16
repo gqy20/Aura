@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -128,8 +127,6 @@ fun McpSettingsScreen(
 }
 
 private enum class McpSettingsMode { LIST, EDITOR }
-
-//region List Mode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -293,17 +290,9 @@ private fun McpServerCard(
                 checked = server.enabled,
                 onCheckedChange = { onToggleEnabled() },
             )
-            Spacer(Modifier.width(4.dp))
-            IconButton(onClick = onClick) {
-                Icon(Icons.Filled.Edit, contentDescription = "编辑")
-            }
         }
     }
 }
-
-//endregion
-
-//region Status helpers
 
 private enum class McpStatus { DISABLED, NOT_READY, NOT_TESTED, EMPTY, READY }
 
@@ -340,10 +329,6 @@ private fun McpStatusDot(server: McpServerConfig, discoveredTools: List<String>?
         drawCircle(color = color)
     }
 }
-
-//endregion
-
-//region Discovered tools
 
 /**
  * "已发现的工具"区 — 只在已编辑/已保存的 server 上显示。
@@ -445,10 +430,6 @@ private fun DiscoveredToolsSection(
         }
     }
 }
-
-//endregion
-
-//region Editor Mode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -643,5 +624,3 @@ private fun McpEditorScreen(
         }
     }
 }
-
-//endregion

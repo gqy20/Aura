@@ -76,8 +76,7 @@ internal fun CompanionHeader(
                 size = 40.dp,
                 onClick = onPresenceTapped,
             )
-            // 副标题为空时不渲染以免撑高 Row,Text 显式 height(48.dp) + wrapContentHeight
-            // 让 glyph 视觉中心对齐外 Row(lineHeight 容器默认会偏上 12px)。
+            // 副标题为空时不渲染,避免空 Text 撑高 Row。
             val subtitle = presence.chatHeaderStatus(configStatus)
             Row(
                 modifier = Modifier

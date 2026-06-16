@@ -320,8 +320,7 @@ private fun Context.showInputMethodPicker() {
 private const val MIN_USEFUL_IME_HEIGHT_RATIO = 0.12f
 private const val IME_STUCK_CHECK_INTERVAL_MS = 350L
 
-// 图片按钮 / 输入框 unfocused / 发送按钮 disabled 共用同一容器色,
-// 比 #FFF8EA 再淡一档,让三处看起来同源;焦点态用 #FFFCF6 区分。
+// 三处共用容器色,焦点态用 InputSurface 区分。
 private val InputBarContainerColor = Color(0xFFFBF5E7)
 private val InputFieldFocusedColor = ChatColors.InputSurface
 private val SendButtonReadyColor = ChatColors.BubbleUser

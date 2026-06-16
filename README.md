@@ -1,138 +1,124 @@
+<div align="center">
+
+<img src="docs/brand/aura-logo.svg" width="120" alt="Aura · 奥拉" />
+
 # Aura · 奥拉
 
-一款具有情绪感知和关系记忆的 Android AI 陪伴应用。
+**一个有情绪、有记性的 Android AI 陪伴 App。**
 
-核心理念：**自研"灵魂"，外包"器官"** — 情绪状态机、关系模型、Prompt 引擎等创新能力全部自研，基础设施依托 Android/Kotlin 生态成熟组件。
+会记住几个月前你说过的烦心事，会感知到你今天语气不太好，
+会隔一段时间主动找你聊聊。不是聊天机器人，更像一个老朋友。
 
-## 特性
+[官网](https://aura.gqy20.top) · [Releases](https://github.com/gqy20/Aura/releases) · [架构文档](docs/architecture.md) · [Roadmap](docs/roadmap.md)
 
-- **当前版本：0.1.3**
-- **已实现：文本聊天闭环** — Compose 聊天页 + `ChatViewModel` + `CompanionRuntime` + Koog Agent
-- **已实现：流式对话** — Anthropic Messages 兼容 SSE 流式输出，聊天气泡逐字渲染
-- **已实现：长期记忆体系增强** — Room 存储消息、记忆、摘要、情绪快照、工具调用、insight、reminder、health；`MemoryRepository` 统一保存、搜索、prompt selection 和访问时间更新
-- **已实现：Agent 工具调用** — 只读上下文工具、记忆搜索、摘要搜索、设备/时间/天气/提醒/Health/MCP 工具
-- **已实现：情绪与关系核心** — 情绪状态机和关系模型已接入 Agent 主循环
-- **已实现：设置与可观测性** — Provider、模型名、Base URL、API Key、MCP HTTP URL、连通性检查、Dream Loop 周期、Health 同步、数据导出/清空
-- **已实现：Insight / Onboarding / Presence** — Insight 卡片、Mood Trend、Onboarding、PresenceController、PresenceReactionPolicy
-- **已实现：Vision 闭环** — Photo Picker 选图 + `UserInput.Vision` + memory 落库 + Dream evidence 注入
-- **部分实现：主动陪伴与动画** — PulseWorker、Rive/Lottie 状态机、语音 I/O、CameraX 拍摄 UI、远端 Agent Server 仍未完成
+</div>
 
-## 技术栈
+<div align="center">
 
-| 层面 | 选型 |
-|------|------|
-| JDK | 21 |
-| 语言 | Kotlin 2.3.21 |
-| Android Gradle Plugin | 9.2.0 |
-| SDK | compileSdk 36 / minSdk 26 / targetSdk 36 |
-| UI | Jetpack Compose + Material 3 |
-| 架构 | MVVM + Repository |
-| 并发 | Coroutines + Flow |
-| Agent 框架 | [Koog](https://github.com/JetBrains/koog) 0.8.0 |
-| LLM | GLM-5v-turbo (智谱) / Kimi 2.6 (月之暗面) / ModelScope Inference (本地：MNN + Qwen) |
-| DI | Hilt |
-| 数据库 | Room |
-| 配置存储 | DataStore |
-| 后台任务 | WorkManager |
-| 相机 | CameraX |
-| 动画 | Lottie / Coil |
+[![Website](https://img.shields.io/badge/%E5%AE%98%E7%BD%91-aura.gqy20.top-7B6EF6?style=flat-square)](https://aura.gqy20.top)
+[![Release](https://img.shields.io/github/v/release/gqy20/Aura?include_prereleases&style=flat-square&label=%E7%89%88%E6%9C%AC&color=blue)](https://github.com/gqy20/Aura/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/gqy20/Aura/ci.yml?style=flat-square&logo=github-actions&label=CI)](https://github.com/gqy20/Aura/actions)
+[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white)]()
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.21-7F52FF?style=flat-square&logo=kotlin&logoColor=white)]()
+[![License](https://img.shields.io/badge/License-Private-red?style=flat-square)]()
 
-## 项目结构
+</div>
 
-```
-app/src/main/java/com/xiaoqi/companion/
-├── feature/                  # UI 层 — 当前已实现 chat
-├── core/                     # 核心逻辑 — Agent 运行时、情绪、关系、Prompt
-│   ├── companion/            #   CompanionRuntime 主循环 + Koog 集成
-│   ├── llm/                  #   Anthropic Messages 兼容 LLM client / executor
-│   ├── prompt/               #   Prompt 组装引擎 + 模板
-│   ├── tools/                #   Agent tools + 工具调用记录
-│   └── logging/              #   Timber 日志封装与字段脱敏
-├── data/                     # 数据层 — Room DAO/Entity、DataStore、Repository
-│   ├── db/
-│   ├── datastore/
-│   └── repository/
-└── di/                       # Hilt 依赖注入模块
+## 它能做什么
+
+- **长期记忆** — 跨会话记住你的偏好、习惯、重要的人和事
+- **情绪感知** — 识别你当下的心情，对话风格随之调整
+- **关系建模** — 认识得越久，越懂你的说话方式
+- **图片理解** — 可以发图，能记住画面里的内容
+- **主动陪伴** — 到点提醒喝水、休息，偶尔主动发起对话
+- **本地可选** — 不想上云？可切换到本地 Qwen 模型，聊天数据不出手机
+
+## 现在能用什么 / 还差什么
+
+**已可用**：文本聊天、图片理解、记忆、情绪、提醒、设置
+**还在路上**：语音对话、CameraX 拍照、主动推送、动画角色
+
+完整进度见 [Roadmap](docs/roadmap.md)。
+
+## 怎么用
+
+### 安装
+
+```bash
+make run    # 构建 + 安装 + 启动
 ```
 
-> `platform/`、`core/pulse`、`RemoteAgentRuntime` 仍属于 roadmap 中的计划模块；当前已落地的 `feature/onboarding` / `feature/insight`、`core/presence/runtime/` / `core/insight/` / `data/source/` 等子包见 [`docs/architecture.md §2`](docs/architecture.md) 末段。
+### 第一次启动
 
-## 快速开始
+1. 进设置页填入 LLM Provider / API Key（云端），或下载本地模型
+2. 回到主页，点底部 **+** 开始聊天
+3. 发图：点输入框旁的图片按钮，从相册选
 
-### 环境要求
+## 给开发者
+
+### 环境
 
 - JDK 21+
 - Android SDK（compileSdk 36, minSdk 26）
-- Android Studio (推荐) 或 Gradle 命令行
+- Android Studio（推荐）或 Gradle 命令行
 
-### 构建
-
-```bash
-# Debug APK
-./gradlew assembleDebug
-
-# Release APK
-./gradlew assembleRelease
-```
-
-### Makefile 快捷命令
+### 常用命令
 
 ```bash
-make build       # 构建 Debug APK
-make release     # 构建 Release APK
-make test        # 运行单元测试
-make run         # 构建 + 安装 + 启动
-make devices     # 列出已连接设备
-make logcat      # 查看应用日志
-make help        # 查看所有命令
+./gradlew assembleDebug       # 构建 Debug APK
+./gradlew testDebugUnitTest   # 跑 372 个单元测试
+make run                       # 构建 + 安装 + 启动
+make logcat                    # 看日志
+make help                      # 查看所有 make 命令
 ```
 
-### 测试
+### 技术栈
 
-```bash
-# 单元测试
-./gradlew testDebugUnitTest
+| 层 | 选型 |
+|----|------|
+| UI | Jetpack Compose + Material 3 |
+| 架构 | MVVM + Repository |
+| 并发 | Coroutines + Flow |
+| Agent | [Koog](https://github.com/JetBrains/koog) 0.8.0 |
+| LLM | GLM-5v-turbo / Kimi 2.6 / 本地 Qwen (MNN) |
+| 数据 | Room + DataStore |
+| DI | Hilt |
+| 后台 | WorkManager |
 
-# 仪器测试（需连接设备/模拟器）
-./gradlew connectedDebugAndroidTest
+### 核心流程
+
+```
+用户输入（文本 / 图片）
+  → 检索相关记忆与摘要
+  → 组装 Prompt（注入情绪 + 关系 + 记忆）
+  → Koog Agent 调用 LLM（流式输出，可用工具）
+  → 解析响应
+  → 保存消息 / 更新情绪 / 更新关系 / reflection 写入新记忆
+  → UI 渲染
 ```
 
-## Agent 核心流程
+### 项目结构
 
 ```
-用户输入 (文本/图片/语音)
-  → MemoryRepository 选择相关记忆/摘要
-  → PromptBuilder 组装（注入情绪 + 关系 + 记忆上下文）
-    → Koog Agent 调用 LLM（流式输出，可用只读/外部工具）
-      → OutputParser 解析结构化响应
-        → 保存 assistant 消息
-        → 情绪状态机更新
-        → 关系模型更新
-        → LLM reflection 判断并写入值得保留的记忆
-        → UI 响应（表情 / 气泡 / 动作 / 已记住提示）
+app/src/main/java/com/xiaoqi/companion/
+├── feature/        # UI 层（聊天、设置、首页、记忆室、引导）
+├── core/           # 核心逻辑（Agent、情绪、关系、Prompt）
+│   ├── companion/  #   CompanionRuntime 主循环 + Koog 集成
+│   ├── llm/        #   Anthropic Messages 兼容 LLM client
+│   ├── prompt/     #   Prompt 组装引擎 + 模板
+│   └── tools/      #   Agent tools
+├── data/           # 数据层（Room、DataStore、Repository）
+└── di/             # Hilt 模块
 ```
 
-当前已跑通文本输入链路和图片选择 Vision 输入链路；文本与 Vision 场景都会先完成主回复，再用后置 reflection 判断是否保存记忆。语音输入和 CameraX 拍摄 UI 仍在 roadmap 中。
-
-## 配置
-
-LLM 模型配置通过 DataStore 与 BuildConfig 管理。可以从 `.env` / 环境变量读取默认值，也可以在应用内设置弹层切换 provider、模型名、Base URL 和 API Key：
-
-```kotlin
-data class LlmConfig(
-    val provider: LlmProvider = LlmProvider.GLM,
-    val baseUrl: String = "https://open.bigmodel.cn/api/paas/v1",
-    val apiKey: String,
-    val modelName: String = "glm-5v-turbo",
-)
-```
+完整架构见 [docs/architecture.md](docs/architecture.md)。
 
 ## 文档
 
-- [技术架构文档](docs/architecture.md) — 完整的分层设计、LLM 选型、Agent Core 流程
-- [工程化规范](docs/engineering-standards.md) — CI/CD、测试策略、代码规范、质量门禁
-- [Roadmap](docs/roadmap.md) — 当前进度、下一阶段任务和里程碑
-- [Archive](docs/archive/README.md) — 历史方案和已归档调研材料
+- [技术架构](docs/architecture.md) — 分层设计、Agent Core、模块清单
+- [Roadmap](docs/roadmap.md) — M0-M6 里程碑进度
+- [工程化规范](docs/engineering-standards.md) — CI/CD、测试、代码规范
+- [Koog API 参考](docs/koog-api-reference.md) — Koog 0.8.0 完整 API 签名
 
 ## License
 

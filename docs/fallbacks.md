@@ -1369,11 +1369,15 @@
 | `ChatViewModel.removePendingImage` | `remove_pending_image` | UI 行为 |
 | `ChatViewModel.sendMessage` | `send_message_started` | 区分发送失败 / 没发 |
 
-### 32.6 仍存在的缺口(P2+,本轮不修)
+### 32.6 P2 评估:全不做
 
-1. **无文件持久化** — 当前 logcat 看完即丢,用户拿不到日志。需加 `BufferedWriter` + SAF 导出,见 `DataTransparencySection` 现成的 SAF 链路可复用
-2. **无 Settings 日志开关** — release 树只打 WARN+,但用户无"暂时记录全部 / 关闭全部"二档
-3. **无采样 / 限速** — 任何高频路径(`ChatScreen` IME 350ms 轮询、Memory 列表滚动)理论上都会打 log,但实测不会爆量
-4. **tag 分布不均** — `Repo 37 / Tools 28 / Llm 28 / LocalModel 23 / Config 23` 头部 5 个,`Emotion 1 / Relation 1 / Database 0` 尾部 3 个几乎闲置
-5. **`verbose()` 方法定义但 0 调用** — 保留作为粒度选择,或后续删除
+最初考虑过 5 项后续改进,经 2026-06-16 评估后**全部判定为不做**:
+
+1. ~~无文件持久化(SAF 导出)~~ — **不做**。本项目使用模型是"用户装 release build / 开发者装 debug build + adb",两者无交集;让用户主动导出日志给开发者在 UX 上不成立,反而把"用户对话 + 工具调用 + 错误"全量外泄到 Drive / 本地存储,等出泄露就是大事故。**真实调试需求走 adb logcat**。
+2. ~~无 Settings 日志开关~~ — **不做**。`BuildConfig.DEBUG` 已经分流(Debug 全打 / Release 只 WARN+),用户场景已覆盖;用户主动调日志级别是开发者行为,不是终端用户行为。
+3. ~~无采样 / 限速~~ — **不做**。实测高频路径(`ChatScreen` IME 350ms 轮询、Memory 列表滚动)未打 log,目前调用频率(205 calls / 43 文件)远未到需要限速。
+4. ~~tag 分布不均(`Repo 37 / Tools 28 / Llm 28 / LocalModel 23 / Config 23` 头部 5 个,`Emotion 1 / Relation 1 / Database 0` 尾部 3 个)~~ — **不做**。头部 5 tag 占比高是合理的(它们覆盖的代码路径多),尾部 3 tag 闲置也是设计选择(`Emotion/Relation` 走 presence state 不打 log,`Database` 走 Room 自带 stderr)。**不是技术债,不需要"均衡"**。
+5. ~~`verbose()` 方法定义但 0 调用~~ — **保留**。0 调用 ≠ 无用,是粒度选择(未来想给高频低价值事件加 verbose 时不用重声明);3 行代码成本极低,删了之后想用反而要重新加。
+
+**结论**:日志体系 P0-P1 已完整闭环。其他缺口(接入 Sentry、本地 LLM 调试、特定 tag 增量打点)等真实需求出现时再补,不预设。
 

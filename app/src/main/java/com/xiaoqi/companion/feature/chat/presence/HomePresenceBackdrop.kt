@@ -104,7 +104,8 @@ internal fun PresenceBackdropAndHalo(
         }
 
         // --- Halo: glow + rings + reaction + orbiting particles ---
-        val haloCenter = Offset(w / 2f, h * 0.56f)
+        // 居中对齐 Aura 角色本体(Avatar Canvas 中心在 w/2, h/2)。
+        val haloCenter = Offset(w / 2f, h * 0.5f)
         val reactionBoost = reaction.haloBoost()
         val baseRadius = w * (0.29f + pulse * (0.015f + reactionBoost * 0.012f))
 
@@ -125,7 +126,7 @@ internal fun PresenceBackdropAndHalo(
             drawCircle(
                 color = palette.ring.copy(alpha = 0.20f - index * 0.045f + reactionBoost * 0.06f),
                 radius = baseRadius + index * w * 0.064f,
-                center = haloCenter.copy(y = haloCenter.y + h * 0.22f),
+                center = haloCenter,
                 style = Stroke(width = 1.1.dp.toPx(), cap = StrokeCap.Round),
             )
         }
@@ -163,12 +164,13 @@ private fun DrawScope.drawReactionHalo(
     height: Float,
     center: Offset,
 ) {
+    // 反应光环与 ring 共享同一个 haloCenter(已对齐 Aura 角色),不再额外 y 偏移。
     when (reaction) {
         PresenceReaction.RETURN_BLINK -> {
             drawCircle(
                 color = palette.ring.copy(alpha = 0.18f * (1f - pulse)),
                 radius = width * (0.24f + pulse * 0.22f),
-                center = center.copy(y = center.y + height * 0.21f),
+                center = center,
                 style = Stroke(width = 1.2.dp.toPx(), cap = StrokeCap.Round),
             )
         }
@@ -200,7 +202,7 @@ private fun DrawScope.drawReactionHalo(
             drawCircle(
                 color = palette.ring.copy(alpha = 0.16f * (1f - pulse)),
                 radius = width * (0.30f + pulse * 0.08f),
-                center = center.copy(y = center.y + height * 0.21f),
+                center = center,
                 style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
             )
         }

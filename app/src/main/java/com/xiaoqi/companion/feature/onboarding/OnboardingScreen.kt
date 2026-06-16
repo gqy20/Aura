@@ -66,9 +66,6 @@ fun OnboardingScreen(
     val q4Friends = remember { mutableStateOf(listOf("", "", "")) }
     var q5Choice by rememberSaveable { mutableStateOf("") }
 
-    // 5 问全部可选 — 用户可以快速跳过,plan §5.2 强调"不强迫"产品调性
-    val canAdvance = true
-
     val isLast = step == 4
     val progress = (step + 1) / 5f
 
@@ -97,11 +94,6 @@ fun OnboardingScreen(
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = "第 ${step + 1} / 5 步",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             LazyColumn(
@@ -236,7 +228,6 @@ fun OnboardingScreen(
                             step++
                         }
                     },
-                    enabled = canAdvance,
                 ) {
                     Text(if (isLast) "完成" else "下一步")
                     if (!isLast) {

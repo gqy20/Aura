@@ -433,7 +433,8 @@ private fun ChatUiState.homePresenceLine(): String =
         isLoading -> "思考中"
         inputText.isNotBlank() -> "在听"
         presence.mode == PresenceMode.SEARCHING -> "查找中"
-        presence.mode == PresenceMode.HAPPY -> "心情好"
+        // 与其他"X中"句式一致(读图/思考/查找/休息)。
+        presence.mode == PresenceMode.HAPPY -> "开心中"
         presence.mode == PresenceMode.TIRED || presence.mode == PresenceMode.SLEEPING -> "休息中"
         else -> "在这里"
     }

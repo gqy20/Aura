@@ -116,11 +116,6 @@ internal fun InsightLongPressDialog(
                     label = if (showEvidence) "隐藏依据" else "查看依据",
                     onClick = onShowEvidence,
                 )
-                InsightActionRow(
-                    icon = Icons.Filled.Close,
-                    label = "知道了",
-                    onClick = onAcknowledge,
-                )
             }
         },
     )
