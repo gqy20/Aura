@@ -76,11 +76,8 @@ internal fun CompanionHeader(
                 size = 40.dp,
                 onClick = onPresenceTapped,
             )
-            // Aura 标题 + 副标题横向排成一行,占满到右侧 icon,
-            // 避免 Column 双行撑高 Row 让"Aura" 文字偏离 Row 中心。
-            // 副标题为空时直接不渲染,不占行高。
-            // Text 显式 height(48.dp) + wrapContentHeight 让 glyph 视觉中心
-            // 跟外 Row 中心对齐(否则 lineHeight 容器会让 glyph 偏上 12px)。
+            // 副标题为空时不渲染以免撑高 Row,Text 显式 height(48.dp) + wrapContentHeight
+            // 让 glyph 视觉中心对齐外 Row(lineHeight 容器默认会偏上 12px)。
             val subtitle = presence.chatHeaderStatus(configStatus)
             Row(
                 modifier = Modifier

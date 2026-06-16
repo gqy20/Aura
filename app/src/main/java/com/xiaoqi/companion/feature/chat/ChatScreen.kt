@@ -152,30 +152,20 @@ fun ChatScreenContent(
     val messages = uiState.messages
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
     var hasCompletedInitialScroll by remember { mutableStateOf(false) }
-    // reverseLayout 下 LazyColumn 把 index 0 渲染在底部;
-    // 我们要让"最新消息在底部",所以 items 用反向顺序。
-    // reversed 列表的 index 0 = 原 messages 的 lastIndex(最新一条)。
     val reversedMessages = remember(messages) { messages.asReversed() }
 
-    // P3: 滚动策略——2 秒后自动恢复跟随
-    // - 用户上滑(index > 0 或 offset > 32dp)→ isUserPinnedToBottom = false
-    // - 用户主动拖动(isScrollInProgress)→ 临时禁止跟随
-    // - 2 秒内用户无进一步操作 → 恢复 isUserPinnedToBottom = true
-    // - 流式期间只在 pinned 时自动 scrollToItem(0)
+    // 跟随策略:用户上滑 → 解锁跟随;松手 2s 后自动恢复;流式期间仅在 pinned 时 scrollToItem(0)。
     var isUserPinnedToBottom by rememberSaveable { mutableStateOf(true) }
     var followRecoveryJob by remember { mutableStateOf<Job?>(null) }
     val followRecoveryScope = rememberCoroutineScope()
 
-    // 1) 初始滚动(同步)
     LaunchedEffect(reversedMessages.size) {
         if (reversedMessages.isNotEmpty() && !hasCompletedInitialScroll) {
-            // 反向布局:index 0 是底部(最新消息),scrollToItem(0) 即滚到底
             listState.scrollToItem(0)
             hasCompletedInitialScroll = true
         }
     }
 
-    // 2) 跟踪用户滚动意图:上滑时取消恢复计时器
     LaunchedEffect(listState) {
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
@@ -193,7 +183,6 @@ fun ChatScreenContent(
             }
     }
 
-    // 3) 跟踪用户拖动中状态:正在拖动 → 临时禁止跟随
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .collect { isScrolling ->
@@ -204,7 +193,6 @@ fun ChatScreenContent(
             }
     }
 
-    // 4) 2 秒后自动恢复跟随(用户上滑后)
     LaunchedEffect(isUserPinnedToBottom) {
         if (!isUserPinnedToBottom) {
             followRecoveryJob?.cancel()
@@ -217,7 +205,6 @@ fun ChatScreenContent(
         }
     }
 
-    // 5) 流式期间智能跟随:仅在 pinned 时 scrollToItem(0)
     LaunchedEffect(listState) {
         snapshotFlow {
             Triple(
@@ -237,9 +224,7 @@ fun ChatScreenContent(
             }
     }
 
-    // 键盘弹起/收起的动画结束后,把最新一条(index 0)滚入视口。
-    // reverseLayout 下 index 0 永远在 LazyColumn 底部,IME 弹起高度收缩
-    // 时从顶部裁,index 0 天然保持完整可见。
+    // IME 弹起/收起动画结束后,确保 index 0(最新消息)滚入视口。
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
     val listStateHolder = rememberUpdatedState(listState)

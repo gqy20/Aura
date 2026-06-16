@@ -75,7 +75,6 @@ object PromptConfigLoader {
                 i++
                 continue
             }
-            // Skip comments
             if (line.startsWith("#")) {
                 i++
                 continue
@@ -84,13 +83,11 @@ object PromptConfigLoader {
             val indent = line.takeWhile { it == ' ' }.length
 
             if (inMultiline) {
-                // Still inside multiline block?
                 if (indent >= multilineIndent) {
                     multilineBuffer.appendLine(line.trimStart())
                     i++
                     continue
                 }
-                // Multiline block ended — flush and reprocess this line
                 builder.setMultiline(
                     section = multilineSectionName,
                     key = multilineKey!!,
@@ -102,7 +99,6 @@ object PromptConfigLoader {
                 // Don't increment i; fall through to process lines[i] as normal
             }
 
-            // Normal key-value parsing
             val colonIndex = line.indexOf(':')
             if (colonIndex < 0) { i++; continue }
 
@@ -110,17 +106,14 @@ object PromptConfigLoader {
             val rest = line.substring(colonIndex + 1).trim()
 
             when {
-                // "sections:" map opener
                 key == "sections" -> {
                     sectionName = ""
                 }
 
-                // Section name entry (e.g. "emotion:")
                 sectionName != null && indent == 2 && rest.isEmpty() -> {
                     sectionName = key
                 }
 
-                // Section multi-line field (e.g. placeholder: |)
                 sectionName != null && indent >= 4 && key in listOf("title", "placeholder") && rest == "|" -> {
                     multilineKey = key
                     multilineSectionName = sectionName
@@ -129,14 +122,12 @@ object PromptConfigLoader {
                     inMultiline = true
                 }
 
-                // Section field (4+ spaces under a section name)
                 sectionName != null && indent >= 4 -> {
                     if (key in listOf("title", "placeholder") && rest.isNotEmpty()) {
                         builder.setSectionField(sectionName, key, rest.unquote())
                     }
                 }
 
-                // Multi-line scalar ("key: |")
                 rest == "|" -> {
                     multilineKey = key
                     multilineSectionName = null
@@ -145,7 +136,6 @@ object PromptConfigLoader {
                     inMultiline = true
                 }
 
-                // Simple scalar ("key: value")
                 else -> {
                     if (sectionName.isNullOrEmpty()) {
                         builder.setTopLevel(key, rest.unquote())
@@ -157,7 +147,6 @@ object PromptConfigLoader {
             i++
         }
 
-        // Flush trailing multiline if file ends mid-block
         if (inMultiline && multilineKey != null) {
             builder.setMultiline(
                 section = multilineSectionName,

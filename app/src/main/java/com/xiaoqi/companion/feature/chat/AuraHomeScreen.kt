@@ -91,7 +91,6 @@ fun AuraHomeScreen(
         onOpenMemoryRoom = onOpenMemoryRoom,
         onOpenMcpSettings = onOpenMcpSettings,
         onInsightClick = { insight ->
-            // 方案 A:短按 = 弹和长按一样的弹层(原行为只跑 markClicked 无 UI 反馈,反直觉)
             AppLogger.debug(
                 LogTags.Chat,
                 "insight_tapped",

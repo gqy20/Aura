@@ -99,7 +99,6 @@ class SensorManagerHealthSource @Inject constructor(
                 ),
             )
         }
-        // _days 暂保留 — 未来 v2 baseline 持久化后,会写 7 天的 diff
         @Suppress("UNUSED_VARIABLE")
         val unused = days
         AppLogger.info(

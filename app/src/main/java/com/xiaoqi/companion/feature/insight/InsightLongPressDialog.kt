@@ -53,7 +53,6 @@ internal fun InsightLongPressDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            // 标题栏右侧 ⨯ 关闭 — 跟 MemoryDetailDialog 风格统一;dismissButton 不再放"关闭"避免和 4 个带 icon 的 action 视觉混在一起
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -124,7 +123,6 @@ internal fun InsightLongPressDialog(
                 )
             }
         },
-        // 删掉 dismissButton 的"关闭" — 关闭入口上移到 title 栏右侧 ⨯,跟 MemoryDetailDialog 风格一致
     )
 }
 

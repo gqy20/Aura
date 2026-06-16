@@ -73,8 +73,7 @@ class DreamDataCollector @Inject constructor(
         val memoryCount = memoryDao.countAll()
         val topKeywords = extractTopKeywords(msgs, KEYWORD_LIMIT)
 
-        // M4:近 N 张有图 memory,过滤 7 天窗口,只取元数据进 prompt。
-        // 内容原文本身就是 "[图片] 摘要" 形态,不需要再裁剪。
+        // M4:近 N 张有图 memory,过滤 7 天窗口,只取元数据(content 本身是 "[图片] 摘要" 不再裁剪)。
         val imageMemories = memoryDao.getRecentImages(IMAGE_MEMORY_LIMIT)
             .filter { it.timestamp in start..end }
             .map {
@@ -86,7 +85,7 @@ class DreamDataCollector @Inject constructor(
                 )
             }
 
-        // 健康快照:近 7 天(从 date 计算,date 形如 20260615)
+        // 健康快照:近 7 天,date 形如 20260615
         val today = Calendar.getInstance().apply { timeInMillis = end }
         val endDate = today.get(Calendar.YEAR) * 10000 +
             (today.get(Calendar.MONTH) + 1) * 100 +
@@ -133,7 +132,7 @@ class DreamDataCollector @Inject constructor(
         if (snapshot.topKeywords.isNotEmpty()) {
             appendLine("## 高频关键词:${snapshot.topKeywords.joinToString(", ")}")
         }
-        // M4:视觉证据 — 本地 LLM 看不到图,但能从元数据推测用户的视觉节奏/兴趣。
+        // M4:视觉证据 — 本地 LLM 看不到图,只能从元数据推测用户视觉节奏/兴趣。
         if (snapshot.imageMemories.isNotEmpty()) {
             appendLine()
             appendLine("## 视觉证据(${snapshot.imageMemories.size} 张)")
@@ -141,7 +140,7 @@ class DreamDataCollector @Inject constructor(
                 appendLine("- ${formatTimestamp(img.timestamp)} ${img.content}")
             }
         }
-        // Health Connect:健康快照(小米运动健康等)
+        // Health Connect 健康快照(小米运动健康等)
         if (snapshot.healthSnapshots.isNotEmpty()) {
             appendLine()
             appendLine("## 健康快照(${snapshot.healthSnapshots.size} 天)")
@@ -212,7 +211,7 @@ class DreamDataCollector @Inject constructor(
         const val DEFAULT_SESSION_ID = "default"
         const val RECENT_MESSAGE_LIMIT = 200
         const val KEYWORD_LIMIT = 10
-        // M4:视觉证据上限。防止 prompt 膨胀,5 张图 metadata ≈ 500 字符,可控。
+        // M4 视觉证据上限:5 张图 metadata ≈ 500 字符,避免 prompt 膨胀。
         const val IMAGE_MEMORY_LIMIT = 5
         const val HEALTH_LOOKBACK_DAYS = 7
 

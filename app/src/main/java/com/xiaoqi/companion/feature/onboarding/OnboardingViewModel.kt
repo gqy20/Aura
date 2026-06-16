@@ -58,9 +58,6 @@ class OnboardingViewModel @Inject constructor(
         onDone: () -> Unit,
     ) {
         viewModelScope.launch {
-            // 主写入:5 问进 LTM,LLM 后续能 search_memory 召回。
-            // 防御性 runCatching:MemoryRepository 内部已经 runCatching 单条失败,
-            // 但整个方法被 Mock 替身或外部异常替换时不能阻断 DataStore 写入。
             runCatching {
                 memoryRepository.saveOnboardingMemories(
                     concerns = concerns,
@@ -76,8 +73,6 @@ class OnboardingViewModel @Inject constructor(
                     "error" to (it.message ?: it::class.simpleName.orEmpty()),
                 )
             }
-            // 缓存:DataStore 保留 userPatterns/recurringTopics JSON,只给 MainActivity
-            // 启动判断用,LTM 已落地后,这段缓存可后续废弃
             autoMemoryStore.saveOnboardingAnswers(
                 userPatterns = listOfNotNull(
                     concerns.takeIf { it.isNotBlank() },

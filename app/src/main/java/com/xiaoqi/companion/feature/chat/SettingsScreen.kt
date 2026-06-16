@@ -890,7 +890,6 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
                             ClearTarget.Memories -> viewModel.clearMemories()
                         }
                         pendingClear = null
-                        // 同步本地 count
                         scope.launch {
                             insightCount = viewModel.insightCount()
                             memoryCount = viewModel.memoryCount()

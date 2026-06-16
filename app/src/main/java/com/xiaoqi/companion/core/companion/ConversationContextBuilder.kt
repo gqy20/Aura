@@ -117,9 +117,7 @@ private fun estimateTokens(text: String): Int =
 private fun String.truncateToTokenBudget(tokenBudget: Int): String {
     val maxChars = (tokenBudget * 3).coerceAtLeast(1)
     if (length <= maxChars) return this
-    // Center-crop: keep the first 1/3 and the last 2/3, drop the middle.
-    // This preserves both the start of the message (intent) and the most
-    // recent context, which the tail-only crop used to lose.
+    // 中心裁剪:保留前 1/3(意图) + 后 2/3(最近上下文),丢中间。
     val headChars = maxChars / 3
     val tailChars = maxChars - headChars
     val head = take(headChars).trimEnd()

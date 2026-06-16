@@ -31,17 +31,17 @@ data class McpSettingsSnapshot(
             val provider: McpServerPreset
             val apiKey: String
             when {
-                // 1) 老数据迁移: providerId 未设置 + url 非空 → 按 url 形状反推
+                // 老数据迁移: providerId 未设置 + url 非空 → 按 url 形状反推
                 rawProviderId.isNullOrBlank() && url.isNotBlank() -> {
                     provider = McpServerPresets.detectFromUrl(url)
                     apiKey = McpServerPresets.extractApiKey(provider, url).orEmpty()
                 }
-                // 2) 新用户: 啥都没填 → 默认 Amap,让首屏直接展示 key 输入框
+                // 新用户: 啥都没填 → 默认 Amap,让首屏直接展示 key 输入框
                 rawProviderId.isNullOrBlank() -> {
                     provider = McpServerPresets.Amap
                     apiKey = rawApiKey.orEmpty()
                 }
-                // 3) 显式选过 provider → 信任用户选择
+                // 显式选过 provider → 信任用户选择
                 else -> {
                     provider = McpServerPresets.byId(rawProviderId)
                     apiKey = rawApiKey.orEmpty()

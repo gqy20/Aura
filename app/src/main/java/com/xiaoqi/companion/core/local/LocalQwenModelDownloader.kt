@@ -163,7 +163,7 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
             modelName = modelName,
             isInstalled = installed,
             progress = if (installed) 1f else 0f,
-            message = if (installed) "已安装" else "未安装",
+            message = null,
         )
     }
 

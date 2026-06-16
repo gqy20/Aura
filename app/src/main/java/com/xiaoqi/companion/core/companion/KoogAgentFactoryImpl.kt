@@ -63,8 +63,6 @@ class KoogAgentFactoryImpl @Inject constructor(
             "hasApiKey" to config.apiKey.isNotBlank(),
         )
         if (config.provider == LlmProvider.LOCAL_QWEN) {
-            // dual-mind Phase 0 临时二选一,Phase 1 拆开云端对话体/本地觉察面后,
-            // 这条分支应改为"ReactiveCompanion 仅在 presence runtime 内被 LocalQwenExecutor 调"
             @Suppress("DEPRECATION_RENAMED_TO_REACTIVE_COMPANION")
             return ReactiveCompanion(
                 engine = localQwenEngine,

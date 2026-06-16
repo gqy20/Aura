@@ -89,10 +89,8 @@ fun McpSettingsScreen(
     var mode by rememberSaveable { mutableStateOf(McpSettingsMode.LIST) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // 一次性"已保存"事件:saveMcpSettings 成功时 UseCase 会 increment mcpEditorJustSaved,
-    // UI 在这里观察到这个变化 → 切回 list + 弹 snackbar 给用户反馈。
-    // key 用 mcpEditorJustSaved 而非 mcpSettingsMessage 是因为后者被 UseCase
-    // 设回 null,只有这个 tick 能稳定地表达"刚保存"这个离散事件。
+    // 一次性"已保存"事件:saveMcpSettings 成功时 UseCase 递增 mcpEditorJustSaved。
+    // 用 counter 而非 mcpSettingsMessage(后者会被 UseCase 写回 null)来表达离散事件。
     LaunchedEffect(uiState.mcpEditorJustSaved) {
         if (uiState.mcpEditorJustSaved > 0L && mode == McpSettingsMode.EDITOR) {
             mode = McpSettingsMode.LIST

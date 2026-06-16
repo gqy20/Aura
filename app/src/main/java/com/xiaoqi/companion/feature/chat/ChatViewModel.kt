@@ -141,14 +141,12 @@ class ChatViewModel @Inject constructor(
         )
 
     init {
-        // 1. LLM 配置状态
         viewModelScope.launch {
             configRepository.observeLlmConfigStatus().collect { status ->
                 _uiState.update { it.copy(configStatus = status.toChatConfigStatus()) }
             }
         }
 
-        // 2. Agent 持久化状态(mood / intensity / relationship)
         viewModelScope.launch {
             agentStateDao.observeByCompanionId(DEFAULT_SESSION_ID).collect { savedState ->
                 if (savedState != null) {
@@ -165,7 +163,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 3. 5 个 tool capability 偏好 + MCP server 列表
         viewModelScope.launch {
             combine(
                 combine(
@@ -192,7 +189,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 4. 消息列表
         viewModelScope.launch {
             messageRepository.getMessagesBySession(DEFAULT_SESSION_ID).collect { messages ->
                 _uiState.update { state ->
@@ -205,7 +201,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 5. 记忆列表(置顶优先,见 PR-A MIGRATION_5_6)
         viewModelScope.launch {
             memoryRepository.observeMemoriesPinnedFirst().collect { memories ->
                 _uiState.update { state ->
@@ -214,7 +209,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 6. 提醒列表
         viewModelScope.launch {
             reminderRepository.observeReminders().collect { reminders ->
                 _uiState.update { state ->
@@ -223,7 +217,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 7. 工具调用流(同时驱动 Presence reaction)
         viewModelScope.launch {
             toolCallRepository.observeBySession(DEFAULT_SESSION_ID).collect { calls ->
                 var shouldClearReaction = false
@@ -269,7 +262,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 8. Insight 卡片(主页用,带静音过滤,见 PR-B InsightRepository)
         viewModelScope.launch {
             insightRepository.observeVisibleNotMuted(limit = INSIGHT_CARD_LIMIT).collect { insights ->
                 _uiState.update { state ->
@@ -278,7 +270,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 9. 首次启动:种 2-3 条占位 insight(仅当 DB 为空)
         viewModelScope.launch {
             runCatching {
                 insightRepository.seedDemoInsights(
@@ -297,7 +288,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 10. 近 28 天 mood trend(M3 Chart 用)
         viewModelScope.launch {
             val cal = java.util.Calendar.getInstance()
             val end = cal.timeInMillis
@@ -597,9 +587,7 @@ class ChatViewModel @Inject constructor(
                     mcpConnectivityResult = null,
                 )
             }
-            // 探测所有 enabled + isReady 的 server,缓存每条的 tool 列表到 uiState,
-            // 让 McpListScreen 卡片能展开看 tool 名字。失败也单独缓存(空 list),
-            // 这样用户能看到"这个 server 不可达"。
+            // 探测每个 ready server,缓存 tool 列表(含失败空 list)给 McpListScreen 展示。
             val servers = mcpServerListRepository.readAll()
             val targets = servers.filter { it.enabled && it.isReady }
             if (targets.isEmpty()) {

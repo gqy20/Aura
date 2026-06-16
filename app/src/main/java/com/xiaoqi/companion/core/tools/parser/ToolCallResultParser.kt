@@ -33,7 +33,6 @@ class ToolCallResultParser @Inject constructor() {
     fun parse(toolName: String, resultJson: String?): ToolResultSummary {
         if (resultJson.isNullOrBlank()) return ToolResultSummary.Unknown(raw = "")
 
-        // 1. envelope error
         if (isError(resultJson)) {
             return ToolResultSummary.Failed(
                 title = toolTitle(toolName),
@@ -42,15 +41,13 @@ class ToolCallResultParser @Inject constructor() {
             )
         }
 
-        // 2. envelope ok:读 data 字段
         val env = parseOrNull(resultJson)
         if (env is ToolEnvelope.Ok) {
             return parseEnvelopeOk(toolName, env.data)
         }
 
-        // 3. legacy raw JSON:可能是 search_records 的 {count, results} 等旧结构
-        //    或 create_local_reminder 的 {status:scheduled, title, ...} 裸格式
-        //    (CreateLocalReminderTool.kt:122 不走 envelope,直接 buildJsonObject)
+        // Legacy 裸 JSON:search_records 的 {count, results}、create_local_reminder
+        // (CreateLocalReminderTool.kt:122 不走 envelope,直接 buildJsonObject) 等旧结构。
         return parseLegacy(toolName, resultJson)
             ?: ToolResultSummary.Unknown(raw = resultJson)
     }

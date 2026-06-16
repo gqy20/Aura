@@ -176,21 +176,18 @@ class SendMessageUseCase @Inject constructor(
 
         fun scheduleStreamingRender() {
             val pendingLen = pendingStreamingContent.length
-            // 1) 大段文本(>= 48 chars)→ 立即 flush
             if (pendingLen >= STREAMING_RENDER_BATCH_CHARS) {
                 streamingRenderJob?.cancel()
                 streamingRenderJob = null
                 flushStreamingContent()
                 return
             }
-            // 2) Leading flush:首字符立即 flush,消除 90ms 视觉空档
             if (pendingLen >= STREAMING_LEADING_FLUSH_CHARS &&
                 streamingRenderJob?.isActive != true
             ) {
                 flushStreamingContent()
                 return
             }
-            // 3) Trailing:小增量累积到 8ms 兜底 flush
             if (streamingRenderJob?.isActive == true) return
             streamingRenderJob = scope.launch {
                 delay(STREAMING_RENDER_BATCH_MS)
@@ -292,7 +289,6 @@ class SendMessageUseCase @Inject constructor(
                         //
                         // 状态机式过滤:跨 chunk 的"半个标签"不会泄漏到 draft。
                         val cleanDelta = filterControlTags(event.delta, pendingTagTail)
-                        // DEBUG:info 级别确保 logcat 必出,看实际 delta 内容
                         AppLogger.info(
                             LogTags.Chat,
                             "streaming_delta",
@@ -379,7 +375,6 @@ class SendMessageUseCase @Inject constructor(
                         pendingTagTail.clear()
 
                         val finalReply = event.parsed.textReply
-                        // DEBUG:info 级别确保 logcat 必出
                         AppLogger.info(
                             LogTags.Chat,
                             "complete_text_reply",
