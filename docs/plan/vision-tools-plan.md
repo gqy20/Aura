@@ -1,7 +1,9 @@
 # Vision 与 Agent Tools 协同计划
 
-> Last updated: 2026-05-15
+> Last updated: 2026-06-16
 > Scope: Aura Android app, Koog 0.8.0, GLM-5v-turbo Vision, Agent tools
+>
+> 2026-06-16 同步：M4 vision→memory→dream 闭环已在 commit `1b826d1` 落地（见 §7.9 "2026-06-15 更新"）。P0 / P1 / P1.5 全部 ✅，P2 / P3 未做（依赖 P2 的 tool decision 抽象 + M5 Pulse 周期任务）。
 
 ## 1. 背景
 

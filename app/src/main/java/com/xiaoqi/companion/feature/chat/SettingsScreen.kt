@@ -41,6 +41,8 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -70,6 +72,7 @@ import com.xiaoqi.companion.core.llm.ConnectivityResult
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
+import com.xiaoqi.companion.core.presence.runtime.DreamRunObserver
 import kotlinx.coroutines.launch
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
@@ -77,6 +80,7 @@ import com.xiaoqi.companion.ui.theme.ChatCardSurface
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun SettingsScreen(
@@ -86,6 +90,9 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val dreamLoopInterval by viewModel.dreamLoopInterval.collectAsStateWithLifecycle()
+    val dreamRunState by viewModel.dreamRunState.collectAsStateWithLifecycle()
+    val lastDreamSuccessAtMs by viewModel.lastDreamSuccessAtMs.collectAsStateWithLifecycle()
+    val lastDreamSuccessSavedCount by viewModel.lastDreamSuccessSavedCount.collectAsStateWithLifecycle()
     val healthSyncState by viewModel.healthSyncState.collectAsStateWithLifecycle()
     val healthAutoSyncEnabled by viewModel.healthAutoSyncEnabled.collectAsStateWithLifecycle()
     val healthLastSyncAt by viewModel.healthLastSyncAt.collectAsStateWithLifecycle()
@@ -104,6 +111,9 @@ fun SettingsScreen(
         connectivityResult = uiState.connectivityResult,
         isCheckingConnectivity = uiState.isCheckingConnectivity,
         dreamLoopInterval = dreamLoopInterval,
+        dreamRunState = dreamRunState,
+        lastDreamSuccessAtMs = lastDreamSuccessAtMs,
+        lastDreamSuccessSavedCount = lastDreamSuccessSavedCount,
         healthSyncState = healthSyncState,
         healthAutoSyncEnabled = healthAutoSyncEnabled,
         healthLastSyncAt = healthLastSyncAt,
@@ -146,6 +156,9 @@ private fun SettingsScreenContent(
     connectivityResult: ConnectivityResult?,
     isCheckingConnectivity: Boolean,
     dreamLoopInterval: DreamLoopInterval,
+    dreamRunState: DreamRunObserver.Snapshot,
+    lastDreamSuccessAtMs: Long,
+    lastDreamSuccessSavedCount: Int,
     healthSyncState: com.xiaoqi.companion.data.source.HealthSyncManager.SyncState,
     healthAutoSyncEnabled: Boolean,
     healthLastSyncAt: Long,
@@ -163,14 +176,40 @@ private fun SettingsScreenContent(
     onNotificationEnabledChanged: (Boolean) -> Unit,
     onDreamLoopIntervalChanged: (DreamLoopInterval) -> Unit,
     onTriggerDreamLoopNow: () -> Unit,
+    onDismissDreamMessage: () -> Unit = {},
     onRequestContextPermissions: () -> Unit,
     onHealthAutoSyncEnabledChanged: (Boolean) -> Unit,
     onHealthSyncNow: () -> Unit,
     onOpenMcpSettings: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // dreamRunState 变化时弹一次 snackbar 反馈;Queued/Succeeded/Failed 各自一次。
+    // 用 status 当 key 而不是整个 snapshot,避免 savedCount 改变时(理论上不会,但稳)重复弹。
+    val queuedMsg = stringResource(R.string.dream_loop_queued)
+    val completedWithCountTemplate = stringResource(R.string.dream_loop_completed_with_count)
+    val completedEmptyMsg = stringResource(R.string.dream_loop_completed_empty)
+    val failedMsg = stringResource(R.string.dream_loop_failed)
+    LaunchedEffect(dreamRunState.status) {
+        when (dreamRunState.status) {
+            DreamRunObserver.Status.QUEUED -> snackbarHostState.showSnackbar(queuedMsg)
+            DreamRunObserver.Status.SUCCEEDED -> {
+                val msg = if (dreamRunState.savedCount > 0) {
+                    completedWithCountTemplate.format(dreamRunState.savedCount)
+                } else {
+                    completedEmptyMsg
+                }
+                snackbarHostState.showSnackbar(msg)
+            }
+            DreamRunObserver.Status.FAILED -> snackbarHostState.showSnackbar(failedMsg)
+            else -> Unit
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("设置") },
@@ -276,6 +315,9 @@ private fun SettingsScreenContent(
             item {
                 DreamLoopSection(
                     current = dreamLoopInterval,
+                    runState = dreamRunState,
+                    lastSuccessAtMs = lastDreamSuccessAtMs,
+                    lastSuccessSavedCount = lastDreamSuccessSavedCount,
                     onIntervalChanged = onDreamLoopIntervalChanged,
                     onTriggerNow = onTriggerDreamLoopNow,
                 )
@@ -638,6 +680,9 @@ private fun ToolCapabilityRow(
 @Composable
 private fun DreamLoopSection(
     current: DreamLoopInterval,
+    runState: DreamRunObserver.Snapshot,
+    lastSuccessAtMs: Long,
+    lastSuccessSavedCount: Int,
     onIntervalChanged: (DreamLoopInterval) -> Unit,
     onTriggerNow: () -> Unit,
 ) {
@@ -663,7 +708,7 @@ private fun DreamLoopSection(
                         onValueChange = {},
                         readOnly = true,
                         singleLine = true,
-                        label = { Text(stringResource(R.string.dream_loop_section_title)) },
+                        label = { Text("周期") },
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                         },
@@ -697,12 +742,64 @@ private fun DreamLoopSection(
                 OutlinedButton(
                     onClick = onTriggerNow,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = current.isEnabled,
+                    enabled = current.isEnabled && !runState.isRunning,
                 ) {
-                    Text(stringResource(R.string.dream_loop_trigger_now))
+                    if (runState.isRunning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(
+                        if (runState.isRunning) {
+                            stringResource(R.string.dream_loop_running)
+                        } else {
+                            stringResource(R.string.dream_loop_trigger_now)
+                        },
+                    )
                 }
+                Text(
+                    text = lastDreamRunLabel(lastSuccessAtMs = lastSuccessAtMs, lastSavedCount = lastSuccessSavedCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
+    }
+}
+
+/**
+ * 上次运行状态的展示文案:
+ * - 从未成功过 → "尚无运行记录"
+ * - 跑过 + 有新增 → "上次运行: 3 分钟前 · 新增 2 条"
+ * - 跑过 + 0 新增 → "上次运行: 3 分钟前"
+ *
+ * savedCount 仅在当前 snapshot.status == SUCCEEDED 时才有意义 — 但 UI 层无法判断
+ * "当前 lastSuccessAtMs 对应的 savedCount 是多少",所以简化成"有 >0 就显示"且只在
+ * status 是 SUCCEEDED 时显示。失败/运行中 → 不显示数字。
+ */
+@Composable
+private fun lastDreamRunLabel(lastSuccessAtMs: Long, lastSavedCount: Int): String {
+    if (lastSuccessAtMs == 0L) {
+        return stringResource(R.string.dream_loop_last_run_never)
+    }
+    val ago = relativeTimeAgo(lastSuccessAtMs)
+    return if (lastSavedCount > 0) {
+        stringResource(R.string.dream_loop_last_run_with_count, ago, lastSavedCount)
+    } else {
+        stringResource(R.string.dream_loop_last_run_at, ago)
+    }
+}
+
+private fun relativeTimeAgo(thenMs: Long): String {
+    val diffMs = (System.currentTimeMillis() - thenMs).coerceAtLeast(0L)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(diffMs)
+    return when {
+        minutes < 1L -> "刚刚"
+        minutes < 60L -> "${minutes} 分钟前"
+        minutes < 60L * 24L -> "${TimeUnit.MILLISECONDS.toHours(diffMs)} 小时前"
+        else -> "${TimeUnit.MILLISECONDS.toDays(diffMs)} 天前"
     }
 }
 

@@ -14,6 +14,7 @@ import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceReactionPolicy
 import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
 import com.xiaoqi.companion.core.presence.runtime.DreamLoopScheduler
+import com.xiaoqi.companion.core.presence.runtime.DreamRunObserver
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -90,6 +91,7 @@ class ChatViewModel @Inject constructor(
     private val remoteMcpClient: RemoteMcpClient,
     private val mcpServerListRepository: McpServerListRepository,
     private val dreamLoopScheduler: DreamLoopScheduler,
+    private val dreamRunObserver: DreamRunObserver,
     private val healthSyncManager: HealthSyncManager,
     /** 对 Settings 暴露,用于查询 SDK 状态和已授权权限。 */
     val healthConnectDataSource: HealthConnectDataSource,
@@ -110,6 +112,15 @@ class ChatViewModel @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = DreamLoopInterval.DEFAULT,
         )
+
+    /** "立即跑一次"按钮对应的 Worker 状态(Idle / Queued / Running / Succeeded / Failed)。 */
+    val dreamRunState: StateFlow<DreamRunObserver.Snapshot> = dreamRunObserver.state
+
+    /** 上次成功跑完的 epoch ms;0L = 从未成功过。 */
+    val lastDreamSuccessAtMs: StateFlow<Long> = dreamRunObserver.lastSuccessAtMs
+
+    /** 上次成功跑完时新增的洞察数,新一次 trigger 后保留直到下次 SUCCEEDED。 */
+    val lastDreamSuccessSavedCount: StateFlow<Int> = dreamRunObserver.lastSuccessSavedCount
 
     /**
      * M7 Health Connect: 同步状态机直接对外暴露(供 Settings UI 显示 loading / 失败原因)。

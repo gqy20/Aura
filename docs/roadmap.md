@@ -1,6 +1,6 @@
 # Aura Roadmap
 
-> 最后核对：2026-06-15
+> 最后核对：2026-06-16
 >
 > 本文档用于跟踪当前实现进度，并把 `README.md` / `docs/architecture.md` 中的产品愿景拆成可执行里程碑。
 
@@ -65,6 +65,21 @@
 - 单元测试覆盖：372 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、ReactiveCompanion 4、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）**、**DreamLoopIntervalTest 6 + DreamLoopSchedulerTest 9** 等）。
 - Debug APK 构建链路。
 - `docs/plan` 当前保留端云智能体能力整体方案、Vision/tools 协同计划、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）；已完成/阶段性过期方案归档到 `docs/archive/plan`。
+
+### 近期打磨（2026-06-15 → 06-16，commit `1b826d1` 之后）
+
+无新功能模块上线，全部为**重构 / 优化 / 文档**类工作：
+
+- **注释规范文档化**（`4bc1f4b`）：AGENTS.md / CLAUDE.md 新增"注释规范"章节（不写什么 / 压到什么 / 保留什么）
+- **注释清理**（`5d1920b` 等）：A 类删 19 处（步骤编号、字面复述、考古注释、防御性解释），B 类合并（章节标题砍半、`when` 分支标签精简）
+- **日志体系 P0-P1 补缺**（`1df684e`）：隐私字段脱敏 + 关键 catch 兜底打点 + `Insight/Feature` tag 覆盖
+- **设计 token 抽取**（`e1b9f8c` / `f6f599b`）：`ChatColors` / `ChatStatusColors` / `ChatCardSurface` 统一 8 个 Composable 重复的 `Surface` 模板
+- **envelope 协议**（`5203538`）：工具调用 envelope + 错误结构化 + ToolCall 详情面板
+- **中文 i18n**（`fe7b1df`）：settings + chat UI 文案本地化
+- **UI 打磨**（`68986c9` / `5f74e18` / `7bca3cf` / `2b6b458` / `0708baa`）：对齐优化 / 文案统一 / tool chip 动态文案 / 主页 Insight 短按弹层 / 颜色编码主信号
+- **DB 优化**（`1c639f0`）：拆 `MessageDao` → `MessageSearchDao`，删 LIKE fallback，加 androidTest 真 FTS5 验证
+
+> 备注：上述 12 个 commit 期间未新增单元测试用例（仍为 372 全绿，commit `1b826d1` 时基线）；打磨以 UI/重构/文档为主，不影响测试覆盖范围。
 
 ## 部分实现
 

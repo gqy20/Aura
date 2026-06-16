@@ -223,6 +223,13 @@ class ChatViewModelTest {
             remoteMcpClient = remoteMcpClient,
             mcpServerListRepository = io.mockk.mockk(relaxed = true),
             dreamLoopScheduler = dreamLoopScheduler,
+            dreamRunObserver = io.mockk.mockk(relaxed = true) {
+                every { state } returns kotlinx.coroutines.flow.MutableStateFlow(
+                    com.xiaoqi.companion.core.presence.runtime.DreamRunObserver.Snapshot.IDLE,
+                )
+                every { lastSuccessAtMs } returns kotlinx.coroutines.flow.MutableStateFlow(0L)
+                every { lastSuccessSavedCount } returns kotlinx.coroutines.flow.MutableStateFlow(0)
+            },
             healthSyncManager = io.mockk.mockk(relaxed = true),
             healthConnectDataSource = io.mockk.mockk(relaxed = true),
             sensorHealthSource = io.mockk.mockk(relaxed = true),
@@ -387,6 +394,13 @@ class ChatViewModelTest {
             remoteMcpClient = remoteMcpClient,
             mcpServerListRepository = io.mockk.mockk(relaxed = true),
             dreamLoopScheduler = io.mockk.mockk(relaxed = true),
+            dreamRunObserver = io.mockk.mockk(relaxed = true) {
+                every { state } returns kotlinx.coroutines.flow.MutableStateFlow(
+                    com.xiaoqi.companion.core.presence.runtime.DreamRunObserver.Snapshot.IDLE,
+                )
+                every { lastSuccessAtMs } returns kotlinx.coroutines.flow.MutableStateFlow(0L)
+                every { lastSuccessSavedCount } returns kotlinx.coroutines.flow.MutableStateFlow(0)
+            },
             healthSyncManager = io.mockk.mockk(relaxed = true),
             healthConnectDataSource = io.mockk.mockk(relaxed = true),
             sensorHealthSource = io.mockk.mockk(relaxed = true),

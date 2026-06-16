@@ -8,15 +8,23 @@
     -->
 
     <!-- Dream Loop 周期档位 (Settings → Presence Layer) -->
-    <string name="dream_loop_section_title">后台觉察 (Dream Loop)</string>
-    <string name="dream_loop_section_subtitle">Aura 在后台做模式识别的频率</string>
+    <string name="dream_loop_section_title">后台觉察</string>
+    <string name="dream_loop_section_subtitle">Aura 在后台做模式识别</string>
     <string name="dream_loop_warning_freq">⚠ 频繁触发会增加耗电与算力占用</string>
     <string name="dream_loop_trigger_now">立即跑一次</string>
+    <string name="dream_loop_running">运行中…</string>
+    <string name="dream_loop_queued">已加入队列</string>
     <string name="dream_loop_off">已关闭</string>
     <string name="dream_loop_15min">15 分钟</string>
     <string name="dream_loop_30min">30 分钟</string>
     <string name="dream_loop_1h">1 小时</string>
     <string name="dream_loop_3h">3 小时</string>
-    <string name="dream_loop_6h">6 小时(默认)</string>
+    <string name="dream_loop_6h">6 小时</string>
     <string name="dream_loop_12h">12 小时</string>
+    <string name="dream_loop_completed_with_count">完成 · 新增 %1$d 条洞察</string>
+    <string name="dream_loop_completed_empty">完成 · 本次没新内容</string>
+    <string name="dream_loop_failed">失败 · 请重试</string>
+    <string name="dream_loop_last_run_never">尚无运行记录</string>
+    <string name="dream_loop_last_run_at">上次运行: %1$s</string>
+    <string name="dream_loop_last_run_with_count">上次运行: %1$s · 新增 %2$d 条</string>
 </resources>

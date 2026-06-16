@@ -3,7 +3,9 @@ package com.xiaoqi.companion.core.presence.runtime
 import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.repository.InsightRepository
@@ -103,6 +105,16 @@ class DreamLoopWorker @AssistedInject constructor(
             "latencyMs" to result.latencyMs,
             "durationMs" to (System.currentTimeMillis() - startedAt),
         )
-        Result.success()
+        Result.success(
+            workDataOf(
+                KEY_SAVED_COUNT to savedCount,
+                KEY_DRAFTS_PARSED to drafts.size,
+            ),
+        )
+    }
+
+    companion object {
+        const val KEY_SAVED_COUNT = "dream_loop_saved_count"
+        const val KEY_DRAFTS_PARSED = "dream_loop_drafts_parsed"
     }
 }

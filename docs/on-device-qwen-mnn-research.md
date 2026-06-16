@@ -1,6 +1,6 @@
 # Aura 端侧 Qwen / MNN / SME2 调研备忘
 
-> 更新时间：2026-05-31
+> 更新时间：2026-06-16
 >
 > 范围：整理将 Qwen 小模型加入 Aura Android 项目、在手机本地部署的可行性分析。本文不包含后续 ADB 连机调试记录。
 
@@ -273,4 +273,62 @@ User / Chat UI -> CompanionRuntime      |
 ```
 
 这条路线既保留现有云端 agent 能力，也为 Aura 增加真正的端侧生命感和隐私能力。
+
+---
+
+## 9. 实际落地状态（2026-06-16 更新）
+
+调研完成 16 天后，跟进 M3 / M4 阶段的实际落地情况（commit `1b826d1` 起）：
+
+### 阶段 1（本地文本聊天原型）— ✅ 已落地
+
+调研建议的"阶段 1：本地文本聊天 MVP"全部落地：
+
+| 调研建议 | 实际落地 | 引用 |
+|---------|---------|------|
+| 新增 `LlmProvider.LOCAL_QWEN` | ✅ `LlmProvider.LOCAL_QWEN` 已在 SettingsScreen ProviderPicker | `feature/chat/SettingsScreen.kt` |
+| 新增 `LocalQwenEngine` / `LocalModelRuntime` 接口 | ✅ `LocalQwenEngine` + `MnnLocalQwenEngine` + `NativeMnnLlmBridge` 落地 | `core/local/` |
+| 接入真实 native 后端 | ✅ MNN native 桥接 + ARM CPU 推理路径 | `core/local/MnnLocalQwenEngine.kt` |
+| 文本输入 + 流式输出 | ✅ `LocalQwenExecutor` 包装 MNN + `Request(maxTokens/temperature)` + `parsePatternDetectOutput` | `core/presence/runtime/LocalQwenExecutor.kt` |
+| 本地 prompt 简化 | ✅ DreamDataCollector 生成轻量 prompt（不含 base64） | `core/presence/runtime/DreamDataCollector.kt` |
+| 禁用 tools | ✅ MNN 路径不挂 Koog tool loop | runtime 设计 |
+| 失败 fallback 云端 | ✅ SettingsScreen 允许 Provider 切换，Runtime 按 Provider 路由 | `CompanionRuntime` |
+
+### 阶段 2（产品化 MVP）— ✅ 已落地
+
+| 调研建议 | 实际落地 | 引用 |
+|---------|---------|------|
+| 模型下载、校验、删除 | ✅ `LocalQwenModelDownloader` UI 入口（SettingsScreen "下载 / 删除" 按钮） | commit `5d1920b` 修"两个未安装"显示 |
+| 模型状态显示 | ✅ `LocalQwenDownloadSection` 实时显示下载进度 + 字节数 + 状态 | `feature/chat/SettingsScreen.kt` |
+| 设置页选择本地/云端 | ✅ ProviderPicker 包含 `Local Qwen` chip | 同上 |
+| 设备能力检测 | ⏳ SME2 检测未做（调研结论"SME2 不是必要条件"） | — |
+| 本地 prompt 压缩 | ✅ DreamDataCollector 走 metadata-only 路径 | 阶段 1 落地 |
+
+### 阶段 3（端侧增强能力）— 🚧 部分落地
+
+| 调研建议 | 实际落地 | 引用 |
+|---------|---------|------|
+| 本地摘要 / 分类 / 记忆候选提取 | ✅ `parsePatternDetectOutput` 走 `LocalQwenExecutor` | `core/presence/runtime/LocalQwenExecutor.kt` |
+| 少量只读工具调用 | ⏳ 未做（依赖 P2 tool decision 抽象） | — |
+| 更严格结构化输出 parser | ✅ `parsePatternDetectOutput` + `InsightValidator` 8 边界 | commit `5b77241` |
+| Vision 输入实验 | ❌ 未做（调研建议"放到文本 MVP 之后"，M4 已走云端 GLM Vision） | — |
+
+### 调研结论的验证
+
+- ✅ **"端云协同，而非二选一"**：Aura 实际采用 Provider 切换模型，云端 GLM/Kimi + 本地 Qwen 0.8B 并存。
+- ✅ **"MNN 是可行路线"**：`MnnLocalQwenEngine` + `NativeMnnLlmBridge` 跑通，本地文本生成可用。
+- ✅ **"Q4/Q5 量化后 GB 级"**：当前 Qwen 0.8B MNN 模型约 1GB，与调研判断一致。
+- ✅ **"SME2 不是必要条件"**：当前未做 SME2 优化，普通 ARM CPU 跑通。
+
+### 当前未做的项
+
+1. **SME2 / KleidiAI 优化路径**：调研时标注"2026 年新设备开始关注"，当前真机是 realme RMX3888 (ARMv8.2)，MNN 走普通 CPU 路径够用。
+2. **本地 LLM 替代 GLM Vision**：调研时标注"放到文本 MVP 之后"，目前 Vision 仍走云端 GLM-5v-turbo，本地仅服务 DreamLoop 文本分析。
+3. **PocketPal 风格的 llama.cpp/GGUF 路线**：选择 MNN 路线后未实施，作为未来备选。
+
+### 后续建议
+
+- M3 PoC 完善（用户在真机触发 Qwen 模型下载 → DreamLoop 跑出第一条 LLM 真实生成的 insight）是当前最优先项。
+- 本地 LLM 增强能力（阶段 3）依赖 M5 PulseWorker 落地后的内存预算反馈再排期。
+- llama.cpp/GGUF 路线作为"Plan B"，若 MNN 路线出现性能瓶颈再考虑切换。
 

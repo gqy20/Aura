@@ -4,6 +4,78 @@
 
 ## [Unreleased]
 
+0.1.4 计划合入 M2 Insight 框架 + M3 端到端 + M4 vision→memory→dream 闭环（commit `1b826d1`），以及 12+ 项打磨 / 重构 / 文档类工作。距 0.1.3 (2026-05-25) 已 22 天 / 30+ commit。
+
+### 新增
+
+**M2 Insight 框架**（commit `5b77241`）
+- 新增 `insights` 表 / Entity / DAO / Repository，承载"长期认识你"叙事的数据底座。
+- 新增 `InsightValidator`（8 边界单元测试：缺 evidence / 全部 hallucinate / 重复 / 信心度低 / evidence 不存在）。
+- 主页 `InsightCard` / `InsightCardList` / `InsightLongPressDialog` 落地，4 动作：本周不再说 X 类 / 知道了 / 查看依据 / 和 Aura 聊聊。
+- Onboarding 5 问（最近挂心事 / 未来重要日期 / 称呼 / 关系人 / 作息）—— 全部可选可跳过，模板表单不入 LLM（`4ee7758`）。
+- `DataTransparencySection`：设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + 二次确认。
+
+**M3 端到端**（commit `ba6ebad`）
+- `ReactiveCompanion`（dual-mind Phase 0）：原 `LocalQwenAgentWrapper` 重命名，体现"对用户消息的本地觉察响应"语义。
+- `core/presence/runtime/` 目录：`LocalQwenExecutor` / `DreamDataCollector` / `DreamLoopWorker` / `DreamLoopScheduler` / `BatteryHelper` 落地。
+- `DreamLoopScheduler` 7 档周期（OFF / 15min / 30min / 1h / 3h / 6h(默认) / 12h）+ 立即跑一次按钮；改档位走 `ExistingPeriodicWorkPolicy.UPDATE` 立即生效。
+- `MoodTrendChart` Canvas 4 根周柱状图（高/中/低 3 档配色），按周聚合近 28 天 mood_snapshots。
+- Insight 与对话体打通："和 Aura 聊聊" → prefill prompt → ChatScreen `LaunchedEffect(pendingPrefill)` 消费。
+
+**M3 PoC 修复**（commit `9fa58ab`）
+- `seedDemoInsights` evidence 真实化（不再 hallucinate）。
+- Onboarding 5 问改为"5/5 必填，1/5 可空"。
+
+**M4 vision→memory→dream 闭环**（commit `1b826d1`）
+- `MemoryEntity` 升级到 v8（`MIGRATION_7_8` 新增 `imageBase64` + `imageMediaType` 两列）。
+- `MemoryRepository.saveVisionMemory` 把"用户发图"事件作为 FACT 记忆写入。
+- `SendMessageUseCase` 注入 `MemoryRepository`，发送带图消息时 fire-and-forget 调 `saveVisionMemory`（失败仅 log 不阻塞主流程）。
+- `DreamDataCollector.collectLast7Days` 拉最近 5 张图 metadata（**不含 base64**）进 `Snapshot.imageMemories` 注入 DreamPrompt `## 视觉证据` section。
+
+**i18n**（commit `fe7b1df`）
+- settings + chat UI 中文本地化 + 冗余清理。
+
+### 变更
+
+**UI / 设计 token 收敛**
+- `ChatColors` / `ChatStatusColors` 抽取（`e1b9f8c`），统一状态色 + 卡片色映射。
+- `ChatCardSurface` 抽取（`f6f599b`），收敛 8 个 Composable 重复的 `Surface` 模板。
+- 颜色编码当主信号、文字作辅助（`0708baa`）—— 进一步去文字徽章。
+- 主页 Insight 短按弹层 + 关闭按钮统一（`2b6b458`）。
+- tool chip 动态文案 + streaming draft 过滤 LLM 控制标签（`7bca3cf`）。
+
+**Save 按钮**（commit `85cb87c`）
+- TopAppBar actions 永久显示 Save 按钮；api_key 字段实时保存（不依赖 Save 按钮）。
+
+**envelope 协议**（commit `5203538`）
+- 工具调用 envelope + 错误结构化 + ToolCall 详情面板。
+
+**UI 打磨**（commit `68986c9` / `5f74e18`）
+- B/C 类对齐优化 + 文案统一。
+
+### 修复
+
+- 修本地模型"两个未安装"显示（`5d1920b`）：`LocalQwenModelDownloader.status()` 不再填充 message，状态文本完全由 UI 端派生。
+- 拆 `MessageDao` → `MessageSearchDao`，删 LIKE fallback，加 androidTest 真 FTS5 验证（`1c639f0`）。
+
+### 工具链
+
+- 日志体系 P0-P1 补缺（`1df684e`）：隐私字段脱敏 + 关键 catch 兜底打点 + `Insight/Feature` tag 覆盖。
+- 注释规范文档化（`4bc1f4b`）：AGENTS.md / CLAUDE.md 新增"注释规范"章节。
+- 注释清理（`5d1920b` 等）：A 类删 19 处（步骤编号、字面复述、考古注释、防御性解释），B 类合并（章节标题砍半）。
+- CI lint 解锁（`c103384`）：`RestrictedApi` + `PropertyEscape` 修复。
+
+### 文档
+
+- `docs/fallbacks.md` full sweep（`a65bc18`）：sync stale entries + 11 个新 module chapters。
+- 归档 6 个过时 plan docs（`b54025e`）。
+- 更新 `README.md`（加 logo + 徽章 + 详细化）、`docs/roadmap.md`（最后核对 2026-06-16 + 近期打磨段）。
+
+### 备注
+
+- M2-M4 已在代码里完整跑通，0.1.4 仅是"合入 release"的过程性版本；下一真正有产品意义的小版本是 M5 后的 0.2.0（Pulse + 双轨拆分）。
+- 372 个单元测试通过（commit `1b826d1` 时基线），打磨类工作未新增测试用例。
+
 ---
 
 ## [0.1.3] - 2026-05-25
