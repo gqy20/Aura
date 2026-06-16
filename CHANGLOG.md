@@ -2,9 +2,9 @@
 
 项目使用带 `v` 前缀的语义化版本标签，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
-## [Unreleased]
+## [0.1.4] - 2026-06-16
 
-0.1.4 计划合入 M2 Insight 框架 + M3 端到端 + M4 vision→memory→dream 闭环（commit `1b826d1`），以及 12+ 项打磨 / 重构 / 文档类工作。距 0.1.3 (2026-05-25) 已 22 天 / 30+ commit。
+距 0.1.3 (2026-05-25) 共 100 个提交。核心主题：M2 Insight 框架 + M3 Presence 端到端 + M4 Vision→Memory→Dream 闭环 + 本地 LLM 全链路（MNN + ModelScope）+ Health Connect + 项目官网上线 + 品牌体系统一 + UI/UX 全面打磨。
 
 ### 新增
 
@@ -32,6 +32,28 @@
 - `SendMessageUseCase` 注入 `MemoryRepository`，发送带图消息时 fire-and-forget 调 `saveVisionMemory`（失败仅 log 不阻塞主流程）。
 - `DreamDataCollector.collectLast7Days` 拉最近 5 张图 metadata（**不含 base64**）进 `Snapshot.imageMemories` 注入 DreamPrompt `## 视觉证据` section。
 
+**本地 LLM 全链路**
+- MNN native runtime 完整链路：`NativeMnnLlmBridge` → `MnnLocalQwenEngine` → `MnnInferenceConfig`（设备自适应推理参数）（`54254b2` / `da8ed2b` / `e50e555`）。
+- ModelScope（魔搭）本地 Qwen 模型下载器，端内一键下载安装（`8e445b3`）。
+- 本地模型 A+B 共享：云端 provider 与本地 provider 共享同一模型实例，MNN 默认路径自动配置（`94870ef`）。
+- 本地工具调用（tool call）与聊天入口对齐，本地模型也能触发 agent tools（`460b058`）。
+- 本地模型运行时边界检查 + 诊断信息，未安装模型时阻止进入聊天（`948133f` / `780f4fd`）。
+- MNN prompt cache 与结构化 turn 同步，改善多轮本地推理一致性（`d3fd6c7`）。
+
+**Health Connect 集成（M7）**
+- Health Connect 多源适配层，统一健康数据读取接口（`9b78c34`）。
+- SensorManager 步数源作为兜底，Health Connect 不可用时自动降级（`84a4e1f`）。
+
+**魔搭 ModelScope provider**
+- 新增 ModelScope provider（Anthropic Messages 兼容协议），可直接使用 Kimi / GLM 等国产模型（`503425d`）。
+
+**MCP multi-server preset**
+- multi-server preset 架构，支持 key-only onboarding（填 key 即用，无需手动配 URL）（`25d2cec`）。
+
+**品牌体系统一**
+- Aura logo — crescent ring design 月牙环设计（`fb7a791`）。
+- `brand.properties` 作为品牌 single source of truth，`colors.xml` + `BuildConfig` 统一读取（`a8edfc0`）。
+
 **i18n**（commit `fe7b1df`）
 - settings + chat UI 中文本地化 + 冗余清理。
 
@@ -53,10 +75,17 @@
 **UI 打磨**（commit `68986c9` / `5f74e18`）
 - B/C 类对齐优化 + 文案统一。
 
+**Presence animation mapping**
+- 新增 Presence animation state mapping，角色状态与动画帧映射（`3997506`）。
+
 ### 修复
 
 - 修本地模型"两个未安装"显示（`5d1920b`）：`LocalQwenModelDownloader.status()` 不再填充 message，状态文本完全由 UI 端派生。
 - 拆 `MessageDao` → `MessageSearchDao`，删 LIKE fallback，加 androidTest 真 FTS5 验证（`1c639f0`）。
+- 稳定本地 Qwen 与后台状态同步（`4a03436`）。
+- 修主页 Insight 短按弹层交互（`2b6b458`）。
+- 修聊天 WeChat IME 面板卡住（`ccf7f27` / `dd1d8ff`）。
+- 修 settings page Save 按钮 + api_key 实时保存（`85cb87c`）。
 
 ### 工具链
 
@@ -70,10 +99,22 @@
 - `docs/fallbacks.md` full sweep（`a65bc18`）：sync stale entries + 11 个新 module chapters。
 - 归档 6 个过时 plan docs（`b54025e`）。
 - 更新 `README.md`（加 logo + 徽章 + 详细化）、`docs/roadmap.md`（最后核对 2026-06-16 + 近期打磨段）。
+- 新增创意赛方案 + LifeScore 设计（`d7f3a95`）。
+- 新增 dual-mind 架构方案（`dfb0c7b`）。
+- 重写 agent 编排层文档（M4 vision memory 同步）（`f739090`）。
+
+### 项目官网
+
+- 新增项目官网：Next.js 15 + Tailwind v4 + monorepo（`web/`）（`835cb30`）。
+- Hero 3D 主视觉 + 滚动叙事 + 磁性光标（`fdb7fe7` / `0f19022`）。
+- 三个特性深页（/presence, /memory, /agent）含 3D + stats 立体结构（`2b89d80` / `d0fdab0`）。
+- T2 节奏感：3 特性页背景渐变 + GSAP timeline 点亮 + reaction 强度条（`96e4d6f`）。
+- 站点文案全量中文化（`c89afe7`）。
+- Vercel 部署配置 + 多轮修复（`59dd743` / `9c3f53c` / `522ebf1` / `e12ed22` / `de74a89` / `96ded35`）。
 
 ### 备注
 
-- M2-M4 已在代码里完整跑通，0.1.4 仅是"合入 release"的过程性版本；下一真正有产品意义的小版本是 M5 后的 0.2.0（Pulse + 双轨拆分）。
+- M2-M4 已在代码里完整跑通，0.1.4 是"合入 release"的过程性版本。
 - 372 个单元测试通过（commit `1b826d1` 时基线），打磨类工作未新增测试用例。
 
 ---
