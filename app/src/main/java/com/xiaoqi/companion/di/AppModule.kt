@@ -4,8 +4,6 @@ import com.xiaoqi.companion.core.companion.EmotionStateMachine
 import com.xiaoqi.companion.core.companion.EmotionStateMachineImpl
 import com.xiaoqi.companion.core.companion.KoogAgentFactory
 import com.xiaoqi.companion.core.companion.KoogAgentFactoryImpl
-import com.xiaoqi.companion.core.companion.RelationshipModel
-import com.xiaoqi.companion.core.companion.RelationshipModelImpl
 import com.xiaoqi.companion.core.context.AndroidContextPermissionReader
 import com.xiaoqi.companion.core.context.AndroidCurrentLocationProvider
 import com.xiaoqi.companion.core.context.AndroidDeviceStatusProvider
@@ -55,10 +53,6 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindEmotionMachine(machine: EmotionStateMachineImpl): EmotionStateMachine
-
-    @Binds
-    @Singleton
-    abstract fun bindRelationshipModel(model: RelationshipModelImpl): RelationshipModel
 
     @Binds
     @Singleton
