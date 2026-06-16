@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.core.llm.ConnectivityResult
 import com.xiaoqi.companion.core.mcp.McpServerConfig
 import com.xiaoqi.companion.core.mcp.McpServerPresets
+import com.xiaoqi.companion.ui.theme.ChatCardSurface
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
 
@@ -369,11 +370,7 @@ private fun DiscoveredToolsSection(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = ChatColors.CardSurface,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        ChatCardSurface {
             Column(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -555,11 +552,7 @@ private fun McpEditorScreen(
                     )
                 }
                 item {
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = ChatColors.CardSurface,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
+                    ChatCardSurface {
                         Column(
                             modifier = Modifier.padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),

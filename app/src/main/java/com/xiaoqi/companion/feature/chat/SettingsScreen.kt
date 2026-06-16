@@ -73,6 +73,7 @@ import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
 import kotlinx.coroutines.launch
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
+import com.xiaoqi.companion.ui.theme.ChatCardSurface
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
 import java.util.Locale
@@ -311,7 +312,12 @@ private fun ProviderPicker(
     provider: LlmProvider,
     onProviderChanged: (LlmProvider) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // FlowRow:避免窄屏下最后一个 chip 被挤出/换行。
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         FilterChip(
             selected = provider == LlmProvider.GLM,
             onClick = { onProviderChanged(LlmProvider.GLM) },
@@ -330,7 +336,7 @@ private fun ProviderPicker(
         FilterChip(
             selected = provider == LlmProvider.LOCAL_QWEN,
             onClick = { onProviderChanged(LlmProvider.LOCAL_QWEN) },
-            label = { Text("Local Qwen") },
+            label = { Text("Local") },
         )
     }
 }
@@ -384,6 +390,8 @@ internal fun SettingsSectionTitle(
             )
         }
     }
+    // 父 LazyColumn 的 18dp 不够:subtitle 会跟下方卡片粘在一起,再补 6dp。
+    Spacer(Modifier.height(6.dp))
 }
 
 @Composable
@@ -391,17 +399,15 @@ private fun LocalQwenDownloadSection(
     state: LocalQwenDownloadUiState,
     onDownload: () -> Unit,
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = ChatColors.CardSurface,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    ChatCardSurface {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val status = when {
-                state.isDownloading -> "下载中 ${formatPercent(state.progress)}"
+                // 下载中:把百分比和字节数合并到同一行,避免再占一行字节数。
+                state.isDownloading ->
+                    "下载中 ${formatPercent(state.progress)} · ${formatBytes(state.downloadedBytes, state.totalBytes)}"
                 state.isInstalled -> "已安装"
                 state.error != null -> "下载失败"
                 else -> "未安装"
@@ -419,11 +425,6 @@ private fun LocalQwenDownloadSection(
                 LinearProgressIndicator(
                     progress = { state.progress.coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    text = formatBytes(state.downloadedBytes, state.totalBytes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             state.message?.takeIf { it.isNotBlank() && !state.isDownloading }?.let {
@@ -648,11 +649,7 @@ private fun DreamLoopSection(
             title = stringResource(R.string.dream_loop_section_title),
             subtitle = stringResource(R.string.dream_loop_section_subtitle),
         )
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = ChatColors.CardSurface,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        ChatCardSurface {
             Column(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -727,7 +724,8 @@ internal fun CapabilityMetaPill(text: String) {
 
 internal fun String.modelOptionLabel(provider: LlmProvider): String =
     if (provider == LlmProvider.LOCAL_QWEN) {
-        removePrefix("Qwen3.5-").removeSuffix("-MNN")
+        // "Qwen3.5-0.8B-MNN" -> "Qwen 0.8B":保留 Qwen 前缀便于识别尺寸档位。
+        replace("Qwen3.5-", "Qwen ").removeSuffix("-MNN")
     } else {
         this
     }
@@ -835,11 +833,7 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
             title = "数据透明",
             subtitle = "本地存储，可查可改可删",
         )
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = ChatColors.CardSurface,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        ChatCardSurface {
             Column(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -858,15 +852,27 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
                 ) {
                     Text("导出全部为 JSON")
                 }
-                Spacer(Modifier.height(4.dp))
-                androidx.compose.material3.Text(
-                    text = "清空（需二次确认）",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                )
-                ClearButton("清空洞察", ClearTarget.Insights) { pendingClear = it }
-                ClearButton("清空情绪快照", ClearTarget.MoodSnapshots) { pendingClear = it }
-                ClearButton("清空记忆", ClearTarget.Memories) { pendingClear = it }
+                // 二次确认由 AlertDialog 处理,无需额外标题。
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ClearButton(
+                        label = "清空洞察",
+                        target = ClearTarget.Insights,
+                        modifier = Modifier.weight(1f),
+                    ) { pendingClear = it }
+                    ClearButton(
+                        label = "清空情绪快照",
+                        target = ClearTarget.MoodSnapshots,
+                        modifier = Modifier.weight(1f),
+                    ) { pendingClear = it }
+                    ClearButton(
+                        label = "清空记忆",
+                        target = ClearTarget.Memories,
+                        modifier = Modifier.weight(1f),
+                    ) { pendingClear = it }
+                }
             }
         }
     }
@@ -931,15 +937,18 @@ private fun CountRow(label: String, count: Int) {
 private fun ClearButton(
     label: String,
     target: ClearTarget,
+    modifier: Modifier = Modifier,
     onClick: (ClearTarget) -> Unit,
 ) {
     androidx.compose.material3.TextButton(
         onClick = { onClick(target) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
     ) {
         Text(
             text = label,
             color = MaterialTheme.colorScheme.error,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

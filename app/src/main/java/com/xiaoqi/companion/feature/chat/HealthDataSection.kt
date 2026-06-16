@@ -18,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +44,7 @@ import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.HealthSyncManager
 import com.xiaoqi.companion.data.source.SensorManagerHealthSource
+import com.xiaoqi.companion.ui.theme.ChatCardSurface
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
 import java.util.concurrent.TimeUnit
@@ -127,11 +127,7 @@ private fun HealthPermissionsCard(dataSource: HealthConnectDataSource) {
         refresh()
     }
 
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = ChatColors.CardSurface,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    ChatCardSurface {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -257,11 +253,7 @@ private fun SensorSourceCard(sensorSource: SensorManagerHealthSource) {
         refresh()
     }
 
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = ChatColors.CardSurface,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    ChatCardSurface {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -377,11 +369,7 @@ private fun HealthSyncStatusCard(
     onAutoSyncEnabledChanged: (Boolean) -> Unit,
     onSyncNow: () -> Unit,
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = ChatColors.CardSurface,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    ChatCardSurface {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
