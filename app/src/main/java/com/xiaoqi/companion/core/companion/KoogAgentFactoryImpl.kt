@@ -67,6 +67,8 @@ class KoogAgentFactoryImpl @Inject constructor(
             return ReactiveCompanion(
                 engine = localQwenEngine,
                 modelName = config.modelName,
+                toolRegistry = if (config.provider == LlmProvider.LOCAL_QWEN) toolRegistry.create() else ToolRegistry.EMPTY,
+                toolCallRecorder = toolCallRecorder,
             )
         }
         return KoogPromptExecutorWrapper(

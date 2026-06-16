@@ -284,6 +284,7 @@ fun ChatScreenContent(
         ) {
             CompanionHeader(
                 presence = uiState.presence,
+                presenceAnimation = uiState.presenceAnimation,
                 configStatus = uiState.configStatus,
                 memories = uiState.memories,
                 reminders = uiState.reminders,

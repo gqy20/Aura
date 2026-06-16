@@ -251,7 +251,49 @@ class KoogAgentFactoryImplTest {
         )
         assertEquals("system", localEngine.lastRequest?.systemPrompt)
         assertEquals("hello", localEngine.lastRequest?.userMessage)
-        assertEquals(false, localEngine.lastRequest?.allowTools)
+        assertEquals(true, localEngine.lastRequest?.allowTools)
+    }
+
+    @Test
+    fun create_localQwenProvider_withTools_executesLocalToolLoop() = runTest {
+        val localEngine = SequencedLocalQwenEngine(
+            listOf(
+                listOf("""{"tool_calls":[{"name":"test_note","arguments":{"content":"User likes jasmine tea"}}]}"""),
+                listOf("remembered"),
+            )
+        )
+        val factory = KoogAgentFactoryImpl(
+            executorFactory = object : KoogPromptExecutorFactory {
+                override fun create(config: LlmConfig): PromptExecutor = error("remote executor should not be used")
+            },
+            localQwenEngine = localEngine,
+            toolCallRecorder = toolCallRecorder,
+            toolRegistry = object : AgentToolRegistry {
+                override fun create(): ToolRegistry =
+                    ToolRegistry.builder()
+                        .tool(noteTool)
+                        .build()
+            },
+        )
+
+        val events = factory.create(testConfig.copy(provider = LlmProvider.LOCAL_QWEN)).runEvents(
+            BuiltPrompt(
+                systemPrompt = "system",
+                userMessage = "remember this",
+                allowTools = true,
+            )
+        ).toList()
+
+        assertTrue(events.any {
+            val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
+            call?.name == "test_note" && call.status == ToolCallStatus.STARTED
+        })
+        assertTrue(events.any {
+            val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
+            call?.name == "test_note" && call.status == ToolCallStatus.SUCCEEDED
+        })
+        assertTrue(events.contains(KoogAgentEvent.TextDelta("remembered")))
+        assertEquals(2, localEngine.requests.size)
     }
 
     private class ToolCallingPromptExecutor : PromptExecutor() {
@@ -313,6 +355,17 @@ class KoogAgentFactoryImplTest {
         override fun stream(request: LocalQwenRequest): Flow<String> = flow {
             lastRequest = request
             chunks.forEach { emit(it) }
+        }
+    }
+
+    private class SequencedLocalQwenEngine(
+        private val responses: List<List<String>>,
+    ) : LocalQwenEngine {
+        val requests = mutableListOf<LocalQwenRequest>()
+
+        override fun stream(request: LocalQwenRequest): Flow<String> = flow {
+            requests += request
+            responses[requests.lastIndex].forEach { emit(it) }
         }
     }
 

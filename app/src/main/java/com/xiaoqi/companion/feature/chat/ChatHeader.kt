@@ -36,8 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xiaoqi.companion.BuildConfig
+import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceUiState
-import com.xiaoqi.companion.core.presence.animationState
 
 /**
  * 聊天页顶栏:头像 + 标题 + Memory/Reminders/MCP/Settings 入口按钮,
@@ -50,6 +50,7 @@ import com.xiaoqi.companion.core.presence.animationState
 @Composable
 internal fun CompanionHeader(
     presence: PresenceUiState,
+    presenceAnimation: PresenceAnimationState,
     configStatus: ChatConfigStatus,
     memories: List<ChatMemory>,
     reminders: List<ChatReminder>,
@@ -74,7 +75,7 @@ internal fun CompanionHeader(
         ) {
             AuraPetAvatar(
                 presence = presence,
-                animationState = presence.animationState(),
+                animationState = presenceAnimation,
                 size = 40.dp,
                 onClick = onPresenceTapped,
             )

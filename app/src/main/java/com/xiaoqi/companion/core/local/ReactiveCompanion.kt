@@ -5,6 +5,8 @@ import com.xiaoqi.companion.core.companion.KoogAgentWrapper
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
+import com.xiaoqi.companion.core.tools.ToolCallRecorder
+import ai.koog.agents.core.tools.ToolRegistry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.mapNotNull
@@ -30,6 +32,8 @@ import kotlinx.serialization.json.Json
 class ReactiveCompanion(
     private val engine: LocalQwenEngine,
     private val modelName: String = "",
+    private val toolRegistry: ToolRegistry = ToolRegistry.EMPTY,
+    private val toolCallRecorder: ToolCallRecorder? = null,
 ) : KoogAgentWrapper {
 
     override suspend fun run(prompt: BuiltPrompt): String =
@@ -48,25 +52,66 @@ class ReactiveCompanion(
         runEvents(prompt).mapNotNull { event -> (event as? KoogAgentEvent.TextDelta)?.text }
 
     override fun runEvents(prompt: BuiltPrompt): Flow<KoogAgentEvent> = flow {
-        engine.stream(prompt.toLocalRequest()).collect { emit(KoogAgentEvent.TextDelta(it)) }
+        if (!prompt.allowTools || prompt.hasImage || toolRegistry.tools.isEmpty()) {
+            engine.stream(prompt.toLocalRequest()).collect { emit(KoogAgentEvent.TextDelta(it)) }
+            return@flow
+        }
+
+        val firstPassPrompt = prompt.copy(
+            systemPrompt = buildString {
+                append(prompt.systemPrompt)
+                append("\n\n")
+                append(LocalToolProtocol.buildToolInstructionBlock(toolRegistry))
+            }
+        )
+        val firstPassText = engine.stream(firstPassPrompt.toLocalRequest())
+            .toList()
+            .joinToString("")
+        val toolCalls = LocalToolProtocol.parseToolCalls(firstPassText)
+        if (toolCalls.isEmpty()) {
+            emit(KoogAgentEvent.TextDelta(firstPassText))
+            return@flow
+        }
+
+        val execution = LocalToolExecutor(
+            registry = toolRegistry,
+            recorder = toolCallRecorder,
+            sessionId = DEFAULT_SESSION_ID,
+        ).execute(toolCalls)
+        execution.events.forEach { emit(it) }
+
+        val secondPassPrompt = prompt.copy(
+            userMessage = buildString {
+                append(prompt.userMessage)
+                append("\n\n")
+                append(execution.transcript)
+            }
+        )
+        engine.stream(secondPassPrompt.toLocalRequest()).collect {
+            emit(KoogAgentEvent.TextDelta(it))
+        }
     }
 
     private fun BuiltPrompt.toLocalRequest(): LocalQwenRequest {
-        if (allowTools) {
+        if (allowTools && toolRegistry.tools.isEmpty()) {
             AppLogger.warn(
                 LogTags.LocalModel,
                 "local_qwen_tool_request_skipped",
-                "reason" to "Local Qwen text engine does not support tool calls; allowTools ignored",
+                "reason" to "No registered local tools; allowTools ignored",
             )
         }
         return LocalQwenRequest(
             systemPrompt = systemPrompt,
             userMessage = userMessage,
             modelName = modelName,
-            allowTools = false,
+            allowTools = allowTools,
             imageBase64 = imageBase64,
             imageMediaType = imageMediaType,
         )
+    }
+
+    private companion object {
+        const val DEFAULT_SESSION_ID = "default"
     }
 }
 
