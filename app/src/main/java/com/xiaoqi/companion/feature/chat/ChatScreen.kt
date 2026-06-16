@@ -39,7 +39,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,6 +60,10 @@ import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.CompanionTheme
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -151,26 +157,84 @@ fun ChatScreenContent(
     // reversed 列表的 index 0 = 原 messages 的 lastIndex(最新一条)。
     val reversedMessages = remember(messages) { messages.asReversed() }
 
-    LaunchedEffect(messages.size, lastContentLength) {
-        if (reversedMessages.isNotEmpty()) {
-            if (!hasCompletedInitialScroll) {
-                // 反向布局:index 0 是底部(最新消息),scrollToItem(0) 即滚到底
-                listState.scrollToItem(0)
-                hasCompletedInitialScroll = true
-            } else {
-                // reverseLayout 下 firstVisibleItemIndex 是底部最小 index,
-                // 接近 0 表示用户已经在底部附近
-                val firstVisible = listState.firstVisibleItemIndex
-                val isNearLatest = firstVisible <= 1
-                if (isNearLatest) {
-                    if (messages.lastOrNull()?.isStreaming == true) {
-                        listState.scrollToItem(0)
-                    } else {
-                        listState.animateScrollToItem(0)
-                    }
+    // P3: 滚动策略——2 秒后自动恢复跟随
+    // - 用户上滑(index > 0 或 offset > 32dp)→ isUserPinnedToBottom = false
+    // - 用户主动拖动(isScrollInProgress)→ 临时禁止跟随
+    // - 2 秒内用户无进一步操作 → 恢复 isUserPinnedToBottom = true
+    // - 流式期间只在 pinned 时自动 scrollToItem(0)
+    var isUserPinnedToBottom by rememberSaveable { mutableStateOf(true) }
+    var followRecoveryJob by remember { mutableStateOf<Job?>(null) }
+    val followRecoveryScope = rememberCoroutineScope()
+
+    // 1) 初始滚动(同步)
+    LaunchedEffect(reversedMessages.size) {
+        if (reversedMessages.isNotEmpty() && !hasCompletedInitialScroll) {
+            // 反向布局:index 0 是底部(最新消息),scrollToItem(0) 即滚到底
+            listState.scrollToItem(0)
+            hasCompletedInitialScroll = true
+        }
+    }
+
+    // 2) 跟踪用户滚动意图:上滑时取消恢复计时器
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }
+            .distinctUntilChanged()
+            .collect { (idx, offset) ->
+                val nowPinned = idx == 0 && offset < 32
+                if (!nowPinned) {
+                    isUserPinnedToBottom = false
+                    followRecoveryJob?.cancel()
+                } else if (!isUserPinnedToBottom) {
+                    isUserPinnedToBottom = true
+                    followRecoveryJob?.cancel()
                 }
             }
+    }
+
+    // 3) 跟踪用户拖动中状态:正在拖动 → 临时禁止跟随
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { isScrolling ->
+                if (isScrolling) {
+                    isUserPinnedToBottom = false
+                    followRecoveryJob?.cancel()
+                }
+            }
+    }
+
+    // 4) 2 秒后自动恢复跟随(用户上滑后)
+    LaunchedEffect(isUserPinnedToBottom) {
+        if (!isUserPinnedToBottom) {
+            followRecoveryJob?.cancel()
+            followRecoveryJob = followRecoveryScope.launch {
+                delay(2000L)
+                isUserPinnedToBottom = true
+            }
+        } else {
+            followRecoveryJob?.cancel()
         }
+    }
+
+    // 5) 流式期间智能跟随:仅在 pinned 时 scrollToItem(0)
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            Triple(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+                messages.lastOrNull()?.content?.length ?: 0,
+            )
+        }
+            .distinctUntilChanged()
+            .collectLatest { (_, _, lastLen) ->
+                if (!hasCompletedInitialScroll) return@collectLatest
+                if (!isUserPinnedToBottom) return@collectLatest
+                val isStreaming = messages.lastOrNull()?.isStreaming == true
+                if (isStreaming && lastLen > 0) {
+                    listState.scrollToItem(0)
+                }
+            }
     }
 
     // 键盘弹起/收起的动画结束后,把最新一条(index 0)滚入视口。

@@ -47,7 +47,8 @@ class ToolCallResultParser @Inject constructor() {
         }
 
         // 3. legacy raw JSON:可能是 search_records 的 {count, results} 等旧结构
-        //    尝试 parseOrNull 但当作 legacy 兜底;不再 envelope 路径
+        //    或 create_local_reminder 的 {status:scheduled, title, ...} 裸格式
+        //    (CreateLocalReminderTool.kt:122 不走 envelope,直接 buildJsonObject)
         return parseLegacy(toolName, resultJson)
             ?: ToolResultSummary.Unknown(raw = resultJson)
     }
@@ -189,6 +190,15 @@ class ToolCallResultParser @Inject constructor() {
         return runCatching {
             val element = kotlinx.serialization.json.Json.parseToJsonElement(raw)
             val obj = element as? JsonObject ?: return@runCatching null
+
+            // create_local_reminder 真实路径不返回 envelope,直接 buildJsonObject:
+            //   {status:scheduled, reminderId, title, triggerAtEpochMillis, ...}
+            // 走 envelope 路径会被 parseOrNull 当成 legacy JSON 而漏掉,这里显式分发。
+            if (toolName == "create_local_reminder" && obj.str("status") == "scheduled") {
+                return@runCatching parseCreateReminder(obj)
+            }
+
+            // 通用 search_* 工具的 {count, results} 旧结构
             val count = obj.int("count")
             if (count != null) {
                 val items = obj.arrayAt("results")

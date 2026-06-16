@@ -127,11 +127,13 @@ class ToolDisplayFormatterTest {
     }
 
     @Test
-    fun registry_resolveLabel_blankJson_fallsBackToGenericCompletedLabel() {
+    fun registry_resolveLabel_blankJson_fallsBackToStaticLabel() {
+        // P0 修复:null resultJson → parser returns Unknown → formatter 现在返回 null
+        // 让 resolveLabel 走 staticLabel(toolName) 回退("已搜索"),而不是通用"已完成"。
+        // 这样 chip 文案保留工具身份信息,而不是变成与具体工具无关的兜底词。
         val label = registry.resolveLabel("search_memory", ToolCallStatus.SUCCEEDED, null)
 
-        // null resultJson → parser returns Unknown → formatter returns "已完成" 兜底
-        assertEquals("已完成", label)
+        assertEquals("已搜索", label)
     }
 
     @Test

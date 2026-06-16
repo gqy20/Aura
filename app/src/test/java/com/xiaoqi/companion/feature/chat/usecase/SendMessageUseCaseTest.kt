@@ -421,6 +421,46 @@ class SendMessageUseCaseTest {
     }
 
     @Test
+    fun sendMessage_createLocalReminder_success_showsScheduledWithSubject() = runTest {
+        // P0 修复:ToolCallUpdated 分支切到 resolveLabel 动态路径,
+        // create_local_reminder 带 resultJson 时显示"已创建提醒 · {title}"。
+        // CreateLocalReminderTool 真实输出格式:{status:scheduled, title, triggerAtEpochMillis, ...}
+        fakeRuntime.toolEvents = listOf(
+            AgentToolCall(
+                name = "create_local_reminder",
+                status = ToolCallStatus.SUCCEEDED,
+                resultJson = """{"status":"scheduled","reminderId":"r-1","title":"吃药","triggerAtEpochMillis":1234}""",
+            )
+        )
+        sendMessageUseCase("remind me to take medicine", null, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        val assistant = state.value.messages.first { it.role == "ASSISTANT" }
+        assertEquals("已创建提醒 · 吃药", assistant.toolStatus)
+    }
+
+    @Test
+    fun sendMessage_memorySaved_afterToolCall_doesNotOverwriteChip() = runTest {
+        // P0 修复:MemorySaved 是 conversation 级别的后置 reflection 提示,
+        // 不应覆盖最近一次 tool call 的 chip(否则"已创建提醒"会被改成"已记住")。
+        fakeRuntime.toolEvents = listOf(
+            AgentToolCall(
+                name = "create_local_reminder",
+                status = ToolCallStatus.SUCCEEDED,
+                resultJson = """{"status":"scheduled","title":"吃药"}""",
+            )
+        )
+        fakeRuntime.memorySavedCount = 2
+        sendMessageUseCase("remind me to take medicine", null, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        val assistant = state.value.messages.first { it.role == "ASSISTANT" }
+        // 关键断言:chip 仍是 tool call 的"已创建提醒 · 吃药",
+        // 没有被 MemorySaved 的"已记住 2 条"覆盖。
+        assertEquals("已创建提醒 · 吃药", assistant.toolStatus)
+    }
+
+    @Test
     fun sendMessage_exactReminderMissingPermission_showsPermissionPrompt() = runTest {
         fakeRuntime.toolEvents = listOf(
             AgentToolCall(
@@ -465,5 +505,99 @@ class SendMessageUseCaseTest {
 
         // 3 个小 delta 在 batch 之后会按到达顺序 flush,最终内容等于完整字符串
         assertEquals("abc", state.value.messages.last { it.role == "ASSISTANT" }.content)
+    }
+
+    @Test
+    fun sendMessage_leadingFlushOnFirstDelta() = runTest {
+        // P0: leading flush 路径——首字符到达后不依赖 90ms trailing 计时器
+        // 立即 flush 到 state。不调用 advanceTimeBy 也能观察到首字符。
+        fakeRuntime.rawResponse = "a"
+        fakeRuntime.streamingDeltas = listOf("a")
+        fakeRuntime.completeDelayMs = 200L
+
+        sendMessageUseCase("hello", null, readyConfig(), this, update)
+        // 注意：故意不 advanceTimeBy —— leading flush 路径应让首个 delta 立即可见
+
+        val assistant = state.value.messages.lastOrNull { it.role == "ASSISTANT" }
+        assertEquals("a", assistant?.content)
+    }
+
+    @Test
+    fun sendMessage_eachSmallDeltaFlushesImmediately() = runTest {
+        // P0: 每个 1-char delta 都立即 flush（leading flush 路径）。
+        // 不需要等 trailing 计时器累积 batch。
+        fakeRuntime.rawResponse = "abc"
+        fakeRuntime.streamingDeltas = listOf("a", "b", "c")
+        fakeRuntime.completeDelayMs = 200L
+
+        sendMessageUseCase("hello", null, readyConfig(), this, update)
+        // 同样不 advanceTime —— 验证三个 delta 都各自触发 leading flush
+
+        val assistant = state.value.messages.lastOrNull { it.role == "ASSISTANT" }
+        assertEquals("abc", assistant?.content)
+    }
+
+    @Test
+    fun sendMessage_streamingDelta_stripsControlTagsFromDraft() = runTest {
+        // LLM 输出 [mood:happy][intensity:0.6] + 正文,streaming draft 应该是纯正文,
+        // 不显示 raw 标签,也不留空行占位。UseCase 输出层负责过滤。
+        fakeRuntime.rawResponse = "[mood:happy] 你好世界"
+        fakeRuntime.streamingDeltas = listOf(
+            "[mood:happy]",
+            "[intensity:0.6]",
+            " 你好世界",
+        )
+        fakeRuntime.completeDelayMs = 200L
+
+        sendMessageUseCase("hello", null, readyConfig(), this, update)
+
+        val assistant = state.value.messages.last { it.role == "ASSISTANT" }
+        // 累加过程中 control tag 应被过滤,draft / content 都不含 [xxx:xxx]
+        assertFalse("content 不应含 control tag: ${assistant.content}", assistant.content.contains("[mood:"))
+        assertFalse("content 不应含 intensity tag: ${assistant.content}", assistant.content.contains("[intensity:"))
+        assertTrue("正文应保留: ${assistant.content}", assistant.content.contains("你好世界"))
+    }
+
+    @Test
+    fun sendMessage_streamingDelta_tagSplitAcrossChunks_isStillStripped() = runTest {
+        // 标签被切到 chunk 边界 — 模拟 LLM 流式把 [mood:happy] 切成
+        // "[" / "mood:happy" / "]" 三个 chunk。状态机应跨 chunk 识别整段标签吞掉,
+        // 不让半个标签字符(mood:happy 之类)泄漏到 draft。
+        fakeRuntime.rawResponse = "[mood:happy] 嘿"
+        fakeRuntime.streamingDeltas = listOf(
+            "[",
+            "mood:happy",
+            "]",
+            " 嘿",
+        )
+        fakeRuntime.completeDelayMs = 200L
+
+        sendMessageUseCase("hi", null, readyConfig(), this, update)
+
+        val assistant = state.value.messages.last { it.role == "ASSISTANT" }
+        assertFalse("content 不应残留 [mood: ${assistant.content}", assistant.content.contains("[mood:"))
+        assertFalse("content 不应残留 mood:happy 半个标签: ${assistant.content}", assistant.content.contains("mood:happy"))
+        assertTrue("正文应保留: ${assistant.content}", assistant.content.contains("嘿"))
+    }
+
+    @Test
+    fun sendMessage_streamingDelta_unclosedBraceOverLimit_fallsBackToText() = runTest {
+        // 未闭合的 [ 超过 CONTROL_TAG_MAX_TAIL — 状态机应放弃等待,
+        // 把这段当正文推出去,而不是永远留在 buffer。
+        // 构造一个故意过长的未闭合 chunk:[ 后面 80 个普通字符(无 ])。
+        val longUnclosed = "[" + "x".repeat(80)
+        fakeRuntime.rawResponse = "$longUnclosed done"
+        fakeRuntime.streamingDeltas = listOf(
+            longUnclosed,
+            " done",
+        )
+        fakeRuntime.completeDelayMs = 200L
+
+        sendMessageUseCase("hi", null, readyConfig(), this, update)
+
+        val assistant = state.value.messages.last { it.role == "ASSISTANT" }
+        // 超长未闭合被当作正文吐出,content 包含这些 x 字符
+        assertTrue("超长未闭合应被回退为正文: ${assistant.content}", assistant.content.contains("x"))
+        assertTrue("后续正文保留: ${assistant.content}", assistant.content.contains("done"))
     }
 }

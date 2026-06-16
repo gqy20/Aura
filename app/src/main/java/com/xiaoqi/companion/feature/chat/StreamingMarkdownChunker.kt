@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.feature.chat
 
+import androidx.annotation.VisibleForTesting
+
 private const val SOFT_TEXT_BLOCK_LIMIT = 640
 
 data class StreamingMessageRenderState(
@@ -23,6 +25,10 @@ class StreamingMarkdownChunker {
     private val textBlock = StringBuilder()
     private val codeBlock = StringBuilder()
     private var inCodeBlock = false
+    // P2: 增量 append-only 解析优化——state 实例缓存 + committedBlocks list 引用稳定
+    // 让上游 ChatMessage.copy() 在 rawText/draftText 未变时引用等、跳过 Compose 重组
+    private var cachedState: StreamingMessageRenderState? = null
+    private var cachedBlocksSnapshot: List<MessageRenderBlock>? = null
 
     fun append(delta: String): StreamingMessageRenderState {
         if (delta.isEmpty()) return state()
@@ -48,6 +54,13 @@ class StreamingMarkdownChunker {
         }
         return committedBlocks.toList()
     }
+
+    /**
+     * 测试入口：直接读取当前 state（不通过 append/empty 路径触发）。
+     * 用于验证"连续两次 state() 调用是否返回同一 instance"等缓存行为。
+     */
+    @VisibleForTesting
+    internal fun stateForTest(): StreamingMessageRenderState = state()
 
     private fun processCompleteLines() {
         while (true) {
@@ -94,20 +107,42 @@ class StreamingMarkdownChunker {
         val text = textBlock.toString().trim()
         if (text.isNotEmpty()) committedBlocks += MessageRenderBlock.Text(text)
         textBlock.clear()
+        // commit 后必须 invalidate blocks snapshot,否则下次 state() 会拿到过期的 list
+        cachedBlocksSnapshot = null
     }
 
     private fun commitCode() {
         committedBlocks += MessageRenderBlock.Code(codeBlock.toString().trimEnd())
         codeBlock.clear()
+        cachedBlocksSnapshot = null
     }
 
-    private fun state(): StreamingMessageRenderState =
-        StreamingMessageRenderState(
-            committedBlocks = committedBlocks.toList(),
-            draftText = draftText(),
-            isDraftCode = inCodeBlock,
-            rawText = rawText.toString(),
+    private fun state(): StreamingMessageRenderState {
+        // Blocks 引用稳定:连续 state() 在无 commit 时复用上次 toList() 引用
+        val blocksSnapshot = cachedBlocksSnapshot
+            ?: committedBlocks.toList().also { cachedBlocksSnapshot = it }
+        val draft = draftText()
+        val isCode = inCodeBlock
+        val raw = rawText.toString()
+        // State 实例缓存:4 字段全等时返回 cached instance
+        val cached = cachedState
+        if (cached != null &&
+            cached.committedBlocks === blocksSnapshot &&
+            cached.draftText == draft &&
+            cached.isDraftCode == isCode &&
+            cached.rawText == raw
+        ) {
+            return cached
+        }
+        val next = StreamingMessageRenderState(
+            committedBlocks = blocksSnapshot,
+            draftText = draft,
+            isDraftCode = isCode,
+            rawText = raw,
         )
+        cachedState = next
+        return next
+    }
 
     private fun draftText(): String =
         if (inCodeBlock) {
@@ -127,5 +162,7 @@ class StreamingMarkdownChunker {
         textBlock.clear()
         codeBlock.clear()
         inCodeBlock = false
+        cachedState = null
+        cachedBlocksSnapshot = null
     }
 }

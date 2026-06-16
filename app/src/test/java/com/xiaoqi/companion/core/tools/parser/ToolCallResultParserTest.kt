@@ -98,6 +98,21 @@ class ToolCallResultParserTest {
     }
 
     @Test
+    fun parse_createReminderLegacyScheduled_returnsScheduled() {
+        // P0 修复:CreateLocalReminderTool 真实路径不返回 envelope,
+        // 直接 buildJsonObject 输出 {status:scheduled, title, triggerAtEpochMillis, ...}
+        // parseLegacy 路径必须识别这种格式,否则 chip 文案会丢失 subject。
+        val raw = """{"status":"scheduled","reminderId":"r-1","title":"吃药","triggerAtEpochMillis":1234,"delayMillis":600000,"exact":true}"""
+
+        val summary = parser.parse("create_local_reminder", raw)
+
+        assertTrue(summary is ToolResultSummary.Scheduled)
+        summary as ToolResultSummary.Scheduled
+        assertEquals("吃药", summary.subject)
+        assertEquals(true, summary.exact)
+    }
+
+    @Test
     fun parse_deviceStatusEnvelopeOk_returnsKeyValueReport() {
         val env = encode(ToolEnvelopeFactory.ok(buildJsonObject {
             put("batteryPercent", JsonPrimitive(42))

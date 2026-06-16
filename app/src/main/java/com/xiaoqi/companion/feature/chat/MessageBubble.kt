@@ -161,7 +161,13 @@ private fun MessageBubbleContent(
                 color = MaterialTheme.colorScheme.primary,
             )
         } else if (message.isStreaming) {
-            StreamingMessageText(message = message, color = contentColor)
+            StreamingMessageText(
+                renderBlocks = message.renderBlocks,
+                renderDraft = message.renderDraft,
+                isRenderDraftCode = message.isRenderDraftCode,
+                contentFallback = message.content,
+                color = contentColor,
+            )
         } else {
             MarkdownMessageText(
                 text = message.content,
@@ -175,35 +181,6 @@ private fun MessageBubbleContent(
                 text = message.toolStatus,
                 status = message.toolStatusType,
                 onClick = onToolStatusClick,
-            )
-        }
-    }
-}
-
-@Composable
-private fun StreamingMessageText(message: ChatMessage, color: androidx.compose.ui.graphics.Color) {
-    val draftText = message.renderDraft.ifBlank {
-        message.content.takeIf { message.renderBlocks.isEmpty() }.orEmpty()
-    }
-    Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        message.renderBlocks.forEach { block ->
-            MessageRenderBlockText(
-                block = block,
-                color = color,
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp),
-            )
-        }
-        if (draftText.isNotBlank()) {
-            Text(
-                text = "$draftText...",
-                color = color,
-                style = if (message.isRenderDraftCode) {
-                    MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
-                } else {
-                    MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp)
-                },
             )
         }
     }
