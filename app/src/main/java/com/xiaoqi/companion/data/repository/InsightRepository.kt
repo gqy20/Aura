@@ -294,6 +294,15 @@ class InsightRepository @Inject constructor(
         fun decodeEvidenceStatic(insight: InsightEntity): InsightEvidenceView {
             val json = Json { ignoreUnknownKeys = true }
             val parsed = runCatching { json.parseToJsonElement(insight.evidence) as? JsonObject }
+                .onFailure {
+                    AppLogger.warn(
+                        LogTags.Repo,
+                        "insight_evidence_parse_failed",
+                        "insightId" to insight.id,
+                        "evidenceLength" to insight.evidence.length,
+                        "error" to (it.message ?: it::class.simpleName.orEmpty()),
+                    )
+                }
                 .getOrNull() ?: return InsightEvidenceView()
             val msgIds = (parsed["messageIds"] as? JsonArray)
                 ?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }

@@ -67,6 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.R
 import com.xiaoqi.companion.core.llm.ConnectivityResult
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
 import kotlinx.coroutines.launch
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -817,7 +819,7 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
                     out.write(json.toByteArray(Charsets.UTF_8))
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DataTransparency", "export failed", e)
+                AppLogger.error(LogTags.App, e, "export_all_failed")
             }
         }
     }

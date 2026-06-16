@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.insight
 
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
@@ -27,10 +29,44 @@ class InsightValidator @Inject constructor(
 ) {
 
     suspend fun validate(draft: InsightDraft): InsightDraft? {
-        if (hasNoEvidence(draft)) return null
-        if (!passesEvidenceRealityCheck(draft)) return null
-        if (draft.confidence < MIN_CONFIDENCE) return null
-        if (isDuplicateHeading(draft)) return null
+        if (hasNoEvidence(draft)) {
+            AppLogger.debug(
+                LogTags.Repo,
+                "insight_rejected",
+                "stage" to "no_evidence",
+                "trigger" to draft.triggerType,
+                "category" to draft.category,
+            )
+            return null
+        }
+        if (!passesEvidenceRealityCheck(draft)) {
+            AppLogger.debug(
+                LogTags.Repo,
+                "insight_rejected",
+                "stage" to "evidence_reality_check",
+                "trigger" to draft.triggerType,
+            )
+            return null
+        }
+        if (draft.confidence < MIN_CONFIDENCE) {
+            AppLogger.debug(
+                LogTags.Repo,
+                "insight_rejected",
+                "stage" to "low_confidence",
+                "trigger" to draft.triggerType,
+                "confidence" to draft.confidence,
+            )
+            return null
+        }
+        if (isDuplicateHeading(draft)) {
+            AppLogger.debug(
+                LogTags.Repo,
+                "insight_rejected",
+                "stage" to "duplicate_heading",
+                "trigger" to draft.triggerType,
+            )
+            return null
+        }
         return draft
     }
 

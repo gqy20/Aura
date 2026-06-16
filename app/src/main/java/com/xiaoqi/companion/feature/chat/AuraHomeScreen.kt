@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xiaoqi.companion.BuildConfig
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.feature.chat.HomePresencePalette
 import com.xiaoqi.companion.feature.chat.animated
@@ -90,33 +92,87 @@ fun AuraHomeScreen(
         onOpenMcpSettings = onOpenMcpSettings,
         onInsightClick = { insight ->
             // 方案 A:短按 = 弹和长按一样的弹层(原行为只跑 markClicked 无 UI 反馈,反直觉)
+            AppLogger.debug(
+                LogTags.Chat,
+                "insight_tapped",
+                "insightId" to insight.id,
+                "category" to insight.category,
+            )
             showEvidence = false
             actionInsight = insight
             viewModel.openInsight(insight.id)
         },
         onInsightLongPress = { insight ->
+            AppLogger.debug(
+                LogTags.Chat,
+                "insight_long_pressed",
+                "insightId" to insight.id,
+                "category" to insight.category,
+            )
             showEvidence = false
             actionInsight = insight
         },
-        onInsightDismiss = { insight -> viewModel.dismissInsight(insight.id) },
+        onInsightDismiss = { insight ->
+            AppLogger.info(
+                LogTags.Chat,
+                "insight_dismissed",
+                "insightId" to insight.id,
+                "category" to insight.category,
+            )
+            viewModel.dismissInsight(insight.id)
+        },
         onInsightChat = { insight ->
             val prefill = "我们聊聊: ${insight.headline}?"
+            AppLogger.info(
+                LogTags.Chat,
+                "insight_chat_pressed",
+                "insightId" to insight.id,
+                "prefillLength" to prefill.length,
+            )
             viewModel.consumePrefillPrompt(prefill)
             viewModel.openInsight(insight.id)
             onOpenChat()
         },
         actionInsight = actionInsight,
-        onActionDismiss = { actionInsight = null; showEvidence = false },
+        onActionDismiss = {
+            AppLogger.debug(LogTags.Chat, "insight_action_dismissed")
+            actionInsight = null; showEvidence = false
+        },
         onActionMute = { insight, days ->
+            AppLogger.info(
+                LogTags.Chat,
+                "insight_category_muted",
+                "insightId" to insight.id,
+                "category" to insight.category,
+                "days" to days,
+            )
             viewModel.muteInsightCategory(insight.id, insight.category, days)
             actionInsight = null
         },
         onActionAcknowledge = { insight ->
+            AppLogger.info(
+                LogTags.Chat,
+                "insight_acknowledged",
+                "insightId" to insight.id,
+                "category" to insight.category,
+            )
             viewModel.dismissInsight(insight.id)
             actionInsight = null
         },
-        onShowEvidence = { showEvidence = !showEvidence },
+        onShowEvidence = {
+            showEvidence = !showEvidence
+            AppLogger.debug(
+                LogTags.Chat,
+                "insight_evidence_toggled",
+                "visible" to showEvidence,
+            )
+        },
         onChatFromAction = { insight ->
+            AppLogger.info(
+                LogTags.Chat,
+                "insight_chat_from_action",
+                "insightId" to insight.id,
+            )
             viewModel.openInsight(insight.id)
             actionInsight = null
         },

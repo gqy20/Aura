@@ -93,7 +93,17 @@ class LocalQwenExecutor @Inject constructor(
             .trim()
         if (cleaned.isBlank()) return emptyList()
 
-        val parsed = runCatching { json.parseToJsonElement(cleaned) }.getOrNull() ?: return emptyList()
+        val parsed = runCatching { json.parseToJsonElement(cleaned) }
+            .onFailure {
+                AppLogger.warn(
+                    LogTags.LocalModel,
+                    "insight_json_parse_failed",
+                    "rawLength" to raw.length,
+                    "cleanedLength" to cleaned.length,
+                    "error" to (it.message ?: it::class.simpleName.orEmpty()),
+                )
+            }
+            .getOrNull() ?: return emptyList()
         val array = parsed as? JsonArray ?: return emptyList()
 
         return array.mapNotNull { element ->

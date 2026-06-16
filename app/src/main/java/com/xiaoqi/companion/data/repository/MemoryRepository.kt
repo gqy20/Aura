@@ -584,8 +584,26 @@ private fun mergeSource(existing: String, incoming: String): String =
 
 private fun mergeJsonStringLists(left: String, right: String): String {
     val json = Json { ignoreUnknownKeys = true }
-    val leftItems = runCatching { json.decodeFromString<List<String>>(left) }.getOrDefault(emptyList())
-    val rightItems = runCatching { json.decodeFromString<List<String>>(right) }.getOrDefault(emptyList())
+    val leftItems = runCatching { json.decodeFromString<List<String>>(left) }
+        .onFailure {
+            AppLogger.warn(
+                LogTags.Repo,
+                "merge_json_list_left_failed",
+                "leftLength" to left.length,
+                "error" to (it.message ?: it::class.simpleName.orEmpty()),
+            )
+        }
+        .getOrDefault(emptyList())
+    val rightItems = runCatching { json.decodeFromString<List<String>>(right) }
+        .onFailure {
+            AppLogger.warn(
+                LogTags.Repo,
+                "merge_json_list_right_failed",
+                "rightLength" to right.length,
+                "error" to (it.message ?: it::class.simpleName.orEmpty()),
+            )
+        }
+        .getOrDefault(emptyList())
     return json.encodeToString((leftItems + rightItems).map { it.trim() }.filter { it.isNotBlank() }.distinct())
 }
 

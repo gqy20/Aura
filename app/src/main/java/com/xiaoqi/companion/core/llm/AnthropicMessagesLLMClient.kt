@@ -458,7 +458,16 @@ class AnthropicMessagesLLMClient(
             ?: emptyList()
 
     private fun parseSseData(data: String): ParsedSse {
-        val event = runCatching { json.parseToJsonElement(data).jsonObject }.getOrNull()
+        val event = runCatching { json.parseToJsonElement(data).jsonObject }
+            .onFailure { parseError ->
+                AppLogger.debug(
+                    LogTags.Llm,
+                    "sse_event_parse_failed",
+                    "dataLength" to data.length,
+                    "error" to (parseError.message ?: parseError::class.simpleName.orEmpty()),
+                )
+            }
+            .getOrNull()
             ?: return ParsedSse()
         val type = event["type"]?.jsonPrimitive?.contentOrNull
         if (type == "message_delta") {

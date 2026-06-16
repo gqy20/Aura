@@ -5,6 +5,8 @@ import com.xiaoqi.companion.core.tools.isError
 import com.xiaoqi.companion.core.tools.parseErrorHint
 import com.xiaoqi.companion.core.tools.parseErrorReason
 import com.xiaoqi.companion.core.tools.parseOrNull
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
@@ -207,7 +209,17 @@ class ToolCallResultParser @Inject constructor() {
             } else {
                 null
             }
-        }.getOrNull()
+        }
+            .onFailure {
+                AppLogger.debug(
+                    LogTags.Parser,
+                    "tool_legacy_parse_failed",
+                    "tool" to toolName,
+                    "rawLength" to raw.length,
+                    "error" to (it.message ?: it::class.simpleName.orEmpty()),
+                )
+            }
+            .getOrNull()
     }
 
     private fun toolTitle(toolName: String): String = when (toolName) {

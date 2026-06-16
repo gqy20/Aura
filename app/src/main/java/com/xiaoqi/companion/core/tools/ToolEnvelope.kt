@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.tools
 
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.db.converter.MemoryType
 import com.xiaoqi.companion.data.db.converter.SummaryType
 import kotlinx.serialization.Serializable
@@ -145,10 +147,24 @@ fun parseOrNull(raw: String?): ToolEnvelope? {
     return runCatching {
         // 先尝试 Ok 形态(默认 status="ok",所以原 data 字段必填)
         runCatching { envelopeJson.decodeFromString(OkEnvelope.serializer(), raw) }
+            .onFailure {
+                AppLogger.debug(
+                    LogTags.Parser,
+                    "envelope_ok_parse_failed",
+                    "rawLength" to raw.length,
+                )
+            }
             .getOrNull()
             ?.let { ToolEnvelope.Ok(data = it.data) }
         // 再尝试 Error 形态
             ?: runCatching { envelopeJson.decodeFromString(ErrorEnvelope.serializer(), raw) }
+                .onFailure {
+                    AppLogger.debug(
+                        LogTags.Parser,
+                        "envelope_error_parse_failed",
+                        "rawLength" to raw.length,
+                    )
+                }
                 .getOrNull()
                 ?.let { ToolEnvelope.Error(reason = it.reason, hint = it.hint, details = it.details) }
     }.getOrNull()

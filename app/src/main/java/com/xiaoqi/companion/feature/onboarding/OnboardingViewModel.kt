@@ -3,6 +3,8 @@ package com.xiaoqi.companion.feature.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xiaoqi.companion.core.insight.memory.AutoMemoryStore
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -66,6 +68,12 @@ class OnboardingViewModel @Inject constructor(
                     addressStyle = addressStyle,
                     friends = friends,
                     scheduleChoice = scheduleChoice,
+                )
+            }.onFailure {
+                AppLogger.warn(
+                    LogTags.Repo,
+                    "onboarding_memories_save_failed",
+                    "error" to (it.message ?: it::class.simpleName.orEmpty()),
                 )
             }
             // 缓存:DataStore 保留 userPatterns/recurringTopics JSON,只给 MainActivity

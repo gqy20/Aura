@@ -3,6 +3,8 @@ package com.xiaoqi.companion.core.tools
 import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -38,7 +40,18 @@ class GetCurrentTimeTool(
         withContext(Dispatchers.Default) {
             val zone = args.timezone
                 .takeIf { it.isNotBlank() }
-                ?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+                ?.let { rawTimezone ->
+                    runCatching { ZoneId.of(rawTimezone) }
+                        .onFailure { error ->
+                            AppLogger.debug(
+                                LogTags.Tools,
+                                "invalid_timezone_fallback",
+                                "raw" to rawTimezone,
+                                "error" to (error.message ?: error::class.simpleName.orEmpty()),
+                            )
+                        }
+                        .getOrNull()
+                }
                 ?: defaultZoneProvider()
             val now = Instant.ofEpochMilli(nowProvider()).atZone(zone)
 

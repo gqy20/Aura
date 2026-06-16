@@ -45,6 +45,7 @@
 | Onboarding 🆕 | 5 问全可选可跳过 / 模板表单不入 LLM | `OnboardingScreen`、`OnboardingViewModel` |
 | Memory Room 操作 🆕 | 长按菜单：置顶 / 取消置顶 / 归档 / 取消归档 / 删除（runCatching 模式） | `MemoryRoomScreen`、`ChatViewModel` |
 | Settings 实时保存 🆕 | api_key 不依赖 Save 按钮 / Save 永久置顶 | `SettingsUseCase.updateSettingsApiKey`、`SettingsScreen` |
+| 日志体系 🆕 | `AppLogger` 统一入口 + 15 `LogTags` + `LogFieldSanitizer` 自动 hash 敏感字段 + Debug/Release 双树 | `core/logging/` |
 
 ---
 
@@ -1301,3 +1302,78 @@
 - **触发**：用户进入 SettingsScreen
 - **兜底**：`SettingsScreen` 把 Save 按钮放在 `TopAppBar actions`，永久可见；不再被 `LazyColumn` 末尾的 `DataTransparencySection` 推到屏外；M3 PoC 现象 #1 已修
 - **位置**：[`SettingsScreen`](../app/src/main/java/com/xiaoqi/companion/feature/chat/SettingsScreen.kt)
+
+---
+
+## 三十二、日志体系
+
+> **历史**:2026-06-16 一次性补 P0(隐私泄漏 + 关键 catch 静默吞)+ P1(`core/insight` 整目录 + `feature/chat` 关键页)日志缺口。`./gradlew.bat testDebugUnitTest` 479 个测试 0 失败。
+
+### 32.1 架构
+
+- **统一入口** [`AppLogger`](../app/src/main/java/com/xiaoqi/companion/core/logging/AppLogger.kt) — 5 个方法:`verbose / debug / info / warn / error`,全部基于 Timber
+- **15 个 `LogTags`** [`LogTags`](../app/src/main/java/com/xiaoqi/companion/core/logging/LogTags.kt) — `App / Chat / Runtime / Llm / LocalModel / Prompt / Parser / Repo / Tools / Reminder / Config / Emotion / Relation / Database / HealthConnect`
+- **3 个 `LogEventType`** — `Diagnostic / Audit / Failure`,格式化时作为 `type=` 前缀
+- **结构化日志**:`type=Audit event=foo key1=value1 key2=value2`
+- **自动脱敏** [`LogFieldSanitizer`](../app/src/main/java/com/xiaoqi/companion/core/logging/LogFieldSanitizer.kt) — 字段名命中 `apikey/authorization/prompt/text/message/url/base64/image/input/response/secret/token/content` 时值走 SHA-256 hash
+- **Debug/Release 双树** [`SafeLogTree`](../app/src/main/java/com/xiaoqi/companion/core/logging/SafeLogTree.kt) — `SafeDebugTree` 全打,`SafeReleaseTree` 只 WARN+,且 release 不走 Timber(直接 `Log.println`)
+
+### 32.2 业务层不准直接 `android.util.Log`(P0-1 已修)
+
+- **触发**:任何业务代码使用 `android.util.Log.*`
+- **兜底**:走 `AppLogger`,享受自动脱敏 + Debug/Release 树分流
+- **位置**:业务层 0 处 `android.util.Log`(2026-06-16 后;`AppLogger.kt` / `SafeLogTree.kt` 内部 import 除外)
+- **历史修复**:
+  - `HealthDataSection.kt:199` 双重 `runCatching` 静默吞 → 拆 `open_settings_intent_failed_primary` / `open_settings_intent_failed` 两条 warn
+  - `SettingsScreen.kt:820` 导出失败 → `error(..., "export_all_failed")`
+
+### 32.3 关键路径 `runCatching` 不准静默(P0-2 已修)
+
+约 20 处"关键 catch 不打 log"已逐一补 `AppLogger.warn` / `debug` / `error`,覆盖:
+
+| 文件 | 触发点 | 补的 event |
+|---|---|---|
+| `McpHttpClient.kt:355` | SSE JSON 解析 | `mcp_sse_payload_parse_failed` |
+| `AnthropicMessagesLLMClient.kt:461` | SSE event 解析 | `sse_event_parse_failed` |
+| `MemoryRepository.kt:587-588` | memory tags/keywords 合并 | `merge_json_list_left_failed` / `_right_failed` |
+| `InsightRepository.kt:296` | evidence JSON 解析 | `insight_evidence_parse_failed` |
+| `LocalQwenExecutor.kt:96` | 本地模型输出 JSON 解析 | `insight_json_parse_failed` |
+| `OnboardingViewModel.kt:62` | 5 问落 LTM | `onboarding_memories_save_failed` |
+| `ToolCallResultParser.kt:212` | legacy 工具 JSON 解析 | `tool_legacy_parse_failed` |
+| `ToolEnvelope.kt:149/153` | 信封 Ok/Error 形态 | `envelope_ok_parse_failed` / `_error_parse_failed` |
+| `SearchRecordsTool.kt:88` | FTS 查询 | `search_records_fts_failed` |
+| `GetCurrentTimeTool.kt:41` | `ZoneId.of` 非法字符串 | `invalid_timezone_fallback` |
+| `McpServerListRepository.kt:118` | MCP server 列表 JSON 解析 | `mcp_servers_parse_failed` |
+
+### 32.4 `core/insight` 整目录 0/4 → 4/4(P1-1 已修)
+
+- **历史**:整目录零 `AppLogger` 调用,而 §22.5 / §23.1 / §23.2 反复提"insight 校验 4 道门槛是 M3 PoC 调试高发路径"
+- **修复**:
+  - `InsightValidator.kt:30-58` 4 道校验(no_evidence / evidence_reality_check / low_confidence / duplicate_heading)每道都加 `AppLogger.debug(..., "insight_rejected", "stage" to ..., ...)`
+  - `AutoMemoryStore.kt:43` `decodeList` 静默吞 → `auto_memory_list_decode_failed`
+- **未改**:`InsightDraft.kt` / `InsightPrompts.kt` 是字面量,无可观测事件
+
+### 32.5 `feature/chat` 关键页补日志(P1-2 已修)
+
+用户报"我点了没反应"时,logcat 现在能看到完整链路:
+
+| 触发点 | event | 用途 |
+|---|---|---|
+| `AuraHomeScreen` Insight 短按 | `insight_tapped` | 验证 M3 真机报告"短按无反应"复现路径 |
+| `AuraHomeScreen` Insight 长按 | `insight_long_pressed` | 与短按区分 |
+| `AuraHomeScreen` Insight 隐藏/取消隐藏 | `insight_dismissed` | 行为追踪 |
+| `AuraHomeScreen` "和 Aura 聊聊" | `insight_chat_pressed` / `_from_action` | 预填 prompt 路径 |
+| `AuraHomeScreen` 4 个弹层动作 | `insight_action_dismissed` / `_category_muted` / `_acknowledged` | 闭环追踪 |
+| `AuraHomeScreen` 依据展开 | `insight_evidence_toggled` | UI 行为 |
+| `ChatViewModel.attachImage` | `attach_image_empty_uri` / `_started` | 图片路径 |
+| `ChatViewModel.removePendingImage` | `remove_pending_image` | UI 行为 |
+| `ChatViewModel.sendMessage` | `send_message_started` | 区分发送失败 / 没发 |
+
+### 32.6 仍存在的缺口(P2+,本轮不修)
+
+1. **无文件持久化** — 当前 logcat 看完即丢,用户拿不到日志。需加 `BufferedWriter` + SAF 导出,见 `DataTransparencySection` 现成的 SAF 链路可复用
+2. **无 Settings 日志开关** — release 树只打 WARN+,但用户无"暂时记录全部 / 关闭全部"二档
+3. **无采样 / 限速** — 任何高频路径(`ChatScreen` IME 350ms 轮询、Memory 列表滚动)理论上都会打 log,但实测不会爆量
+4. **tag 分布不均** — `Repo 37 / Tools 28 / Llm 28 / LocalModel 23 / Config 23` 头部 5 个,`Emotion 1 / Relation 1 / Database 0` 尾部 3 个几乎闲置
+5. **`verbose()` 方法定义但 0 调用** — 保留作为粒度选择,或后续删除
+

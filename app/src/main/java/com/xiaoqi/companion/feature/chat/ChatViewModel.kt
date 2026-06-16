@@ -316,7 +316,15 @@ class ChatViewModel @Inject constructor(
     }
 
     fun attachImage(uriString: String?) {
-        if (uriString.isNullOrBlank()) return
+        if (uriString.isNullOrBlank()) {
+            AppLogger.debug(LogTags.Chat, "attach_image_empty_uri")
+            return
+        }
+        AppLogger.info(
+            LogTags.Chat,
+            "attach_image_started",
+            "uriHost" to uriString.substringBefore('?').take(64),
+        )
         _uiState.update {
             it.copy(
                 isPreparingImage = true,
@@ -354,6 +362,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun removePendingImage() {
+        AppLogger.debug(LogTags.Chat, "remove_pending_image")
         _uiState.update { it.copy(pendingImage = null, isPreparingImage = false) }
     }
 
@@ -637,10 +646,17 @@ class ChatViewModel @Inject constructor(
     //region 委托给 UseCase
 
     fun sendMessage(text: String) {
+        val pendingImage = _uiState.value.pendingImage
+        AppLogger.info(
+            LogTags.Chat,
+            "send_message_started",
+            "textLength" to text.length,
+            "hasImage" to (pendingImage != null),
+        )
         viewModelScope.launch {
             sendMessageUseCase(
                 text = text,
-                pendingImage = _uiState.value.pendingImage,
+                pendingImage = pendingImage,
                 configStatus = _uiState.value.configStatus,
                 scope = this,
                 update = { reducer -> _uiState.update(reducer) },

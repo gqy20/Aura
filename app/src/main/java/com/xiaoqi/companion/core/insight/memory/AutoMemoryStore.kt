@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.insight.memory
 
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,6 +44,13 @@ class AutoMemoryStore @Inject constructor(
 
     private fun decodeList(raw: String): List<String> = runCatching {
         json.decodeFromString(stringListSerializer, raw)
+    }.onFailure {
+        AppLogger.warn(
+            LogTags.Repo,
+            "auto_memory_list_decode_failed",
+            "rawLength" to raw.length,
+            "error" to (it.message ?: it::class.simpleName.orEmpty()),
+        )
     }.getOrDefault(emptyList())
 
     private val stringListSerializer = ListSerializer(String.serializer())

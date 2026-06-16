@@ -3,6 +3,8 @@ package com.xiaoqi.companion.core.tools
 import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MessageSearchDao
@@ -84,6 +86,13 @@ class SearchRecordsTool @Inject constructor(
                         limit = candidateLimit,
                     )
                 }.getOrElse { error ->
+                    AppLogger.warn(
+                        LogTags.Tools,
+                        "search_records_fts_failed",
+                        "queryLength" to query.length,
+                        "sessionId" to args.sessionId,
+                        "error" to (error.message ?: error::class.simpleName.orEmpty()),
+                    )
                     return@withContext encode(
                         ToolEnvelopeFactory.ftsFailure(error.message ?: error::class.simpleName.orEmpty())
                     )

@@ -353,6 +353,14 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             parseSseDataPayloads(trimmed)
                 .firstNotNullOfOrNull { payload ->
                     runCatching { json.parseToJsonElement(payload).jsonObject }
+                        .onFailure { parseError ->
+                            AppLogger.debug(
+                                LogTags.Llm,
+                                "mcp_sse_payload_parse_failed",
+                                "expectedResponseId" to expectedResponseId?.toString(),
+                                "error" to (parseError.message ?: parseError::class.simpleName.orEmpty()),
+                            )
+                        }
                         .getOrNull()
                         ?.takeIf { expectedResponseId == null || it.matchesId(expectedResponseId) || it.containsKey("error") }
                 }

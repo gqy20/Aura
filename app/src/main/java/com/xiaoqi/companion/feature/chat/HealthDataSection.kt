@@ -40,6 +40,8 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.HealthSyncManager
 import com.xiaoqi.companion.data.source.SensorManagerHealthSource
@@ -185,6 +187,11 @@ private fun HealthPermissionsCard(dataSource: HealthConnectDataSource) {
                             }
                             runCatching { context.startActivity(intent) }
                                 .onFailure { err ->
+                                    AppLogger.warn(
+                                        LogTags.HealthConnect,
+                                        "open_settings_intent_failed_primary",
+                                        "error" to err.javaClass.simpleName,
+                                    )
                                     runCatching {
                                         context.startActivity(
                                             Intent().apply {
@@ -195,8 +202,13 @@ private fun HealthPermissionsCard(dataSource: HealthConnectDataSource) {
                                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                             },
                                         )
-                                    }.onFailure {
-                                        android.util.Log.w("HealthDataSection", "no HC settings", err)
+                                    }.onFailure { fallbackErr ->
+                                        AppLogger.warn(
+                                            LogTags.HealthConnect,
+                                            "open_settings_intent_failed",
+                                            "primary_error" to err.javaClass.simpleName,
+                                            "fallback_error" to fallbackErr.javaClass.simpleName,
+                                        )
                                     }
                                 }
                         },

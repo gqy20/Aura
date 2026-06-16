@@ -4,6 +4,8 @@ import com.xiaoqi.companion.core.mcp.CustomMcpServerPreset
 import com.xiaoqi.companion.core.mcp.McpServerConfig
 import com.xiaoqi.companion.core.mcp.McpServerPresets
 import com.xiaoqi.companion.core.mcp.McpSettingsSnapshot
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -115,7 +117,16 @@ class McpServerListRepository @Inject constructor(
 
     private fun parseOrEmpty(raw: String): List<McpServerConfig> {
         if (raw.isBlank()) return emptyList()
-        return runCatching { json.decodeFromString(serializer, raw) }.getOrDefault(emptyList())
+        return runCatching { json.decodeFromString(serializer, raw) }
+            .onFailure {
+                AppLogger.warn(
+                    LogTags.Repo,
+                    "mcp_servers_parse_failed",
+                    "rawLength" to raw.length,
+                    "error" to (it.message ?: it::class.simpleName.orEmpty()),
+                )
+            }
+            .getOrDefault(emptyList())
     }
 
     companion object {
