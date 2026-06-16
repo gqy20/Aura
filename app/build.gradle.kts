@@ -37,6 +37,9 @@ val brandVersionCode: String = brand("VERSION_CODE", "4")
 val auraMnnHomeProvider = providers
     .gradleProperty("auraMnnHome")
     .orElse(providers.environmentVariable("AURA_MNN_HOME"))
+    // 本机默认 MNN 仓库位置(Windows 资源管理器视角是大写 MNN,NTFS 大小写不敏感,小写也能用)。
+    // 显式 > 隐式,被前面两个 source 覆盖。
+    .orElse("D:/C/Desktop/ai/MNN")
 
 val auraMnnHomePath = auraMnnHomeProvider.orNull
 val auraMnnHomeDir = auraMnnHomePath

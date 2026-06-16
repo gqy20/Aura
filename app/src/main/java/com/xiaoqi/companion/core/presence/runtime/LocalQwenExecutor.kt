@@ -3,12 +3,16 @@ package com.xiaoqi.companion.core.presence.runtime
 import com.xiaoqi.companion.core.insight.InsightDraft
 import com.xiaoqi.companion.core.insight.InsightPrompts
 import com.xiaoqi.companion.core.local.LocalQwenEngine
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.core.local.LocalQwenRequest
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.data.datastore.AppPreferences
+import com.xiaoqi.companion.data.db.converter.LlmProvider
+import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -34,6 +38,8 @@ import kotlinx.serialization.json.jsonPrimitive
 @Singleton
 class LocalQwenExecutor @Inject constructor(
     private val engine: LocalQwenEngine,
+    private val appPreferences: AppPreferences,
+    private val localQwenModelDownloader: LocalQwenModelDownloader,
 ) {
 
     data class Request(
@@ -41,22 +47,27 @@ class LocalQwenExecutor @Inject constructor(
         val userMessage: String,
         val maxTokens: Int = 300,
         val temperature: Float = 0.3f,
+        /** null = 从 AppPreferences 读主对话选中的本地模型名 */
+        val modelName: String? = null,
     )
 
     data class ExecutionResult(
         val text: String,
         val latencyMs: Long,
         val truncated: Boolean,
+        /** null = 成功无错误;非 null = 异常 message,worker 据此走 failure/retry */
+        val errorMessage: String? = null,
     )
 
     suspend fun execute(req: Request): ExecutionResult {
         val startedAt = System.currentTimeMillis()
+        val resolvedModelName = req.modelName ?: resolveActiveLocalModelName()
         return runCatching {
             val chunks = engine.stream(
                 LocalQwenRequest(
                     systemPrompt = req.systemPrompt,
                     userMessage = req.userMessage,
-                    modelName = "",
+                    modelName = resolvedModelName,
                     allowTools = false,
                 ),
             ).toList()
@@ -70,11 +81,31 @@ class LocalQwenExecutor @Inject constructor(
             AppLogger.warn(
                 LogTags.Llm,
                 "local_qwen_execute_failed",
+                "model" to resolvedModelName,
                 "cause" to (e.message ?: e::class.simpleName.orEmpty()),
                 "latencyMs" to (System.currentTimeMillis() - startedAt),
             )
-            ExecutionResult(text = "", latencyMs = System.currentTimeMillis() - startedAt, truncated = true)
+            ExecutionResult(
+                text = "",
+                latencyMs = System.currentTimeMillis() - startedAt,
+                truncated = true,
+                errorMessage = e.message ?: e::class.simpleName.orEmpty(),
+            )
         }
+    }
+
+    /**
+     * 解析"后台任务当前应使用的本地模型名",与 SettingsScreen "本地模型"区块的 UI 状态源**保持一致**:
+     * 1. 优先用 AppPreferences.modelName(主对话 Provider = LOCAL_QWEN 时用户选的)
+     * 2. 否则(主对话是云端)扫 `filesDir/models/` 找本地下好的那个 catalog model
+     * 3. 都没装回退 0.8B 默认值,worker 会落到 Result.failure 路径
+     */
+    private suspend fun resolveActiveLocalModelName(): String {
+        val stored = appPreferences.modelName.first()
+        val localOptions = DefaultLlmValues.modelOptions(LlmProvider.LOCAL_QWEN)
+        if (stored in localOptions) return stored
+        val installed = localQwenModelDownloader.findAnyInstalledModel()
+        return installed ?: DefaultLlmValues.LOCAL_QWEN_MODEL
     }
 
     /**

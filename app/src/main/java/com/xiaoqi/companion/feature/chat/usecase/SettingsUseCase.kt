@@ -208,11 +208,16 @@ class SettingsUseCase @Inject constructor(
         scope: CoroutineScope,
         update: (ChatUiState.() -> ChatUiState) -> Unit,
     ) {
-        if (modelName !in DefaultLlmValues.modelOptions(LlmProvider.LOCAL_QWEN)) return
+        // 不论主对话 Provider 是云端还是本地,状态源以"本地实际装好的"为准 —
+        // 若 caller 传的 modelName 是云端("glm-5v-turbo" 等),自动 fallback 到本地下好的那个;
+        // 都没有就回 0.8B 默认值。
+        val resolved = modelName.takeIf { it in DefaultLlmValues.modelOptions(LlmProvider.LOCAL_QWEN) }
+            ?: localQwenModelDownloader.findAnyInstalledModel()
+            ?: DefaultLlmValues.LOCAL_QWEN_MODEL
         if (localQwenDownloadJob?.isActive == true) return
         localQwenStatusJob?.cancel()
         localQwenStatusJob = scope.launch {
-            localQwenModelDownloader.observeStatus(modelName).collect { downloadState ->
+            localQwenModelDownloader.observeStatus(resolved).collect { downloadState ->
                 update {
                     copy(
                         configStatus = configStatus.withLocalQwenDownloadState(downloadState),

@@ -85,6 +85,7 @@ class MnnLocalQwenEngineTest {
         private val modelDir: File?,
     ) : LocalQwenModelLocator {
         override fun findModelDir(modelName: String): File? = modelDir
+        override fun findAnyInstalledModel(): String? = modelDir?.name
     }
 
     private class FakeMnnLlmBridge(

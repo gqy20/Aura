@@ -3,9 +3,12 @@ package com.xiaoqi.companion.core.presence.runtime
 import android.content.Context
 import androidx.work.WorkerParameters
 import com.xiaoqi.companion.core.local.LocalQwenEngine
-import com.xiaoqi.companion.core.local.LocalQwenRequest
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.InsightRepository
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 
@@ -27,7 +30,11 @@ class DreamLoopWorkerTest {
         val params = mockk<WorkerParameters>(relaxed = true)
         val dataCollector = mockk<DreamDataCollector>(relaxed = true)
         val engine = mockk<LocalQwenEngine>(relaxed = true)
-        val executor = LocalQwenExecutor(engine)
+        val prefs = mockk<AppPreferences>(relaxed = true)
+        every { prefs.modelName } returns flowOf("Qwen3.5-0.8B-MNN")
+        val downloader = mockk<LocalQwenModelDownloader>(relaxed = true)
+        every { downloader.findAnyInstalledModel() } returns "Qwen3.5-0.8B-MNN"
+        val executor = LocalQwenExecutor(engine, prefs, downloader)
         val insightRepo = mockk<InsightRepository>(relaxed = true)
 
         val worker = DreamLoopWorker(ctx, params, dataCollector, executor, insightRepo)

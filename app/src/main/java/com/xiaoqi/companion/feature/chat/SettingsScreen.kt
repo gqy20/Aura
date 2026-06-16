@@ -302,8 +302,8 @@ private fun SettingsScreenContent(
         ) {
             item {
                 SettingsSectionTitle(
-                    title = "模型",
-                    subtitle = "对话引擎",
+                    title = "主对话模型",
+                    subtitle = "Dream Loop / Insight / Reminder 等后台任务固定使用本地 Qwen，与本设置无关",
                 )
             }
             item {
@@ -319,20 +319,7 @@ private fun SettingsScreenContent(
                     onModelNameChanged = actions.onModelNameChanged,
                 )
             }
-            if (state.provider == LlmProvider.LOCAL_QWEN) {
-                item {
-                    SettingsSectionTitle(
-                        title = "本地模型",
-                        subtitle = "离线回复",
-                    )
-                }
-                item {
-                    LocalQwenDownloadSection(
-                        state = state.localQwenDownload,
-                        onDownload = actions.onDownloadLocalQwenModel,
-                    )
-                }
-            } else {
+            if (state.provider != LlmProvider.LOCAL_QWEN) {
                 item {
                     OutlinedTextField(
                         value = state.baseUrl,
@@ -362,6 +349,19 @@ private fun SettingsScreenContent(
                         onTest = actions.onTestConnection,
                     )
                 }
+            }
+            item {
+                SettingsSectionTitle(
+                    title = "本地模型",
+                    subtitle = "主对话 Provider = 本地 Qwen 时使用此处下载的模型；" +
+                        "Dream Loop / Insight / Reminder 等后台任务也共用此模型。",
+                )
+            }
+            item {
+                LocalQwenDownloadSection(
+                    state = state.localQwenDownload,
+                    onDownload = actions.onDownloadLocalQwenModel,
+                )
             }
             item {
                 ToolCapabilitiesSection(
@@ -508,6 +508,12 @@ private fun LocalQwenDownloadSection(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Text(
+                text = state.modelName,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             val status = when {
                 // 下载中:把百分比和字节数合并到同一行,避免再占一行字节数。
                 state.isDownloading ->

@@ -155,6 +155,7 @@ class ChatViewModelTest {
                 progress = 1f,
             )
         )
+        override fun findAnyInstalledModel(): String? = if (installed) "Qwen3.5-0.8B-MNN" else null
     }
 
     private class FakeChatImageProcessor : ChatImageProcessor {

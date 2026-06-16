@@ -18,6 +18,12 @@ import okhttp3.Request
 interface LocalQwenModelDownloader {
     fun observeStatus(modelName: String): Flow<LocalQwenModelDownloadState>
     fun download(modelName: String): Flow<LocalQwenModelDownloadState>
+
+    /**
+     * 扫 `filesDir/models/` 找到第一个 LOCAL_QWEN catalog model 文件全齐的 modelName;
+     * 都未装返回 null。UI 状态源 / 后台任务 fallback 共用。
+     */
+    fun findAnyInstalledModel(): String?
 }
 
 data class LocalQwenModelDownloadState(
@@ -40,6 +46,14 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
     override fun observeStatus(modelName: String): Flow<LocalQwenModelDownloadState> = flow {
         emit(status(modelName))
     }.flowOn(Dispatchers.IO)
+
+    override fun findAnyInstalledModel(): String? {
+        val modelsDir = File(context.filesDir, "models")
+        return LocalQwenModelCatalog.models.firstOrNull { spec ->
+            val dir = File(modelsDir, spec.modelName)
+            LocalQwenModelCatalog.requiredFiles.all { File(dir, it).isFile }
+        }?.modelName
+    }
 
     override fun download(modelName: String): Flow<LocalQwenModelDownloadState> = flow {
         val spec = LocalQwenModelCatalog.requireSpec(modelName)

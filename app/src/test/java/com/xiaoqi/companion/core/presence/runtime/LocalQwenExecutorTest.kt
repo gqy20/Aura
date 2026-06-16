@@ -1,7 +1,11 @@
 package com.xiaoqi.companion.core.presence.runtime
 
 import com.xiaoqi.companion.core.local.LocalQwenEngine
+import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
 import com.xiaoqi.companion.core.local.LocalQwenRequest
+import com.xiaoqi.companion.data.datastore.AppPreferences
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -16,7 +20,7 @@ class LocalQwenExecutorTest {
     @Test
     fun execute_gluesSystemAndUserMessages() = runTest {
         val engine = StubLocalQwenEngine(flowOf("hello", " ", "world"))
-        val executor = LocalQwenExecutor(engine)
+        val executor = LocalQwenExecutor(engine, fakeAppPreferences(), fakeDownloader())
 
         val result = executor.execute(
             LocalQwenExecutor.Request(
@@ -36,7 +40,7 @@ class LocalQwenExecutorTest {
     @Test
     fun execute_returnsEmptyOnException() = runTest {
         val engine = StubLocalQwenEngine(flow { throw IllegalStateException("MNN not loaded") })
-        val executor = LocalQwenExecutor(engine)
+        val executor = LocalQwenExecutor(engine, fakeAppPreferences(), fakeDownloader())
 
         val result = executor.execute(
             LocalQwenExecutor.Request("sys", "user"),
@@ -48,7 +52,7 @@ class LocalQwenExecutorTest {
 
     @Test
     fun parsePatternDetectOutput_validJson_returnsDrafts() {
-        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")))
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
         val raw = """
             [
               { "headline": "周日下午情绪偏低", "body": "连续 3 周", "evidence_ids": ["m1", "m2"], "confidence": 0.78 },
@@ -68,14 +72,14 @@ class LocalQwenExecutorTest {
 
     @Test
     fun parsePatternDetectOutput_invalidJson_returnsEmpty() {
-        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")))
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
         val drafts = executor.parsePatternDetectOutput("not json at all")
         assertTrue(drafts.isEmpty())
     }
 
     @Test
     fun parsePatternDetectOutput_stripsMarkdownFences() {
-        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")))
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
         val raw = """
             ```json
             [{ "headline": "X", "body": "Y", "evidence_ids": [], "confidence": 0.7 }]
@@ -90,7 +94,7 @@ class LocalQwenExecutorTest {
 
     @Test
     fun parsePatternDetectOutput_skipsEntriesWithoutHeadline() {
-        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")))
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
         val raw = """
             [
               { "body": "no headline here" },
@@ -106,7 +110,7 @@ class LocalQwenExecutorTest {
 
     @Test
     fun parsePatternDetectOutput_confidenceClampedTo01() {
-        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")))
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
         val raw = """
             [{ "headline": "X", "body": "Y", "evidence_ids": [], "confidence": 1.5 }]
         """.trimIndent()
@@ -116,6 +120,17 @@ class LocalQwenExecutorTest {
         assertEquals(1, drafts.size)
         assertEquals(1.0f, drafts[0].confidence, 0.001f)
     }
+
+    private fun fakeAppPreferences(modelName: String = "Qwen3.5-0.8B-MNN"): AppPreferences {
+        val prefs = mockk<AppPreferences>(relaxed = true)
+        every { prefs.modelName } returns flowOf(modelName)
+        return prefs
+    }
+
+    private fun fakeDownloader(installedModel: String? = "Qwen3.5-0.8B-MNN"): LocalQwenModelDownloader =
+        mockk<LocalQwenModelDownloader>(relaxed = true).also {
+            every { it.findAnyInstalledModel() } returns installedModel
+        }
 
     private class StubLocalQwenEngine(
         private val chunks: Flow<String>,

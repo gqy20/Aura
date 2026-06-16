@@ -72,6 +72,24 @@ class DreamLoopWorker @AssistedInject constructor(
                 userMessage = dataCollector.render(snapshot),
             ),
         )
+        if (result.errorMessage != null) {
+            // 模型缺失是不该 retry 的硬错误(下个 6h 周期也不会自动下载模型),
+            // 转成 failure 让 UI 上的 dream loop 状态自然落到 FAILED,而不是无限 backoff 转圈。
+            val modelMissing = result.errorMessage.contains("model not found", ignoreCase = true)
+                || result.errorMessage.contains("model is missing", ignoreCase = true)
+                || result.errorMessage.contains("config.json", ignoreCase = true)
+            AppLogger.warn(
+                LogTags.Config,
+                if (modelMissing) "dream_loop_model_missing" else "dream_loop_executor_error",
+                "cause" to result.errorMessage,
+                "latencyMs" to result.latencyMs,
+            )
+            return@withContext if (modelMissing) {
+                Result.failure(workDataOf(KEY_ERROR to result.errorMessage))
+            } else {
+                Result.retry()
+            }
+        }
         if (result.text.isBlank()) {
             AppLogger.warn(
                 LogTags.Config,
@@ -116,5 +134,6 @@ class DreamLoopWorker @AssistedInject constructor(
     companion object {
         const val KEY_SAVED_COUNT = "dream_loop_saved_count"
         const val KEY_DRAFTS_PARSED = "dream_loop_drafts_parsed"
+        const val KEY_ERROR = "dream_loop_error"
     }
 }
