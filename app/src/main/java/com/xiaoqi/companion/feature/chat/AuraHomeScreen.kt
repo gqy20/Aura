@@ -88,7 +88,12 @@ fun AuraHomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenMemoryRoom = onOpenMemoryRoom,
         onOpenMcpSettings = onOpenMcpSettings,
-        onInsightClick = { insight -> viewModel.openInsight(insight.id) },
+        onInsightClick = { insight ->
+            // 方案 A:短按 = 弹和长按一样的弹层(原行为只跑 markClicked 无 UI 反馈,反直觉)
+            showEvidence = false
+            actionInsight = insight
+            viewModel.openInsight(insight.id)
+        },
         onInsightLongPress = { insight ->
             showEvidence = false
             actionInsight = insight
