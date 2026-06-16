@@ -28,10 +28,16 @@
 
 ## TL;DR
 
-Aura 是一个本地优先的 Android AI 陪伴应用，把"长期记忆 + 情绪感知 + 关系建模"作为第一性能力。
-当前已完成**文本聊天 + 图片理解 + 记忆 + 情绪 + 提醒**闭环（v0.1.3，372 个单元测试通过），
-云端走 Anthropic Messages 兼容接口（GLM-5v-turbo / Kimi 2.6），本地可切 MNN 跑的 Qwen 模型。
-语音 I/O、主动 Pulse、动画角色仍在路上。
+Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
+
+- **跨会话长期记忆** — 事实 / 时刻 / 习惯自动归档，回复前自动召回相关条目
+- **后台 Dream Loop** — 6h 周期的本地 Qwen 模式识别，把"近 7 天值得说的"生成 Insight 卡片
+- **图 + 工具** — 发图能记住画面；Health Connect 步数 / 心率 / 睡眠；定时提醒；MCP server 可配置
+
+云端走 Anthropic Messages 兼容接口（GLM / Kimi）；本地 Qwen 0.8B
+是独立子系统，聊天数据不出手机。
+
+语音 I/O、主动 Pulse、动画角色 仍在路上。
 
 ---
 
