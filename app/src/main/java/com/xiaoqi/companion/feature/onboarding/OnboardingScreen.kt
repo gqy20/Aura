@@ -175,24 +175,16 @@ fun OnboardingScreen(
                             subtitle = "让我知道规律",
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // chip 内嵌 Column 容易高度不一致,label 本身已 self-descriptive,hint 删掉。
                                 listOf(
-                                    "早睡早起" to "11 点前睡,6-7 点起",
-                                    "晚睡晚起" to "凌晨后睡,10 点后起",
-                                    "工作日规律,周末放飞" to "工作日固定,周末随便",
-                                ).forEach { (label, hint) ->
+                                    "早睡早起",
+                                    "晚睡晚起",
+                                    "工作日规律,周末放飞",
+                                ).forEach { label ->
                                     FilterChip(
                                         selected = q5Choice == label,
                                         onClick = { q5Choice = label },
-                                        label = {
-                                            Column {
-                                                Text(label)
-                                                Text(
-                                                    text = hint,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        },
+                                        label = { Text(label) },
                                     )
                                 }
                             }

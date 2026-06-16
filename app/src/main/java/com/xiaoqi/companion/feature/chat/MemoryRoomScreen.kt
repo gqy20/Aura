@@ -28,10 +28,12 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -122,26 +125,17 @@ private fun MemoryRoomScreenContent(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    Text(
+                        text = if (memories.isEmpty()) {
+                            "暂无记忆 · 聊几周后会开始自动归档"
+                        } else {
+                            "该筛选下无内容 · 换其他类型试试"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.padding(28.dp),
-                    ) {
-                        Text(
-                            text = if (memories.isEmpty()) "暂无记忆" else "该筛选下无内容",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = if (memories.isEmpty()) {
-                                "记忆将出现在这里"
-                            } else {
-                                "换其他类型试试"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    )
                 }
             } else {
                 LazyColumn(
@@ -413,66 +407,47 @@ private fun MemoryActionDialog(
             }
         },
         confirmButton = {
+            // 2x2 布局:置顶/归档(状态 toggle,各自独立)一行,删除(危险色)+ 关闭(右对齐)一行。
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (memory.pinned) {
-                    TextButton(onClick = onUnpin) {
-                        Icon(
-                            imageVector = Icons.Outlined.StarOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("取消置顶")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (memory.pinned) {
+                        OutlinedButton(onClick = onUnpin, modifier = Modifier.weight(1f)) {
+                            Text("取消置顶")
+                        }
+                    } else {
+                        OutlinedButton(onClick = onPin, modifier = Modifier.weight(1f)) {
+                            Text("置顶")
+                        }
                     }
-                } else {
-                    TextButton(onClick = onPin) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("置顶")
-                    }
-                }
-                if (memory.archived) {
-                    TextButton(onClick = onUnarchive) {
-                        Icon(
-                            imageVector = Icons.Outlined.Archive,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("取消归档")
-                    }
-                } else {
-                    TextButton(onClick = onArchive) {
-                        Icon(
-                            imageVector = Icons.Filled.Archive,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("归档")
+                    if (memory.archived) {
+                        OutlinedButton(onClick = onUnarchive, modifier = Modifier.weight(1f)) {
+                            Text("取消归档")
+                        }
+                    } else {
+                        OutlinedButton(onClick = onArchive, modifier = Modifier.weight(1f)) {
+                            Text("归档")
+                        }
                     }
                 }
-                TextButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("删除")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    TextButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                    ) {
+                        Text("删除")
+                    }
+                    TextButton(onClick = onDismiss) {
+                        Text("关闭")
+                    }
                 }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
             }
         },
     )
@@ -525,7 +500,7 @@ private fun MemoryDetailDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("完成")
+                Text("关闭")
             }
         },
     )

@@ -113,7 +113,7 @@ internal fun InsightLongPressDialog(
                 )
                 InsightActionRow(
                     icon = Icons.Filled.Visibility,
-                    label = if (showEvidence) "隐藏依据" else "查看依据",
+                    label = if (showEvidence) "隐藏原因" else "查看原因",
                     onClick = onShowEvidence,
                 )
             }

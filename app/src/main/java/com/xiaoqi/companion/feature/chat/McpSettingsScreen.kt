@@ -166,9 +166,9 @@ private fun McpListScreen(
             item {
                 Text(
                     text = if (servers.isEmpty()) {
-                        "还没有 MCP 服务，点下方添加高德或其他自定义。"
+                        "还没有 MCP 服务"
                     } else {
-                        "共 ${servers.size} 个，点卡片编辑，关右侧开关可临时停用。"
+                        "已添加 ${servers.size} 个"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
