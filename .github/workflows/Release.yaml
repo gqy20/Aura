@@ -88,8 +88,6 @@ jobs:
           fi
 
           cat > "$notes_file" << EOF
-          ## Aura ${tag}
-
           Android AI 陪伴应用 · 文本聊天技术闭环 / Phase 1 agent tools
 
           ### 下载
