@@ -66,6 +66,7 @@ class ToolCallResultParser @Inject constructor() {
             "get_user_context_settings" -> parseUserContextSettings(data)
             "update_mood" -> parseMood(data)
             "update_relationship" -> parseRelationship(data)
+            "update_state" -> parseUpdateState(data)
             "query_health_data" -> parseHealthData(data)
             else -> ToolResultSummary.Unknown(raw = data.toString())
         }
@@ -176,6 +177,13 @@ class ToolCallResultParser @Inject constructor() {
         return ToolResultSummary.SavedOne(title = "更新关系", subject = subject)
     }
 
+    private fun parseUpdateState(data: JsonObject): ToolResultSummary {
+        val memorySaved = data.int("memorySaved") ?: 0
+        val mood = data.str("mood") ?: ""
+        val subject = if (memorySaved > 0) "已保存记忆" else mood.ifBlank { "状态" }
+        return ToolResultSummary.SavedOne(title = "状态更新", subject = subject)
+    }
+
     private fun parseHealthData(data: JsonObject): ToolResultSummary {
         val count = data.int("count") ?: 0
         if (count == 0) return ToolResultSummary.Empty(title = "健康数据")
@@ -232,6 +240,7 @@ class ToolCallResultParser @Inject constructor() {
         "get_user_context_settings" -> "上下文设置"
         "update_mood" -> "更新情绪"
         "update_relationship" -> "更新关系"
+        "update_state" -> "状态更新"
         "query_health_data" -> "健康数据"
         else -> toolName
     }

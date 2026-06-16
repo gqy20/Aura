@@ -29,20 +29,6 @@ object SystemPersona {
     var recentTitle: String = "最近对话"
         private set
 
-    var reflectionSystemPrompt: String = ""
-        private set
-
-    var reflectionUserTemplate: String = ""
-        private set
-
-    /**
-     * Few-shot JSON examples loaded from `sections.examples_*` in `system_persona.yml`.
-     * Keyed by the example name (e.g. `reflection_empty`, `reflection_save`).
-     * The values are raw JSON strings; callers must deserialize them into the target type.
-     */
-    var reflectionExamples: Map<String, String> = emptyMap()
-        private set
-
     var isInitialized: Boolean = false
         private set
 
@@ -69,9 +55,6 @@ object SystemPersona {
         toolsSectionTemplate = buildSectionRaw(config, "tools")
         summariesTitle = config.sections["summaries"]?.title?.takeIf { it.isNotBlank() } ?: "会话摘要"
         recentTitle = config.sections["recent"]?.title?.takeIf { it.isNotBlank() } ?: "最近对话"
-        reflectionSystemPrompt = config.sections["reflection_system"]?.placeholder.orEmpty()
-        reflectionUserTemplate = config.sections["reflection_user"]?.placeholder.orEmpty()
-        reflectionExamples = config.examples
         isInitialized = true
     }
 

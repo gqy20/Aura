@@ -3,8 +3,8 @@ package com.xiaoqi.companion.feature.chat.usecase
 import app.cash.turbine.test
 import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.ConversationContextBuilder
-import com.xiaoqi.companion.core.companion.ConversationReflectionResult
-import com.xiaoqi.companion.core.companion.OutputParser
+import com.xiaoqi.companion.core.companion.EmotionStateMachine
+import com.xiaoqi.companion.core.companion.RelationshipModel
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
@@ -100,25 +100,31 @@ class SendMessageUseCaseTest {
         )
     }
 
+    private val emotionMachine: EmotionStateMachine = mockk(relaxed = true) {
+        every { currentMood } returns "calm"
+        every { latestIntensity } returns 0.5f
+    }
+    private val relationshipModel: RelationshipModel = mockk(relaxed = true) {
+        every { currentLevel } returns 0.5f
+    }
+
     private class FakeCompanionRuntime(
         configRepo: ConfigRepository,
         messageRepo: MessageRepository,
         memoryRepo: MemoryRepository,
+        emotionMachine: EmotionStateMachine,
+        relationshipModel: RelationshipModel,
     ) : CompanionRuntime(
         configRepository = configRepo,
         koogAgentFactory = mockk(),
         promptBuilder = mockk(),
-        outputParser = OutputParser(),
         messageRepository = messageRepo,
         memoryRepository = memoryRepo,
         conversationContextBuilder = ConversationContextBuilder(messageRepo),
-        conversationReflection = mockk(relaxed = true) {
-            coEvery { reflectAndSave(any(), any(), any()) } returns ConversationReflectionResult()
-        },
-        emotionMachine = mockk(relaxed = true),
-        relationshipModel = mockk(relaxed = true),
+        emotionMachine = emotionMachine,
+        relationshipModel = relationshipModel,
     ) {
-        var rawResponse = "[mood:happy][intensity:0.7] 你好呀！"
+        var rawResponse = "你好呀！"
         var shouldFail = false
         var emitToolEvents = false
         var toolEvents: List<AgentToolCall> = emptyList()
@@ -151,8 +157,7 @@ class SendMessageUseCaseTest {
                     return@flow
                 }
                 if (completeDelayMs > 0L) delay(completeDelayMs)
-                val parsed = OutputParser().parse(rawResponse)
-                emit(AgentEvent.Complete(parsed))
+                emit(AgentEvent.Complete(rawResponse))
             }
         }
     }
@@ -185,7 +190,7 @@ class SendMessageUseCaseTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        fakeRuntime = FakeCompanionRuntime(configRepository, messageRepo, memoryRepo)
+        fakeRuntime = FakeCompanionRuntime(configRepository, messageRepo, memoryRepo, emotionMachine, relationshipModel)
         imageProcessor = FakeChatImageProcessor()
         sendMessageUseCase = SendMessageUseCase(
             runtime = fakeRuntime,
@@ -194,6 +199,8 @@ class SendMessageUseCaseTest {
             presenceController = presenceController,
             agentStateDao = agentStateDao,
             memoryRepository = memoryRepo,
+            emotionMachine = emotionMachine,
+            relationshipModel = relationshipModel,
         )
     }
 
@@ -479,7 +486,11 @@ class SendMessageUseCaseTest {
 
     @Test
     fun sendMessage_completeEvent_persistsCompanionStatus() = runTest {
-        fakeRuntime.rawResponse = "[mood:happy][intensity:0.7][affinity:+0.2] 你好呀！"
+        // update_state tool 已在上游写入情绪/关系;UseCase 从单例读取并持久化
+        every { emotionMachine.currentMood } returns "happy"
+        every { emotionMachine.latestIntensity } returns 0.7f
+        every { relationshipModel.currentLevel } returns 0.7f
+        fakeRuntime.rawResponse = "你好呀！"
         sendMessageUseCase("hello", null, readyConfig(), this, update)
         advanceUntilIdle()
 
@@ -487,7 +498,7 @@ class SendMessageUseCaseTest {
             agentStateDao.insert(match {
                 it.companionId == "default" &&
                     it.mood == "happy" &&
-                    it.relationshipLevel == 0.2f &&
+                    it.relationshipLevel == 0.7f &&
                     it.emotionVector.contains("0.7")
             })
         }
@@ -537,67 +548,4 @@ class SendMessageUseCaseTest {
         assertEquals("abc", assistant?.content)
     }
 
-    @Test
-    fun sendMessage_streamingDelta_stripsControlTagsFromDraft() = runTest {
-        // LLM 输出 [mood:happy][intensity:0.6] + 正文,streaming draft 应该是纯正文,
-        // 不显示 raw 标签,也不留空行占位。UseCase 输出层负责过滤。
-        fakeRuntime.rawResponse = "[mood:happy] 你好世界"
-        fakeRuntime.streamingDeltas = listOf(
-            "[mood:happy]",
-            "[intensity:0.6]",
-            " 你好世界",
-        )
-        fakeRuntime.completeDelayMs = 200L
-
-        sendMessageUseCase("hello", null, readyConfig(), this, update)
-
-        val assistant = state.value.messages.last { it.role == "ASSISTANT" }
-        // 累加过程中 control tag 应被过滤,draft / content 都不含 [xxx:xxx]
-        assertFalse("content 不应含 control tag: ${assistant.content}", assistant.content.contains("[mood:"))
-        assertFalse("content 不应含 intensity tag: ${assistant.content}", assistant.content.contains("[intensity:"))
-        assertTrue("正文应保留: ${assistant.content}", assistant.content.contains("你好世界"))
-    }
-
-    @Test
-    fun sendMessage_streamingDelta_tagSplitAcrossChunks_isStillStripped() = runTest {
-        // 标签被切到 chunk 边界 — 模拟 LLM 流式把 [mood:happy] 切成
-        // "[" / "mood:happy" / "]" 三个 chunk。状态机应跨 chunk 识别整段标签吞掉,
-        // 不让半个标签字符(mood:happy 之类)泄漏到 draft。
-        fakeRuntime.rawResponse = "[mood:happy] 嘿"
-        fakeRuntime.streamingDeltas = listOf(
-            "[",
-            "mood:happy",
-            "]",
-            " 嘿",
-        )
-        fakeRuntime.completeDelayMs = 200L
-
-        sendMessageUseCase("hi", null, readyConfig(), this, update)
-
-        val assistant = state.value.messages.last { it.role == "ASSISTANT" }
-        assertFalse("content 不应残留 [mood: ${assistant.content}", assistant.content.contains("[mood:"))
-        assertFalse("content 不应残留 mood:happy 半个标签: ${assistant.content}", assistant.content.contains("mood:happy"))
-        assertTrue("正文应保留: ${assistant.content}", assistant.content.contains("嘿"))
-    }
-
-    @Test
-    fun sendMessage_streamingDelta_unclosedBraceOverLimit_fallsBackToText() = runTest {
-        // 未闭合的 [ 超过 CONTROL_TAG_MAX_TAIL — 状态机应放弃等待,
-        // 把这段当正文推出去,而不是永远留在 buffer。
-        // 构造一个故意过长的未闭合 chunk:[ 后面 80 个普通字符(无 ])。
-        val longUnclosed = "[" + "x".repeat(80)
-        fakeRuntime.rawResponse = "$longUnclosed done"
-        fakeRuntime.streamingDeltas = listOf(
-            longUnclosed,
-            " done",
-        )
-        fakeRuntime.completeDelayMs = 200L
-
-        sendMessageUseCase("hi", null, readyConfig(), this, update)
-
-        val assistant = state.value.messages.last { it.role == "ASSISTANT" }
-        // 超长未闭合被当作正文吐出,content 包含这些 x 字符
-        assertTrue("超长未闭合应被回退为正文: ${assistant.content}", assistant.content.contains("x"))
-        assertTrue("后续正文保留: ${assistant.content}", assistant.content.contains("done"))
-    }
 }

@@ -1,6 +1,5 @@
 package com.xiaoqi.companion.core.companion
 
-import com.xiaoqi.companion.core.companion.model.InteractionSignal
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import javax.inject.Inject
@@ -12,20 +11,18 @@ class RelationshipModelImpl @Inject constructor() : RelationshipModel {
     override var currentLevel: Float = 0f
         private set
 
-    override suspend fun update(signal: InteractionSignal) {
+    override suspend fun applyDelta(delta: Float, reason: String) {
+        if (delta == 0f) return
         val previous = currentLevel
-        currentLevel = (currentLevel + signal.affinityDelta).coerceIn(0f, 1f)
-        if (signal.affinityDelta != 0f) {
-            AppLogger.debug(
-                LogTags.Relation,
-                "relationship_level_changed",
-                "previousLevel" to previous,
-                "currentLevel" to currentLevel,
-                "delta" to signal.affinityDelta,
-                "topicCount" to signal.topicTags.size,
-                "isDeepConversation" to signal.isDeepConversation,
-            )
-        }
+        currentLevel = (currentLevel + delta).coerceIn(0f, 1f)
+        AppLogger.debug(
+            LogTags.Relation,
+            "relationship_level_changed",
+            "previousLevel" to previous,
+            "currentLevel" to currentLevel,
+            "delta" to delta,
+            "reason" to reason,
+        )
     }
 
     override fun contextModifier(): String {

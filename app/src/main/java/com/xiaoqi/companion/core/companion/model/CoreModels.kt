@@ -27,7 +27,7 @@ sealed class AgentEvent {
     data class ToolStarted(val name: String) : AgentEvent()
     data class ToolFinished(val name: String) : AgentEvent()
     data class MemorySaved(val count: Int) : AgentEvent()
-    data class Complete(val parsed: ParsedOutput) : AgentEvent()
+    data class Complete(val textReply: String = "") : AgentEvent()
     data class Error(val error: AgentError) : AgentEvent()
 }
 
@@ -53,29 +53,3 @@ sealed class AgentError {
     data class ParseError(val reason: String) : AgentError()
 }
 
-// --- Parsed Output ---
-
-data class ParsedOutput(
-    val textReply: String = "",
-    val emotionSignal: EmotionSignal = EmotionSignal(),
-    val interactionSignal: InteractionSignal = InteractionSignal(),
-    val actions: List<AgentAction> = emptyList(),
-)
-
-data class EmotionSignal(
-    val mood: String = "neutral",
-    val intensity: Float = 0.5f,
-    val trigger: String = "",
-    val emotionVector: Map<String, Float> = emptyMap(),
-)
-
-data class InteractionSignal(
-    val affinityDelta: Float = 0f,
-    val topicTags: List<String> = emptyList(),
-    val isDeepConversation: Boolean = false,
-)
-
-data class AgentAction(
-    val type: String,
-    val params: Map<String, String> = emptyMap(),
-)

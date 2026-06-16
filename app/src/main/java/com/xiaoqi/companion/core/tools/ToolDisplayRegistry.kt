@@ -72,6 +72,7 @@ class ToolDisplayRegistry @Inject constructor(
                 "已更新",
                 "更新失败",
             )
+            "update_state" -> ToolDisplayLabels("更新状态中", "已更新", "更新失败")
             else -> if (toolName.startsWith("mcp__")) {
                 ToolDisplayLabels("调用远端 MCP", "MCP 已完成", "MCP 失败")
             } else {

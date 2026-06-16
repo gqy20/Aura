@@ -1,9 +1,8 @@
 package com.xiaoqi.companion.core.companion
 
-import com.xiaoqi.companion.core.companion.model.EmotionSignal
-
 interface EmotionStateMachine {
     val currentMood: String
-    suspend fun feed(signal: EmotionSignal)
+    val latestIntensity: Float
+    suspend fun record(mood: String, intensity: Float = 0.5f, reason: String = "")
     fun getContext(): String
 }

@@ -10,7 +10,6 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.xiaoqi.companion.core.companion.OutputParser
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.db.CompanionDatabase
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
@@ -39,10 +38,6 @@ object DataModule {
     @Provides
     @Singleton
     fun providePromptBuilder(): PromptBuilder = PromptBuilder()
-
-    @Provides
-    @Singleton
-    fun provideOutputParser(): OutputParser = OutputParser()
 
     @Provides
     @Singleton

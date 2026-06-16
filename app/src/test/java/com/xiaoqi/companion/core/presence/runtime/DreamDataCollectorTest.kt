@@ -72,29 +72,6 @@ class DreamDataCollectorTest {
     }
 
     @Test
-    fun collectLast7Days_extractsTopKeywords() = runTest {
-        val moodDao = mockk<MoodSnapshotDao> {
-            coEvery { findInRange(any(), any(), any()) } returns emptyList()
-        }
-        val messageDao = mockk<MessageDao> {
-            coEvery { getRecentMessages(any(), any()) } returns listOf(
-                MessageEntity(id = "msg1", sessionId = "default", role = MessageRole.USER, content = "工作压力很大很累 工作", timestamp = 1L),
-                MessageEntity(id = "msg2", sessionId = "default", role = MessageRole.USER, content = "工作今天加班", timestamp = 2L),
-            )
-        }
-        val memoryDao = mockk<MemoryDao> {
-            coEvery { countAll() } returns 0
-            coEvery { getRecentImages(any()) } returns emptyList()
-        }
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
-
-        val snapshot = collector.collectLast7Days(now = 2L)
-
-        assertTrue(snapshot.topKeywords.contains("工作"))
-        assertTrue(snapshot.topKeywords.indexOf("工作") < snapshot.topKeywords.size)
-    }
-
-    @Test
     fun render_containsKeySections() = runTest {
         val moodDao = mockk<MoodSnapshotDao> {
             coEvery { findInRange(any(), any(), any()) } returns emptyList()
@@ -235,7 +212,6 @@ class DreamDataCollectorTest {
             moodSnapshots = emptyList(),
             messages = emptyList(),
             memoryCount = 0,
-            topKeywords = emptyList(),
             imageMemories = listOf(
                 DreamDataCollector.ImageMemorySummary(
                     id = "img-1",
@@ -275,7 +251,6 @@ class DreamDataCollectorTest {
             moodSnapshots = emptyList(),
             messages = emptyList(),
             memoryCount = 3,
-            topKeywords = emptyList(),
         )
 
         val rendered = collector.render(snapshot)
@@ -296,7 +271,6 @@ class DreamDataCollectorTest {
             moodSnapshots = emptyList(),
             messages = emptyList(),
             memoryCount = 0,
-            topKeywords = emptyList(),
             imageMemories = listOf(
                 DreamDataCollector.ImageMemorySummary(
                     id = "img-1",

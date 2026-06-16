@@ -46,7 +46,6 @@ class DreamDataCollector @Inject constructor(
         val moodSnapshots: List<MoodSnapshotEntity>,
         val messages: List<MessageEntity>,
         val memoryCount: Int,
-        val topKeywords: List<String>,
         val imageMemories: List<ImageMemorySummary> = emptyList(),
         val healthSnapshots: List<HealthSnapshotEntity> = emptyList(),
     ) {
@@ -71,7 +70,6 @@ class DreamDataCollector @Inject constructor(
         val msgs = messageDao.getRecentMessages(DEFAULT_SESSION_ID, RECENT_MESSAGE_LIMIT)
             .filter { it.timestamp in start..end }
         val memoryCount = memoryDao.countAll()
-        val topKeywords = extractTopKeywords(msgs, KEYWORD_LIMIT)
 
         // M4:近 N 张有图 memory,过滤 7 天窗口,只取元数据(content 本身是 "[图片] 摘要" 不再裁剪)。
         val imageMemories = memoryDao.getRecentImages(IMAGE_MEMORY_LIMIT)
@@ -99,7 +97,6 @@ class DreamDataCollector @Inject constructor(
             moodSnapshots = moods,
             messages = msgs,
             memoryCount = memoryCount,
-            topKeywords = topKeywords,
             imageMemories = imageMemories,
             healthSnapshots = healthSnapshots,
         )
@@ -129,9 +126,6 @@ class DreamDataCollector @Inject constructor(
         }
         appendLine()
         appendLine("## 长期记忆总数:${snapshot.memoryCount}")
-        if (snapshot.topKeywords.isNotEmpty()) {
-            appendLine("## 高频关键词:${snapshot.topKeywords.joinToString(", ")}")
-        }
         // M4:视觉证据 — 本地 LLM 看不到图,只能从元数据推测用户视觉节奏/兴趣。
         if (snapshot.imageMemories.isNotEmpty()) {
             appendLine()
@@ -186,39 +180,12 @@ class DreamDataCollector @Inject constructor(
         return "${cal.get(Calendar.MONTH) + 1}/${cal.get(Calendar.DAY_OF_MONTH)}"
     }
 
-    /**
-     * 简易词频统计:小写化 + 去停用词 + 去标点 + 长度 ≥ 2 + 取 top N。
-     * **不**做中文分词(MVP 阶段够用,真实"长期认识"留给 M3+ 接 jieba 等)。
-     */
-    private fun extractTopKeywords(messages: List<MessageEntity>, limit: Int): List<String> {
-        val counts = HashMap<String, Int>()
-        messages.forEach { msg ->
-            msg.content.lowercase()
-                .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
-                .split(Regex("\\s+"))
-                .map { it.trim() }
-                .filter { it.length >= 2 && it !in STOPWORDS }
-                .forEach { token -> counts[token] = (counts[token] ?: 0) + 1 }
-        }
-        return counts.entries
-            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
-            .take(limit)
-            .map { it.key }
-    }
-
     companion object {
         const val DEFAULT_COMPANION_ID = "default"
         const val DEFAULT_SESSION_ID = "default"
         const val RECENT_MESSAGE_LIMIT = 200
-        const val KEYWORD_LIMIT = 10
         // M4 视觉证据上限:5 张图 metadata ≈ 500 字符,避免 prompt 膨胀。
         const val IMAGE_MEMORY_LIMIT = 5
         const val HEALTH_LOOKBACK_DAYS = 7
-
-        private val STOPWORDS = setOf(
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "我", "你", "他", "她", "它", "的", "了", "在", "是", "和",
-            "to", "of", "in", "on", "at", "for", "and", "or", "but",
-        )
     }
 }

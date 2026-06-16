@@ -169,12 +169,12 @@ internal fun defaultBaseUrl(provider: LlmProvider): String =
 internal fun CompanionStatus.after(
     mood: String,
     intensity: Float,
-    affinityDelta: Float,
+    relationshipLevel: Float,
 ): CompanionStatus =
     copy(
         mood = mood.ifBlank { this.mood },
         intensity = intensity.coerceIn(0f, 1f),
-        relationshipLevel = (relationshipLevel + affinityDelta).coerceIn(0f, 1f),
+        relationshipLevel = relationshipLevel.coerceIn(0f, 1f),
     )
 
 /**

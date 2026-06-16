@@ -2,10 +2,12 @@ package com.xiaoqi.companion.core.companion
 
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.PromptBuilder
+import com.xiaoqi.companion.core.tools.parseOrNull
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -18,16 +20,16 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
 
 open class CompanionRuntime @Inject constructor(
     private val configRepository: ConfigRepository,
     private val koogAgentFactory: KoogAgentFactory,
     private val promptBuilder: PromptBuilder,
-    private val outputParser: OutputParser,
     private val messageRepository: MessageRepository,
     private val memoryRepository: MemoryRepository,
     private val conversationContextBuilder: ConversationContextBuilder,
-    private val conversationReflection: ConversationReflection,
     private val emotionMachine: EmotionStateMachine,
     private val relationshipModel: RelationshipModel,
 ) {
@@ -89,7 +91,23 @@ open class CompanionRuntime @Inject constructor(
                             rawResponse += event.text
                             trySend(AgentEvent.Streaming(event.text))
                         }
-                        is KoogAgentEvent.ToolCallUpdated -> trySend(AgentEvent.ToolCallUpdated(event.call))
+                        is KoogAgentEvent.ToolCallUpdated -> {
+                            trySend(AgentEvent.ToolCallUpdated(event.call))
+                            // update_state 完成时，如果有记忆保存，触发 MemorySaved 事件
+                            if (event.call.name == "update_state" &&
+                                event.call.status == ToolCallStatus.SUCCEEDED
+                            ) {
+                                val resultJson = event.call.resultJson
+                                val envelope = parseOrNull(resultJson)
+                                if (envelope is com.xiaoqi.companion.core.tools.ToolEnvelope.Ok) {
+                                    val memorySaved = envelope.data["memorySaved"]
+                                        ?.jsonPrimitive?.intOrNull ?: 0
+                                    if (memorySaved > 0) {
+                                        trySend(AgentEvent.MemorySaved(memorySaved))
+                                    }
+                                }
+                            }
+                        }
                         is KoogAgentEvent.ToolStarted -> trySend(AgentEvent.ToolStarted(event.name))
                         is KoogAgentEvent.ToolFinished -> trySend(AgentEvent.ToolFinished(event.name))
                     }
@@ -111,71 +129,23 @@ open class CompanionRuntime @Inject constructor(
                 )
                 trySend(AgentEvent.Error(AgentError.ParseError("Empty model response")))
             } else {
-                val parsed = outputParser.parse(rawResponse)
-                val finalParsed = if (parsed.textReply.isBlank() && rawResponse.isNotBlank()) {
-                    AppLogger.warn(
-                        LogTags.Runtime,
-                        "empty_parsed_reply_using_raw_fallback",
-                        "rawResponseLength" to rawResponse.length,
-                        "durationMs" to (System.currentTimeMillis() - startedAt),
-                    )
-                    parsed.copy(textReply = rawResponse.trim())
-                } else {
-                    parsed
-                }
+                val assistantMessageId = messageRepository.saveAssistantMessage(
+                    sessionId = DEFAULT_SESSION_ID,
+                    content = rawResponse,
+                )
+                AppLogger.debug(
+                    LogTags.Runtime,
+                    "response_saved",
+                    "replyLength" to rawResponse.length,
+                )
 
-                if (finalParsed.textReply.isBlank()) {
-                    AppLogger.warn(
-                        LogTags.Runtime,
-                        "empty_assistant_reply_after_fallback",
-                        "rawResponseLength" to rawResponse.length,
-                        "durationMs" to (System.currentTimeMillis() - startedAt),
-                    )
-                    trySend(AgentEvent.Error(AgentError.ParseError("Empty assistant reply")))
-                } else {
-                    val assistantMessageId = messageRepository.saveAssistantMessage(
-                        sessionId = DEFAULT_SESSION_ID,
-                        content = finalParsed.textReply,
-                    )
-                    AppLogger.debug(
-                        LogTags.Runtime,
-                        "response_parsed",
-                        "mood" to finalParsed.emotionSignal.mood,
-                        "replyLength" to finalParsed.textReply.length,
-                        "actionCount" to finalParsed.actions.size,
-                    )
-
-                    emotionMachine.feed(finalParsed.emotionSignal)
-                    relationshipModel.update(finalParsed.interactionSignal)
-                    val savedMemoryCount = runCatching {
-                        conversationReflection.reflectAndSave(
-                            input = ConversationReflectionInput(
-                                userInput = input,
-                                assistantReply = finalParsed.textReply,
-                                sourceMessageIds = listOfNotNull(userMessageId, assistantMessageId),
-                            ),
-                            config = config,
-                            agent = agent,
-                        ).savedMemoryCount
-                    }.onFailure { error ->
-                        AppLogger.warn(
-                            LogTags.Runtime,
-                            "conversation_reflection_failed",
-                            "message" to (error.message ?: error::class.simpleName.orEmpty()),
-                        )
-                    }.getOrDefault(0)
-                    if (savedMemoryCount > 0) {
-                        trySend(AgentEvent.MemorySaved(savedMemoryCount))
-                    }
-
-                    AppLogger.info(
-                        LogTags.Runtime,
-                        "pipeline_completed",
-                        "durationMs" to (System.currentTimeMillis() - startedAt),
-                        "replyLength" to finalParsed.textReply.length,
-                    )
-                    trySend(AgentEvent.Complete(finalParsed))
-                }
+                AppLogger.info(
+                    LogTags.Runtime,
+                    "pipeline_completed",
+                    "durationMs" to (System.currentTimeMillis() - startedAt),
+                    "replyLength" to rawResponse.length,
+                )
+                trySend(AgentEvent.Complete(rawResponse))
             }
         } catch (e: Exception) {
             AppLogger.error(

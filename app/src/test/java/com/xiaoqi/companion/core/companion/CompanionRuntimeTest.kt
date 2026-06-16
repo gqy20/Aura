@@ -4,9 +4,6 @@ import app.cash.turbine.test
 import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
-import com.xiaoqi.companion.core.companion.model.EmotionSignal
-import com.xiaoqi.companion.core.companion.model.InteractionSignal
-import com.xiaoqi.companion.core.companion.model.ParsedOutput
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
@@ -51,10 +48,6 @@ class CompanionRuntimeTest {
         )
     }
 
-    private val outputParser: OutputParser = mockk {
-        every { parse(any<String>()) } returns ParsedOutput(textReply = "你好！")
-    }
-
     private val messageRepo: MessageRepository = mockk(relaxed = true) {
         coEvery { getRecentMessages(any(), any()) } returns emptyList()
     }
@@ -68,13 +61,10 @@ class CompanionRuntimeTest {
     }
     private val emotionMachine: EmotionStateMachine = mockk(relaxed = true)
     private val relationshipModel: RelationshipModel = mockk(relaxed = true)
-    private val conversationReflection: ConversationReflection = mockk(relaxed = true) {
-        coEvery { reflectAndSave(any(), any(), any()) } returns ConversationReflectionResult()
-    }
 
     private class FakeKoogAgentFactory : KoogAgentFactory {
         var lastConfig: com.xiaoqi.companion.data.repository.LlmConfig? = null
-        var responseText = "[mood:happy][intensity:0.7] 你好呀！"
+        var responseText = "你好呀！"
         var shouldFail = false
         var emitToolEvents = false
         var emitTextEvents = true
@@ -105,8 +95,8 @@ class CompanionRuntimeTest {
                     runEventsCallCount++
                     if (shouldFail) throw RuntimeException("API error")
                     if (emitToolEvents) {
-                        emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)))
-                        emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
+                        emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("update_state", ToolCallStatus.STARTED)))
+                        emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("update_state", ToolCallStatus.SUCCEEDED)))
                     }
                     if (emitTextEvents) {
                         emit(KoogAgentEvent.TextDelta(responseText))
@@ -120,11 +110,9 @@ class CompanionRuntimeTest {
         configRepository = configRepo,
         koogAgentFactory = factory,
         promptBuilder = promptBuilder,
-        outputParser = outputParser,
         messageRepository = messageRepo,
         memoryRepository = memoryRepository,
         conversationContextBuilder = ConversationContextBuilder(messageRepo),
-        conversationReflection = conversationReflection,
         emotionMachine = emotionMachine,
         relationshipModel = relationshipModel,
     )
@@ -136,7 +124,7 @@ class CompanionRuntimeTest {
             assertTrue(awaitItem() is AgentEvent.Streaming)
             val event = awaitItem()
             assertTrue(event is AgentEvent.Complete)
-            assertEquals("你好！", (event as AgentEvent.Complete).parsed.textReply)
+            assertEquals("你好呀！", (event as AgentEvent.Complete).textReply)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -163,34 +151,6 @@ class CompanionRuntimeTest {
     }
 
     @Test
-    fun send_feedsEmotionMachine() = runTest {
-        val factory = FakeKoogAgentFactory()
-        every { outputParser.parse(any()) } returns ParsedOutput(
-            textReply = "回复",
-            emotionSignal = EmotionSignal(mood = "excited", intensity = 0.9f),
-        )
-        makeRuntime(factory).send(UserInput.Text("test")).test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-        coVerify { emotionMachine.feed(EmotionSignal(mood = "excited", intensity = 0.9f)) }
-    }
-
-    @Test
-    fun send_updatesRelationship() = runTest {
-        val factory = FakeKoogAgentFactory()
-        every { outputParser.parse(any()) } returns ParsedOutput(
-            textReply = "回复",
-            interactionSignal = InteractionSignal(affinityDelta = 0.05f),
-        )
-        makeRuntime(factory).send(UserInput.Text("test")).test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-        coVerify { relationshipModel.update(InteractionSignal(affinityDelta = 0.05f)) }
-    }
-
-    @Test
     fun send_storesUserMessage() = runTest {
         val factory = FakeKoogAgentFactory()
         makeRuntime(factory).send(UserInput.Text("用户消息")).test {
@@ -201,53 +161,18 @@ class CompanionRuntimeTest {
     }
 
     @Test
-    fun send_textInput_runsConversationReflectionAfterReply() = runTest {
+    fun send_savesRawResponseAsAssistantMessage() = runTest {
         val factory = FakeKoogAgentFactory()
         coEvery { messageRepo.sendMessage(any(), any(), any()) } returns "user-message"
         coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
 
-        makeRuntime(factory).send(UserInput.Text("remember that I like jasmine tea")).test {
+        makeRuntime(factory).send(UserInput.Text("hello")).test {
             assertTrue(awaitItem() is AgentEvent.Streaming)
             assertTrue(awaitItem() is AgentEvent.Complete)
             cancelAndIgnoreRemainingEvents()
         }
 
-        coVerify {
-            conversationReflection.reflectAndSave(
-                match {
-                    it.userInput.content == "remember that I like jasmine tea" &&
-                        it.sourceMessageIds == listOf("user-message", "assistant-message")
-                },
-                any(),
-                any(),
-            )
-        }
-    }
-
-    @Test
-    fun send_whenReflectionSavesMemory_emitsMemorySavedBeforeComplete() = runTest {
-        val factory = FakeKoogAgentFactory()
-        coEvery { conversationReflection.reflectAndSave(any(), any(), any()) } returns
-            ConversationReflectionResult(savedMemoryCount = 2)
-
-        makeRuntime(factory).send(UserInput.Text("remember that I like jasmine tea")).test {
-            assertTrue(awaitItem() is AgentEvent.Streaming)
-            assertEquals(AgentEvent.MemorySaved(2), awaitItem())
-            assertTrue(awaitItem() is AgentEvent.Complete)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun send_whenReflectionFails_stillCompletesReply() = runTest {
-        val factory = FakeKoogAgentFactory()
-        coEvery { conversationReflection.reflectAndSave(any(), any(), any()) } throws RuntimeException("bad reflection")
-
-        makeRuntime(factory).send(UserInput.Text("remember that I like jasmine tea")).test {
-            assertTrue(awaitItem() is AgentEvent.Streaming)
-            assertTrue(awaitItem() is AgentEvent.Complete)
-            cancelAndIgnoreRemainingEvents()
-        }
+        coVerify { messageRepo.saveAssistantMessage("default", factory.responseText) }
     }
 
     @Test
@@ -261,7 +186,7 @@ class CompanionRuntimeTest {
     }
 
     @Test
-    fun send_whenRunEventsHasNoText_doesNotFallbackToSecondRun() = runTest {
+    fun send_whenRunEventsHasNoText_emitsError() = runTest {
         val factory = FakeKoogAgentFactory().apply { emitTextEvents = false }
 
         makeRuntime(factory).send(UserInput.Text("hi")).test {
@@ -273,26 +198,6 @@ class CompanionRuntimeTest {
 
         assertEquals(1, factory.runEventsCallCount)
         assertEquals(0, factory.runCallCount)
-    }
-
-    @Test
-    fun send_whenParsedReplyIsEmpty_usesRawResponseFallback() = runTest {
-        val factory = FakeKoogAgentFactory()
-        every { outputParser.parse(any()) } returns ParsedOutput(
-            textReply = "",
-            emotionSignal = EmotionSignal(mood = "happy", intensity = 0.7f),
-        )
-
-        makeRuntime(factory).send(UserInput.Text("hi")).test {
-            assertTrue(awaitItem() is AgentEvent.Streaming)
-            val event = awaitItem()
-            assertTrue(event is AgentEvent.Complete)
-            assertEquals(factory.responseText, (event as AgentEvent.Complete).parsed.textReply)
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        coVerify { messageRepo.saveAssistantMessage("default", factory.responseText) }
-        coVerify { emotionMachine.feed(match { it.mood == "happy" }) }
     }
 
     @Test
@@ -330,45 +235,15 @@ class CompanionRuntimeTest {
     }
 
     @Test
-    fun send_visionInput_runsConversationReflection() = runTest {
-        val factory = FakeKoogAgentFactory()
-        coEvery { messageRepo.sendMessage(any(), any(), any()) } returns "user-message"
-        coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
-
-        makeRuntime(factory).send(
-            UserInput.Vision(
-                text = "这是我的猫，叫奶茶",
-                imageBase64 = "base64img",
-                mediaType = "image/jpeg",
-                displayText = "这是我的猫，叫奶茶",
-            )
-        ).test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        coVerify {
-            conversationReflection.reflectAndSave(
-                match {
-                    it.userInput is UserInput.Vision &&
-                        it.sourceMessageIds == listOf("user-message", "assistant-message")
-                },
-                any(),
-                any(),
-            )
-        }
-    }
-
-    @Test
     fun send_agentToolEvents_emitsObservableToolEvents() = runTest {
         val factory = FakeKoogAgentFactory().apply { emitToolEvents = true }
         makeRuntime(factory).send(UserInput.Text("remember this")).test {
             assertEquals(
-                AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)),
+                AgentEvent.ToolCallUpdated(AgentToolCall("update_state", ToolCallStatus.STARTED)),
                 awaitItem(),
             )
             assertEquals(
-                AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)),
+                AgentEvent.ToolCallUpdated(AgentToolCall("update_state", ToolCallStatus.SUCCEEDED)),
                 awaitItem(),
             )
             assertTrue(awaitItem() is AgentEvent.Streaming)

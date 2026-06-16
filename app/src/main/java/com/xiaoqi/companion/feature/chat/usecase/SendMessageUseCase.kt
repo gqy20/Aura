@@ -1,6 +1,8 @@
 package com.xiaoqi.companion.feature.chat.usecase
 
 import com.xiaoqi.companion.core.companion.CompanionRuntime
+import com.xiaoqi.companion.core.companion.EmotionStateMachine
+import com.xiaoqi.companion.core.companion.RelationshipModel
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
@@ -55,6 +57,8 @@ class SendMessageUseCase @Inject constructor(
     private val presenceController: PresenceController,
     private val agentStateDao: com.xiaoqi.companion.data.db.dao.AgentStateDao,
     private val memoryRepository: MemoryRepository,
+    private val emotionMachine: EmotionStateMachine,
+    private val relationshipModel: RelationshipModel,
 ) {
     companion object {
         private const val DEFAULT_SESSION_ID = "default"
@@ -67,25 +71,6 @@ class SendMessageUseCase @Inject constructor(
         // Leading flush 阈值——首字符到达后立即 flush 到 UI。
         private const val STREAMING_LEADING_FLUSH_CHARS = 1
         private const val IMAGE_ONLY_PROMPT = "我想给你看这张图片。先说说你看到了什么，再自然地回应我。"
-
-        // LLM 输出的控制标签(与 OutputParser.allTagRegex 同源):
-        //   [mood:happy][intensity:0.6][affinity:+0.02][topics:a,b][action:foo[text:bar]]
-        // 这些是 LLM 给 parser 的协议,不是给用户看的正文。Streaming 路径
-        // 直接累加原始 delta,需要在 UseCase 输出层过滤。
-        //
-        // 关键:流式 chunk 切在标签**中间**(例 `][`、`aff`、`inity`),简单的
-        // per-delta `Regex.replace` 会让"[aff"这种"半个标签"被当成正文推
-        // 进 draft 区,UI 就会显示成 "affinity...]" 半成品。改为**单遍状态机**:
-        // 边扫描边记录'已发现 `[` 但未配对 `]`'的尾段,完整标签命中才吞掉,
-        // 部分标签保留在 tail 等后续 chunk 续上。
-        // 末尾未配对的 `[` 必须等流结束后再判定(Complete 事件里走一遍
-        // flushTail 清空,Complete 阶段也走 parser 重新提取,这里不会
-        // 损失真实标签)。
-        private const val CONTROL_TAG_PREFIX = '['
-        private const val CONTROL_TAG_SUFFIX = ']'
-        // "半个标签"的预估上限:超过这个长度还没找到 ']',就不再等配对,
-        // 把这段当成正文推出去(防止一个未闭合的 `[` 永远滞留 buffer)。
-        private const val CONTROL_TAG_MAX_TAIL = 64
     }
 
     suspend operator fun invoke(
@@ -133,8 +118,6 @@ class SendMessageUseCase @Inject constructor(
         var assistantContent = ""
         val streamingChunker = StreamingMarkdownChunker()
         val pendingStreamingContent = StringBuilder()
-        // 流式过滤跨 chunk 标签用:见 filterControlTags 注释。
-        var pendingTagTail: StringBuilder = StringBuilder()
         var streamingRenderJob: Job? = null
         var idleTimeoutJob: Job? = null
         var timedOut = false
@@ -280,27 +263,14 @@ class SendMessageUseCase @Inject constructor(
                 when (event) {
                     is AgentEvent.Streaming -> {
                         resetIdleTimer()
-                        // LLM 输出含 [mood:happy][intensity:0.6] 这类控制标签,
-                        // OutputParser 只在 Complete 事件时清理,但 streaming draft
-                        // 区是原始 delta 累积,UI 会显示成 raw 标签。
-                        // 在 UseCase 输出层做一次过滤,让 draft 始终是干净文本,
-                        // UI 渲染层(MarkdownMessageText.sanitizeDisplayMarkdown)
-                        // 不用再操心这层协议,职责更清晰。
-                        //
-                        // 状态机式过滤:跨 chunk 的"半个标签"不会泄漏到 draft。
-                        val cleanDelta = filterControlTags(event.delta, pendingTagTail)
                         AppLogger.info(
                             LogTags.Chat,
                             "streaming_delta",
                             "rawLen" to event.delta.length,
-                            "cleanLen" to cleanDelta.length,
-                            "filtered" to (cleanDelta != event.delta),
                             "rawPreview" to event.delta.take(80),
-                            "cleanPreview" to cleanDelta.take(80),
-                            "tailLen" to pendingTagTail.length,
                         )
-                        assistantContent += cleanDelta
-                        pendingStreamingContent.append(cleanDelta)
+                        assistantContent += event.delta
+                        pendingStreamingContent.append(event.delta)
                         scheduleStreamingRender()
                     }
                     is AgentEvent.ToolCallUpdated -> {
@@ -362,24 +332,12 @@ class SendMessageUseCase @Inject constructor(
                         idleTimeoutJob?.cancel()
                         streamingRenderJob?.cancel()
                         flushStreamingContent()
-                        // Complete 时再清一次 pendingTagTail 的剩余尾巴
-                        // (例如 LLM 最后 chunk 把 '[' 切了,没续完)。
-                        // 状态机 flush 策略: 把尾巴里所有 '[' 也吐回正文,
-                        // 避免永远滞留 buffer 污染下一轮。
-                        val tailFlush = pendingTagTail.toString()
-                        if (tailFlush.isNotEmpty()) {
-                            // pendingTagTail 此时只可能含 '[...' 类未闭合片段,
-                            // 全部当作正文推一次清空。
-                            assistantContent += tailFlush
-                        }
-                        pendingTagTail.clear()
 
-                        val finalReply = event.parsed.textReply
+                        val finalReply = event.textReply
                         AppLogger.info(
                             LogTags.Chat,
                             "complete_text_reply",
                             "len" to finalReply.length,
-                            "tailFlushed" to tailFlush.length,
                             "preview" to finalReply.take(200),
                         )
                         AppLogger.info(
@@ -399,9 +357,9 @@ class SendMessageUseCase @Inject constructor(
                         }
                         update {
                             val nextStatus = status.after(
-                                mood = event.parsed.emotionSignal.mood,
-                                intensity = event.parsed.emotionSignal.intensity,
-                                affinityDelta = event.parsed.interactionSignal.affinityDelta,
+                                mood = emotionMachine.currentMood,
+                                intensity = emotionMachine.latestIntensity,
+                                relationshipLevel = relationshipModel.currentLevel,
                             )
                             persistStatus(nextStatus, scope)
                             copy(
@@ -435,73 +393,6 @@ class SendMessageUseCase @Inject constructor(
             )
             finishWithError("发送失败，请重试。")
         }
-    }
-
-    /**
-     * 流式过滤 LLM 控制标签(状态机版)。
-     *
-     * 背景:per-delta `Regex("""\[[^\]]+]""").replace(delta, "")` 在 chunk 切到标签
-     * 中间时会把"半个标签"字符当成正文推给 draft,UI 显示成
-     * "[mood" / "aff" / "inity" / "][" 这种半成品。
-     *
-     * 解决:维护一个跨 chunk 的 `pendingTagTail`(在调用方持有):
-     * 1. 把上次的未配对尾巴 + 本次 chunk 拼起来当作完整输入
-     * 2. 扫描输入:遇到 `[` 开始一节候选标签,遇到第一个 `]` 立刻吞掉整节
-     *    `[` 之前的字符当正文输出
-     * 3. 扫描到末尾若仍在标签中(没遇到 `]`),把这段留在 pendingTagTail
-     *    等下次 chunk 续上
-     * 4. 若未配对长度超过 [CONTROL_TAG_MAX_TAIL],放弃,作为正文吐出
-     *    (防止一个未闭合的 `[` 永远滞留 buffer)
-     *
-     * @param chunk 本次 streaming delta
-     * @param pendingTagTail 调用方持有的跨 chunk 状态(mutable)
-     * @return 推给 draft 区的干净文本
-     */
-    private fun filterControlTags(chunk: String, pendingTagTail: StringBuilder): String {
-        if (chunk.isEmpty() && pendingTagTail.isEmpty()) return ""
-        val combined = buildString(pendingTagTail.length + chunk.length) {
-            append(pendingTagTail)
-            append(chunk)
-        }
-        val out = StringBuilder(combined.length)
-        var inTag = false
-        var tagStart = -1  // combined 中 '[' 的索引(用于 inTag 状态下超长兜底)
-        var i = 0
-        while (i < combined.length) {
-            val c = combined[i]
-            if (inTag) {
-                if (c == CONTROL_TAG_SUFFIX) {
-                    // 完整标签 — 吞掉
-                    inTag = false
-                    tagStart = -1
-                    i++
-                } else {
-                    i++
-                }
-            } else {
-                if (c == CONTROL_TAG_PREFIX) {
-                    inTag = true
-                    tagStart = i
-                    i++
-                } else {
-                    out.append(c)
-                    i++
-                }
-            }
-        }
-
-        // 处理尾巴:inTag=true 表示有未配对的 '[';否则清空
-        pendingTagTail.clear()
-        if (inTag) {
-            val tailLen = combined.length - tagStart
-            if (tailLen >= CONTROL_TAG_MAX_TAIL) {
-                // 超长未闭合 — 放弃等待,作为正文吐出
-                out.append(combined, tagStart, combined.length)
-            } else {
-                pendingTagTail.append(combined, tagStart, combined.length)
-            }
-        }
-        return out.toString()
     }
 
     private fun updateAssistantMessage(
