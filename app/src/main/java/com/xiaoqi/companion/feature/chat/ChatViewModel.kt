@@ -513,7 +513,9 @@ class ChatViewModel @Inject constructor(
     fun clearInsights() {
         viewModelScope.launch {
             try {
+                val count = insightRepository.countAll()
                 insightRepository.clearAll()
+                emitDataCleared(count)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_clear_insights_failed")
                 _uiState.update { it.copy(error = "清空 insights 失败,请重试。") }
@@ -524,7 +526,9 @@ class ChatViewModel @Inject constructor(
     fun clearMemories() {
         viewModelScope.launch {
             try {
+                val count = memoryRepository.countAll()
                 memoryRepository.clearAll()
+                emitDataCleared(count)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_clear_memories_failed")
                 _uiState.update { it.copy(error = "清空 memories 失败,请重试。") }
@@ -535,11 +539,19 @@ class ChatViewModel @Inject constructor(
     fun clearMoodSnapshots() {
         viewModelScope.launch {
             try {
+                val count = moodSnapshotDao.countAll()
                 moodSnapshotDao.clearAll()
+                emitDataCleared(count)
             } catch (e: Exception) {
                 AppLogger.error(LogTags.Repo, e, "ui_clear_mood_snapshots_failed")
                 _uiState.update { it.copy(error = "清空 mood_snapshots 失败,请重试。") }
             }
+        }
+    }
+
+    private fun emitDataCleared(count: Int) {
+        _uiState.update {
+            it.copy(dataJustClearedAt = System.currentTimeMillis(), dataJustClearedCount = count)
         }
     }
 

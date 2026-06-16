@@ -27,4 +27,12 @@
     <string name="dream_loop_last_run_never">尚无运行记录</string>
     <string name="dream_loop_last_run_at">上次运行: %1$s</string>
     <string name="dream_loop_last_run_with_count">上次运行: %1$s · 新增 %2$d 条</string>
+
+    <!-- Health 同步反馈 (Settings → Health) -->
+    <string name="health_sync_success">同步完成 · %1$d 天有数据</string>
+    <string name="health_sync_failure">同步失败: %1$s</string>
+    <string name="health_sync_skipped">防抖 · 上次同步在 %1$s 前</string>
+
+    <!-- 清空类反馈 (Settings → 数据透明) -->
+    <string name="data_clear_done">已清空 %1$d 条</string>
 </resources>

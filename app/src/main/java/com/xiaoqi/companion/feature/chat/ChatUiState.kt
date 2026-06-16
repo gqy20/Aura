@@ -167,6 +167,13 @@ data class ChatUiState(
      * 这个字段的变化来切回 list 模式 + 展示 snackbar。仅作信号用,UI 不要按它的值做业务判断。
      */
     val mcpEditorJustSaved: Long = 0L,
+    /**
+     * 一次性"已清空"事件,清空 insights / memories / mood_snapshots 成功时写入
+     * (timestamp, count) 元组。UI 用 [LaunchedEffect] 监听 timestamp 弹 snackbar;
+     * count 用于文案 "已清空 N 条"。仅作信号用,不要按 timestamp 的值做业务判断。
+     */
+    val dataJustClearedAt: Long = 0L,
+    val dataJustClearedCount: Int = 0,
     val toolCapabilitySettings: ChatToolCapabilitySettings = ChatToolCapabilitySettings(),
     val pendingImage: ChatImageAttachment? = null,
     val isPreparingImage: Boolean = false,

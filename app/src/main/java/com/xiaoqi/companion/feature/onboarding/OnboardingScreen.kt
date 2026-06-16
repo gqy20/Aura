@@ -104,7 +104,7 @@ fun OnboardingScreen(
                     0 -> item {
                         QuestionBlock(
                             title = "最近 1-2 件让你挂心的事?",
-                            subtitle = "让我记住,你最近在忙什么",
+                            subtitle = "你最近在忙什么",
                         ) {
                             OutlinedTextField(
                                 value = q1,
@@ -119,7 +119,7 @@ fun OnboardingScreen(
                     1 -> item {
                         QuestionBlock(
                             title = "未来 14 天的 1-2 个重要日期?",
-                            subtitle = "让我提醒",
+                            subtitle = "想被提醒的事",
                         ) {
                             OutlinedTextField(
                                 value = q2,
@@ -134,7 +134,7 @@ fun OnboardingScreen(
                     2 -> item {
                         QuestionBlock(
                             title = "希望我怎么称呼你 / 怎么说话?",
-                            subtitle = "让我适应你",
+                            subtitle = "希望的称呼和语气",
                         ) {
                             OutlinedTextField(
                                 value = q3,
@@ -150,7 +150,7 @@ fun OnboardingScreen(
                     3 -> item {
                         QuestionBlock(
                             title = "3 个高频聊天的朋友/家人",
-                            subtitle = "让我识别人",
+                            subtitle = "常聊到的名字",
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 q4Friends.value.forEachIndexed { index, name ->
@@ -172,7 +172,7 @@ fun OnboardingScreen(
                     4 -> item {
                         QuestionBlock(
                             title = "你最近的作息节奏?",
-                            subtitle = "让我知道规律",
+                            subtitle = "选最贴近的",
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 // chip 内嵌 Column 容易高度不一致,label 本身已 self-descriptive,hint 删掉。

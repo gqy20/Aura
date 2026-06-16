@@ -27,12 +27,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -316,50 +320,48 @@ private fun HomeTopBar(
         ) {
             HomeTopActionIcon(
                 imageVector = Icons.Default.Favorite,
-                contentDescription = "记忆",
+                tooltip = "记忆",
                 onClick = onOpenMemoryRoom,
             )
             HomeTopActionIcon(
                 imageVector = Icons.Default.Build,
-                contentDescription = "MCP",
+                tooltip = "MCP",
                 onClick = onOpenMcpSettings,
             )
-            Surface(
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = Color.White.copy(alpha = 0.72f),
-                shadowElevation = 4.dp,
-                tonalElevation = 1.dp,
-            ) {
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "设置",
-                        tint = primary,
-                    )
-                }
-            }
+            HomeTopActionIcon(
+                imageVector = Icons.Default.Settings,
+                tooltip = "设置",
+                onClick = onOpenSettings,
+            )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeTopActionIcon(
     imageVector: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
+    tooltip: String,
     onClick: () -> Unit,
 ) {
-    Surface(
-        shape = androidx.compose.foundation.shape.CircleShape,
-        color = Color.White.copy(alpha = 0.52f),
-        shadowElevation = 2.dp,
-        tonalElevation = 0.dp,
+    TooltipBox(
+        positionProvider = androidx.compose.material3.TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(tooltip) } },
+        state = rememberTooltipState(),
     ) {
-        IconButton(onClick = onClick) {
-            Icon(
-                imageVector = imageVector,
-                contentDescription = contentDescription,
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
-            )
+        Surface(
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = Color.White.copy(alpha = 0.52f),
+            shadowElevation = 2.dp,
+            tonalElevation = 0.dp,
+        ) {
+            IconButton(onClick = onClick) {
+                Icon(
+                    imageVector = imageVector,
+                    contentDescription = tooltip,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
+                )
+            }
         }
     }
 }

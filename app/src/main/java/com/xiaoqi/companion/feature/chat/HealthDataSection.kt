@@ -75,7 +75,7 @@ fun HealthDataSection(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingsSectionTitle(
             title = "健康数据接入",
-            subtitle = "Health Connect · 步数/心率/睡眠；HC 不可用时用本机传感器兜底步数",
+            subtitle = "步数 / 心率 / 睡眠",
         )
 
         HealthPermissionsCard(dataSource = healthConnectDataSource)
@@ -259,12 +259,12 @@ private fun SensorSourceCard(sensorSource: SensorManagerHealthSource) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "本机传感器兜底",
+                text = "本机传感器",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "HC 不可用时（如国行 ROM、realme），用本机传感器统计今日步数。",
+                text = "Health Connect 不可用时的步数兜底。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -272,8 +272,6 @@ private fun SensorSourceCard(sensorSource: SensorManagerHealthSource) {
                 ok = hasPermission, error = !hasPermission)
             SensorRow("计步传感器", if (hasHardware) "已内置" else "不支持",
                 ok = hasHardware, error = !hasHardware)
-            SensorRow("传感器", if (isAvailable) "可用" else "不可用",
-                ok = isAvailable, error = !isAvailable)
             if (!hasPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 OutlinedButton(
                     onClick = {
@@ -381,8 +379,9 @@ private fun HealthSyncStatusCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "状态",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "上次同步: ${formatLastSync(lastSyncAtMillis)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (syncState is HealthSyncManager.SyncState.Syncing) {
@@ -400,12 +399,6 @@ private fun HealthSyncStatusCard(
                     )
                 }
             }
-            Text(
-                text = "上次同步: ${formatLastSync(lastSyncAtMillis)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -437,12 +430,12 @@ private fun HealthSyncStatusCard(
 private fun describeSyncState(state: HealthSyncManager.SyncState): Pair<String, Color> = when (state) {
     is HealthSyncManager.SyncState.Idle -> "空闲" to MaterialTheme.colorScheme.onSurfaceVariant
     is HealthSyncManager.SyncState.Syncing -> "同步中…" to MaterialTheme.colorScheme.primary
-    is HealthSyncManager.SyncState.Skipped -> "防抖 · 上次同步在 ${humanizeDuration(state.sinceLastMs)} 前" to MaterialTheme.colorScheme.onSurfaceVariant
-    is HealthSyncManager.SyncState.Success -> "成功 · ${state.daysWithData} 天有数据" to ChatStatusColors.SuccessText
-    is HealthSyncManager.SyncState.Failure -> "失败: ${state.reason}" to MaterialTheme.colorScheme.error
+    is HealthSyncManager.SyncState.Skipped -> "防抖 · ${humanizeDuration(state.sinceLastMs)}前" to MaterialTheme.colorScheme.onSurfaceVariant
+    is HealthSyncManager.SyncState.Success -> "成功 · ${state.daysWithData} 天" to ChatStatusColors.SuccessText
+    is HealthSyncManager.SyncState.Failure -> "失败 · ${state.reason}" to MaterialTheme.colorScheme.error
 }
 
-private fun humanizeDuration(ms: Long): String {
+internal fun humanizeDuration(ms: Long): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(ms)
     if (minutes < 1) return "刚刚"
     if (minutes < 60) return "$minutes 分钟"
@@ -452,7 +445,7 @@ private fun humanizeDuration(ms: Long): String {
     return "$days 天"
 }
 
-private fun formatLastSync(atMillis: Long): String {
+internal fun formatLastSync(atMillis: Long): String {
     if (atMillis == 0L) return "从未同步"
     val delta = System.currentTimeMillis() - atMillis
     if (delta < 0) return "刚刚"

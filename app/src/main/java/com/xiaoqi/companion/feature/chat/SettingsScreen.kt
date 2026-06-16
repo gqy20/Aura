@@ -73,14 +73,95 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.runtime.DreamLoopInterval
 import com.xiaoqi.companion.core.presence.runtime.DreamRunObserver
+import com.xiaoqi.companion.feature.chat.humanizeDuration
 import kotlinx.coroutines.launch
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
+import com.xiaoqi.companion.data.source.HealthConnectDataSource
+import com.xiaoqi.companion.data.source.SensorManagerHealthSource
 import com.xiaoqi.companion.ui.theme.ChatCardSurface
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+
+internal data class SettingsScreenState(
+    val apiKey: String,
+    val provider: LlmProvider,
+    val modelName: String,
+    val baseUrl: String,
+    val message: String?,
+    val localQwenDownload: LocalQwenDownloadUiState,
+    val toolSettings: ChatToolCapabilitySettings,
+    val connectivityResult: ConnectivityResult?,
+    val isCheckingConnectivity: Boolean,
+    val dreamLoopInterval: DreamLoopInterval,
+    val dreamRunState: DreamRunObserver.Snapshot,
+    val lastDreamSuccessAtMs: Long,
+    val lastDreamSuccessSavedCount: Int,
+    val dataJustClearedAt: Long,
+    val dataJustClearedCount: Int,
+    val healthSyncState: com.xiaoqi.companion.data.source.HealthSyncManager.SyncState,
+    val healthAutoSyncEnabled: Boolean,
+    val healthLastSyncAt: Long,
+)
+
+internal data class SettingsScreenActions(
+    val viewModel: ChatViewModel,
+    val healthConnectDataSource: HealthConnectDataSource,
+    val sensorHealthSource: SensorManagerHealthSource,
+    val onApiKeyChanged: (String) -> Unit,
+    val onProviderChanged: (LlmProvider) -> Unit,
+    val onModelNameChanged: (String) -> Unit,
+    val onBaseUrlChanged: (String) -> Unit,
+    val onSave: () -> Unit,
+    val onTestConnection: () -> Unit,
+    val onDownloadLocalQwenModel: () -> Unit,
+    val onDeviceStatusEnabledChanged: (Boolean) -> Unit,
+    val onLocationContextEnabledChanged: (Boolean) -> Unit,
+    val onWeatherContextEnabledChanged: (Boolean) -> Unit,
+    val onReminderToolEnabledChanged: (Boolean) -> Unit,
+    val onNotificationEnabledChanged: (Boolean) -> Unit,
+    val onDreamLoopIntervalChanged: (DreamLoopInterval) -> Unit,
+    val onTriggerDreamLoopNow: () -> Unit,
+    val onRequestContextPermissions: () -> Unit,
+    val onHealthAutoSyncEnabledChanged: (Boolean) -> Unit,
+    val onHealthSyncNow: () -> Unit,
+    val onOpenMcpSettings: () -> Unit,
+    val onBack: () -> Unit,
+) {
+    companion object {
+        fun from(
+            viewModel: ChatViewModel,
+            onRequestContextPermissions: () -> Unit,
+            onOpenMcpSettings: () -> Unit,
+            onBack: () -> Unit,
+        ): SettingsScreenActions = SettingsScreenActions(
+            viewModel = viewModel,
+            healthConnectDataSource = viewModel.healthConnectDataSource,
+            sensorHealthSource = viewModel.sensorHealthSource,
+            onApiKeyChanged = viewModel::updateSettingsApiKey,
+            onProviderChanged = viewModel::updateSettingsProvider,
+            onModelNameChanged = viewModel::updateSettingsModelName,
+            onBaseUrlChanged = viewModel::updateSettingsBaseUrl,
+            onSave = viewModel::saveSettings,
+            onTestConnection = viewModel::checkLlmConnectivity,
+            onDownloadLocalQwenModel = viewModel::downloadSelectedLocalQwenModel,
+            onDeviceStatusEnabledChanged = viewModel::setDeviceStatusContextEnabled,
+            onLocationContextEnabledChanged = viewModel::setLocationContextEnabled,
+            onWeatherContextEnabledChanged = viewModel::setWeatherContextEnabled,
+            onReminderToolEnabledChanged = viewModel::setReminderToolEnabled,
+            onNotificationEnabledChanged = viewModel::setNotificationEnabled,
+            onDreamLoopIntervalChanged = viewModel::setDreamLoopInterval,
+            onTriggerDreamLoopNow = viewModel::triggerDreamLoopNow,
+            onRequestContextPermissions = onRequestContextPermissions,
+            onHealthAutoSyncEnabledChanged = viewModel::setHealthAutoSyncEnabled,
+            onHealthSyncNow = viewModel::triggerHealthSyncNow,
+            onOpenMcpSettings = onOpenMcpSettings,
+            onBack = onBack,
+        )
+    }
+}
 
 @Composable
 fun SettingsScreen(
@@ -101,89 +182,53 @@ fun SettingsScreen(
     ) { }
 
     SettingsScreenContent(
-        apiKey = uiState.settingsApiKey,
-        provider = uiState.settingsProvider,
-        modelName = uiState.settingsModelName,
-        baseUrl = uiState.settingsBaseUrl,
-        message = uiState.settingsMessage,
-        localQwenDownload = uiState.localQwenDownload,
-        toolSettings = uiState.toolCapabilitySettings,
-        connectivityResult = uiState.connectivityResult,
-        isCheckingConnectivity = uiState.isCheckingConnectivity,
-        dreamLoopInterval = dreamLoopInterval,
-        dreamRunState = dreamRunState,
-        lastDreamSuccessAtMs = lastDreamSuccessAtMs,
-        lastDreamSuccessSavedCount = lastDreamSuccessSavedCount,
-        healthSyncState = healthSyncState,
-        healthAutoSyncEnabled = healthAutoSyncEnabled,
-        healthLastSyncAt = healthLastSyncAt,
-        viewModel = viewModel,
-        onApiKeyChanged = viewModel::updateSettingsApiKey,
-        onProviderChanged = viewModel::updateSettingsProvider,
-        onModelNameChanged = viewModel::updateSettingsModelName,
-        onBaseUrlChanged = viewModel::updateSettingsBaseUrl,
-        onSave = viewModel::saveSettings,
-        onTestConnection = viewModel::checkLlmConnectivity,
-        onDownloadLocalQwenModel = viewModel::downloadSelectedLocalQwenModel,
-        onDeviceStatusEnabledChanged = viewModel::setDeviceStatusContextEnabled,
-        onLocationContextEnabledChanged = viewModel::setLocationContextEnabled,
-        onWeatherContextEnabledChanged = viewModel::setWeatherContextEnabled,
-        onReminderToolEnabledChanged = viewModel::setReminderToolEnabled,
-        onNotificationEnabledChanged = viewModel::setNotificationEnabled,
-        onDreamLoopIntervalChanged = viewModel::setDreamLoopInterval,
-        onTriggerDreamLoopNow = viewModel::triggerDreamLoopNow,
-        onRequestContextPermissions = {
-            contextPermissionLauncher.launch(contextPermissions())
-        },
-        onHealthAutoSyncEnabledChanged = viewModel::setHealthAutoSyncEnabled,
-        onHealthSyncNow = viewModel::triggerHealthSyncNow,
-        onOpenMcpSettings = onOpenMcpSettings,
-        onBack = onBack,
+        state = SettingsScreenState(
+            apiKey = uiState.settingsApiKey,
+            provider = uiState.settingsProvider,
+            modelName = uiState.settingsModelName,
+            baseUrl = uiState.settingsBaseUrl,
+            message = uiState.settingsMessage,
+            localQwenDownload = uiState.localQwenDownload,
+            toolSettings = uiState.toolCapabilitySettings,
+            connectivityResult = uiState.connectivityResult,
+            isCheckingConnectivity = uiState.isCheckingConnectivity,
+            dreamLoopInterval = dreamLoopInterval,
+            dreamRunState = dreamRunState,
+            lastDreamSuccessAtMs = lastDreamSuccessAtMs,
+            lastDreamSuccessSavedCount = lastDreamSuccessSavedCount,
+            dataJustClearedAt = uiState.dataJustClearedAt,
+            dataJustClearedCount = uiState.dataJustClearedCount,
+            healthSyncState = healthSyncState,
+            healthAutoSyncEnabled = healthAutoSyncEnabled,
+            healthLastSyncAt = healthLastSyncAt,
+        ),
+        actions = SettingsScreenActions.from(
+            viewModel = viewModel,
+            onRequestContextPermissions = {
+                contextPermissionLauncher.launch(contextPermissions())
+            },
+            onOpenMcpSettings = onOpenMcpSettings,
+            onBack = onBack,
+        ),
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScreenContent(
-    viewModel: ChatViewModel,
-    apiKey: String,
-    provider: LlmProvider,
-    modelName: String,
-    baseUrl: String,
-    message: String?,
-    localQwenDownload: LocalQwenDownloadUiState,
-    toolSettings: ChatToolCapabilitySettings,
-    connectivityResult: ConnectivityResult?,
-    isCheckingConnectivity: Boolean,
-    dreamLoopInterval: DreamLoopInterval,
-    dreamRunState: DreamRunObserver.Snapshot,
-    lastDreamSuccessAtMs: Long,
-    lastDreamSuccessSavedCount: Int,
-    healthSyncState: com.xiaoqi.companion.data.source.HealthSyncManager.SyncState,
-    healthAutoSyncEnabled: Boolean,
-    healthLastSyncAt: Long,
-    onApiKeyChanged: (String) -> Unit,
-    onProviderChanged: (LlmProvider) -> Unit,
-    onModelNameChanged: (String) -> Unit,
-    onBaseUrlChanged: (String) -> Unit,
-    onSave: () -> Unit,
-    onTestConnection: () -> Unit,
-    onDownloadLocalQwenModel: () -> Unit,
-    onDeviceStatusEnabledChanged: (Boolean) -> Unit,
-    onLocationContextEnabledChanged: (Boolean) -> Unit,
-    onWeatherContextEnabledChanged: (Boolean) -> Unit,
-    onReminderToolEnabledChanged: (Boolean) -> Unit,
-    onNotificationEnabledChanged: (Boolean) -> Unit,
-    onDreamLoopIntervalChanged: (DreamLoopInterval) -> Unit,
-    onTriggerDreamLoopNow: () -> Unit,
-    onDismissDreamMessage: () -> Unit = {},
-    onRequestContextPermissions: () -> Unit,
-    onHealthAutoSyncEnabledChanged: (Boolean) -> Unit,
-    onHealthSyncNow: () -> Unit,
-    onOpenMcpSettings: () -> Unit,
-    onBack: () -> Unit,
+    state: SettingsScreenState,
+    actions: SettingsScreenActions,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // 清空类操作完成时弹一次 snackbar:用 dataJustClearedAt 时间戳当 key,避免 count
+    // 不变时(理论上不会,稳)重复弹。
+    val dataClearTemplate = stringResource(R.string.data_clear_done)
+    LaunchedEffect(state.dataJustClearedAt) {
+        if (state.dataJustClearedAt > 0L && state.dataJustClearedCount > 0) {
+            snackbarHostState.showSnackbar(dataClearTemplate.format(state.dataJustClearedCount))
+        }
+    }
 
     // dreamRunState 变化时弹一次 snackbar 反馈;Queued/Succeeded/Failed 各自一次。
     // 用 status 当 key 而不是整个 snapshot,避免 savedCount 改变时(理论上不会,但稳)重复弹。
@@ -191,18 +236,35 @@ private fun SettingsScreenContent(
     val completedWithCountTemplate = stringResource(R.string.dream_loop_completed_with_count)
     val completedEmptyMsg = stringResource(R.string.dream_loop_completed_empty)
     val failedMsg = stringResource(R.string.dream_loop_failed)
-    LaunchedEffect(dreamRunState.status) {
-        when (dreamRunState.status) {
+    LaunchedEffect(state.dreamRunState.status) {
+        when (state.dreamRunState.status) {
             DreamRunObserver.Status.QUEUED -> snackbarHostState.showSnackbar(queuedMsg)
             DreamRunObserver.Status.SUCCEEDED -> {
-                val msg = if (dreamRunState.savedCount > 0) {
-                    completedWithCountTemplate.format(dreamRunState.savedCount)
+                val msg = if (state.dreamRunState.savedCount > 0) {
+                    completedWithCountTemplate.format(state.dreamRunState.savedCount)
                 } else {
                     completedEmptyMsg
                 }
                 snackbarHostState.showSnackbar(msg)
             }
             DreamRunObserver.Status.FAILED -> snackbarHostState.showSnackbar(failedMsg)
+            else -> Unit
+        }
+    }
+
+    // healthSyncState 走 snackbar 反馈。Skipped 故意弹 — 用户期待点击立即有动作,
+    // 没动作 = bug,告知防抖原因可减少困惑。
+    val healthSuccessTemplate = stringResource(R.string.health_sync_success)
+    val healthFailureTemplate = stringResource(R.string.health_sync_failure)
+    val healthSkippedTemplate = stringResource(R.string.health_sync_skipped)
+    LaunchedEffect(state.healthSyncState) {
+        when (val s = state.healthSyncState) {
+            is com.xiaoqi.companion.data.source.HealthSyncManager.SyncState.Success ->
+                snackbarHostState.showSnackbar(healthSuccessTemplate.format(s.daysWithData))
+            is com.xiaoqi.companion.data.source.HealthSyncManager.SyncState.Failure ->
+                snackbarHostState.showSnackbar(healthFailureTemplate.format(s.reason))
+            is com.xiaoqi.companion.data.source.HealthSyncManager.SyncState.Skipped ->
+                snackbarHostState.showSnackbar(healthSkippedTemplate.format(humanizeDuration(s.sinceLastMs)))
             else -> Unit
         }
     }
@@ -214,17 +276,17 @@ private fun SettingsScreenContent(
             TopAppBar(
                 title = { Text("设置") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = actions.onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
-                    IconButton(onClick = onOpenMcpSettings) {
+                    IconButton(onClick = actions.onOpenMcpSettings) {
                         Icon(Icons.Default.Build, contentDescription = "MCP 设置")
                     }
                     // 保存按钮提到 TopAppBar — 之前放在 LazyColumn 末尾会被数据透明 Section
                     // 推到屏外,用户根本点不到,导致 api_key 等字段没真正写进 DataStore。
-                    androidx.compose.material3.TextButton(onClick = onSave) {
+                    androidx.compose.material3.TextButton(onClick = actions.onSave) {
                         Text("保存")
                     }
                 },
@@ -246,18 +308,18 @@ private fun SettingsScreenContent(
             }
             item {
                 ProviderPicker(
-                    provider = provider,
-                    onProviderChanged = onProviderChanged,
+                    provider = state.provider,
+                    onProviderChanged = actions.onProviderChanged,
                 )
             }
             item {
                 ModelPicker(
-                    provider = provider,
-                    modelName = modelName,
-                    onModelNameChanged = onModelNameChanged,
+                    provider = state.provider,
+                    modelName = state.modelName,
+                    onModelNameChanged = actions.onModelNameChanged,
                 )
             }
-            if (provider == LlmProvider.LOCAL_QWEN) {
+            if (state.provider == LlmProvider.LOCAL_QWEN) {
                 item {
                     SettingsSectionTitle(
                         title = "本地模型",
@@ -266,15 +328,15 @@ private fun SettingsScreenContent(
                 }
                 item {
                     LocalQwenDownloadSection(
-                        state = localQwenDownload,
-                        onDownload = onDownloadLocalQwenModel,
+                        state = state.localQwenDownload,
+                        onDownload = actions.onDownloadLocalQwenModel,
                     )
                 }
             } else {
                 item {
                     OutlinedTextField(
-                        value = baseUrl,
-                        onValueChange = onBaseUrlChanged,
+                        value = state.baseUrl,
+                        onValueChange = actions.onBaseUrlChanged,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("接口地址") },
                         readOnly = true,
@@ -283,8 +345,8 @@ private fun SettingsScreenContent(
                 }
                 item {
                     OutlinedTextField(
-                        value = apiKey,
-                        onValueChange = onApiKeyChanged,
+                        value = state.apiKey,
+                        onValueChange = actions.onApiKeyChanged,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("API Key") },
                         placeholder = { Text("保留当前密钥") },
@@ -295,49 +357,49 @@ private fun SettingsScreenContent(
                 }
                 item {
                     ConnectivityCheckRow(
-                        result = connectivityResult,
-                        isChecking = isCheckingConnectivity,
-                        onTest = onTestConnection,
+                        result = state.connectivityResult,
+                        isChecking = state.isCheckingConnectivity,
+                        onTest = actions.onTestConnection,
                     )
                 }
             }
             item {
                 ToolCapabilitiesSection(
-                    settings = toolSettings,
-                    onDeviceStatusEnabledChanged = onDeviceStatusEnabledChanged,
-                    onLocationContextEnabledChanged = onLocationContextEnabledChanged,
-                    onWeatherContextEnabledChanged = onWeatherContextEnabledChanged,
-                    onReminderToolEnabledChanged = onReminderToolEnabledChanged,
-                    onNotificationEnabledChanged = onNotificationEnabledChanged,
-                    onRequestContextPermissions = onRequestContextPermissions,
+                    settings = state.toolSettings,
+                    onDeviceStatusEnabledChanged = actions.onDeviceStatusEnabledChanged,
+                    onLocationContextEnabledChanged = actions.onLocationContextEnabledChanged,
+                    onWeatherContextEnabledChanged = actions.onWeatherContextEnabledChanged,
+                    onReminderToolEnabledChanged = actions.onReminderToolEnabledChanged,
+                    onNotificationEnabledChanged = actions.onNotificationEnabledChanged,
+                    onRequestContextPermissions = actions.onRequestContextPermissions,
                 )
             }
             item {
                 DreamLoopSection(
-                    current = dreamLoopInterval,
-                    runState = dreamRunState,
-                    lastSuccessAtMs = lastDreamSuccessAtMs,
-                    lastSuccessSavedCount = lastDreamSuccessSavedCount,
-                    onIntervalChanged = onDreamLoopIntervalChanged,
-                    onTriggerNow = onTriggerDreamLoopNow,
+                    current = state.dreamLoopInterval,
+                    runState = state.dreamRunState,
+                    lastSuccessAtMs = state.lastDreamSuccessAtMs,
+                    lastSuccessSavedCount = state.lastDreamSuccessSavedCount,
+                    onIntervalChanged = actions.onDreamLoopIntervalChanged,
+                    onTriggerNow = actions.onTriggerDreamLoopNow,
                 )
             }
             item {
                 HealthDataSection(
-                    syncState = healthSyncState,
-                    autoSyncEnabled = healthAutoSyncEnabled,
-                    lastSyncAtMillis = healthLastSyncAt,
-                    onAutoSyncEnabledChanged = onHealthAutoSyncEnabledChanged,
-                    onSyncNow = onHealthSyncNow,
-                    healthConnectDataSource = viewModel.healthConnectDataSource,
-                    sensorSource = viewModel.sensorHealthSource,
+                    syncState = state.healthSyncState,
+                    autoSyncEnabled = state.healthAutoSyncEnabled,
+                    lastSyncAtMillis = state.healthLastSyncAt,
+                    onAutoSyncEnabledChanged = actions.onHealthAutoSyncEnabledChanged,
+                    onSyncNow = actions.onHealthSyncNow,
+                    healthConnectDataSource = actions.healthConnectDataSource,
+                    sensorSource = actions.sensorHealthSource,
                 )
             }
             item {
-                DataTransparencySection(viewModel = viewModel)
+                DataTransparencySection(viewModel = actions.viewModel)
             }
             item {
-                message?.let {
+                state.message?.let {
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodySmall,

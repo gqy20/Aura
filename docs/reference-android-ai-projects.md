@@ -1,6 +1,8 @@
 # Android AI 聊天/陪伴应用 — 开源项目参考
 
 > 本文档整理了与当前项目（companion: Kotlin + Compose + Hilt + Room + Anthropic API）技术栈相似、架构优雅的开源项目，供开发时参考借鉴。
+>
+> 截至 2026-06-16 仍为有效参考。期间未补充新调研（端侧推理方向可参考 `docs/on-device-qwen-mnn-research.md` 中的 PocketPal 调研）。
 
 ---
 
@@ -233,4 +235,4 @@ Chat SDK 集成模式       →   GetStream/gemini-android
 
 ---
 
-*文档生成日期: 2026-05-12*
+*文档生成日期: 2026-05-12 · 最后核对: 2026-06-16*

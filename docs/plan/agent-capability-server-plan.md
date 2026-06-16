@@ -1,7 +1,9 @@
 # Aura 智能体能力整体方案
 
-> Last updated: 2026-05-15
+> Last updated: 2026-06-16
 > Scope: Aura Android app, Koog, MCP, remote agent server, browser tools, skills, long-running tasks
+>
+> 2026-06-16 同步：本文档对应 roadmap M7"端云 Agent 能力"。当前状态为"方案已就位 / 实现未启动"，M5+M6 完成后启动。`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 字段（commit `1b826d1`），M4 起可对接。
 
 ## 1. 目标
 
