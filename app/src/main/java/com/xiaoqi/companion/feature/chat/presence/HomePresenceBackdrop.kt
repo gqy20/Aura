@@ -74,8 +74,8 @@ internal fun PresenceBackdropAndHalo(
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    palette.glow.copy(alpha = 0.24f),
-                    palette.glow.copy(alpha = 0.08f),
+                    palette.glow.copy(alpha = animationState.glowAlpha * 0.72f),
+                    palette.glow.copy(alpha = animationState.glowAlpha * 0.24f),
                     Color.Transparent,
                 ),
                 center = Offset(w * 0.52f, h * 0.39f),
@@ -98,7 +98,7 @@ internal fun PresenceBackdropAndHalo(
             val x = w * (0.2f + (index % 5) * 0.16f) + cos(angle) * 10f
             val y = h * (0.22f + (index % 4) * 0.12f) + sin(angle * 0.7f) * 14f
             drawCircle(
-                color = palette.spark.copy(alpha = 0.12f + (index % 3) * 0.045f),
+                color = palette.spark.copy(alpha = animationState.sparkAlpha * (0.32f + (index % 3) * 0.11f)),
                 radius = 2.4f + (index % 3) * 1.4f,
                 center = Offset(x, y),
             )
@@ -108,7 +108,7 @@ internal fun PresenceBackdropAndHalo(
         // 居中对齐 Aura 角色本体(Avatar Canvas 中心在 w/2, h/2)。
         val haloCenter = Offset(w / 2f, h * 0.5f)
         val reactionBoost = animationState.haloBoost
-        val baseRadius = w * (0.29f + pulse * (0.015f + reactionBoost * 0.012f))
+        val baseRadius = w * (0.29f + pulse * (animationState.pulseAmplitude + reactionBoost * 0.012f))
 
         drawCircle(
             brush = Brush.radialGradient(
@@ -145,8 +145,8 @@ internal fun PresenceBackdropAndHalo(
             repeat(animationState.orbitParticleCount.coerceAtLeast(3)) { index ->
                 val angle = (pulse * 2f * PI + index * 2.09f).toFloat()
                 drawCircle(
-                    color = palette.spark.copy(alpha = 0.38f),
-                    radius = 4.2f,
+                    color = palette.spark.copy(alpha = animationState.sparkAlpha),
+                    radius = 3.8f + animationState.pulseAmplitude * 18f,
                     center = Offset(
                         x = haloCenter.x + cos(angle) * w * (0.21f * animationState.orbitRadiusScale),
                         y = haloCenter.y + sin(angle) * h * (0.17f * animationState.orbitRadiusScale),

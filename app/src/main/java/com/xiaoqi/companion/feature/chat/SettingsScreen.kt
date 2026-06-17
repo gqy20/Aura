@@ -18,6 +18,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
@@ -27,7 +34,6 @@ import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -38,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -223,6 +230,7 @@ private fun SettingsScreenContent(
     val snackbarHostState = remember { SnackbarHostState() }
     var hasConsumedInitialDreamState by remember { mutableStateOf(false) }
     var hasConsumedInitialHealthState by remember { mutableStateOf(false) }
+    var selectedPage by remember { mutableStateOf(SettingsPage.MODEL) }
     val spacing = LocalCompanionSpacing.current
 
     // 清空类操作完成时弹一次 snackbar:用 dataJustClearedAt 时间戳当 key,避免 count
@@ -308,110 +316,35 @@ private fun SettingsScreenContent(
             verticalArrangement = Arrangement.spacedBy(spacing.section),
         ) {
             item {
-                SettingsSectionTitle(
-                    title = "主对话模型",
-                    subtitle = "Dream Loop / Insight / Reminder 等后台任务固定使用本地 Qwen，与本设置无关",
+                SettingsPagePicker(
+                    selectedPage = selectedPage,
+                    onSelectedPageChanged = { selectedPage = it },
                 )
             }
             item {
-                ProviderPicker(
-                    provider = state.provider,
-                    onProviderChanged = actions.onProviderChanged,
-                )
-            }
-            item {
-                ModelPicker(
-                    provider = state.provider,
-                    modelName = state.modelName,
-                    onModelNameChanged = actions.onModelNameChanged,
-                )
-            }
-            if (state.provider != LlmProvider.LOCAL_QWEN) {
-                item {
-                    OutlinedTextField(
-                        value = state.baseUrl,
-                        onValueChange = actions.onBaseUrlChanged,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("接口地址") },
-                        readOnly = true,
-                        singleLine = true,
-                    )
-                }
-                item {
-                    OutlinedTextField(
-                        value = state.apiKey,
-                        onValueChange = actions.onApiKeyChanged,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("API Key") },
-                        placeholder = { Text("保留当前密钥") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    )
-                }
-                item {
-                    ConnectivityCheckRow(
-                        result = state.connectivityResult,
-                        isChecking = state.isCheckingConnectivity,
-                        onTest = actions.onTestConnection,
-                    )
+                AnimatedContent(
+                    targetState = selectedPage,
+                    transitionSpec = {
+                        fadeIn(tween(AuraMotion.MediumMs)) togetherWith fadeOut(tween(AuraMotion.ShortMs))
+                    },
+                    label = "settings-page",
+                ) { page ->
+                    when (page) {
+                        SettingsPage.MODEL -> SettingsPageContent { settingsModelPage(state, actions) }
+                        SettingsPage.CAPABILITIES -> SettingsPageContent { settingsCapabilitiesPage(state, actions) }
+                        SettingsPage.SYSTEM -> SettingsPageContent { settingsSystemPage(state, actions) }
+                    }
                 }
             }
-            item {
-                SettingsSectionTitle(
-                    title = "本地模型",
-                    subtitle = "主对话 Provider = 本地 Qwen 时使用此处下载的模型；" +
-                        "Dream Loop / Insight / Reminder 等后台任务也共用此模型。",
-                )
-            }
-            item {
-                LocalQwenDownloadSection(
-                    state = state.localQwenDownload,
-                    onDownload = actions.onDownloadLocalQwenModel,
-                )
-            }
-            item {
-                ToolCapabilitiesSection(
-                    settings = state.toolSettings,
-                    onDeviceStatusEnabledChanged = actions.onDeviceStatusEnabledChanged,
-                    onLocationContextEnabledChanged = actions.onLocationContextEnabledChanged,
-                    onWeatherContextEnabledChanged = actions.onWeatherContextEnabledChanged,
-                    onReminderToolEnabledChanged = actions.onReminderToolEnabledChanged,
-                    onNotificationEnabledChanged = actions.onNotificationEnabledChanged,
-                    onRequestContextPermissions = actions.onRequestContextPermissions,
-                )
-            }
-            item {
-                DreamLoopSection(
-                    current = state.dreamLoopInterval,
-                    runState = state.dreamRunState,
-                    lastSuccessAtMs = state.lastDreamSuccessAtMs,
-                    lastSuccessSavedCount = state.lastDreamSuccessSavedCount,
-                    onIntervalChanged = actions.onDreamLoopIntervalChanged,
-                    onTriggerNow = actions.onTriggerDreamLoopNow,
-                )
-            }
-            item {
-                HealthDataSection(
-                    syncState = state.healthSyncState,
-                    autoSyncEnabled = state.healthAutoSyncEnabled,
-                    lastSyncAtMillis = state.healthLastSyncAt,
-                    onAutoSyncEnabledChanged = actions.onHealthAutoSyncEnabledChanged,
-                    onSyncNow = actions.onHealthSyncNow,
-                    healthConnectDataSource = actions.healthConnectDataSource,
-                    sensorSource = actions.sensorHealthSource,
-                )
-            }
-            item {
-                DataTransparencySection(viewModel = actions.viewModel)
-            }
-            item {
+            if (state.message != null) {
                 state.message?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                    item {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
         }
@@ -419,11 +352,393 @@ private fun SettingsScreenContent(
 }
 
 @Composable
+private fun SettingsPageContent(content: LazyListScope.() -> Unit) {
+    LazyColumn(
+        userScrollEnabled = false,
+        verticalArrangement = Arrangement.spacedBy(LocalCompanionSpacing.current.section),
+    ) {
+        content()
+    }
+}
+
+private enum class SettingsPage(
+    val label: String,
+) {
+    MODEL("模型"),
+    CAPABILITIES("能力"),
+    SYSTEM("系统"),
+}
+
+private fun LazyListScope.settingsModelPage(
+    state: SettingsScreenState,
+    actions: SettingsScreenActions,
+) {
+    item {
+        ModelSummaryCard(state = state)
+    }
+    item {
+        SettingsSectionTitle(
+            title = "当前引擎",
+            subtitle = "选择主对话使用的 Provider 与模型",
+        )
+    }
+    item {
+        SettingsGroupCard {
+            SettingsFieldLabel("Provider")
+            ProviderPicker(
+                provider = state.provider,
+                onProviderChanged = actions.onProviderChanged,
+            )
+            Spacer(Modifier.height(8.dp))
+            SettingsFieldLabel("Model")
+            ModelPicker(
+                provider = state.provider,
+                modelName = state.modelName,
+                onModelNameChanged = actions.onModelNameChanged,
+            )
+        }
+    }
+    if (state.provider != LlmProvider.LOCAL_QWEN) {
+        item {
+            SettingsSectionTitle(
+                title = "云端接入",
+                subtitle = "云端模型会即时保存接口配置与密钥",
+            )
+        }
+        item {
+            SettingsGroupCard {
+                OutlinedTextField(
+                    value = state.baseUrl,
+                    onValueChange = actions.onBaseUrlChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("接口地址") },
+                    readOnly = true,
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.apiKey,
+                    onValueChange = actions.onApiKeyChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("API Key") },
+                    placeholder = { Text("保留当前密钥") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                )
+                Spacer(Modifier.height(10.dp))
+                ConnectivityCheckRow(
+                    result = state.connectivityResult,
+                    isChecking = state.isCheckingConnectivity,
+                    onTest = actions.onTestConnection,
+                )
+            }
+        }
+    }
+    item {
+        SettingsSectionTitle(
+            title = "本地模型",
+            subtitle = "后台任务默认共用本地模型资源",
+        )
+    }
+    item {
+        LocalQwenDownloadSection(
+            state = state.localQwenDownload,
+            onDownload = actions.onDownloadLocalQwenModel,
+        )
+    }
+}
+
+@Composable
+private fun ModelSummaryCard(state: SettingsScreenState) {
+    ChatCardSurface {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "当前：${state.provider.name} · ${state.modelName.modelOptionLabel(state.provider)}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            val statusText = when {
+                state.provider == LlmProvider.LOCAL_QWEN && state.localQwenDownload.isChecking -> "正在检查本地模型"
+                state.provider == LlmProvider.LOCAL_QWEN && state.localQwenDownload.isDownloading -> "本地模型下载中"
+                state.provider == LlmProvider.LOCAL_QWEN && state.localQwenDownload.isInstalled -> "本地模型已安装"
+                state.provider == LlmProvider.LOCAL_QWEN -> "本地模型未安装"
+                state.isCheckingConnectivity -> "正在测试连接"
+                else -> state.connectivityResult.summaryLabel()
+            }
+            SettingsMetaRow(
+                label = "状态",
+                value = statusText,
+            )
+            SettingsMetaRow(
+                label = "说明",
+                value = if (state.provider == LlmProvider.LOCAL_QWEN) {
+                    "聊天与后台任务都会优先复用这份本地模型"
+                } else {
+                    "当前主对话走云端模型，本地模型保留给后台任务"
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsFieldLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun SettingsMetaRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(56.dp),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+private fun LazyListScope.settingsCapabilitiesPage(
+    state: SettingsScreenState,
+    actions: SettingsScreenActions,
+) {
+    item {
+        SettingsSectionTitle(
+            title = "基础能力",
+            subtitle = "这些开关控制 Aura 可读取的环境上下文与工具",
+        )
+    }
+    item {
+        SettingsGroupCard {
+            SettingsToggleRow(
+                title = "设备",
+                detail = "电量与网络",
+                meta = "本机",
+                metaIcon = Icons.Outlined.Smartphone,
+                checked = state.toolSettings.deviceStatusEnabled,
+                onCheckedChange = actions.onDeviceStatusEnabledChanged,
+            )
+            DividerSpacer()
+            SettingsToggleRow(
+                title = "位置",
+                detail = "上次授权位置",
+                meta = "需授权",
+                metaIcon = Icons.Outlined.Lock,
+                checked = state.toolSettings.locationContextEnabled,
+                onCheckedChange = actions.onLocationContextEnabledChanged,
+            )
+            DividerSpacer()
+            SettingsToggleRow(
+                title = "天气",
+                detail = "当前天气",
+                meta = "需联网",
+                metaIcon = Icons.Outlined.Wifi,
+                checked = state.toolSettings.weatherContextEnabled,
+                onCheckedChange = actions.onWeatherContextEnabledChanged,
+            )
+            DividerSpacer()
+            SettingsToggleRow(
+                title = "提醒",
+                detail = "本地提醒",
+                meta = "",
+                checked = state.toolSettings.reminderToolEnabled,
+                onCheckedChange = actions.onReminderToolEnabledChanged,
+            )
+            DividerSpacer()
+            SettingsToggleRow(
+                title = "通知",
+                detail = "提醒推送",
+                meta = "需通知",
+                metaIcon = Icons.Outlined.NotificationsOff,
+                checked = state.toolSettings.notificationEnabled,
+                onCheckedChange = actions.onNotificationEnabledChanged,
+            )
+            DividerSpacer()
+            SettingsToggleRow(
+                title = "上下文",
+                detail = "时间与近期对话",
+                meta = "固定开启",
+                checked = true,
+                enabled = false,
+                locked = true,
+                onCheckedChange = {},
+            )
+            DividerSpacer()
+            SettingsToggleRow(
+                title = "MCP",
+                detail = state.toolSettings.mcpServers.firstOrNull { it.isReady }?.resolvedName
+                    ?: "未配置（缺密钥/地址）",
+                meta = "高级",
+                metaIcon = Icons.Outlined.Bolt,
+                checked = state.toolSettings.mcpServers.any { it.isReady },
+                enabled = false,
+                locked = true,
+                statusDotColor = if (state.toolSettings.mcpServers.any { it.enabled && it.isReady }) {
+                    ChatStatusColors.SuccessDot
+                } else {
+                    ChatStatusColors.Unknown
+                },
+                onCheckedChange = {},
+            )
+        }
+    }
+    item {
+        HealthDataSection(
+            syncState = state.healthSyncState,
+            autoSyncEnabled = state.healthAutoSyncEnabled,
+            lastSyncAtMillis = state.healthLastSyncAt,
+            onAutoSyncEnabledChanged = actions.onHealthAutoSyncEnabledChanged,
+            onSyncNow = actions.onHealthSyncNow,
+            healthConnectDataSource = actions.healthConnectDataSource,
+            sensorSource = actions.sensorHealthSource,
+        )
+    }
+}
+
+private fun LazyListScope.settingsSystemPage(
+    state: SettingsScreenState,
+    actions: SettingsScreenActions,
+) {
+    item {
+        DreamLoopSection(
+            current = state.dreamLoopInterval,
+            runState = state.dreamRunState,
+            lastSuccessAtMs = state.lastDreamSuccessAtMs,
+            lastSuccessSavedCount = state.lastDreamSuccessSavedCount,
+            onIntervalChanged = actions.onDreamLoopIntervalChanged,
+            onTriggerNow = actions.onTriggerDreamLoopNow,
+        )
+    }
+    item {
+        DataTransparencySection(viewModel = actions.viewModel)
+    }
+}
+
+@Composable
+private fun DreamLoopSection(
+    current: DreamLoopInterval,
+    runState: DreamRunObserver.Snapshot,
+    lastSuccessAtMs: Long,
+    lastSuccessSavedCount: Int,
+    onIntervalChanged: (DreamLoopInterval) -> Unit,
+    onTriggerNow: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SettingsSectionTitle(
+            title = "后台觉察",
+            subtitle = "Aura 会在后台按固定间隔整理近期状态",
+        )
+        SettingsGroupCard {
+            SettingsMetaRow(
+                label = "间隔",
+                value = current.label(),
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DreamLoopInterval.entries.forEach { interval ->
+                    FilterChip(
+                        selected = current == interval,
+                        onClick = { onIntervalChanged(interval) },
+                        label = { Text(interval.label()) },
+                    )
+                }
+            }
+            Text(
+                text = when (runState.status) {
+                    DreamRunObserver.Status.IDLE -> "待命中"
+                    DreamRunObserver.Status.QUEUED -> "已排队"
+                    DreamRunObserver.Status.RUNNING -> "运行中"
+                    DreamRunObserver.Status.SUCCEEDED -> {
+                        if (runState.savedCount > 0) {
+                            "已完成 · 新增 ${runState.savedCount} 条"
+                        } else {
+                            "已完成"
+                        }
+                    }
+                    DreamRunObserver.Status.FAILED -> "失败"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = lastDreamRunLabel(lastSuccessAtMs, lastSuccessSavedCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onTriggerNow) {
+                Text(stringResource(R.string.dream_loop_trigger_now))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DreamLoopInterval.label(): String = stringResource(labelRes)
+
+@Composable
+private fun SettingsPagePicker(
+    selectedPage: SettingsPage,
+    onSelectedPageChanged: (SettingsPage) -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SettingsPage.entries.forEach { page ->
+            FilterChip(
+                selected = selectedPage == page,
+                onClick = { onSelectedPageChanged(page) },
+                label = { Text(page.label) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroupCard(content: @Composable () -> Unit) {
+    ChatCardSurface {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun DividerSpacer() {
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+    )
+}
+
+@Composable
 private fun ProviderPicker(
     provider: LlmProvider,
     onProviderChanged: (LlmProvider) -> Unit,
 ) {
-    // FlowRow:避免窄屏下最后一个 chip 被挤出/换行。
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -501,8 +816,74 @@ internal fun SettingsSectionTitle(
             )
         }
     }
-    // 父 LazyColumn 的 18dp 不够:subtitle 会跟下方卡片粘在一起,再补 6dp。
     Spacer(Modifier.height(6.dp))
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    detail: String,
+    meta: String,
+    metaIcon: ImageVector? = null,
+    checked: Boolean,
+    enabled: Boolean = true,
+    locked: Boolean = false,
+    onCheckedChange: (Boolean) -> Unit,
+    statusDotColor: Color? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (metaIcon != null && meta.isNotBlank()) {
+                    Icon(
+                        imageVector = metaIcon,
+                        contentDescription = meta,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+                if (statusDotColor != null) {
+                    Canvas(modifier = Modifier.size(8.dp)) {
+                        drawCircle(color = statusDotColor)
+                    }
+                }
+            }
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+            )
+        }
+        if (locked) {
+            Text(
+                text = if (checked) "开" else "关",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled,
+            )
+        }
+    }
 }
 
 @Composable
@@ -513,7 +894,7 @@ private fun LocalQwenDownloadSection(
     ChatCardSurface {
         Column(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 text = state.modelName,
@@ -521,22 +902,14 @@ private fun LocalQwenDownloadSection(
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            val status = when {
-                state.isChecking -> "正在检查本地模型"
-                // 下载中:把百分比和字节数合并到同一行,避免再占一行字节数。
-                state.isDownloading ->
-                    "下载中 ${formatPercent(state.progress)} · ${formatBytes(state.downloadedBytes, state.totalBytes)}"
-                state.isInstalled -> "已安装"
-                state.error != null -> "下载失败"
-                else -> "未安装"
-            }
-            Text(
-                text = status,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (state.error != null) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+            SettingsMetaRow(
+                label = "状态",
+                value = when {
+                    state.isChecking -> "正在检查"
+                    state.isDownloading -> "下载中 ${formatPercent(state.progress)}"
+                    state.isInstalled -> "已安装"
+                    state.error != null -> "下载失败"
+                    else -> "未安装"
                 },
             )
             if (state.isDownloading) {
@@ -544,15 +917,20 @@ private fun LocalQwenDownloadSection(
                     progress = { state.progress.coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Text(
+                    text = formatBytes(state.downloadedBytes, state.totalBytes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (state.isChecking) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CircularProgressIndicator(
+                    AuraLoadingIndicator(
                         modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         text = "正在确认模型文件完整性",
@@ -577,300 +955,14 @@ private fun LocalQwenDownloadSection(
             }
             Button(
                 onClick = onDownload,
-                enabled = !state.isDownloading,
+                enabled = !state.isDownloading && !state.isChecking,
             ) {
-                Text(if (state.isInstalled) "重试" else "下载")
+                Text(if (state.isInstalled) "重新下载" else "下载模型")
             }
         }
     }
 }
 
-@Composable
-private fun ToolCapabilitiesSection(
-    settings: ChatToolCapabilitySettings,
-    onDeviceStatusEnabledChanged: (Boolean) -> Unit,
-    onLocationContextEnabledChanged: (Boolean) -> Unit,
-    onWeatherContextEnabledChanged: (Boolean) -> Unit,
-    onReminderToolEnabledChanged: (Boolean) -> Unit,
-    onNotificationEnabledChanged: (Boolean) -> Unit,
-    onRequestContextPermissions: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "能力",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            TextButton(onClick = onRequestContextPermissions) {
-                Text("授权")
-            }
-        }
-        ToolCapabilityRow(
-            title = "上下文",
-            detail = "时间与近期对话",
-            meta = "",
-            tools = "",
-            enabled = true,
-            locked = true,
-            onEnabledChanged = {},
-        )
-        ToolCapabilityRow(
-            title = "设备",
-            detail = "电量与网络",
-            meta = "本机",
-            metaIcon = Icons.Outlined.Smartphone,
-            tools = "",
-            enabled = settings.deviceStatusEnabled,
-            onEnabledChanged = onDeviceStatusEnabledChanged,
-        )
-        ToolCapabilityRow(
-            title = "位置",
-            detail = "上次授权位置",
-            meta = "需授权",
-            metaIcon = Icons.Outlined.Lock,
-            tools = "",
-            enabled = settings.locationContextEnabled,
-            onEnabledChanged = onLocationContextEnabledChanged,
-        )
-        ToolCapabilityRow(
-            title = "天气",
-            detail = "当前天气",
-            meta = "需联网",
-            metaIcon = Icons.Outlined.Wifi,
-            tools = "",
-            enabled = settings.weatherContextEnabled,
-            onEnabledChanged = onWeatherContextEnabledChanged,
-        )
-        ToolCapabilityRow(
-            title = "提醒",
-            detail = "本地提醒",
-            meta = "",
-            tools = "",
-            enabled = settings.reminderToolEnabled,
-            onEnabledChanged = onReminderToolEnabledChanged,
-        )
-        ToolCapabilityRow(
-            title = "MCP",
-            detail = settings.mcpServers.firstOrNull { it.isReady }?.resolvedName ?: "未配置（缺密钥/地址）",
-            meta = "高级",
-            metaIcon = Icons.Outlined.Bolt,
-            tools = "",
-            enabled = settings.mcpServers.any { it.isReady },
-            locked = true,
-            onEnabledChanged = {},
-            statusDotColor = if (settings.mcpServers.any { it.enabled && it.isReady }) {
-                ChatStatusColors.SuccessDot
-            } else {
-                ChatStatusColors.Unknown
-            },
-        )
-        ToolCapabilityRow(
-            title = "通知",
-            detail = "提醒推送",
-            meta = "需通知",
-            metaIcon = Icons.Outlined.NotificationsOff,
-            tools = "",
-            enabled = settings.notificationEnabled,
-            onEnabledChanged = onNotificationEnabledChanged,
-        )
-        ToolCapabilityRow(
-            title = "记忆",
-            detail = "回复后自动复盘",
-            meta = "",
-            tools = "",
-            enabled = true,
-            locked = true,
-            onEnabledChanged = {},
-        )
-    }
-}
-
-@Composable
-private fun ToolCapabilityRow(
-    title: String,
-    detail: String,
-    meta: String,
-    metaIcon: ImageVector? = null,
-    tools: String,
-    enabled: Boolean,
-    locked: Boolean = false,
-    onEnabledChanged: (Boolean) -> Unit,
-    statusDotColor: Color? = null,
-) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = ChatColors.CardSurface,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (metaIcon != null) {
-                        Icon(
-                            imageVector = metaIcon,
-                            contentDescription = meta,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(15.dp),
-                        )
-                    }
-                    if (statusDotColor != null) {
-                        Canvas(
-                            modifier = Modifier.size(8.dp),
-                        ) {
-                            drawCircle(color = statusDotColor)
-                        }
-                    }
-                }
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                )
-                if (tools.isNotBlank()) {
-                    Text(
-                        text = tools,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f),
-                        maxLines = 1,
-                    )
-                }
-            }
-            if (locked) {
-                // locked 行没有 Switch,不放右侧 pill 避免无意义标签
-            } else {
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = onEnabledChanged,
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DreamLoopSection(
-    current: DreamLoopInterval,
-    runState: DreamRunObserver.Snapshot,
-    lastSuccessAtMs: Long,
-    lastSuccessSavedCount: Int,
-    onIntervalChanged: (DreamLoopInterval) -> Unit,
-    onTriggerNow: () -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val showFreqWarning = current == DreamLoopInterval.M15 || current == DreamLoopInterval.M30
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SettingsSectionTitle(
-            title = stringResource(R.string.dream_loop_section_title),
-            subtitle = stringResource(R.string.dream_loop_section_subtitle),
-        )
-        ChatCardSurface {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it },
-                ) {
-                    OutlinedTextField(
-                        value = stringResource(current.labelRes),
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        label = { Text("周期") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        DreamLoopInterval.entries.forEach { interval ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(interval.labelRes)) },
-                                onClick = {
-                                    onIntervalChanged(interval)
-                                    expanded = false
-                                },
-                            )
-                        }
-                    }
-                }
-                if (showFreqWarning) {
-                    Text(
-                        text = stringResource(R.string.dream_loop_warning_freq),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                OutlinedButton(
-                    onClick = onTriggerNow,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = current.isEnabled && !runState.isRunning,
-                ) {
-                    if (runState.isRunning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(
-                        if (runState.isRunning) {
-                            stringResource(R.string.dream_loop_running)
-                        } else {
-                            stringResource(R.string.dream_loop_trigger_now)
-                        },
-                    )
-                }
-                Text(
-                    text = lastDreamRunLabel(lastSuccessAtMs = lastSuccessAtMs, lastSavedCount = lastSuccessSavedCount),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-/**
- * 上次运行状态的展示文案:
- * - 从未成功过 → "尚无运行记录"
- * - 跑过 + 有新增 → "上次运行: 3 分钟前 · 新增 2 条"
- * - 跑过 + 0 新增 → "上次运行: 3 分钟前"
- *
- * savedCount 仅在当前 snapshot.status == SUCCEEDED 时才有意义 — 但 UI 层无法判断
- * "当前 lastSuccessAtMs 对应的 savedCount 是多少",所以简化成"有 >0 就显示"且只在
- * status 是 SUCCEEDED 时显示。失败/运行中 → 不显示数字。
- */
 @Composable
 private fun lastDreamRunLabel(lastSuccessAtMs: Long, lastSavedCount: Int): String {
     if (lastSuccessAtMs == 0L) {
@@ -954,9 +1046,9 @@ private fun ConnectivityCheckRow(
             Text("测试连接")
         }
         if (isChecking) {
-            CircularProgressIndicator(
+            AuraLoadingIndicator(
                 modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
         ConnectivityResultLabel(result)
@@ -986,6 +1078,14 @@ private fun ConnectivityResultLabel(result: ConnectivityResult?) {
         )
     }
 }
+
+private fun ConnectivityResult?.summaryLabel(): String =
+    when (this) {
+        null -> "等待检查"
+        is ConnectivityResult.Success -> "连接正常"
+        is ConnectivityResult.AuthFailure -> "鉴权失败"
+        is ConnectivityResult.Unreachable -> "不可达"
+    }
 
 @Composable
 private fun DataTransparencySection(viewModel: ChatViewModel) {

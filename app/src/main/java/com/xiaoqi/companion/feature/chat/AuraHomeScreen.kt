@@ -408,7 +408,7 @@ private fun PresenceStage(
             AnimatedContent(
                 targetState = uiState.homePresenceLine(),
                 transitionSpec = {
-                    fadeIn(tween(400)) togetherWith fadeOut(tween(300))
+                    fadeIn(tween(AuraMotion.LongMs)) togetherWith fadeOut(tween(AuraMotion.MediumMs))
                 },
                 label = "presence-line",
             ) { line ->

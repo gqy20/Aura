@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,8 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontFamily
@@ -153,12 +150,10 @@ private fun MessageBubbleContent(
             Spacer(modifier = Modifier.size(8.dp))
         }
         if (!isUser && message.isStreaming && message.content.isBlank()) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .size(18.dp)
-                    .semantics { contentDescription = "Aura 正在回复" },
-                strokeWidth = 2.dp,
+            AuraLoadingIndicator(
+                modifier = Modifier.size(18.dp),
                 color = MaterialTheme.colorScheme.primary,
+                contentDescription = "Aura 正在回复",
             )
         } else if (message.isStreaming) {
             StreamingMessageText(

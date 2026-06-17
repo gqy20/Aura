@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -212,9 +211,9 @@ private fun McpListScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        CircularProgressIndicator(
+                        AuraLoadingIndicator(
                             modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
                             text = "检查中…",
@@ -385,9 +384,9 @@ private fun DiscoveredToolsSection(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        CircularProgressIndicator(
+                        AuraLoadingIndicator(
                             modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                         Text("发现中…", style = MaterialTheme.typography.bodySmall)
                     }

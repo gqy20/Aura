@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -162,9 +161,8 @@ internal fun InputBar(
                     ),
                 )
                 if (isLoading || isPreparingImage) {
-                    CircularProgressIndicator(
+                    AuraLoadingIndicator(
                         modifier = Modifier.size(24.dp).padding(4.dp),
-                        strokeWidth = 2.dp,
                         color = primary,
                     )
                 } else {

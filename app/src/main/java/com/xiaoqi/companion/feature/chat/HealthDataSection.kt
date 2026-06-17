@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -385,9 +384,9 @@ private fun HealthSyncStatusCard(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (syncState is HealthSyncManager.SyncState.Syncing) {
-                        CircularProgressIndicator(
+                        AuraLoadingIndicator(
                             modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                         Spacer(Modifier.size(6.dp))
                     }

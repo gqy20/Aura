@@ -1,8 +1,6 @@
 package com.xiaoqi.companion.feature.chat
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
@@ -19,11 +17,10 @@ internal data class HomePresencePalette(
 
 @Composable
 internal fun HomePresencePalette.animated(): HomePresencePalette {
-    val animSpec = spring<Color>(stiffness = Spring.StiffnessLow)
-    val bg by animateColorAsState(backgroundTint, animSpec, label = "pal-bg")
-    val g by animateColorAsState(glow, animSpec, label = "pal-glow")
-    val r by animateColorAsState(ring, animSpec, label = "pal-ring")
-    val s by animateColorAsState(spark, animSpec, label = "pal-spark")
+    val bg by animateColorAsState(backgroundTint, AuraMotion.colorSpring, label = "pal-bg")
+    val g by animateColorAsState(glow, AuraMotion.colorSpring, label = "pal-glow")
+    val r by animateColorAsState(ring, AuraMotion.colorSpring, label = "pal-ring")
+    val s by animateColorAsState(spark, AuraMotion.colorSpring, label = "pal-spark")
     return HomePresencePalette(bg, g, r, s)
 }
 

@@ -109,13 +109,13 @@ internal fun LuminousAuraAvatar(
         val w = this.size.width
         val h = this.size.height
         val center = Offset(w / 2f, h / 2f)
-        val breatheScale = 1f + breath * 0.018f
+        val breatheScale = 1f + breath * animationState.breathAmplitude
 
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    palette.glow.copy(alpha = 0.34f),
-                    palette.glow.copy(alpha = 0.13f),
+                    palette.glow.copy(alpha = animationState.glowAlpha),
+                    palette.glow.copy(alpha = animationState.glowAlpha * 0.38f),
                     Color.Transparent,
                 ),
                 center = center,
@@ -222,7 +222,7 @@ private fun DrawScope.drawAuraEar(
         brush = Brush.radialGradient(
             colors = listOf(
                 Color.White.copy(alpha = 0.88f),
-                palette.glow.copy(alpha = 0.32f),
+                palette.glow.copy(alpha = 0.28f),
                 Color(0xFFF6D4AB).copy(alpha = 0.48f),
             ),
             center = Offset(cx - side * width * 0.04f, cy - height * 0.03f),

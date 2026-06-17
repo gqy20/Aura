@@ -28,6 +28,7 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import dagger.hilt.android.AndroidEntryPoint
 import com.xiaoqi.companion.feature.chat.AuraHomeScreen
+import com.xiaoqi.companion.feature.chat.AuraMotion
 import com.xiaoqi.companion.feature.chat.ChatScreen
 import com.xiaoqi.companion.feature.chat.ChatViewModel
 import com.xiaoqi.companion.feature.chat.McpSettingsScreen
@@ -144,20 +145,20 @@ private fun AuraAppNavHost(
 ) {
     val slideIn = slideInHorizontally(
         initialOffsetX = { it },
-        animationSpec = tween(300),
-    ) + fadeIn(animationSpec = tween(300))
+        animationSpec = tween(AuraMotion.MediumMs),
+    ) + fadeIn(animationSpec = tween(AuraMotion.ShortMs))
     val slideOut = slideOutHorizontally(
         targetOffsetX = { -it / 3 },
-        animationSpec = tween(300),
-    ) + fadeOut(animationSpec = tween(300))
+        animationSpec = tween(AuraMotion.MediumMs),
+    ) + fadeOut(animationSpec = tween(AuraMotion.ShortMs))
     val popSlideIn = slideInHorizontally(
         initialOffsetX = { -it },
-        animationSpec = tween(300),
-    ) + fadeIn(animationSpec = tween(300))
+        animationSpec = tween(AuraMotion.MediumMs),
+    ) + fadeIn(animationSpec = tween(AuraMotion.ShortMs))
     val popSlideOut = slideOutHorizontally(
         targetOffsetX = { it },
-        animationSpec = tween(300),
-    ) + fadeOut(animationSpec = tween(300))
+        animationSpec = tween(AuraMotion.MediumMs),
+    ) + fadeOut(animationSpec = tween(AuraMotion.ShortMs))
 
     NavHost(
         navController = navController,
