@@ -27,7 +27,7 @@ export function ScrollSection({ number, title, description }: ScrollSectionProps
   return (
     <section
       ref={ref}
-      className="relative flex min-h-[70vh] items-center py-24"
+      className="relative flex min-h-[100svh] snap-start snap-always items-center py-24"
     >
       <Reveal duration={800} className="mx-auto w-full max-w-6xl px-8 sm:px-12">
         <motion.div

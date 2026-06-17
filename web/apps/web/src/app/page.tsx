@@ -35,7 +35,7 @@ export default function Home() {
   return (
     <SmoothScroll>
       <MagneticCursor />
-      <main className="relative min-h-screen overflow-x-clip">
+      <main className="relative min-h-screen snap-y snap-mandatory overflow-x-clip overflow-y-auto">
         {/* ─── 全局深色底（叙事段/footer 用） ─── */}
         <div
           aria-hidden
@@ -47,7 +47,7 @@ export default function Home() {
             - 文字区保留 px-6 sm:px-10 lg:px-16 让阅读舒适
             - Hero 内的 Mesh Gradient 背景 / PhoneOrb 仍 absolute 撑满 viewport
         */}
-        <div className="flex min-h-screen flex-col">
+        <div className="flex min-h-[100svh] snap-start snap-always flex-col">
           <AnnouncementBar />
           {/* ─── Nav ─── */}
           <motion.nav
@@ -251,7 +251,7 @@ export default function Home() {
           />
         </div>
 
-        <section className="border-t border-border px-6 py-20 sm:px-10 lg:px-16">
+        <section className="border-t border-border px-6 py-20 sm:px-10 lg:px-16 snap-start snap-always min-h-[100svh]">
           <div className="flex items-end justify-between border-b border-border pb-4">
             <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
               继续往下看

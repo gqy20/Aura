@@ -60,7 +60,7 @@ export function FeatureShell({
   return (
     <SmoothScroll>
       <MagneticCursor />
-      <main className="relative min-h-screen overflow-x-clip">
+      <main className="relative min-h-screen snap-y snap-mandatory overflow-x-clip overflow-y-auto">
         {/* 全局深色底 + 页面渐变（中心光晕） */}
         <div
           aria-hidden
@@ -79,7 +79,7 @@ export function FeatureShell({
           <FeatureNav active={active} />
 
           {/* ─── 大标题区 ─── */}
-          <section className="relative pt-12 pb-16 sm:pt-20 sm:pb-24">
+          <section className="relative snap-start snap-always pt-12 pb-16 sm:pt-20 sm:pb-24">
             <div className="grid grid-cols-1 items-end gap-8 md:grid-cols-12">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
