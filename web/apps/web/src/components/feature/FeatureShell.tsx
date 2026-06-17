@@ -63,10 +63,10 @@ export function FeatureShell({
           <FeatureNav active={active} />
         </div>
 
-        {/* 首屏：标题 + 3D 共享 100svh */}
+        {/* 首屏：标题 + 3D 共享 100svh — 固定高度 + overflow-hidden 防止内容撑高导致 snap 后看到上一屏 */}
         <section
           data-snap
-          className="relative flex min-h-[calc(100svh-var(--shell-top-h))] flex-col py-8 sm:py-10"
+          className="relative flex h-[calc(100svh-var(--shell-top-h))] flex-col overflow-hidden py-8 sm:py-10"
         >
           <div className="px-6 sm:px-10 lg:px-16">
             <div className="grid grid-cols-1 items-end gap-6 md:grid-cols-12">

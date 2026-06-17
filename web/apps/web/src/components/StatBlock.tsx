@@ -13,8 +13,8 @@ interface StatBlockProps {
   desc?: string
   /** 强调色 — 默认 accent (#7c5cff) */
   color?: string
-  /** 数字字号 */
-  size?: 'md' | 'lg'
+  /** 数字字号 — sm(60) / md(72) / lg(96) */
+  size?: 'sm' | 'md' | 'lg'
   /** 数字字体族 */
   family?: 'serif' | 'mono'
   /** Reveal 错落延迟 ms */
@@ -50,7 +50,7 @@ export function StatBlock({
   const numberStyle: CSSProperties = color ? { color } : {}
   const numberClass = cn(
     'leading-none',
-    size === 'lg' ? 'text-8xl' : 'text-7xl',
+    size === 'sm' ? 'text-6xl' : size === 'lg' ? 'text-8xl' : 'text-7xl',
     family === 'serif' ? 'font-serif' : 'font-mono font-medium tracking-tight',
   )
 

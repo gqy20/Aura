@@ -40,7 +40,7 @@ interface HeroStageProps {
   statsPosition?: 'right' | 'bottom'
   /** 3D 下方 caption — mono 12px */
   caption?: string
-  /** 自定义高度 — 默认 h-full（占满 flex 父容器），最小 60vh */
+  /** 自定义高度 — 默认 flex-1（占满 flex 父容器剩余空间，允许收缩） */
   height?: string
   /** variant — 影响背景光晕、stats 强调色 */
   variant?: 'presence' | 'memory' | 'agent'
@@ -87,8 +87,8 @@ export function HeroStage({
   disableEnterAnimation = false,
   className,
 }: HeroStageProps) {
-  // 在 FeatureShell flex-col 首屏中：h-full + min-h-[60vh] 兜底
-  const defaultHeight = 'h-full min-h-[60vh]'
+  // 在 FeatureShell flex-col 首屏中：flex-1 占满父容器剩余高度，min-h-0 允许收缩
+  const defaultHeight = 'flex-1 min-h-0'
   const resolvedHeight = height ?? defaultHeight
 
   const sectionRef = useRef<HTMLElement>(null)
@@ -162,10 +162,10 @@ export function HeroStage({
   const statsBlock = (
     <div
       className={cn(
-        'flex flex-col gap-10 md:gap-12',
+        'flex flex-col gap-6 md:gap-7',
         statsPosition === 'right'
-          ? 'md:justify-center md:py-4'
-          : 'mt-10 md:mt-14',
+          ? 'md:justify-center md:py-2'
+          : 'mt-8 md:mt-12',
       )}
     >
       {stats.map((s, i) => (
@@ -176,7 +176,7 @@ export function HeroStage({
           desc={s.desc}
           color={s.color ?? variantAccent}
           delay={delayBase + i * 80}
-          size="md"
+          size={statsPosition === 'right' ? 'sm' : 'md'}
         />
       ))}
     </div>
@@ -185,7 +185,7 @@ export function HeroStage({
   return (
     <section
       ref={sectionRef}
-      className={cn('relative', className)}
+      className={cn('relative flex h-full min-h-0 flex-col', className)}
       style={
         statsPosition === 'right'
           ? ({

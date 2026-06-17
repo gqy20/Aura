@@ -69,10 +69,10 @@ export default function Home() {
           </motion.nav>
         </div>
 
-        {/* 首屏（snap）：hero + data strip */}
+        {/* 首屏（snap）：hero + data strip — 固定高度，防止内容撑高导致 snap 后看到上一屏 */}
         <section
           data-snap
-          className="relative flex min-h-[calc(100svh-var(--home-top-h))] flex-col overflow-hidden"
+          className="relative flex h-[calc(100svh-var(--home-top-h))] flex-col overflow-hidden"
         >
           <div className="relative flex flex-1 items-center px-6 py-12 sm:px-10 lg:px-16">
             <div
