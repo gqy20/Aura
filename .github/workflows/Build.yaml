@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: "Lint, Test & Build"
+  verify:
+    name: "Lint & Test"
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -38,15 +38,6 @@ jobs:
       - name: Run lint
         run: ./gradlew :app:lint
 
-      - name: Build APK
-        run: ./gradlew :app:assemble -PminifyWithR8=false
-
-      - name: Upload APKs
-        uses: actions/upload-artifact@v7
-        with:
-          name: APKs
-          path: '**/build/outputs/apk/**/*.apk'
-
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -60,3 +51,65 @@ jobs:
         with:
           name: lint-reports
           path: '**/build/reports/lint-results-*.html'
+
+  build-debug:
+    name: "Build Debug APK"
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug -PminifyWithR8=false
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+  build-release:
+    name: "Build Release APK"
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/*.apk

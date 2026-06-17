@@ -359,13 +359,15 @@ class SettingsUseCase @Inject constructor(
             }
         }
 
+        val existingServer = state.mcpEditingServerId
+            ?.let { editingId -> state.toolCapabilitySettings.mcpServers.firstOrNull { it.id == editingId } }
         val config = McpServerConfig(
             id = state.mcpEditingServerId ?: java.util.UUID.randomUUID().toString(),
             displayName = name,
             providerId = provider.id,
             apiKey = apiKey,
             customUrl = if (provider is CustomMcpServerPreset) customUrl else "",
-            enabled = true,
+            enabled = existingServer?.enabled ?: true,
         )
 
         val startedAt = System.currentTimeMillis()

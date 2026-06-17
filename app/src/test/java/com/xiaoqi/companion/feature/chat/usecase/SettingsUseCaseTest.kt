@@ -302,4 +302,27 @@ class SettingsUseCaseTest {
         advanceUntilIdle()
         coVerify { mcpServerListRepository.toggleEnabled("id-existing") }
     }
+
+    @Test
+    fun saveMcpSettings_preservesDisabledStateWhenEditingExistingServer() = runTest {
+        state.update {
+            it.copy(
+                toolCapabilitySettings = ChatToolCapabilitySettings(
+                    mcpServers = listOf(initialCustomServer.copy(enabled = false)),
+                ),
+            )
+        }
+        useCase.prepareMcpSettings(update)
+        state.update { it.copy(mcpSettingsUrl = "https://new.example/mcp") }
+        useCase.saveMcpSettings(state.value, this, update)
+        advanceUntilIdle()
+
+        coVerify {
+            mcpServerListRepository.update(match { config ->
+                config.id == "id-existing" &&
+                    !config.enabled &&
+                    config.customUrl == "https://new.example/mcp"
+            })
+        }
+    }
 }
