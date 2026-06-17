@@ -412,6 +412,9 @@ def run_app(args: argparse.Namespace) -> dict:
         "--ei",
         "measureRuns",
         str(args.measure_runs),
+        "--ei",
+        "threadNum",
+        str(args.threads),
     ]
     proc = run(start_cmd, check=False, capture=True)
     (out_dir / "app-benchmark.stdout.txt").write_text(proc.stdout or "", encoding="utf-8")

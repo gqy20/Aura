@@ -10,6 +10,7 @@ general:
   warmup_runs: 1
   measure_runs: 2
   timeout_s: 180
+  threads: 4
 
 modes:
   app: {}

@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        maybeRunBenchmark(intent)
+        if (maybeRunBenchmark(intent)) return
 
         setContent {
             CompanionTheme {
@@ -67,8 +67,8 @@ class MainActivity : ComponentActivity() {
         maybeRunBenchmark(intent)
     }
 
-    private fun maybeRunBenchmark(intent: android.content.Intent?) {
-        if (intent?.action != ACTION_RUN_LOCAL_QWEN_BENCHMARK) return
+    private fun maybeRunBenchmark(intent: android.content.Intent?): Boolean {
+        if (intent?.action != ACTION_RUN_LOCAL_QWEN_BENCHMARK) return false
         AppLogger.info(LogTags.LocalModel, "local_qwen_benchmark_triggered")
         val request = LocalQwenBenchmarkRequest(
             modelName = intent.getStringExtra(EXTRA_MODEL_NAME),
@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
             decodeTokens = intent.getIntExtra(EXTRA_DECODE_TOKENS, DEFAULT_DECODE_TOKENS),
             warmupRuns = intent.getIntExtra(EXTRA_WARMUP_RUNS, DEFAULT_WARMUP_RUNS),
             measureRuns = intent.getIntExtra(EXTRA_MEASURE_RUNS, DEFAULT_MEASURE_RUNS),
+            threadNum = intent.getIntExtra(EXTRA_THREAD_NUM, DEFAULT_THREAD_NUM).takeIf { it > 0 },
         )
         benchmarkScope.launch(Dispatchers.IO) {
             runCatching {
@@ -112,6 +113,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        return true
     }
 
     private companion object {
@@ -122,10 +124,12 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_DECODE_TOKENS = "decodeTokens"
         const val EXTRA_WARMUP_RUNS = "warmupRuns"
         const val EXTRA_MEASURE_RUNS = "measureRuns"
+        const val EXTRA_THREAD_NUM = "threadNum"
         const val DEFAULT_PROMPT_TOKENS = 256
         const val DEFAULT_DECODE_TOKENS = 64
         const val DEFAULT_WARMUP_RUNS = 1
         const val DEFAULT_MEASURE_RUNS = 3
+        const val DEFAULT_THREAD_NUM = -1
     }
 }
 

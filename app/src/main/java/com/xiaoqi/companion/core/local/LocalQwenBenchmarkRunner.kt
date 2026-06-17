@@ -17,6 +17,7 @@ data class LocalQwenBenchmarkRequest(
     val decodeTokens: Int = 64,
     val warmupRuns: Int = 1,
     val measureRuns: Int = 3,
+    val threadNum: Int? = null,
 )
 
 @Serializable
@@ -82,7 +83,9 @@ class LocalQwenBenchmarkRunner(
         val configFile = File(modelDir, CONFIG_FILE_NAME)
         require(configFile.isFile) { "Missing config.json for benchmark" }
 
-        val runtimeConfig = MnnInferenceConfig.forCurrentDevice().copy(
+        val defaultConfig = MnnInferenceConfig.forCurrentDevice()
+        val runtimeConfig = defaultConfig.copy(
+            threadNum = request.threadNum ?: defaultConfig.threadNum,
             maxNewTokens = request.decodeTokens,
             temperature = 0.4f,
         )
@@ -90,12 +93,50 @@ class LocalQwenBenchmarkRunner(
         val warmupStats = mutableListOf<LocalQwenBenchmarkRun>()
         val measuredStats = mutableListOf<LocalQwenBenchmarkRun>()
         try {
+            AppLogger.info(
+                LogTags.LocalModel,
+                "local_qwen_benchmark_load_started",
+                "model" to modelName,
+                "threadNum" to runtimeConfig.threadNum,
+                "maxNewTokens" to runtimeConfig.maxNewTokens,
+            )
             bridge.load(configFile.absolutePath, runtimeConfig.toJson())
+            AppLogger.info(
+                LogTags.LocalModel,
+                "local_qwen_benchmark_load_completed",
+                "model" to modelName,
+            )
             repeat(request.warmupRuns) {
+                AppLogger.info(
+                    LogTags.LocalModel,
+                    "local_qwen_benchmark_warmup_started",
+                    "index" to (it + 1),
+                    "total" to request.warmupRuns,
+                    "promptTokens" to request.promptTokens,
+                )
                 warmupStats += bridge.runBenchmark(request.promptTokens)
+                AppLogger.info(
+                    LogTags.LocalModel,
+                    "local_qwen_benchmark_warmup_completed",
+                    "index" to (it + 1),
+                    "total" to request.warmupRuns,
+                )
             }
             repeat(request.measureRuns) {
+                AppLogger.info(
+                    LogTags.LocalModel,
+                    "local_qwen_benchmark_measure_started",
+                    "index" to (it + 1),
+                    "total" to request.measureRuns,
+                    "promptTokens" to request.promptTokens,
+                )
                 measuredStats += bridge.runBenchmark(request.promptTokens)
+                AppLogger.info(
+                    LogTags.LocalModel,
+                    "local_qwen_benchmark_measure_completed",
+                    "index" to (it + 1),
+                    "total" to request.measureRuns,
+                )
             }
         } finally {
             bridge.release()
