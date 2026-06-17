@@ -308,43 +308,36 @@ private fun SettingsScreenContent(
             )
         },
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(spacing.lg),
+                .padding(padding)
+                .padding(spacing.lg),
             verticalArrangement = Arrangement.spacedBy(spacing.section),
         ) {
-            item {
-                SettingsPagePicker(
-                    selectedPage = selectedPage,
-                    onSelectedPageChanged = { selectedPage = it },
+            SettingsPagePicker(
+                selectedPage = selectedPage,
+                onSelectedPageChanged = { selectedPage = it },
+            )
+            state.message?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
-            item {
-                AnimatedContent(
-                    targetState = selectedPage,
-                    transitionSpec = {
-                        fadeIn(tween(AuraMotion.MediumMs)) togetherWith fadeOut(tween(AuraMotion.ShortMs))
-                    },
-                    label = "settings-page",
-                ) { page ->
-                    when (page) {
-                        SettingsPage.MODEL -> SettingsPageContent { settingsModelPage(state, actions) }
-                        SettingsPage.CAPABILITIES -> SettingsPageContent { settingsCapabilitiesPage(state, actions) }
-                        SettingsPage.SYSTEM -> SettingsPageContent { settingsSystemPage(state, actions) }
-                    }
-                }
-            }
-            if (state.message != null) {
-                state.message?.let {
-                    item {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
+            AnimatedContent(
+                modifier = Modifier.weight(1f, fill = true),
+                targetState = selectedPage,
+                transitionSpec = {
+                    fadeIn(tween(AuraMotion.MediumMs)) togetherWith fadeOut(tween(AuraMotion.ShortMs))
+                },
+                label = "settings-page",
+            ) { page ->
+                when (page) {
+                    SettingsPage.MODEL -> SettingsPageContent { settingsModelPage(state, actions) }
+                    SettingsPage.CAPABILITIES -> SettingsPageContent { settingsCapabilitiesPage(state, actions) }
+                    SettingsPage.SYSTEM -> SettingsPageContent { settingsSystemPage(state, actions) }
                 }
             }
         }
@@ -354,8 +347,9 @@ private fun SettingsScreenContent(
 @Composable
 private fun SettingsPageContent(content: LazyListScope.() -> Unit) {
     LazyColumn(
-        userScrollEnabled = false,
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(LocalCompanionSpacing.current.section),
+        contentPadding = PaddingValues(bottom = LocalCompanionSpacing.current.section),
     ) {
         content()
     }

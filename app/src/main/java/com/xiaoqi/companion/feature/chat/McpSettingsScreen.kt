@@ -33,9 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHost
@@ -470,13 +468,17 @@ private fun McpEditorScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.size(4.dp))
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    McpServerPresets.all.forEachIndexed { i, p ->
-                        SegmentedButton(
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    McpServerPresets.all.forEach { p ->
+                        FilterChip(
                             selected = p.id == settings.mcpSettingsProviderId,
                             onClick = { viewModel.selectMcpProvider(p.id) },
-                            shape = SegmentedButtonDefaults.itemShape(i, McpServerPresets.all.size),
-                        ) { Text(p.displayName) }
+                            label = { Text(p.displayName) },
+                        )
                     }
                 }
                 Spacer(Modifier.size(4.dp))

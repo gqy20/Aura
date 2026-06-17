@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -145,7 +146,7 @@ private fun ListHitsBody(summary: ToolResultSummary.ListHits) {
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (summary.items.size > 5) 240.dp else (24 * summary.items.size + 16).dp)
+            .heightIn(max = 240.dp)
             .padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
