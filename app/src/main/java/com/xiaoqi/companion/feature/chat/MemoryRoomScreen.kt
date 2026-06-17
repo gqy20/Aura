@@ -101,9 +101,9 @@ private fun MemoryRoomScreenContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             CompanionTopAppBar(
-                title = "??",
+                title = "记忆房间",
                 navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-                navigationContentDescription = "??",
+                navigationContentDescription = "返回",
                 onNavigationClick = onBack,
             )
         },

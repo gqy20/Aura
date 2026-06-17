@@ -27,11 +27,11 @@ class RelationshipModel @Inject constructor() {
 
     fun contextModifier(): String {
         val desc = when {
-            currentLevel >= 0.8f -> "闈炲父浜插瘑"
-            currentLevel >= 0.5f -> "姣旇緝鐔熸倝"
-            currentLevel >= 0.2f -> "鍒氳璇嗕笉涔?"
-            else -> "闄岀敓浜?"
+            currentLevel >= 0.8f -> "非常亲密"
+            currentLevel >= 0.5f -> "比较熟悉"
+            currentLevel >= 0.2f -> "刚认识不久"
+            else -> "陌生人"
         }
-        return "鍏崇郴绛夌骇锛?desc(${String.format("%.2f", currentLevel)})"
+        return "关系等级：$desc(${String.format("%.2f", currentLevel)})"
     }
 }

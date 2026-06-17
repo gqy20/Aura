@@ -155,6 +155,7 @@ internal fun LocalQwenModelDownloadState.toUiState(): LocalQwenDownloadUiState =
     LocalQwenDownloadUiState(
         modelName = modelName,
         isInstalled = isInstalled,
+        isChecking = false,
         isDownloading = isDownloading,
         progress = progress,
         downloadedBytes = downloadedBytes,

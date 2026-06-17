@@ -115,6 +115,7 @@ data class ChatToolCapabilitySettings(
 data class LocalQwenDownloadUiState(
     val modelName: String = DefaultLlmValues.LOCAL_QWEN_MODEL,
     val isInstalled: Boolean = false,
+    val isChecking: Boolean = false,
     val isDownloading: Boolean = false,
     val progress: Float = 0f,
     val downloadedBytes: Long = 0L,

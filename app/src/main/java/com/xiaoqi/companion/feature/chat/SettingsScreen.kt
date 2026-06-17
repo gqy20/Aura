@@ -286,15 +286,15 @@ private fun SettingsScreenContent(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CompanionTopAppBar(
-                title = "??",
+                title = "设置",
                 navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-                navigationContentDescription = "??",
+                navigationContentDescription = "返回",
                 onNavigationClick = actions.onBack,
-                actionText = "??",
+                actionText = "保存",
                 onActionClick = actions.onSave,
                 extraActions = {
                     IconButton(onClick = actions.onOpenMcpSettings) {
-                        Icon(Icons.Default.Build, contentDescription = "MCP ??")
+                        Icon(Icons.Default.Build, contentDescription = "MCP 设置")
                     }
                 },
             )
@@ -522,6 +522,7 @@ private fun LocalQwenDownloadSection(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             val status = when {
+                state.isChecking -> "正在检查本地模型"
                 // 下载中:把百分比和字节数合并到同一行,避免再占一行字节数。
                 state.isDownloading ->
                     "下载中 ${formatPercent(state.progress)} · ${formatBytes(state.downloadedBytes, state.totalBytes)}"
@@ -543,6 +544,22 @@ private fun LocalQwenDownloadSection(
                     progress = { state.progress.coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+            if (state.isChecking) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Text(
+                        text = "正在确认模型文件完整性",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             state.message?.takeIf { it.isNotBlank() && !state.isDownloading }?.let {
                 Text(

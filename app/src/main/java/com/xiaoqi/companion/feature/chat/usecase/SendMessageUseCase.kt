@@ -15,6 +15,7 @@ import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.presence.PresenceEvent
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
+import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.feature.chat.ChatConfigStatus
 import com.xiaoqi.companion.feature.chat.ChatImageAttachment
@@ -71,6 +72,7 @@ class SendMessageUseCase @Inject constructor(
         // Leading flush 阈值——首字符到达后立即 flush 到 UI。
         private const val STREAMING_LEADING_FLUSH_CHARS = 1
         private const val IMAGE_ONLY_PROMPT = "我想给你看这张图片。先说说你看到了什么，再自然地回应我。"
+        private const val LOCAL_GENERATION_STATUS = "本地模型加载并生成中"
     }
 
     suspend operator fun invoke(
@@ -225,6 +227,11 @@ class SendMessageUseCase @Inject constructor(
                         role = "ASSISTANT",
                         content = "",
                         isStreaming = true,
+                        toolStatus = if (configStatus.provider == LlmProvider.LOCAL_QWEN) {
+                            LOCAL_GENERATION_STATUS
+                        } else {
+                            null
+                        },
                     )
                 )
             }
@@ -353,6 +360,11 @@ class SendMessageUseCase @Inject constructor(
                                 renderBlocks = emptyList(),
                                 renderDraft = "",
                                 isRenderDraftCode = false,
+                                toolStatus = if (it.toolStatus == LOCAL_GENERATION_STATUS) {
+                                    null
+                                } else {
+                                    it.toolStatus
+                                },
                             )
                         }
                         update {

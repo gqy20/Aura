@@ -41,6 +41,8 @@ import com.xiaoqi.companion.feature.chat.mapper.toChatMemory
 import com.xiaoqi.companion.feature.chat.mapper.toChatMessage
 import com.xiaoqi.companion.feature.chat.mapper.toChatReminder
 import com.xiaoqi.companion.feature.chat.mapper.toChatToolCall
+import com.xiaoqi.companion.feature.chat.mapper.toUiState
+import com.xiaoqi.companion.feature.chat.mapper.withLocalQwenDownloadState
 import com.xiaoqi.companion.feature.chat.usecase.SendMessageUseCase
 import com.xiaoqi.companion.feature.chat.usecase.SettingsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -76,6 +78,7 @@ class ChatViewModel @Inject constructor(
     private val imageProcessor: com.xiaoqi.companion.feature.chat.ChatImageProcessor,
     private val toolCallRepository: ToolCallRepository,
     private val configRepository: ConfigRepository,
+    private val localQwenModelDownloader: LocalQwenModelDownloader,
     private val messageRepository: MessageRepository,
     private val memoryRepository: MemoryRepository,
     private val insightRepository: InsightRepository,
@@ -155,7 +158,43 @@ class ChatViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             configRepository.observeLlmConfigStatus().collect { status ->
-                _uiState.update { it.copy(configStatus = status.toChatConfigStatus()) }
+                val configStatus = status.toChatConfigStatus()
+                _uiState.update {
+                    it.copy(
+                        configStatus = configStatus,
+                        localQwenDownload = if (status.provider == LlmProvider.LOCAL_QWEN) {
+                            it.localQwenDownload.copy(
+                                modelName = status.modelName,
+                                isChecking = true,
+                                error = null,
+                            )
+                        } else {
+                            it.localQwenDownload
+                        },
+                    )
+                }
+                if (status.provider == LlmProvider.LOCAL_QWEN) {
+                    runCatching {
+                        localQwenModelDownloader.observeStatus(status.modelName).first()
+                    }.onSuccess { downloadState ->
+                        _uiState.update {
+                            it.copy(
+                                configStatus = it.configStatus.withLocalQwenDownloadState(downloadState),
+                                localQwenDownload = downloadState.toUiState(),
+                            )
+                        }
+                    }.onFailure { error ->
+                        _uiState.update {
+                            it.copy(
+                                localQwenDownload = it.localQwenDownload.copy(
+                                    modelName = status.modelName,
+                                    isChecking = false,
+                                    error = error.message ?: error::class.simpleName.orEmpty(),
+                                )
+                            )
+                        }
+                    }
+                }
             }
         }
 
