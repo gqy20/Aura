@@ -14,19 +14,19 @@ const MemoryNetworkDynamic = dynamic(
 const MEMORY_TYPES = [
   {
     name: 'FACT',
-    color: '#7c5cff',
+    color: 'var(--color-accent)',
     desc: '关于你的稳定信息。',
     examples: ['住在北京', '养了一只猫', '做产品工作'],
   },
   {
     name: 'EPISODE',
-    color: '#5cffb0',
+    color: 'var(--aura-memory)',
     desc: '有时间线的互动与事件。',
     examples: ['上周聊过露营', '昨天抱怨过加班', '三月看过那部电影'],
   },
   {
     name: 'PROCEDURAL',
-    color: '#ffb85c',
+    color: 'var(--aura-speaking)',
     desc: '你的习惯、偏好和节奏。',
     examples: ['喜欢先结论后展开', '晚上十点后更想安静', '对猫毛过敏'],
   },
@@ -38,7 +38,7 @@ const STORAGE_BREAKDOWN = [
   { type: '关系与偏好', count: 16, weight: 0.03 },
 ]
 
-const STORAGE_COLORS = ['#7c5cff', '#5cefff', '#ffb85c']
+const STORAGE_COLORS = ['var(--color-accent)', 'var(--aura-listening)', 'var(--aura-speaking)']
 
 export default function MemoryPage() {
   return (
@@ -62,11 +62,11 @@ export default function MemoryPage() {
                   <span className="text-muted">中心枢纽</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
                   <span className="text-muted">记忆 · 3 类</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#5cefff' }} />
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--aura-listening)' }} />
                   <span className="text-muted">摘要 · 5 类</span>
                 </div>
               </div>

@@ -37,9 +37,9 @@ const TIMELINE_POINTS = TIMELINE.map((p) => ({
 }))
 
 const REACTIONS = [
-  { name: 'ERROR_RECOVER', color: '#ff5c7c', desc: '优先级最高，遇错直接接管。' },
-  { name: 'MEMORY_SPARK', color: '#ffb85c', desc: '触发记忆回流，补上上下文。' },
-  { name: 'SEARCH_SWEEP', color: '#5cefff', desc: '工具执行时给出轻量反馈。' },
+  { name: 'ERROR_RECOVER', color: 'var(--aura-alert)', desc: '优先级最高，遇错直接接管。' },
+  { name: 'MEMORY_SPARK', color: 'var(--aura-speaking)', desc: '触发记忆回流，补上上下文。' },
+  { name: 'SEARCH_SWEEP', color: 'var(--aura-listening)', desc: '工具执行时给出轻量反馈。' },
 ]
 
 export default function PresencePage() {

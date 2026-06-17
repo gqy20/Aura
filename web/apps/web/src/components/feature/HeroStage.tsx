@@ -97,10 +97,10 @@ export function HeroStage({
   // variant → 强调色（与 FeatureShell bgGradient 配合）
   const variantAccent =
     variant === 'presence'
-      ? '#7c5cff'
+      ? 'var(--color-accent)'
       : variant === 'memory'
-        ? '#5cffb0'
-        : '#ff7c9c'
+        ? 'var(--aura-memory)'
+        : 'var(--aura-health)'
 
   /**
    * GSAP 入场 + 视差

@@ -31,11 +31,11 @@ const fragmentShader = /* glsl */ `
   }
 
   vec3 colorRamp(float t) {
-    // Aura 紫蓝调色板
-    vec3 c1 = vec3(0.486, 0.361, 1.000); // #7C5CFF accent
+    // 紫蓝调色板（对应 globals.css --color-accent #7c5cff）
+    vec3 c1 = vec3(0.486, 0.361, 1.000); // accent 亮端
     vec3 c2 = vec3(0.180, 0.310, 0.780); // 深蓝
-    vec3 c3 = vec3(0.090, 0.090, 0.110); // 背景深色
-    vec3 c4 = vec3(0.380, 0.220, 0.860); // 紫色变体
+    vec3 c3 = vec3(0.090, 0.090, 0.110); // background 近似
+    vec3 c4 = vec3(0.380, 0.220, 0.860); // thinking #a07cff 近似
 
     if (t < 0.33) return mix(c3, c2, t / 0.33);
     if (t < 0.66) return mix(c2, c4, (t - 0.33) / 0.33);

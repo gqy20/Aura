@@ -18,15 +18,25 @@
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-strong: rgba(255, 255, 255, 0.16);
 
-  /* 强调色（占位 — 等待用户提供） */
+  /* 强调色 */
   --color-accent: #7c5cff;
   --color-accent-foreground: #ffffff;
   --color-accent-muted: rgba(124, 92, 255, 0.16);
 
+  /* 语义功能色 — Presence 状态 / Memory 分类 / Agent 工具类 */
+  --aura-listening: #5cefff;
+  --aura-thinking: #a07cff;
+  --aura-speaking: #ffb85c;
+  --aura-memory: #5cffb0;
+  --aura-health: #ff7c9c;
+  --aura-alert: #ff5c7c;
+  --aura-muted: #9090a8;
+  --aura-sleeping: #404060;
+
   /* 状态色 */
-  --color-success: #4ade80;
-  --color-warning: #fbbf24;
-  --color-error: #f87171;
+  --color-success: #5cffb0;
+  --color-warning: #ffb85c;
+  --color-error: #ff5c7c;
 
   /* 字体 */
   --font-sans: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
@@ -211,6 +221,6 @@ html.cursor-hidden [data-cursor='hover'] {
 .magnetic-ring.is-hovering {
   width: 32px;
   height: 32px;
-  border-color: rgba(124, 92, 255, 0.8);
-  background: rgba(124, 92, 255, 0.1);
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
 }

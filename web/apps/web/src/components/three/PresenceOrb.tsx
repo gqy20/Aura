@@ -16,6 +16,16 @@ import * as THREE from 'three'
  *
  * 状态（精简自 PresenceMode）：
  * - IDLE / LISTENING / THINKING / SPEAKING / REMEMBERING / TIRED
+ *
+ * 色值与 globals.css @theme 的对照（Three.js 无法引用 CSS var，需手动同步）：
+ *   accent    → --color-accent      #7c5cff
+ *   listening → --aura-listening    #5cefff
+ *   thinking  → --aura-thinking     #a07cff
+ *   speaking  → --aura-speaking     #ffb85c
+ *   memory    → --aura-memory       #5cffb0
+ *   muted     → --aura-muted        #9090a8
+ *   sleeping  → --aura-sleeping     #404060
+ *   alert     → --aura-alert        #ff5c7c
  */
 
 type StateKey =

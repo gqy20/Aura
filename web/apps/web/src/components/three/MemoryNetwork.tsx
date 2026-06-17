@@ -14,6 +14,14 @@ import * as THREE from 'three'
  * - 二级子节点（演示数据），半径更小
  * - LineSegments 连接中心 → 一级 → 二级
  * - 鼠标视差
+ *
+ * 色值与 globals.css @theme 的对照（Three.js 无法引用 CSS var，需手动同步）：
+ *   accent    → --color-accent      #7c5cff  (FACT)
+ *   memory    → --aura-memory       #5cffb0  (EPISODE)
+ *   speaking  → --aura-speaking     #ffb85c  (PROCEDURAL)
+ *   listening → --aura-listening    #5cefff  (DAILY)
+ *   thinking  → --aura-thinking     #a07cff  (TOPIC)
+ *   health    → --aura-health       #ff7c9c  (RELATIONSHIP)
  */
 
 interface NodeSpec {

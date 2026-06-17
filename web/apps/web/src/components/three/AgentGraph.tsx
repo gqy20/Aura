@@ -19,6 +19,14 @@ import * as THREE from 'three'
  *   - Cloud Qwen / OpenAI / Local MNN
  * - LineSegments：Core → Tools（实），Core → Providers（虚）
  * - 鼠标视差
+ *
+ * 色值与 globals.css @theme 的对照（Three.js 无法引用 CSS var，需手动同步）：
+ *   accent    → --color-accent      #7c5cff  (Memory)
+ *   listening → --aura-listening    #5cefff  (Context)
+ *   speaking  → --aura-speaking     #ffb85c  (Device)
+ *   memory    → --aura-memory       #5cffb0  (Action)
+ *   thinking  → --aura-thinking     #a07cff  (Provider: Cloud)
+ *   muted     → --aura-muted        #9090a8  (Provider: OpenAI)
  */
 
 interface ToolNode {

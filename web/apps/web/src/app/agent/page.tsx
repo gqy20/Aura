@@ -14,49 +14,49 @@ const AgentGraphDynamic = dynamic(
 const TOOL_CATEGORIES = [
   {
     name: 'Memory',
-    color: '#7c5cff',
+    color: 'var(--color-accent)',
     desc: '检索结构化记忆与摘要。',
     tools: ['SearchMemory', 'SearchRecords', 'SearchSummaries'],
   },
   {
     name: 'Context',
-    color: '#5cefff',
+    color: 'var(--aura-listening)',
     desc: '获取当前时间、上下文与用户设置。',
     tools: ['GetCurrentTime', 'GetRecentContext', 'GetUserContextSettings'],
   },
   {
     name: 'Device',
-    color: '#ffb85c',
+    color: 'var(--aura-speaking)',
     desc: '读取设备与环境信息。',
     tools: ['GetDeviceStatus', 'GetWeather'],
   },
   {
     name: 'Health',
-    color: '#ff7c9c',
+    color: 'var(--aura-health)',
     desc: '查询健康与运动数据。',
     tools: ['QueryHealthData'],
   },
   {
     name: 'Action',
-    color: '#5cffb0',
+    color: 'var(--aura-memory)',
     desc: '触发提醒与本地动作。',
     tools: ['CreateLocalReminder'],
   },
 ] as const
 
 const PIPELINE_STAGES = [
-  { stage: 'Input', desc: '用户消息、上下文和命中的记忆进入一次请求。', color: '#7c5cff' },
-  { stage: 'Assemble', desc: '系统提示、工具描述和用户状态被拼成可执行 Prompt。', color: '#a07cff' },
-  { stage: 'LLM Call', desc: 'Koog PromptExecutor 路由到云端或本地模型。', color: '#5cefff' },
-  { stage: 'Tool Run', desc: '需要外部能力时，进入 ToolRegistry 或 MCP。', color: '#ffb85c' },
-  { stage: 'Stream', desc: '事件流把结果和状态实时推回 UI。', color: '#5cffb0' },
+  { stage: 'Input', desc: '用户消息、上下文和命中的记忆进入一次请求。', color: 'var(--color-accent)' },
+  { stage: 'Assemble', desc: '系统提示、工具描述和用户状态被拼成可执行 Prompt。', color: 'var(--aura-thinking)' },
+  { stage: 'LLM Call', desc: 'Koog PromptExecutor 路由到云端或本地模型。', color: 'var(--aura-listening)' },
+  { stage: 'Tool Run', desc: '需要外部能力时，进入 ToolRegistry 或 MCP。', color: 'var(--aura-speaking)' },
+  { stage: 'Stream', desc: '事件流把结果和状态实时推回 UI。', color: 'var(--aura-memory)' },
 ]
 
 const PROVIDERS = [
-  { name: 'GLM', model: 'glm-5v-turbo', runtime: '云端对话体', color: '#a07cff' },
-  { name: 'KIMI', model: 'kimi-for-coding', runtime: '云端对话体', color: '#9090a8' },
-  { name: 'MODELSCOPE', model: 'Qwen3.5-397B-A17B', runtime: '云端对话体', color: '#ff7c9c' },
-  { name: 'LOCAL_QWEN', model: 'Qwen3.5-{0.8B,2B,4B}-MNN', runtime: '本地陪伴体', color: '#5cffb0' },
+  { name: 'GLM', model: 'glm-5v-turbo', runtime: '云端对话体', color: 'var(--aura-thinking)' },
+  { name: 'KIMI', model: 'kimi-for-coding', runtime: '云端对话体', color: 'var(--aura-muted)' },
+  { name: 'MODELSCOPE', model: 'Qwen3.5-397B-A17B', runtime: '云端对话体', color: 'var(--aura-health)' },
+  { name: 'LOCAL_QWEN', model: 'Qwen3.5-{0.8B,2B,4B}-MNN', runtime: '本地陪伴体', color: 'var(--aura-memory)' },
 ] as const
 
 export default function AgentPage() {
@@ -81,13 +81,13 @@ export default function AgentPage() {
                   <span className="text-muted">智能体核心</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
                   <span className="text-muted">工具 / MCP / 生活能力</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
                     className="h-1.5 w-1.5 rotate-45"
-                    style={{ background: 'transparent', border: '1px solid #9090a8' }}
+                    style={{ background: 'transparent', border: '1px solid var(--aura-muted)' }}
                   />
                   <span className="text-muted">云端对话体 + 本地陪伴体</span>
                 </div>

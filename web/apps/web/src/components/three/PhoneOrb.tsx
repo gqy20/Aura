@@ -14,7 +14,11 @@ import * as THREE from 'three'
  * - 加多色补光（紫 + 青 + 暖白）打破单光源死黑
  * - 屏幕 z 位置 0.065 → 0.07，确保浮于 RoundedBox 前
  * - 缩放 0.7 → 0.85 + 调整 camera fov 32 → 36 让整体更饱满
- * - 内容抽象块（"通知" + "聊天"）改用更亮的 accent 色 + 提高不透明度
+ * - 内容抽象块（“通知” + “聊天”）改用更亮的 accent 色 + 提高不透明度
+ *
+ * 色值与 globals.css @theme 的对照（Three.js 无法引用 CSS var，需手动同步）：
+ *   accent    → --color-accent      #7c5cff  (屏幕 + 点光)
+ *   listening → --aura-listening    #5cefff  (点光补色)
  */
 
 function HeroPhone() {
