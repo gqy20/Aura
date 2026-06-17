@@ -57,11 +57,11 @@ export function FeatureShell({
 
         {/* 第一屏：nav + 标题 + 3D 共享 100svh */}
         <section className="relative flex h-[100svh] snap-start snap-always flex-col overflow-hidden">
-          <div className="px-6 pt-6 sm:px-10 sm:pt-8 lg:px-16">
+          <div className="px-6 sm:px-10 lg:px-16">
             <FeatureNav active={active} />
           </div>
 
-          <div className="flex flex-1 flex-col overflow-hidden px-6 pt-8 sm:px-10 sm:pt-10 lg:px-16">
+          <div className="flex flex-1 flex-col overflow-hidden px-6 pt-6 pb-12 sm:px-10 sm:pt-8 sm:pb-16 lg:px-16">
             <div className="grid grid-cols-1 items-end gap-6 md:grid-cols-12">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -94,7 +94,7 @@ export function FeatureShell({
         <div className={cn('pb-24', className)}>{children}</div>
 
         {/* footer snap 屏 — 必须 h-[100svh] 才能被浏览器 snap 停在这屏 */}
-        <section className="flex h-[100svh] snap-start snap-always flex-col justify-end border-t border-border px-6 pt-10 pb-10 sm:px-10 lg:px-16">
+        <section className="flex h-[100svh] snap-start snap-always flex-col justify-end border-t border-border px-6 pt-12 pb-12 sm:px-10 sm:pb-16 lg:px-16">
           <div className="flex items-center justify-between font-mono text-xs text-muted">
             <span>© 2026 Aura · 开源</span>
             <span>

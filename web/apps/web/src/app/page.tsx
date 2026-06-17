@@ -65,7 +65,7 @@ export default function Home() {
             </motion.nav>
           </div>
 
-          <div className="relative flex flex-1 items-center px-6 py-12 sm:px-10 lg:px-16">
+          <div className="relative flex flex-1 items-center px-6 pt-6 pb-12 sm:px-10 sm:pt-8 lg:px-16">
             <div
               className="pointer-events-none absolute inset-0 hidden md:block"
               style={{
