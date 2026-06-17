@@ -1,109 +1,124 @@
 # Benchmark
 
-## 目标
+## Goal
 
-本项目的本地 Qwen benchmark 统一验证三件事：
+This project's local Qwen benchmark is used to verify three things:
 
-1. APK 构建与安装链路可用
-2. 主 App 进程能正确加载 MNN 本地模型
-3. 能稳定产出 `load / prefill / decode` 三段时延与 tokens/s
+1. `assembleDebug -> install -> am start` app benchmark flow is healthy
+2. the main app process can load the real on-device MNN model
+3. we can stably collect `load / prefill / decode` timings and tokens/s
 
-当前 benchmark 不走 instrumentation，而是走主 App 进程，避免测试沙箱与真实用户进程的模型目录差异。
+The benchmark runs in the **main app process**, not instrumentation, so results are closer to the real product path.
 
-## 入口
+## Entry
 
-默认入口：
+Default entry:
 
 ```bash
 make benchmark-mnn
 ```
 
-等价命令：
+Equivalent command:
 
 ```bash
 python scripts/mnn_benchmark.py --mode app
 ```
 
-默认配置文件：
+Default config file:
 
 ```text
 scripts/mnn_benchmark.yml
 ```
 
-常改字段：
+Commonly changed fields:
 
-- `apk_path`
-- `app_package`
-- `app_activity`
 - `model_name`
 - `prompt_len`
 - `decode_len`
 - `warmup_runs`
 - `measure_runs`
+- `threads`
+- `backend`
+- `precision`
+- `memory`
 - `timeout_s`
 
-## 标准流程
+## Standard Flow
 
-`--mode app` 的执行顺序固定为：
+`--mode app` runs in this order:
 
 1. `./gradlew.bat assembleDebug`
 2. `D:\tools\ADB_Cli\adb.exe install -r app/build/outputs/apk/debug/app-debug.apk`
-3. `adb shell am start` 触发 `MainActivity` 的 benchmark action
-4. 主 App 进程执行 `LocalQwenBenchmarkRunner`
-5. 用 `run-as com.xiaoqi.companion.debug` 拉取 `files/benchmarks/local-qwen-benchmark.json`
+3. `adb shell am start` triggers `MainActivity` benchmark action
+4. `LocalQwenBenchmarkRunner` runs inside the main app process
+5. result JSON is pulled back from `files/benchmarks/`
 
-如果 APK 已经是最新的，可跳过前两步：
+If the APK is already fresh:
 
 ```bash
 python scripts/mnn_benchmark.py --mode app --skip-build-install
 ```
 
-## 结果文件
+## Output Files
 
-主结果：
+Device-side:
 
 ```text
 files/benchmarks/local-qwen-benchmark.json
-```
-
-拉回本地后默认保存到：
-
-```text
-docs/plan/visual-audit-assets/local-qwen-benchmark.json
-```
-
-失败时：
-
-```text
 files/benchmarks/local-qwen-benchmark.error.txt
 ```
 
-## 日志信号
+Pulled to local machine:
 
-关键日志：
+```text
+docs/plan/visual-audit-assets/local-qwen-benchmark-app-*.json
+```
+
+The local filename now includes:
+
+- mode
+- model name
+- backend
+- thread count
+- prompt/decode length
+- timestamp
+
+This avoids result overwrite between runs.
+
+## Key Logs
+
+Useful log events:
 
 - `local_qwen_benchmark_triggered`
-- `local_model_lookup_found`
-- `mnn_bridge_load_started`
-- `mnn_bridge_load_completed`
-- `mnn_bridge_generate_completed`
-- `local_qwen_benchmark_written`
+- `local_qwen_benchmark_request_parsed`
+- `local_qwen_benchmark_load_started`
+- `local_qwen_benchmark_load_completed`
+- `local_qwen_benchmark_warmup_started`
+- `local_qwen_benchmark_measure_started`
+- `mnn_runtime_config_merged`
+- `mnn_prefill_completed`
+- `mnn_decode_progress`
 - `local_qwen_benchmark_completed`
 - `local_qwen_benchmark_failed`
 
-如果 `am start` 命中了当前前台 `MainActivity` 实例，benchmark 会走 `onNewIntent()`；如果是新实例启动，则走 `onCreate()`。
-
-## 当前实测
-
-### 设备
+## Device
 
 - Device: `RMX3562`
-- SoC: `Dimensity 8200` 系列
+- SoC: `Dimensity 8200` series
 - App package: `com.xiaoqi.companion.debug`
 
-### Qwen3.5-4B-MNN
+## Current Conclusions
 
-测试配置：
+- `Qwen3.5-0.8B-MNN` is the current **fast path** and fits primary chat better.
+- `Qwen3.5-4B-MNN` should stay on **CPU + threadNum=4** for now.
+- `Qwen3.5-0.8B-MNN` benefits from `backendType=opencl` on this device.
+- `Qwen3.5-4B-MNN` does **not** currently benefit from `backendType=opencl`.
+
+## Current Results
+
+### 4B / CPU / smoke
+
+Config:
 
 - `model_name`: `Qwen3.5-4B-MNN`
 - `prompt_len`: `32`
@@ -114,54 +129,159 @@ files/benchmarks/local-qwen-benchmark.error.txt
 - `backendType`: `cpu`
 - `precision`: `low`
 
-实测结果：
+Measured:
 
-- `loadUs`: `10,918,355` us, 约 `10.9 s`
-- `prefillUs`: `4,889,600` us
-- `decodeUs`: `10,025,458` us
-- `prefillTokensPerSecond`: `17.997`
-- `decodeTokensPerSecond`: `5.187`
+- `prefillUs`: `3,937,784`
+- `decodeUs`: `2,250,212`
+- `loadUs`: `388,967`
+- `prefillTokensPerSecond`: `22.348`
+- `decodeTokensPerSecond`: `3.555`
 
-结果来源：
+### 4B / CPU / thread sweep
 
-- [local-qwen-benchmark.json](</d:/C/Desktop/ai/android/docs/plan/visual-audit-assets/local-qwen-benchmark.json>)
+`prompt_len=32`, `decode_len=8`, `warmup=1`, `measure=1`
 
-### 0.8B 旧基线（llm_bench）
+| threadNum | backend | prefillUs | decodeUs | prefillTPS | decodeTPS |
+|---|---|---:|---:|---:|---:|
+| 4 | cpu | 3,937,784 | 2,250,212 | 22.348 | 3.555 |
+| 6 | cpu | 4,312,324 | 3,701,745 | 20.407 | 2.161 |
+| 8 | cpu | 4,167,061 | 3,037,098 | 21.118 | 2.634 |
 
-这是早期外部 `llm_bench` 路径的 CPU 结果，可作为量级参考，不等同于当前主 App 进程 benchmark：
+Interpretation:
 
-- `pp256`: `190.71 tok/s`
-- `tg64`: `19.19 tok/s`
-- `loadingTime`: `1.59 - 1.88 s`
+- `threadNum=4` is best on this device for 4B CPU
+- increasing threads hurts decode noticeably
 
-来源：
+### 4B / OpenCL / smoke
 
-- `docs/plan/visual-audit-assets/llm_bench.stdout.txt`
+Config:
 
-## 解读
+- `model_name`: `Qwen3.5-4B-MNN`
+- `prompt_len`: `32`
+- `decode_len`: `8`
+- `warmup_runs`: `1`
+- `measure_runs`: `1`
+- `threadNum`: `4`
+- `backendType`: `opencl`
+- `precision`: `low`
 
-1. 当前 4B benchmark 已经打通到“主 App 进程真实加载并返回 JSON”。
-2. `load` 时间明显高于 0.8B，这是符合预期的。
-3. 当前 `prompt_len=32` / `decode_len=8` 更适合做链路验证与参数回归，不适合直接拿去做比赛级最终性能口径。
-4. 若要做正式横向对比，建议至少固定：
-   - 同一设备
-   - 同一线程数
-   - 同一 backend
-   - 同一 prompt/decode 参数
-   - warmup 与 measured runs 分开记录
+Measured:
 
-## 建议下一步
+- `prefillUs`: `15,501,447`
+- `decodeUs`: `3,045,127`
+- `loadUs`: `435,409`
+- `prefillTokensPerSecond`: `5.677`
+- `decodeTokensPerSecond`: `2.627`
 
-建议补两组标准档位：
+Interpretation:
 
-1. `smoke`
-   - `prompt_len=32`
-   - `decode_len=8`
-   - 用于验证链路是否通
+- OpenCL is functional in app benchmark
+- but it is much worse than CPU for 4B on this device
 
-2. `report`
-   - `prompt_len=256`
-   - `decode_len=64`
-   - `warmup_runs=1`
-   - `measure_runs=3`
-   - 用于后续文档、比赛材料和回归比较
+Source:
+
+- [4B OpenCL smoke](</d:/C/Desktop/ai/android/docs/plan/visual-audit-assets/local-qwen-benchmark-app-Qwen3.5-4B-MNN-opencl-t4-p32-d8-20260617-125339.json>)
+
+### 4B / CPU / report
+
+Config:
+
+- `model_name`: `Qwen3.5-4B-MNN`
+- `prompt_len`: `256`
+- `decode_len`: `64`
+- `warmup_runs`: `1`
+- `measure_runs`: `3`
+- `threadNum`: `4`
+- `backendType`: `cpu`
+
+Measured average:
+
+- `promptTokens`: `439`
+- `completionTokens`: `50`
+- `prefillUs`: `16,801,127`
+- `decodeUs`: `13,941,270`
+- `loadUs`: `360,470`
+- `prefillTokensPerSecond`: `26.129`
+- `decodeTokensPerSecond`: `3.586`
+
+Interpretation:
+
+- 4B can run end to end in the real app path
+- decode is still too slow for primary chat UX
+
+### 0.8B / CPU / smoke
+
+Config:
+
+- `model_name`: `Qwen3.5-0.8B-MNN`
+- `prompt_len`: `32`
+- `decode_len`: `8`
+- `warmup_runs`: `1`
+- `measure_runs`: `1`
+- `threadNum`: `4`
+- `backendType`: `cpu`
+- `precision`: `low`
+
+Measured:
+
+- `prefillUs`: `575,836`
+- `decodeUs`: `223,883`
+- `loadUs`: `324,848`
+- `prefillTokensPerSecond`: `152.821`
+- `decodeTokensPerSecond`: `35.733`
+
+Source:
+
+- [0.8B CPU smoke](</d:/C/Desktop/ai/android/docs/plan/visual-audit-assets/local-qwen-benchmark-app-Qwen3.5-0.8B-MNN-cpu-t4-p32-d8-20260617-124740.json>)
+
+### 0.8B / OpenCL / smoke
+
+Config:
+
+- `model_name`: `Qwen3.5-0.8B-MNN`
+- `prompt_len`: `32`
+- `decode_len`: `8`
+- `warmup_runs`: `1`
+- `measure_runs`: `1`
+- `threadNum`: `4`
+- `backendType`: `opencl`
+- `precision`: `low`
+
+Measured:
+
+- `prefillUs`: `2,362,492`
+- `decodeUs`: `965,349`
+- `loadUs`: `355,123`
+- `prefillTokensPerSecond`: `37.249`
+- `decodeTokensPerSecond`: `8.287`
+
+Source:
+
+- [0.8B OpenCL smoke](</d:/C/Desktop/ai/android/docs/plan/visual-audit-assets/local-qwen-benchmark-app-Qwen3.5-0.8B-MNN-opencl-t4-p32-d8-20260617-125128.json>)
+
+## How To Use This In Aura
+
+Recommended product split right now:
+
+1. `Qwen3.5-0.8B-MNN`
+   - primary chat
+   - quick reaction
+   - high-frequency interaction
+
+2. `Qwen3.5-4B-MNN`
+   - low-frequency heavy tasks
+   - summary
+   - insight extraction
+   - dream / background generation
+
+3. `backendType`
+   - `0.8B`: keep testing CPU vs OpenCL, but do not assume GPU wins without clean repeated runs
+   - `4B`: keep `cpu`
+
+## Recommended Next Steps
+
+1. Add repeated runs for `0.8B cpu/opencl` to confirm whether OpenCL wins consistently or only in some runs.
+2. Add a business-shaped benchmark pair:
+   - `chat_short`
+   - `insight_long`
+3. Keep `4B` on `cpu + threadNum=4` unless a future backend path proves better.

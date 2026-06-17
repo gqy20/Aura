@@ -77,6 +77,19 @@ class MainActivity : ComponentActivity() {
             warmupRuns = intent.getIntExtra(EXTRA_WARMUP_RUNS, DEFAULT_WARMUP_RUNS),
             measureRuns = intent.getIntExtra(EXTRA_MEASURE_RUNS, DEFAULT_MEASURE_RUNS),
             threadNum = intent.getIntExtra(EXTRA_THREAD_NUM, DEFAULT_THREAD_NUM).takeIf { it > 0 },
+            backendType = intent.getStringExtra(EXTRA_BACKEND_TYPE)?.takeIf { it.isNotBlank() },
+            precision = intent.getStringExtra(EXTRA_PRECISION)?.takeIf { it.isNotBlank() },
+            memory = intent.getStringExtra(EXTRA_MEMORY)?.takeIf { it.isNotBlank() },
+        )
+        AppLogger.info(
+            LogTags.LocalModel,
+            "local_qwen_benchmark_request_parsed",
+            "model" to request.modelName,
+            "threadNum" to request.threadNum,
+            "backendType" to request.backendType,
+            "precision" to request.precision,
+            "memory" to request.memory,
+            "decodeTokens" to request.decodeTokens,
         )
         benchmarkScope.launch(Dispatchers.IO) {
             runCatching {
@@ -96,6 +109,7 @@ class MainActivity : ComponentActivity() {
                         "Benchmark done: ${result.modelName}",
                         Toast.LENGTH_SHORT,
                     ).show()
+                    finishAndRemoveTask()
                 }
             }.onFailure { throwable ->
                 LocalQwenBenchmarkRunner(applicationContext).writeFailure(throwable)
@@ -110,6 +124,7 @@ class MainActivity : ComponentActivity() {
                         "Benchmark failed: ${throwable.message ?: throwable::class.java.simpleName}",
                         Toast.LENGTH_LONG,
                     ).show()
+                    finishAndRemoveTask()
                 }
             }
         }
@@ -125,6 +140,9 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_WARMUP_RUNS = "warmupRuns"
         const val EXTRA_MEASURE_RUNS = "measureRuns"
         const val EXTRA_THREAD_NUM = "threadNum"
+        const val EXTRA_BACKEND_TYPE = "backendType"
+        const val EXTRA_PRECISION = "precision"
+        const val EXTRA_MEMORY = "memory"
         const val DEFAULT_PROMPT_TOKENS = 256
         const val DEFAULT_DECODE_TOKENS = 64
         const val DEFAULT_WARMUP_RUNS = 1

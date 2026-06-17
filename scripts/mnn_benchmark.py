@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import platform
@@ -36,6 +37,12 @@ APP_PACKAGE_DEFAULT = "com.xiaoqi.companion.debug"
 APP_ACTIVITY_DEFAULT = "com.xiaoqi.companion.MainActivity"
 BENCHMARK_ACTION = "com.xiaoqi.companion.action.RUN_LOCAL_QWEN_BENCHMARK"
 DEBUG_APK_DEFAULT = Path("app/build/outputs/apk/debug/app-debug.apk")
+
+
+def benchmark_output_name(args: argparse.Namespace) -> str:
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    model = re.sub(r"[^A-Za-z0-9._-]+", "_", args.model_name)
+    return f"local-qwen-benchmark-{args.mode}-{model}-{args.backend}-t{args.threads}-p{args.prompt_len}-d{args.decode_len}-{stamp}.json"
 
 
 def run(cmd: list[str], *, check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
@@ -415,6 +422,15 @@ def run_app(args: argparse.Namespace) -> dict:
         "--ei",
         "threadNum",
         str(args.threads),
+        "--es",
+        "backendType",
+        str(args.backend),
+        "--es",
+        "precision",
+        str(args.precision_name),
+        "--es",
+        "memory",
+        str(args.memory_name),
     ]
     proc = run(start_cmd, check=False, capture=True)
     (out_dir / "app-benchmark.stdout.txt").write_text(proc.stdout or "", encoding="utf-8")
@@ -430,7 +446,7 @@ def run_app(args: argparse.Namespace) -> dict:
     if not json_ready and not error_ready:
         raise RuntimeError(f"Timed out waiting for benchmark result after {args.timeout_s}s")
 
-    local_json = out_dir / "local-qwen-benchmark.json"
+    local_json = out_dir / benchmark_output_name(args)
     if error_ready:
         local_error = out_dir / "local-qwen-benchmark.error.txt"
         adb_exec_out(
@@ -481,6 +497,10 @@ def main() -> int:
     p.add_argument("--skip-build-install", action="store_true")
     args = p.parse_args()
     args = apply_yaml_defaults(args)
+    precision_names = {0: "high", 1: "normal", 2: "low"}
+    memory_names = {0: "high", 1: "normal", 2: "low"}
+    args.precision_name = precision_names.get(args.precision, str(args.precision))
+    args.memory_name = memory_names.get(args.memory, str(args.memory))
 
     if args.mode == "mnn" and not args.model_dir:
         args.model_dir = r"D:\C\Desktop\ai\android\tmp-adb-model"

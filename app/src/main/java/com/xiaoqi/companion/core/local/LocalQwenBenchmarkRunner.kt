@@ -18,6 +18,9 @@ data class LocalQwenBenchmarkRequest(
     val warmupRuns: Int = 1,
     val measureRuns: Int = 3,
     val threadNum: Int? = null,
+    val backendType: String? = null,
+    val precision: String? = null,
+    val memory: String? = null,
 )
 
 @Serializable
@@ -86,6 +89,9 @@ class LocalQwenBenchmarkRunner(
         val defaultConfig = MnnInferenceConfig.forCurrentDevice()
         val runtimeConfig = defaultConfig.copy(
             threadNum = request.threadNum ?: defaultConfig.threadNum,
+            backendType = request.backendType ?: defaultConfig.backendType,
+            precision = request.precision ?: defaultConfig.precision,
+            memory = request.memory ?: defaultConfig.memory,
             maxNewTokens = request.decodeTokens,
             temperature = 0.4f,
         )
@@ -98,6 +104,9 @@ class LocalQwenBenchmarkRunner(
                 "local_qwen_benchmark_load_started",
                 "model" to modelName,
                 "threadNum" to runtimeConfig.threadNum,
+                "backendType" to runtimeConfig.backendType,
+                "precision" to runtimeConfig.precision,
+                "memory" to runtimeConfig.memory,
                 "maxNewTokens" to runtimeConfig.maxNewTokens,
             )
             bridge.load(configFile.absolutePath, runtimeConfig.toJson())
