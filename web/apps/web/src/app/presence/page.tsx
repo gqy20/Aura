@@ -55,7 +55,6 @@ export default function PresencePage() {
       active="presence"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(124, 92, 255, 0.18), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(92, 167, 255, 0.10), transparent 60%), #08090a"
       hideMeta
-      hideAnnouncement
       heroStage={
         <HeroStage
           variant="presence"

@@ -50,7 +50,6 @@ export default function MemoryPage() {
       active="memory"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 255, 176, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(92, 239, 255, 0.10), transparent 60%), #08090a"
       hideMeta
-      hideAnnouncement
       heroStage={
         <HeroStage
           variant="memory"

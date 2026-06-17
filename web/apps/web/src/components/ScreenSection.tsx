@@ -16,9 +16,8 @@ export function ScreenSection({
 }: ScreenSectionProps) {
   return (
     <section
-      data-snap
       className={cn(
-        'h-[100svh] overflow-hidden px-6 py-16 sm:px-10 lg:px-16',
+        'h-[100svh] snap-start snap-always overflow-hidden px-6 py-16 sm:px-10 lg:px-16',
         className,
       )}
     >

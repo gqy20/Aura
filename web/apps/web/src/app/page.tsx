@@ -4,10 +4,8 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { motion } from 'motion/react'
 import { SplitText } from '@/components/SplitText'
-import { SmoothScroll } from '@/components/SmoothScroll'
 import { ScrollSection } from '@/components/ScrollSection'
 import { MagneticCursor } from '@/components/MagneticCursor'
-import { AnnouncementBar } from '@/components/AnnouncementBar'
 import { Reveal } from '@/components/Reveal'
 import { AuraLogo } from '@/components/AuraLogo'
 import { ScreenSection } from '@/components/ScreenSection'
@@ -23,57 +21,50 @@ const PhoneOrb = dynamic(
 
 export default function Home() {
   return (
-    <SmoothScroll>
+    <>
       <MagneticCursor />
-      <main
-        className="relative min-h-screen overflow-x-clip"
-        style={{ ['--home-top-h' as string]: '7.25rem' }}
-      >
+      <main className="relative min-h-screen overflow-x-clip">
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-20"
           style={{ background: '#08090a' }}
         />
 
-        <div className="px-6 sm:px-10 lg:px-16">
-          <AnnouncementBar />
-          <motion.nav
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="flex h-20 items-center justify-between"
-          >
-            <Link href="/" className="flex items-center gap-2" aria-label="Aura home">
-              <AuraLogo size={28} />
-              <span className="font-mono text-sm font-medium tracking-tight">
-                Aura<span className="text-accent">.</span>
-              </span>
-            </Link>
-            <div className="flex items-center gap-6 text-sm sm:gap-8">
-              <Link href="/presence" className="text-muted transition-colors hover:text-foreground">
-                Presence
+        {/* 首屏（snap，整屏 100svh）：nav + hero */}
+        <section className="relative flex h-[100svh] snap-start snap-always flex-col overflow-hidden">
+          <div className="px-6 sm:px-10 lg:px-16">
+            <motion.nav
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="flex h-20 items-center justify-between"
+            >
+              <Link href="/" className="flex items-center gap-2" aria-label="Aura home">
+                <AuraLogo size={28} />
+                <span className="font-mono text-sm font-medium tracking-tight">
+                  Aura<span className="text-accent">.</span>
+                </span>
               </Link>
-              <Link href="/memory" className="text-muted transition-colors hover:text-foreground">
-                Memory
-              </Link>
-              <Link href="/agent" className="text-muted transition-colors hover:text-foreground">
-                Agent
-              </Link>
-              <Link href="/tech" className="text-muted transition-colors hover:text-foreground">
-                Tech
-              </Link>
-              <Link href="https://github.com/gqy20/Aura" className="text-muted transition-colors hover:text-foreground">
-                GitHub ↗
-              </Link>
-            </div>
-          </motion.nav>
-        </div>
+              <div className="flex items-center gap-6 text-sm sm:gap-8">
+                <Link href="/presence" className="text-muted transition-colors hover:text-foreground">
+                  Presence
+                </Link>
+                <Link href="/memory" className="text-muted transition-colors hover:text-foreground">
+                  Memory
+                </Link>
+                <Link href="/agent" className="text-muted transition-colors hover:text-foreground">
+                  Agent
+                </Link>
+                <Link href="/tech" className="text-muted transition-colors hover:text-foreground">
+                  Tech
+                </Link>
+                <Link href="https://github.com/gqy20/Aura" className="text-muted transition-colors hover:text-foreground">
+                  GitHub ↗
+                </Link>
+              </div>
+            </motion.nav>
+          </div>
 
-        {/* 首屏（snap）：hero + data strip — 固定高度，防止内容撑高导致 snap 后看到上一屏 */}
-        <section
-          data-snap
-          className="relative flex h-[calc(100svh-var(--home-top-h))] flex-col overflow-hidden"
-        >
           <div className="relative flex flex-1 items-center px-6 py-12 sm:px-10 lg:px-16">
             <div
               className="pointer-events-none absolute inset-0 hidden md:block"
@@ -164,25 +155,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          <div className="border-t border-border py-8">
-            <dl className="grid grid-cols-1 gap-4 px-6 sm:grid-cols-3 sm:px-10 lg:px-16">
-              {[
-                { label: '双心智智能体', value: 'Cloud + Local' },
-                { label: '陪伴运行时', value: 'Dream Loop' },
-                { label: '生活能力', value: 'MCP' },
-              ].map((stat, i) => (
-                <Reveal
-                  key={stat.label}
-                  delay={i * 100}
-                  className="flex items-end justify-between gap-4 border-b border-border/60 pb-3 sm:block sm:border-b-0 sm:pb-0"
-                >
-                  <dt className="text-2xl font-medium tracking-tight sm:text-3xl">{stat.value}</dt>
-                  <dd className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">{stat.label}</dd>
-                </Reveal>
-              ))}
-            </dl>
-          </div>
         </section>
 
         {/* 第二、三屏：滚动叙事 */}
@@ -201,8 +173,8 @@ export default function Home() {
           />
         </div>
 
-        {/* 第四屏：四个方向导航 */}
-        <ScreenSection className="border-t border-border" innerClassName="max-w-[1280px] justify-center">
+        {/* 第四屏：四个方向导航 + 底部 footer */}
+        <ScreenSection className="border-t border-border" innerClassName="max-w-[1280px]">
           <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-16">
             <div className="md:col-span-4">
               <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">next</span>
@@ -239,16 +211,13 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </ScreenSection>
 
-        {/* footer 非 snap */}
-        <section className="border-t border-border px-6 py-10 sm:px-10 lg:px-16">
-          <div className="flex items-center justify-between font-mono text-xs text-muted">
+          <div className="mt-auto flex items-center justify-between border-t border-border pt-6 font-mono text-xs text-muted">
             <span>© 2026 Aura · 开源</span>
             <span>Home · Presence · Memory · Agent · Tech</span>
           </div>
-        </section>
+        </ScreenSection>
       </main>
-    </SmoothScroll>
+    </>
   )
 }

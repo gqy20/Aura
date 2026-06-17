@@ -69,7 +69,6 @@ export default function AgentPage() {
       active="agent"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 124, 156, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(160, 92, 255, 0.10), transparent 60%), #08090a"
       hideMeta
-      hideAnnouncement
       heroStage={
         <HeroStage
           variant="agent"

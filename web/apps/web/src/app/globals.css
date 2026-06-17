@@ -98,6 +98,8 @@
 }
 
 html {
+  /* 原生 CSS scroll-snap — 一次一屏，浏览器原生物理，零 JS 开销 */
+  scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

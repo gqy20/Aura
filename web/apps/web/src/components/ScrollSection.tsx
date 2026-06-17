@@ -11,9 +11,7 @@ interface ScrollSectionProps {
 }
 
 /**
- * 滚动叙事段落
- * - Reveal 替代 motion whileInView 做入场动画（默认可见 + 进入视口时跑）
- * - 内层 motion.div 保留 useScroll + useTransform 做视差（MotionValue 必须用 motion 组件）
+ * 滚动叙事段落 — 原生 CSS snap，每个 section 整屏 100svh
  */
 export function ScrollSection({ number, title, description }: ScrollSectionProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -27,8 +25,7 @@ export function ScrollSection({ number, title, description }: ScrollSectionProps
   return (
     <section
       ref={ref}
-      data-snap
-      className="relative flex h-[100svh] items-center overflow-hidden px-6 py-20 sm:px-10 lg:px-16"
+      className="relative flex h-[100svh] snap-start snap-always items-center overflow-hidden px-6 py-20 sm:px-10 lg:px-16"
     >
       <Reveal duration={800} className="mx-auto w-full max-w-[1280px]">
         <motion.div
