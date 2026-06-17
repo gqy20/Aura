@@ -18,7 +18,7 @@ interface FeatureShellProps {
   /** 副标题 */
   subtitle: string
   /** 当前页标识（用于 nav 高亮） */
-  active: 'presence' | 'memory' | 'agent'
+  active: 'presence' | 'memory' | 'agent' | 'tech'
   /** 主内容 */
   children: ReactNode
   /** 整页 extra className */

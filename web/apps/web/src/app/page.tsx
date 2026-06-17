@@ -82,7 +82,13 @@ export default function Home() {
                 Agent
               </Link>
               <Link
-                href="https://github.com"
+                href="/tech"
+                className="text-muted transition-colors hover:text-foreground"
+              >
+                Tech
+              </Link>
+              <Link
+                href="https://github.com/gqy20/Aura"
                 className="text-muted transition-colors hover:text-foreground"
               >
                 GitHub ↗
@@ -124,12 +130,12 @@ export default function Home() {
                   transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
                   className="mb-12 font-mono text-xs uppercase tracking-[0.2em] text-muted"
                 >
-                  v0 · 即将上线
+                  Android AI Companion
                 </motion.p>
 
                 <h1 className="relative z-10 max-w-xl text-balance text-5xl font-medium leading-[1.05] tracking-tight sm:text-6xl md:text-6xl lg:text-7xl">
                   <span className="block">
-                    <SplitText text="与你同行的" stagger={0.045} delay={0.4} />
+                    <SplitText text="长期认识你的" stagger={0.045} delay={0.4} />
                   </span>
                   <span className="block">
                     <SplitText
@@ -146,7 +152,7 @@ export default function Home() {
                   transition={{ duration: 0.8, delay: 1.6, ease: [0.22, 1, 0.36, 1] }}
                   className="mt-10 max-w-xl text-pretty text-lg leading-relaxed text-muted sm:text-xl"
                 >
-                  Aura 是一款 AI 陪伴应用，把存在感、记忆与本地大模型装进你的口袋。
+                  Aura 不把所有能力都塞给一个模型，而是把对外办事、对内理解和长期陪伴拆成不同层次，让记忆、洞察与生活建议在手机里持续发生。
                 </motion.p>
 
                 <motion.div
@@ -209,9 +215,9 @@ export default function Home() {
           <section className="border-t border-border py-12">
             <dl className="grid grid-cols-2 gap-x-12 gap-y-8 px-6 sm:grid-cols-3 sm:px-10 lg:px-16">
               {[
-                { label: '模块数', value: '7' },
-                { label: 'Kotlin 代码行', value: '12k+' },
-                { label: '许可证', value: 'MIT' },
+                { label: '双心智智能体', value: 'Cloud + Local' },
+                { label: '陪伴运行时', value: 'Dream Loop' },
+                { label: '生活能力', value: 'MCP' },
               ].map((stat, i) => (
                 <Reveal
                   key={stat.label}
@@ -234,21 +240,82 @@ export default function Home() {
         <div className="border-t border-border">
           <ScrollSection
             number="01"
-            title="永远在那，从不打扰。"
-            description="Aura 不只是聊天工具，而是一个有「存在感」的陪伴体。它能感知你的设备状态、情绪、时间，适时地响应或沉默。"
+            title="它不只在你发消息时出现。"
+            description="Presence、Reaction 与 Dream Loop 共同构成 Aura 的陪伴运行时。它会等待、倾听、整理，再在合适的时候回到你身边。"
           />
           <div className="border-t border-border" />
           <ScrollSection
             number="02"
-            title="它替你记住一切。"
-            description="每一次对话都被结构化地保存，不是简单日志，而是可被 LLM 调用的记忆图谱。从早安到晚安，从今天到明年。"
+            title="它不是记住一句话，而是在理解你。"
+            description="记忆、洞察、来源线索与用户控制共同构成 Aura 的可信个人模型，而不是黑盒人格画像。"
           />
         </div>
+
+        <section className="border-t border-border px-6 py-20 sm:px-10 lg:px-16">
+          <div className="flex items-end justify-between border-b border-border pb-4">
+            <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
+              继续往下看
+            </h2>
+            <span className="font-mono text-xs text-muted">
+              分层浏览
+            </span>
+          </div>
+          <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
+            如果你想继续了解 Aura，可以顺着四个方向往下看：它如何在场、如何理解你、如何连接真实生活，以及这套体验到底怎么被做出来。
+          </p>
+
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                href: '/presence',
+                label: 'Presence',
+                title: '它如何持续在场',
+                desc: '从状态、反应和节制开始，看它为什么像一个会陪着你的存在。',
+              },
+              {
+                href: '/memory',
+                label: 'Memory',
+                title: '它如何逐渐理解你',
+                desc: '从记忆、摘要和用户控制开始，看它如何慢慢形成对你的理解。',
+              },
+              {
+                href: '/agent',
+                label: 'Agent',
+                title: '它如何从聊天走向行动',
+                desc: '从工具层、MCP 和生活能力开始，看它怎样把对话接到现实世界。',
+              },
+              {
+                href: '/tech',
+                label: 'Tech',
+                title: '这套体验如何被做出来',
+                desc: '从架构、执行路径和系统边界开始，看这套体验背后的真实技术方案。',
+              },
+            ].map((item, index) => (
+              <Reveal
+                key={item.href}
+                delay={index * 70}
+                className="rounded-xl border border-border p-6"
+              >
+                <Link href={item.href} className="group block">
+                  <p className="font-mono text-xs uppercase tracking-[0.18em] text-accent">
+                    {item.label}
+                  </p>
+                  <h3 className="mt-3 text-lg font-medium text-foreground transition-colors group-hover:text-accent">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
+                    {item.desc}
+                  </p>
+                </Link>
+              </Reveal>
+            ))}
+          </div>
+        </section>
 
         {/* ─── Footer ─── */}
         <footer className="flex items-center justify-between border-t border-border px-6 py-8 font-mono text-xs text-muted sm:px-10 lg:px-16">
           <span>© 2026 Aura · 开源</span>
-          <span>P2 · 三个特性深度页</span>
+          <span>Home · Presence · Memory · Agent · Tech</span>
         </footer>
       </main>
     </SmoothScroll>

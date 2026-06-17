@@ -57,8 +57,8 @@ export default function MemoryPage() {
     <FeatureShell
       number="02"
       category="System"
-      title="与你一起成长的记忆。"
-      subtitle="每一次对话都被结构化地保存，不是简单日志，而是可被 LLM 调用的记忆图谱。Aura 记得你今天穿的衬衫，也记得你三年前的梦想。"
+      title="它不是记住一句话，而是在理解你。"
+      subtitle="Aura 不把你变成一份黑盒画像。它把对话、情绪、视觉内容和摘要沉淀成一个可信、可修正、可控制的个人模型。"
       active="memory"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 255, 176, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(92, 239, 255, 0.10), transparent 60%), #08090a"
       hideMeta
@@ -94,12 +94,28 @@ export default function MemoryPage() {
           </>
         }
         stats={[
-          { n: '3', label: '记忆类', desc: 'MemoryType · FACT/EPISODE/PROCEDURAL' },
-          { n: '5', label: '摘要类', desc: 'SummaryType · DAILY/SESSION/TOPIC/PROJECT/RELATIONSHIP' },
-          { n: '9', label: '核心列', desc: 'type / importance / confidence / pinned / archived / expiresAt / sensitivity / lastAccessed / sourceMessageIds' },
+          { n: '3', label: '记忆类', desc: '事实、事件、偏好三类长期记忆' },
+          { n: '5', label: '摘要类', desc: '每日、会话、主题、项目、关系五类摘要' },
+          { n: '可信', label: '边界', desc: '来源可追溯、结论可修正、用户可控制' },
         ]}
-        caption="3 MemoryType × 5 SummaryType · Room SQLite + indices on type/lastAccessed/pinned/archived"
+        caption="记忆、摘要与用户控制一起构成 Aura 的长期个人模型"
       />
+
+      {/* ─── 可信个人模型 ─── */}
+      <section className="mt-32 px-6 sm:px-10 lg:px-16">
+        <div className="flex items-end justify-between border-b border-border pb-4">
+          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
+            可信个人模型
+          </h2>
+          <span className="font-mono text-xs text-muted">
+            来源 · 置信度 · 控制
+          </span>
+        </div>
+        <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
+          Aura 的记忆不是“我好像记得你说过什么”，而是把事实、事件、情绪和视觉内容沉淀成可追溯的数据层。
+          它会保留线索，也给用户反悔和修正的权利。
+        </p>
+      </section>
 
       {/* ─── MemoryType 详解 ─── */}
       <section className="mt-32 px-6 sm:px-10 lg:px-16">
@@ -112,9 +128,7 @@ export default function MemoryPage() {
           </span>
         </div>
         <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
-          Memory 不是黑盒。Room 数据库中每条记忆都有 type / importance /
-          confidence / pinned / archived 字段，Agent
-          通过结构化检索调用，绝不靠"模糊匹配"。
+          每条记忆都不是一段松散文本。Aura 会区分事实、事件和偏好，让后续检索、摘要和主动 Insight 都建立在结构化基础上。
         </p>
 
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -188,7 +202,7 @@ export default function MemoryPage() {
       <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            存储分布
+            记忆如何逐渐长大
           </h2>
           <span className="font-mono text-xs text-muted">
             本地 SQLite · 281 条记录 · 演示
@@ -201,7 +215,7 @@ export default function MemoryPage() {
               分布
             </p>
             <p className="mt-2 text-sm text-muted">
-              FACT 占主体，PROCEDURAL 靠日常积累。Summary 跨层索引，避免重复。
+              FACT 是基础，EPISODE 是轨迹，PROCEDURAL 是习惯。Summary 负责跨会话压缩和重新组织理解。
             </p>
           </div>
 
@@ -269,7 +283,7 @@ export default function MemoryPage() {
       <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            每个字段都有意义
+            每个字段都在约束它如何理解你
           </h2>
           <span className="font-mono text-xs text-muted">
             MemoryEntity · 9 核心列

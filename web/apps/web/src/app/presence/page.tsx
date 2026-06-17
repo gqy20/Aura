@@ -54,8 +54,8 @@ export default function PresencePage() {
     <FeatureShell
       number="01"
       category="Capability"
-      title="始终在线的陪伴感。"
-      subtitle="Aura 不只是一个聊天工具，而是一个有「存在感」的陪伴体。它能感知你的设备状态、情绪、时间，适时地响应或沉默——而且不打扰你。"
+      title="它不只在你发消息时出现。"
+      subtitle="Aura 的陪伴感来自一套持续在场的运行时：它会倾听、思考、记住、回归，也会在不该打扰你的时候安静下来。"
       active="presence"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(124, 92, 255, 0.18), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(92, 167, 255, 0.10), transparent 60%), #08090a"
       hideMeta
@@ -92,24 +92,25 @@ export default function PresencePage() {
           color: currentState.color,
         }}
         stats={[
-          { n: '11', label: '状态', desc: 'PresenceMode 11 种' },
-          { n: '5', label: '反应', desc: 'Reaction 5 种节流' },
-          { n: '3', label: '规则', desc: 'shouldShow 3 条规则' },
+          { n: '11', label: '状态', desc: '听、想、说、记、累、恢复等 11 种 PresenceMode' },
+          { n: '5', label: '反应', desc: '点击、回归、记忆保存、搜索、错误恢复' },
+          { n: '24h', label: '在场', desc: '不是一段回复，而是一整天都能感知的状态流' },
         ]}
-        caption={`${currentState.description} · 实时状态`}
+        caption={`${currentState.description} · Aura 当前如何在场`}
       />
 
-      {/* ─── 状态推导 + 节流规则 ─── */}
+      {/* ─── 陪伴运行时：状态推导 + 节流规则 ─── */}
       <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">
           {/* 左：状态推导 */}
           <div className="md:col-span-7">
             <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-              状态推导 · 5 步
+              陪伴运行时，不只是聊天气泡
             </h2>
             <p className="mt-4 text-pretty leading-relaxed text-muted">
-              <code className="font-mono text-xs">PresenceController.derive</code>{' '}
-              从 14 个输入信号推导 11 个状态，按优先级覆盖。
+              Aura 会根据输入、流式回复、工具状态、情绪和关系变化持续调整自己的在场方式。
+              <code className="font-mono text-xs"> PresenceController.derive</code>{' '}
+              把这些信号收束成用户真正能感受到的状态。
             </p>
 
             <ol className="mt-8 space-y-4">
@@ -164,11 +165,11 @@ export default function PresencePage() {
           {/* 右：节流规则 */}
           <div className="md:col-span-5">
             <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-              反应节流 · 3 规则
+              它为什么不会打扰你
             </h2>
             <p className="mt-4 text-pretty leading-relaxed text-muted">
-              <code className="font-mono text-xs">PresenceReactionPolicy.shouldShow</code>{' '}
-              用 3 条规则决定该呈现什么反应。
+              Presence 不是越热闹越好。<code className="font-mono text-xs">PresenceReactionPolicy.shouldShow</code>{' '}
+              用冷却、优先级和任务态过滤，决定什么时候该出现、什么时候该安静。
             </p>
 
             <ol className="mt-8 space-y-4">
@@ -216,7 +217,7 @@ export default function PresencePage() {
       <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            24 小时状态时间线
+            24 小时在场时间线
           </h2>
           <span className="font-mono text-xs text-muted">示例 · 模拟数据</span>
         </div>
@@ -229,7 +230,7 @@ export default function PresencePage() {
                 时间线
               </p>
               <p className="mt-2 text-sm text-muted">
-                一天 8 个关键时刻的状态切换
+                一天 8 个关键时刻里，Aura 如何从倾听、思考、记忆到休息
               </p>
             </div>
 
@@ -245,7 +246,7 @@ export default function PresencePage() {
       <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            反应节流策略
+            节制的反应策略
           </h2>
           <span className="font-mono text-xs text-muted">
             反应策略 · 3 规则 + 5 状态条件
@@ -317,7 +318,7 @@ export default function PresencePage() {
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             { href: '/memory', label: '记忆系统', desc: 'Aura 如何记住你' },
-            { href: '/local-llm', label: '本地大模型', desc: '端侧推理' },
+            { href: '/tech', label: '技术方案', desc: 'Aura 如何跑起来' },
             { href: '/', label: '← 返回首页', desc: 'Aura 总览' },
           ].map((link) => (
             <a

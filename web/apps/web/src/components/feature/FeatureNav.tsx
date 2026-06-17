@@ -7,13 +7,14 @@ import { AuraLogo } from '@/components/AuraLogo'
 
 interface FeatureNavProps {
   /** 当前页路径，用于高亮 */
-  active?: 'home' | 'presence' | 'memory' | 'agent'
+  active?: 'home' | 'presence' | 'memory' | 'agent' | 'tech'
 }
 
 const NAV_LINKS = [
   { href: '/presence', label: 'Presence', key: 'presence' as const },
   { href: '/memory', label: 'Memory', key: 'memory' as const },
   { href: '/agent', label: 'Agent', key: 'agent' as const },
+  { href: '/tech', label: 'Tech', key: 'tech' as const },
 ]
 
 /**
@@ -62,7 +63,7 @@ export function FeatureNav({ active = 'home' }: FeatureNavProps) {
           )
         })}
         <Link
-          href="https://github.com"
+          href="https://github.com/gqy20/Aura"
           className="text-muted transition-colors hover:text-foreground"
         >
           GitHub ↗

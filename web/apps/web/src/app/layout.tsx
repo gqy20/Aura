@@ -24,23 +24,23 @@ const instrumentSerif = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Aura — 与你同行的 AI 陪伴',
+    default: 'Aura — 长期认识你的 AI 陪伴',
     template: '%s · Aura',
   },
   description:
-    'Aura 是一款 Android 上的 AI 陪伴应用，把存在感、记忆和本地大模型装进你的口袋。',
+    'Aura 是一款 Android AI 陪伴应用，把对外办事、对内理解和长期陪伴组织成一个持续运行的体验。',
   applicationName: 'Aura',
   authors: [{ name: 'Aura 团队' }],
   keywords: ['Aura', 'AI 陪伴', 'Android', 'Koog', 'LLM', '本地大模型', '记忆系统'],
   openGraph: {
-    title: 'Aura — 与你同行的 AI 陪伴',
-    description: '存在感、记忆与本地大模型，融于掌心。',
+    title: 'Aura — 长期认识你的 AI 陪伴',
+    description: '让记忆、洞察与生活建议在手机里持续发生。',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Aura — 与你同行的 AI 陪伴',
-    description: '存在感、记忆与本地大模型，融于掌心。',
+    title: 'Aura — 长期认识你的 AI 陪伴',
+    description: '让记忆、洞察与生活建议在手机里持续发生。',
   },
   icons: {
     icon: '/favicon.svg',

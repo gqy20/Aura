@@ -65,8 +65,8 @@ export default function AgentPage() {
     <FeatureShell
       number="03"
       category="Runtime"
-      title="协调一切的智能体。"
-      subtitle="Aura 的灵魂是 Koog AIAgent：内置 10 个结构化工具、4 套大模型 Provider（3 个云端 + 1 个本地）、流式响应、可观测事件流——它不是大模型，是大模型之上的编排者。"
+      title="云端办事，本地懂事。"
+      subtitle="这一页不再讲它懂不懂你，而是讲它怎样连接工具、MCP 和现实生活，让一次对话真的走向行动。"
       active="agent"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 124, 156, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(160, 92, 255, 0.10), transparent 60%), #08090a"
       hideMeta
@@ -90,7 +90,7 @@ export default function AgentPage() {
                   className="h-1.5 w-1.5 rounded-full"
                   style={{ background: '#7c5cff' }}
                 />
-                <span className="text-muted">10 个工具 · 5 类</span>
+                <span className="text-muted">工具 / MCP / 生活能力</span>
               </div>
               <div className="flex items-center gap-2">
                 <span
@@ -100,32 +100,31 @@ export default function AgentPage() {
                     border: '1px solid #9090a8',
                   }}
                 />
-                <span className="text-muted">4 LLM Provider（3 远程 + 1 本地）</span>
+                <span className="text-muted">云端对话体 + 本地陪伴体</span>
               </div>
             </div>
           </>
         }
         stats={[
-          { n: '10', label: '工具', desc: '5 类 · 记忆/上下文/设备/健康/动作' },
-          { n: '4', label: 'Provider', desc: 'GLM / KIMI / MODELSCOPE / LOCAL_QWEN' },
+          { n: '10', label: '工具', desc: '记忆、上下文、设备、健康、动作五类能力' },
+          { n: 'MCP', label: '扩展', desc: '地图、本地生活、出行、咖啡、快餐都能接' },
           { n: '12', label: '迭代上限', desc: 'maxIterations=12 · 有界防失控' },
         ]}
-        caption="Koog AIAgent.builder() · graphStrategy(streamingSingleRunStrategy()) · maxIterations=12"
+        caption="工具层：把外部能力和生活能力接进 Aura"
       />
 
-      {/* ─── 5 类工具详解 ─── */}
+      {/* ─── 双心智与工具层 ─── */}
       <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            十个工具，五类划分
+            它怎么从聊天走向行动
           </h2>
           <span className="font-mono text-xs text-muted">
-            ToolRegistry · 5 类
+            5 类能力
           </span>
         </div>
         <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
-          10 个内置工具 + 动态加载的远程 MCP 工具。AuraAgent 不会"调用 API"——它调度
-          ToolRegistry，把世界变成可执行的指令集。
+          Aura 的工具层不是“会调 API”，而是把记忆、上下文、设备、健康、提醒和 MCP 组织成一层可控的行动能力。
         </p>
 
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -230,10 +229,7 @@ export default function AgentPage() {
         </div>
 
         <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
-          Aura 暴露 3 个云端 Provider（GLM / KIMI / MODELSCOPE，全部兼容 Anthropic
-          Messages）和 1 个本地 Provider（LOCAL_QWEN，走 MNN 推理）。用户在
-          Settings 任选其一，运行时只走一个。
-          全部 4 个 Provider 共享同一个 Koog Agent 接口，UI 层无感。
+          3 个云端 Provider 和 1 个本地 Provider 共享同一个 Koog Agent 接口；真正重要的不是 Provider 名字，而是云端负责办事、本地负责理解。
         </p>
 
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -286,7 +282,7 @@ export default function AgentPage() {
       <section className="mt-32 px-6 sm:px-10 lg:px-16">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-            设计原则
+            生活能力示例
           </h2>
         </div>
 
@@ -294,33 +290,33 @@ export default function AgentPage() {
           {[
             {
               n: '01',
-              t: '拒绝黑盒',
-              d: '所有工具调用都有结构化记录器（toolCallRecorder）：工具名 / 参数 / 结果 / 状态全可追溯。',
+              t: '下班后遛弯',
+              d: '高德 + 天气 + 步数 + 情绪，给出一条能走、能逛、能吃的路线。',
             },
             {
               n: '02',
-              t: '流式优先',
-              d: 'AIAgent 用 streamingSingleRunStrategy + EventHandler，token 级别的流式推回 UI，无整段等待。',
+              t: '今天吃什么',
+              d: 'howtocook + 口味偏好 + 体力 + 预算，给出做饭、外卖或外出就餐方案。',
             },
             {
               n: '03',
-              t: '有界迭代',
-              d: 'maxIterations=12。大模型死循环不消耗资源，到上限自动停。',
+              t: '周末出行',
+              d: '12306 + 地图 + 天气，把出发时间、接驳、目的地和回程建议串成计划。',
             },
             {
               n: '04',
-              t: 'MCP 是一等公民',
-              d: '远程 MCP server 动态加入 ToolRegistry，列表来自 McpServerListRepository，UI 软开关。',
+              t: '瑞幸 / 麦当劳',
+              d: '把散步、咖啡、快餐结合成低决策成本的生活方案。',
             },
             {
               n: '05',
-              t: '默认清空工具注册表',
-              d: '当 prompt 含图片或关闭工具时，ToolRegistry.EMPTY——减少无关工具对大模型的干扰。',
+              t: 'MCP 可扩展',
+              d: '魔搭创空间托管自定义 MCP，再同步到 Aura 工具选择中。',
             },
             {
               n: '06',
               t: '失败可见',
-              d: 'onToolCallFailed / agent_run_failed 都走 AppLogger，logcat 可追。',
+              d: '工具调用、MCP 失败和模型异常都有记录，方便调试和展示。',
             },
           ].map((p, i) => (
             <Reveal
@@ -350,7 +346,7 @@ export default function AgentPage() {
           {[
             { href: '/presence', label: 'Presence', desc: 'Aura 如何呈现自己' },
             { href: '/memory', label: 'Memory', desc: 'Aura 如何记住你' },
-            { href: '/', label: '← 返回首页', desc: 'Aura 总览' },
+            { href: '/tech', label: 'Tech', desc: 'Aura 如何组织系统' },
           ].map((link) => (
             <a
               key={link.href}
