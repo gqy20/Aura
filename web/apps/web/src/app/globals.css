@@ -48,17 +48,19 @@
   --text-8xl: 9rem;
   --text-9xl: 12rem;
 
-  /* 行高 */
+  /* 行高 — display 用于大标题，normal/relaxed 已加大 */
   --leading-tight: 1.05;
   --leading-snug: 1.2;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.625;
+  --leading-display: 1.08;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.7;
 
   /* 字间距 */
   --tracking-tighter: -0.04em;
   --tracking-tight: -0.02em;
   --tracking-normal: 0;
   --tracking-wide: 0.04em;
+  --tracking-label: 0.18em;
 
   /* 圆角 */
   --radius-sm: 0.25rem;
@@ -87,6 +89,14 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out-expo: cubic-bezier(0.87, 0, 0.13, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* mono 标签 — 章节编号、分类名、数据标注（颜色由 text-muted / text-accent 单独控制） */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
 }
 
 /* ============================================================

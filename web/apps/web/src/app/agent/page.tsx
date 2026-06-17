@@ -104,7 +104,7 @@ export default function AgentPage() {
       }
     >
 
-      <ScreenSection innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">它怎么从聊天走向行动</h2>
           <span className="font-mono text-xs text-muted">5 类能力</span>
@@ -144,7 +144,7 @@ export default function AgentPage() {
         </div>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">
           <div className="md:col-span-7">
             <div className="flex items-end justify-between border-b border-border pb-4">
@@ -199,7 +199,7 @@ export default function AgentPage() {
         </div>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">真实生活里的几个场景</h2>
         </div>
@@ -222,7 +222,7 @@ export default function AgentPage() {
         </ol>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">相关</h2>
         </div>

@@ -82,7 +82,7 @@ export default function MemoryPage() {
       }
     >
 
-      <ScreenSection innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">记住什么</h2>
           <span className="font-mono text-xs text-muted">3 类长期信息</span>
@@ -117,7 +117,7 @@ export default function MemoryPage() {
         </div>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">怎么长大</h2>
           <span className="font-mono text-xs text-muted">本地 SQLite · 281 条演示数据</span>
@@ -155,7 +155,7 @@ export default function MemoryPage() {
         </div>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">为什么值得信任</h2>
           <span className="font-mono text-xs text-muted">3 个约束</span>
@@ -175,7 +175,7 @@ export default function MemoryPage() {
         </div>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">相关</h2>
         </div>

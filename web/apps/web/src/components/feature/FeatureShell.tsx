@@ -70,13 +70,13 @@ export function FeatureShell({
                 className="md:col-span-9"
               >
                 {!hideMeta && (
-                  <div className="mb-4 flex items-center gap-4 font-mono text-xs uppercase tracking-[0.2em] text-muted">
+                  <div className="mb-4 flex items-center gap-4 label-mono text-xs text-muted">
                     <span className="text-accent">{number}</span>
                     <span className="h-px w-8 bg-border-strong" />
                     <span>{category}</span>
                   </div>
                 )}
-                <h1 className="text-balance text-4xl font-medium leading-[1.05] tracking-tight sm:text-5xl md:text-6xl lg:text-[5rem]">
+                <h1 className="text-balance text-4xl font-medium leading-display tracking-tight sm:text-5xl md:text-6xl lg:text-[5rem]">
                   {title}
                 </h1>
                 <p className="mt-5 max-w-2xl text-pretty text-base leading-relaxed text-muted sm:text-lg md:text-xl">

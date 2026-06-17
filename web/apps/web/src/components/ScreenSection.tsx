@@ -23,7 +23,7 @@ export function ScreenSection({
     >
       <div
         className={cn(
-          'mx-auto flex h-full w-full max-w-[1280px] flex-col justify-center',
+          'mx-auto flex h-full w-full max-w-7xl flex-col justify-center',
           innerClassName,
         )}
       >

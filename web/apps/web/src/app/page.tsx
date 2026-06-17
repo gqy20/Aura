@@ -91,12 +91,12 @@ export default function Home() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                  className="mb-8 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"
+                  className="mb-8 label-mono text-muted"
                 >
                   Android AI Companion
                 </motion.p>
 
-                <h1 className="relative z-10 max-w-[560px] text-balance text-5xl font-medium leading-[1.02] tracking-tight sm:text-6xl md:text-6xl lg:text-7xl">
+                <h1 className="relative z-10 max-w-[560px] text-balance text-5xl font-medium leading-display tracking-tight sm:text-6xl md:text-6xl lg:text-7xl">
                   <span className="block">
                     <SplitText text="长期认识你的" stagger={0.045} delay={0.4} />
                   </span>
@@ -174,10 +174,10 @@ export default function Home() {
         </div>
 
         {/* 第四屏：四个方向导航 + 底部 footer */}
-        <ScreenSection className="border-t border-border" innerClassName="max-w-[1280px]">
+        <ScreenSection className="border-t border-border" innerClassName="max-w-7xl">
           <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-16">
             <div className="md:col-span-4">
-              <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">next</span>
+              <span className="label-mono text-muted">next</span>
               <h2 className="mt-4 max-w-sm text-balance text-3xl font-medium tracking-tight sm:text-4xl">
                 从四个方向继续认识 Aura
               </h2>
@@ -200,7 +200,7 @@ export default function Home() {
                     className="rounded-xl border border-border p-6 transition-colors hover:border-border-strong"
                   >
                     <Link href={item.href} className="group block">
-                      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accent">{item.label}</p>
+                      <p className="label-mono text-accent">{item.label}</p>
                       <h3 className="mt-3 text-lg font-medium text-foreground transition-colors group-hover:text-accent">
                         {item.title}
                       </h3>

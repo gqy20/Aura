@@ -27,18 +27,18 @@ export function ScrollSection({ number, title, description }: ScrollSectionProps
       ref={ref}
       className="relative flex h-[100svh] snap-start snap-always items-center overflow-hidden px-6 py-20 sm:px-10 lg:px-16"
     >
-      <Reveal duration={800} className="mx-auto w-full max-w-[1280px]">
+      <Reveal duration={800} className="mx-auto w-full max-w-7xl">
         <motion.div
           style={{ y: reduced ? 0 : yParallax }}
           className="grid grid-cols-1 items-end gap-10 md:grid-cols-12 md:gap-16"
         >
           <div className="md:col-span-3">
-            <span className="font-mono text-xs uppercase tracking-[0.18em] text-muted">
+            <span className="label-mono text-xs text-muted">
               chapter {number}
             </span>
           </div>
           <div className="md:col-span-9">
-            <h2 className="max-w-4xl text-balance text-4xl font-medium leading-[1.06] tracking-tight sm:text-5xl md:text-6xl">
+            <h2 className="max-w-4xl text-balance text-4xl font-medium leading-display tracking-tight sm:text-5xl md:text-6xl">
               {title}
             </h2>
             <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted sm:text-lg">

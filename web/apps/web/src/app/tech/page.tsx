@@ -63,7 +63,7 @@ export default function TechPage() {
                 <div className="grid gap-4 text-center md:grid-cols-3">
                   {['云端', '本地', '运行时'].map((item) => (
                     <div key={item} className="rounded-xl border border-border bg-background/25 p-5 backdrop-blur-sm">
-                      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accent">{item}</p>
+                      <p className="label-mono text-accent">{item}</p>
                     </div>
                   ))}
                 </div>
@@ -80,7 +80,7 @@ export default function TechPage() {
       }
     >
 
-      <ScreenSection innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">系统主线</h2>
           <span className="font-mono text-xs text-muted">4 层结构</span>
@@ -89,7 +89,7 @@ export default function TechPage() {
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
           {SYSTEM_LAYERS.map((layer, index) => (
             <Reveal key={layer.name} delay={index * 80} className="rounded-xl border border-border p-6">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-accent">{layer.name}</p>
+              <p className="label-mono text-xs text-accent">{layer.name}</p>
               <p className="mt-3 text-base leading-relaxed text-foreground">{layer.desc}</p>
               <ul className="mt-4 flex flex-wrap gap-2">
                 {layer.points.map((point) => (
@@ -103,7 +103,7 @@ export default function TechPage() {
         </div>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">执行路径</h2>
           <span className="font-mono text-xs text-muted">一次请求怎么流动</span>
@@ -120,7 +120,7 @@ export default function TechPage() {
         </div>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">边界</h2>
           <span className="font-mono text-xs text-muted">真实约束</span>
@@ -136,7 +136,7 @@ export default function TechPage() {
         </div>
       </ScreenSection>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-[1280px] justify-center">
+      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">
           <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">相关</h2>
         </div>

@@ -65,7 +65,7 @@ export function StatBlock({
       <span className={numberClass} style={numberStyle}>
         {n}
       </span>
-      <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
+      <span className="label-mono text-xs text-muted">
         {label}
       </span>
       {desc && (
