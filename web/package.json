@@ -13,9 +13,9 @@
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "turbo": "^2.5.0",
-    "prettier": "^3.6.0",
-    "typescript": "^5.7.0"
+    "prettier": "^3.8.4",
+    "turbo": "^2.9.18",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=20.0.0",

@@ -16,14 +16,15 @@ export function ScreenSection({
 }: ScreenSectionProps) {
   return (
     <section
+      data-snap
       className={cn(
-        'snap-start snap-always min-h-[100svh] px-6 py-20 sm:px-10 lg:px-16',
+        'min-h-[calc(100svh-var(--shell-top-h,0px))] px-6 py-16 sm:px-10 lg:px-16',
         className,
       )}
     >
       <div
         className={cn(
-          'mx-auto flex min-h-[calc(100svh-10rem)] w-full max-w-[1280px] flex-col justify-center',
+          'mx-auto flex min-h-[calc(100svh-var(--shell-top-h,0px)-8rem)] w-full max-w-[1280px] flex-col justify-center',
           innerClassName,
         )}
       >

@@ -40,7 +40,7 @@ interface HeroStageProps {
   statsPosition?: 'right' | 'bottom'
   /** 3D 下方 caption — mono 12px */
   caption?: string
-  /** 自定义高度 — 默认 h-[78vh] */
+  /** 自定义高度 — 默认 h-full（占满 flex 父容器），最小 60vh */
   height?: string
   /** variant — 影响背景光晕、stats 强调色 */
   variant?: 'presence' | 'memory' | 'agent'
@@ -81,12 +81,16 @@ export function HeroStage({
   stats,
   statsPosition = 'right',
   caption,
-  height = 'h-[78vh]',
+  height,
   variant = 'presence',
   delayBase = 0,
   disableEnterAnimation = false,
   className,
 }: HeroStageProps) {
+  // 在 FeatureShell flex-col 首屏中：h-full + min-h-[60vh] 兜底
+  const defaultHeight = 'h-full min-h-[60vh]'
+  const resolvedHeight = height ?? defaultHeight
+
   const sectionRef = useRef<HTMLElement>(null)
   const threeWrapRef = useRef<HTMLDivElement>(null)
 
@@ -204,7 +208,7 @@ export function HeroStage({
         className={cn(
           'will-change-transform relative overflow-hidden',
           'aspect-[16/9] md:aspect-auto',
-          height,
+          resolvedHeight,
         )}
         style={
           statsPosition === 'right'

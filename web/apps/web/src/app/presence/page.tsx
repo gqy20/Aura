@@ -56,41 +56,43 @@ export default function PresencePage() {
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(124, 92, 255, 0.18), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(92, 167, 255, 0.10), transparent 60%), #08090a"
       hideMeta
       hideAnnouncement
+      heroStage={
+        <HeroStage
+          variant="presence"
+          three={
+            <>
+              <PresenceOrbDynamic stateKey={stateKey} />
+              <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
+                {STATE_ORDER.slice(0, 6).map((s, i) => (
+                  <span
+                    key={s}
+                    className="h-1 rounded-full transition-all"
+                    style={{
+                      width: i === index % 6 ? 24 : 6,
+                      backgroundColor:
+                        i === index % 6
+                          ? STATES[s].color
+                          : 'rgba(255,255,255,0.2)',
+                    }}
+                  />
+                ))}
+              </div>
+            </>
+          }
+          badge={{
+            label: '状态',
+            value: currentState.label,
+            color: currentState.color,
+          }}
+          stats={[
+            { n: '11', label: '状态', desc: '听、想、说、记、累、恢复等 11 种 PresenceMode' },
+            { n: '5', label: '反应', desc: '点击、回忆、检索、错误和环境反馈' },
+            { n: '24h', label: '在场', desc: '不是一段回复，而是一整天可感知的状态流' },
+          ]}
+          caption={`${currentState.description} · Aura 当前如何在场`}
+        />
+      }
     >
-      <HeroStage
-        variant="presence"
-        three={
-          <>
-            <PresenceOrbDynamic stateKey={stateKey} />
-            <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
-              {STATE_ORDER.slice(0, 6).map((s, i) => (
-                <span
-                  key={s}
-                  className="h-1 rounded-full transition-all"
-                  style={{
-                    width: i === index % 6 ? 24 : 6,
-                    backgroundColor:
-                      i === index % 6
-                        ? STATES[s].color
-                        : 'rgba(255,255,255,0.2)',
-                  }}
-                />
-              ))}
-            </div>
-          </>
-        }
-        badge={{
-          label: '状态',
-          value: currentState.label,
-          color: currentState.color,
-        }}
-        stats={[
-          { n: '11', label: '状态', desc: '听、想、说、记、累、恢复等 11 种 PresenceMode' },
-          { n: '5', label: '反应', desc: '点击、回忆、检索、错误和环境反馈' },
-          { n: '24h', label: '在场', desc: '不是一段回复，而是一整天可感知的状态流' },
-        ]}
-        caption={`${currentState.description} · Aura 当前如何在场`}
-      />
 
       <ScreenSection innerClassName="max-w-[1280px] justify-center">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">

@@ -9,13 +9,13 @@ importers:
   .:
     devDependencies:
       prettier:
-        specifier: ^3.6.0
+        specifier: ^3.8.4
         version: 3.8.4
       turbo:
-        specifier: ^2.5.0
+        specifier: ^2.9.18
         version: 2.9.18
       typescript:
-        specifier: ^5.7.0
+        specifier: ^5.9.3
         version: 5.9.3
 
   apps/web:

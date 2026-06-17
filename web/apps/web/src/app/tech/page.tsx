@@ -54,30 +54,32 @@ export default function TechPage() {
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 239, 255, 0.12), transparent 60%), radial-gradient(ellipse 60% 40% at 78% 82%, rgba(124, 92, 255, 0.08), transparent 60%), #08090a"
       hideMeta
       hideAnnouncement
-    >
-      <HeroStage
-        variant="presence"
-        three={
-          <div className="relative h-full w-full overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,92,255,0.16),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(92,239,255,0.12),transparent_28%),radial-gradient(circle_at_60%_80%,rgba(92,255,176,0.10),transparent_26%)]" />
-            <div className="absolute inset-0 grid place-items-center">
-              <div className="grid gap-4 text-center md:grid-cols-3">
-                {['云端', '本地', '运行时'].map((item) => (
-                  <div key={item} className="rounded-xl border border-border bg-background/25 p-5 backdrop-blur-sm">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accent">{item}</p>
-                  </div>
-                ))}
+      heroStage={
+        <HeroStage
+          variant="presence"
+          three={
+            <div className="relative h-full w-full overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,92,255,0.16),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(92,239,255,0.12),transparent_28%),radial-gradient(circle_at_60%_80%,rgba(92,255,176,0.10),transparent_26%)]" />
+              <div className="absolute inset-0 grid place-items-center">
+                <div className="grid gap-4 text-center md:grid-cols-3">
+                  {['云端', '本地', '运行时'].map((item) => (
+                    <div key={item} className="rounded-xl border border-border bg-background/25 p-5 backdrop-blur-sm">
+                      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-accent">{item}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        }
-        stats={[
-          { n: '4', label: '核心层', desc: '运行时、双心智、个人模型、工具与 MCP' },
-          { n: '5', label: '执行段', desc: '输入、路由、执行、返回、沉淀' },
-          { n: 'MCP', label: '可扩展', desc: '地图、出行、餐饮和开发者自建服务' },
-        ]}
-        caption="技术页只保留最关键的四层结构和一条执行路径"
-      />
+          }
+          stats={[
+            { n: '4', label: '核心层', desc: '运行时、双心智、个人模型、工具与 MCP' },
+            { n: '5', label: '执行段', desc: '输入、路由、执行、返回、沉淀' },
+            { n: 'MCP', label: '可扩展', desc: '地图、出行、餐饮和开发者自建服务' },
+          ]}
+          caption="技术页只保留最关键的四层结构和一条执行路径"
+        />
+      }
+    >
 
       <ScreenSection innerClassName="max-w-[1280px] justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">

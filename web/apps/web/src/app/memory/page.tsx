@@ -51,35 +51,37 @@ export default function MemoryPage() {
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 255, 176, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(92, 239, 255, 0.10), transparent 60%), #08090a"
       hideMeta
       hideAnnouncement
+      heroStage={
+        <HeroStage
+          variant="memory"
+          three={
+            <>
+              <MemoryNetworkDynamic />
+              <div className="pointer-events-none absolute left-6 top-6 flex flex-col gap-1.5 font-mono text-[10px]">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                  <span className="text-muted">中心枢纽</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
+                  <span className="text-muted">记忆 · 3 类</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#5cefff' }} />
+                  <span className="text-muted">摘要 · 5 类</span>
+                </div>
+              </div>
+            </>
+          }
+          stats={[
+            { n: '3', label: '记忆类', desc: '事实、事件、偏好三类长期记忆' },
+            { n: '5', label: '摘要类', desc: '每日、会话、主题、项目、关系五类摘要' },
+            { n: '可信', label: '边界', desc: '来源可追溯、结论可修正、用户可控制' },
+          ]}
+          caption="记忆、摘要与用户控制，共同构成 Aura 的长期个人模型"
+        />
+      }
     >
-      <HeroStage
-        variant="memory"
-        three={
-          <>
-            <MemoryNetworkDynamic />
-            <div className="pointer-events-none absolute left-6 top-6 flex flex-col gap-1.5 font-mono text-[10px]">
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                <span className="text-muted">中心枢纽</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
-                <span className="text-muted">记忆 · 3 类</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#5cefff' }} />
-                <span className="text-muted">摘要 · 5 类</span>
-              </div>
-            </div>
-          </>
-        }
-        stats={[
-          { n: '3', label: '记忆类', desc: '事实、事件、偏好三类长期记忆' },
-          { n: '5', label: '摘要类', desc: '每日、会话、主题、项目、关系五类摘要' },
-          { n: '可信', label: '边界', desc: '来源可追溯、结论可修正、用户可控制' },
-        ]}
-        caption="记忆、摘要与用户控制，共同构成 Aura 的长期个人模型"
-      />
 
       <ScreenSection innerClassName="max-w-[1280px] justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">

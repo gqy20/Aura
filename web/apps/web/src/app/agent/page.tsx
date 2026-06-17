@@ -70,38 +70,40 @@ export default function AgentPage() {
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 124, 156, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(160, 92, 255, 0.10), transparent 60%), #08090a"
       hideMeta
       hideAnnouncement
+      heroStage={
+        <HeroStage
+          variant="agent"
+          three={
+            <>
+              <AgentGraphDynamic />
+              <div className="pointer-events-none absolute left-6 top-6 flex flex-col gap-1.5 font-mono text-[10px]">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                  <span className="text-muted">智能体核心</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
+                  <span className="text-muted">工具 / MCP / 生活能力</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-1.5 w-1.5 rotate-45"
+                    style={{ background: 'transparent', border: '1px solid #9090a8' }}
+                  />
+                  <span className="text-muted">云端对话体 + 本地陪伴体</span>
+                </div>
+              </div>
+            </>
+          }
+          stats={[
+            { n: '10', label: '工具', desc: '记忆、上下文、设备、健康、动作五类能力' },
+            { n: 'MCP', label: '扩展', desc: '地图、出行、咖啡、餐饮和开发者自建服务' },
+            { n: '12', label: '迭代上限', desc: 'maxIterations=12，保证流程有边界' },
+          ]}
+          caption="工具层把外部能力真正接入 Aura，而不是停留在回答层"
+        />
+      }
     >
-      <HeroStage
-        variant="agent"
-        three={
-          <>
-            <AgentGraphDynamic />
-            <div className="pointer-events-none absolute left-6 top-6 flex flex-col gap-1.5 font-mono text-[10px]">
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                <span className="text-muted">智能体核心</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#7c5cff' }} />
-                <span className="text-muted">工具 / MCP / 生活能力</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className="h-1.5 w-1.5 rotate-45"
-                  style={{ background: 'transparent', border: '1px solid #9090a8' }}
-                />
-                <span className="text-muted">云端对话体 + 本地陪伴体</span>
-              </div>
-            </div>
-          </>
-        }
-        stats={[
-          { n: '10', label: '工具', desc: '记忆、上下文、设备、健康、动作五类能力' },
-          { n: 'MCP', label: '扩展', desc: '地图、出行、咖啡、餐饮和开发者自建服务' },
-          { n: '12', label: '迭代上限', desc: 'maxIterations=12，保证流程有边界' },
-        ]}
-        caption="工具层把外部能力真正接入 Aura，而不是停留在回答层"
-      />
 
       <ScreenSection innerClassName="max-w-[1280px] justify-center">
         <div className="flex items-end justify-between border-b border-border pb-4">

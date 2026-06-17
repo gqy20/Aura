@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aura · Twilight 紫金配色方案预览</title>
+<style>
+  :root {
+    /* ── 基础色 ── */
+    --bg:          #0a0b0f;
+    --bg-card:     #111218;
+    --bg-raised:   #181a22;
+    --fg:          #f0eff4;
+    --fg-muted:    rgba(240,239,244, 0.55);
+    --fg-subtle:   rgba(240,239,244, 0.06);
+    --border:      rgba(255,255,255, 0.06);
+    --border-strong: rgba(255,255,255, 0.14);
+
+    /* ── 品牌双色 ── */
+    --accent:      #7B6EF6;
+    --accent-fg:   #ffffff;
+    --accent-muted: rgba(123,110,246, 0.14);
+    --gold:        #C9A96E;
+    --gold-fg:     #0a0b0f;
+    --gold-muted:  rgba(201,169,110, 0.12);
+
+    /* ── 语义功能色 ── */
+    --listening:   #6EC8F6;
+    --thinking:    #A07CF6;
+    --speaking:    #E8B85C;
+    --memory:      #6EF6B0;
+    --alert:       #F66E8A;
+
+    /* ── 状态色 ── */
+    --success:     #6EF6B0;
+    --warning:     #E8B85C;
+    --error:       #F66E8A;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 48px 32px; }
+
+  h1 {
+    font-size: 42px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+  }
+  h1 .dot { color: var(--accent); }
+
+  .subtitle {
+    color: var(--fg-muted);
+    font-size: 16px;
+    margin-bottom: 56px;
+  }
+
+  h2 {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--fg-muted);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  section { margin-bottom: 56px; }
+
+  /* ── 色块网格 ── */
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .swatch {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .swatch-color {
+    height: 80px;
+    display: flex;
+    align-items: flex-end;
+    padding: 8px 12px;
+  }
+
+  .swatch-info {
+    padding: 10px 12px;
+    background: var(--bg-card);
+  }
+
+  .swatch-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .swatch-hex {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--fg-muted);
+  }
+
+  /* ── 渐变展示 ── */
+  .gradient-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .gradient-card {
+    height: 120px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 14px;
+  }
+
+  .gradient-label {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .gradient-desc {
+    font-size: 11px;
+    color: var(--fg-muted);
+    font-family: monospace;
+  }
+
+  /* ── UI 组件演示 ── */
+  .demo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  .demo-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+
+  .demo-card h3 {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+
+  /* Buttons */
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+
+  .btn-primary { background: var(--accent); color: var(--accent-fg); }
+  .btn-gold { background: var(--gold); color: var(--gold-fg); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--border-strong);
+  }
+  .btn-sm {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+
+  /* Badges */
+  .badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-family: monospace;
+    letter-spacing: 0.04em;
+  }
+
+  .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Timeline */
+  .timeline {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    position: relative;
+    padding-top: 8px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .timeline-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    min-width: 0;
+  }
+
+  .timeline-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 0 10px currentColor;
+  }
+
+  .timeline-meta {
+    margin-top: 10px;
+    text-align: center;
+  }
+
+  .timeline-time {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--fg-muted);
+  }
+
+  .timeline-label {
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  /* Memory cards */
+  .memory-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .memory-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .memory-type {
+    font-family: monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+    width: 80px;
+  }
+
+  .memory-text {
+    color: var(--fg-muted);
+    font-size: 12px;
+  }
+
+  /* Presence orb mock */
+  .orb-mock {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    position: relative;
+  }
+
+  .orb-mock::after {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    border-radius: 50%;
+    opacity: 0.15;
+  }
+
+  .orb-idle {
+    background: radial-gradient(circle at 40% 35%, var(--accent), #3a1cff);
+    box-shadow: 0 0 60px rgba(123,110,246, 0.3);
+  }
+  .orb-idle::after { background: var(--accent); }
+
+  .orb-listening {
+    background: radial-gradient(circle at 40% 35%, var(--listening), #1c8fff);
+    box-shadow: 0 0 60px rgba(110,200,246, 0.3);
+  }
+
+  .orb-speaking {
+    background: radial-gradient(circle at 40% 35%, var(--speaking), #ff8030);
+    box-shadow: 0 0 60px rgba(232,184,92, 0.3);
+  }
+
+  .orb-memory {
+    background: radial-gradient(circle at 40% 35%, var(--memory), #1cff80);
+    box-shadow: 0 0 60px rgba(110,246,176, 0.3);
+  }
+
+  /* Nav mock */
+  .nav-mock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-card);
+    margin-bottom: 12px;
+  }
+
+  .nav-logo {
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+  }
+
+  .nav-links span {
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .nav-links span:hover { color: var(--fg); }
+  .nav-links span.active { color: var(--fg); position: relative; }
+  .nav-links span.active::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  /* Logo SVG area */
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    background: var(--bg-card);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+  }
+
+  .logo-text-main {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+
+  .logo-text-sub {
+    font-size: 13px;
+    color: var(--fg-muted);
+    margin-top: 4px;
+  }
+
+  /* Comparison bar */
+  .compare-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .compare-item {
+    flex: 1;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .compare-item .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--fg-muted);
+    margin-bottom: 6px;
+    font-family: monospace;
+  }
+
+  .compare-item .value {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--fg-muted);
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .container { padding: 32px 16px; }
+    h1 { font-size: 28px; }
+    .swatch-grid { grid-template-columns: repeat(2, 1fr); }
+    .demo-grid { grid-template-columns: 1fr; }
+    .gradient-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Aura Twilight<span class="dot">.</span></h1>
+  <p class="subtitle">暮光紫金配色方案 · 品牌双色 + 5 语义功能色</p>
+
+  <!-- ━━ 品牌双色 ━━ -->
+  <section>
+    <h2>01 · 品牌双色 — AI × 你</h2>
+    <div class="swatch-grid">
+      <div class="swatch">
+        <div class="swatch-color" style="background: #7B6EF6;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Accent · AI 紫</div>
+          <div class="swatch-hex">#7B6EF6</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: rgba(123,110,246, 0.14);"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Accent Muted</div>
+          <div class="swatch-hex">rgba(123,110,246, 0.14)</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #C9A96E;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Gold · 用户金</div>
+          <div class="swatch-hex">#C9A96E</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: rgba(201,169,110, 0.12);"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Gold Muted</div>
+          <div class="swatch-hex">rgba(201,169,110, 0.12)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━ 基础色 ━━ -->
+  <section>
+    <h2>02 · 基础色阶 — 深空蓝黑</h2>
+    <div class="swatch-grid">
+      <div class="swatch">
+        <div class="swatch-color" style="background: #0a0b0f;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Background</div>
+          <div class="swatch-hex">#0a0b0f</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #111218;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Card</div>
+          <div class="swatch-hex">#111218</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #181a22;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Raised</div>
+          <div class="swatch-hex">#181a22</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #f0eff4;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Foreground</div>
+          <div class="swatch-hex">#f0eff4</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: rgba(240,239,244, 0.55);"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Muted</div>
+          <div class="swatch-hex">rgba(…, 0.55)</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: rgba(255,255,255, 0.14); border-bottom: 1px solid rgba(255,255,255,0.06);"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Border Strong</div>
+          <div class="swatch-hex">rgba(255,255,255, 0.14)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━ 语义功能色 ━━ -->
+  <section>
+    <h2>03 · 语义功能色 — 5 色精简</h2>
+    <div class="swatch-grid">
+      <div class="swatch">
+        <div class="swatch-color" style="background: #6EC8F6;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Listening · 倾听</div>
+          <div class="swatch-hex">#6EC8F6</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #A07CF6;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Thinking · 思考</div>
+          <div class="swatch-hex">#A07CF6</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #E8B85C;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Speaking · 发言</div>
+          <div class="swatch-hex">#E8B85C</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #6EF6B0;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Memory · 记忆</div>
+          <div class="swatch-hex">#6EF6B0</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background: #F66E8A;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Alert · 警告</div>
+          <div class="swatch-hex">#F66E8A</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━ 页面渐变 ━━ -->
+  <section>
+    <h2>04 · 页面背景渐变 — 紫金交织</h2>
+    <div class="gradient-grid">
+      <div class="gradient-card" style="background: radial-gradient(ellipse 70% 50% at 30% 0%, rgba(123,110,246,0.15), transparent), radial-gradient(ellipse 50% 40% at 80% 90%, rgba(201,169,110,0.10), transparent), #0a0b0f;">
+        <span class="gradient-label">Home · 相遇</span>
+        <span class="gradient-desc">紫(左) + 金(右)</span>
+      </div>
+      <div class="gradient-card" style="background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(123,110,246,0.18), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(110,200,246,0.10), transparent 60%), #0a0b0f;">
+        <span class="gradient-label">Presence · 在场</span>
+        <span class="gradient-desc">紫 + 蓝</span>
+      </div>
+      <div class="gradient-card" style="background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(201,169,110,0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(110,246,176,0.10), transparent 60%), #0a0b0f;">
+        <span class="gradient-label">Memory · 理解</span>
+        <span class="gradient-desc">金 + 绿</span>
+      </div>
+      <div class="gradient-card" style="background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(246,110,138,0.12), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(123,110,246,0.10), transparent 60%), #0a0b0f;">
+        <span class="gradient-label">Agent · 行动</span>
+        <span class="gradient-desc">粉 + 紫</span>
+      </div>
+      <div class="gradient-card" style="background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(110,200,246,0.10), transparent 60%), radial-gradient(ellipse 60% 40% at 78% 82%, rgba(123,110,246,0.08), transparent 60%), #0a0b0f;">
+        <span class="gradient-label">Tech · 系统</span>
+        <span class="gradient-desc">冷蓝 + 紫</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━ UI 组件 ━━ -->
+  <section>
+    <h2>05 · UI 组件效果</h2>
+    <div class="demo-grid">
+
+      <!-- Buttons -->
+      <div class="demo-card">
+        <h3>按钮</h3>
+        <div class="btn-row">
+          <button class="btn btn-primary">下载 Aura</button>
+          <button class="btn btn-gold">记住我</button>
+          <button class="btn btn-ghost">GitHub ↗</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-sm">Primary</button>
+          <button class="btn btn-gold btn-sm">Gold</button>
+          <button class="btn btn-ghost btn-sm">Ghost</button>
+        </div>
+      </div>
+
+      <!-- Badges -->
+      <div class="demo-card">
+        <h3>标签 · Badge</h3>
+        <div class="badge-row">
+          <span class="badge" style="background: var(--accent-muted); color: var(--accent);">
+            <span class="badge-dot" style="background: var(--accent);"></span>
+            IDLE · 空闲
+          </span>
+          <span class="badge" style="background: rgba(110,200,246,0.12); color: var(--listening);">
+            <span class="badge-dot" style="background: var(--listening);"></span>
+            LISTENING
+          </span>
+          <span class="badge" style="background: rgba(232,184,92,0.12); color: var(--speaking);">
+            <span class="badge-dot" style="background: var(--speaking);"></span>
+            SPEAKING
+          </span>
+        </div>
+        <div class="badge-row" style="margin-top: 8px;">
+          <span class="badge" style="background: rgba(110,246,176,0.12); color: var(--memory);">
+            <span class="badge-dot" style="background: var(--memory);"></span>
+            REMEMBERING
+          </span>
+          <span class="badge" style="background: rgba(246,110,138,0.12); color: var(--alert);">
+            <span class="badge-dot" style="background: var(--alert);"></span>
+            ERROR
+          </span>
+          <span class="badge" style="background: var(--gold-muted); color: var(--gold);">
+            <span class="badge-dot" style="background: var(--gold);"></span>
+            on-device
+          </span>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <div class="demo-card" style="grid-column: 1 / -1;">
+        <h3>导航栏</h3>
+        <div class="nav-mock">
+          <div class="nav-logo">
+            <span style="color: var(--accent);">●</span>
+            Aura<span style="color: var(--accent);">.</span>
+          </div>
+          <div class="nav-links">
+            <span class="active">Presence</span>
+            <span>Memory</span>
+            <span>Agent</span>
+            <span>Tech</span>
+            <span>GitHub ↗</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orb mock -->
+      <div class="demo-card" style="text-align: center;">
+        <h3 style="text-align: left;">Presence 状态球</h3>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">
+          <div>
+            <div class="orb-mock orb-idle" style="width: 56px; height: 56px;"></div>
+            <div style="font-size: 10px; font-family: monospace; color: var(--accent);">IDLE</div>
+            <div style="font-size: 10px; color: var(--fg-muted);">空闲</div>
+          </div>
+          <div>
+            <div class="orb-mock orb-listening" style="width: 56px; height: 56px;"></div>
+            <div style="font-size: 10px; font-family: monospace; color: var(--listening);">LISTENING</div>
+            <div style="font-size: 10px; color: var(--fg-muted);">倾听</div>
+          </div>
+          <div>
+            <div class="orb-mock orb-speaking" style="width: 56px; height: 56px;"></div>
+            <div style="font-size: 10px; font-family: monospace; color: var(--speaking);">SPEAKING</div>
+            <div style="font-size: 10px; color: var(--fg-muted);">发言</div>
+          </div>
+          <div>
+            <div class="orb-mock orb-memory" style="width: 56px; height: 56px;"></div>
+            <div style="font-size: 10px; font-family: monospace; color: var(--memory);">REMEMBERING</div>
+            <div style="font-size: 10px; color: var(--fg-muted);">回忆</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Memory items -->
+      <div class="demo-card">
+        <h3>记忆卡片</h3>
+        <div class="memory-list">
+          <div class="memory-item">
+            <span class="memory-type" style="color: var(--accent);">FACT</span>
+            <span class="memory-text">住在北京 · 养了一只猫</span>
+          </div>
+          <div class="memory-item">
+            <span class="memory-type" style="color: var(--memory);">EPISODE</span>
+            <span class="memory-text">上周聊过露营计划</span>
+          </div>
+          <div class="memory-item">
+            <span class="memory-type" style="color: var(--speaking);">PROCEDURAL</span>
+            <span class="memory-text">喜欢先结论后展开</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="demo-card" style="grid-column: 1 / -1;">
+        <h3>24h 时间线 — 紫金交替</h3>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background: var(--accent); color: var(--accent);"></div>
+            <div class="timeline-meta">
+              <div class="timeline-time">07:30</div>
+              <div class="timeline-label">醒来</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background: var(--listening); color: var(--listening);"></div>
+            <div class="timeline-meta">
+              <div class="timeline-time">08:15</div>
+              <div class="timeline-label">问候</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background: var(--thinking); color: var(--thinking);"></div>
+            <div class="timeline-meta">
+              <div class="timeline-time">09:40</div>
+              <div class="timeline-label">规划</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background: var(--accent); color: var(--accent); opacity: 0.5;"></div>
+            <div class="timeline-meta">
+              <div class="timeline-time">12:00</div>
+              <div class="timeline-label">安静</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background: var(--gold); color: var(--gold);"></div>
+            <div class="timeline-meta">
+              <div class="timeline-time">14:20</div>
+              <div class="timeline-label" style="color: var(--gold);">回忆</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background: var(--speaking); color: var(--speaking);"></div>
+            <div class="timeline-meta">
+              <div class="timeline-time">17:45</div>
+              <div class="timeline-label">帮忙</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background: #9090a8; color: #9090a8;"></div>
+            <div class="timeline-meta">
+              <div class="timeline-time">21:10</div>
+              <div class="timeline-label">疲倦</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background: #404060; color: #404060;"></div>
+            <div class="timeline-meta">
+              <div class="timeline-time">23:30</div>
+              <div class="timeline-label">入睡</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="demo-card">
+        <h3>数字速记</h3>
+        <div class="compare-bar">
+          <div class="compare-item" style="background: var(--bg-raised);">
+            <div class="label">状态</div>
+            <div class="value" style="color: var(--accent); font-size: 36px; font-family: Georgia, serif;">11</div>
+          </div>
+          <div class="compare-item" style="background: var(--bg-raised);">
+            <div class="label">记忆类</div>
+            <div class="value" style="color: var(--gold); font-size: 36px; font-family: Georgia, serif;">3</div>
+          </div>
+          <div class="compare-item" style="background: var(--bg-raised);">
+            <div class="label">工具</div>
+            <div class="value" style="color: var(--memory); font-size: 36px; font-family: Georgia, serif;">10</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Provider list -->
+      <div class="demo-card">
+        <h3>双模路由</h3>
+        <div class="memory-list">
+          <div class="memory-item">
+            <span class="memory-type" style="color: var(--thinking);">GLM</span>
+            <span class="memory-text">glm-5v-turbo · 云端对话体</span>
+          </div>
+          <div class="memory-item">
+            <span class="memory-type" style="color: var(--alert);">MODELSCOPE</span>
+            <span class="memory-text">Qwen3.5-397B · 云端对话体</span>
+          </div>
+          <div class="memory-item" style="border-color: var(--accent-muted);">
+            <span class="memory-type" style="color: var(--memory);">LOCAL</span>
+            <span class="memory-text">Qwen3.5-MNN · 本地陪伴体</span>
+            <span class="badge" style="background: var(--accent-muted); color: var(--accent); font-size: 9px; margin-left: auto;">on-device</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ━━ 新旧对比 ━━ -->
+  <section>
+    <h2>06 · 新旧对比</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div style="padding: 24px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); background: #08090a;">
+        <div style="font-size: 11px; font-family: monospace; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(247,248,248,0.6); margin-bottom: 12px;">旧方案</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #7c5cff;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #5cefff;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #a07cff;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #ffb85c;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #5cffb0;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #ff7c9c;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #ff5c7c;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #9090a8;"></span>
+        </div>
+        <div style="font-size: 12px; color: rgba(247,248,248,0.6);">8 种功能色散落在各文件中<br/>强调色 #7c5cff 与 Logo #7B6EF6 不一致<br/>无品牌第二色</div>
+      </div>
+      <div style="padding: 24px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card);">
+        <div style="font-size: 11px; font-family: monospace; text-transform: uppercase; letter-spacing: 0.15em; color: var(--fg-muted); margin-bottom: 12px;">新方案 · Twilight</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #7B6EF6;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #C9A96E;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #6EC8F6;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #A07CF6;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #E8B85C;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #6EF6B0;"></span>
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #F66E8A;"></span>
+        </div>
+        <div style="font-size: 12px; color: var(--fg-muted);">2 品牌色 + 5 功能色，全部收进 Token<br/>紫 = Logo = AI，金 = Logo = 你<br/>与 Linear / Vercel 差异化的紫金叙事</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <span>Aura Twilight · 配色方案 v1</span>
+    <span>2026</span>
+  </div>
+
+</div>
+</body>
+</html>

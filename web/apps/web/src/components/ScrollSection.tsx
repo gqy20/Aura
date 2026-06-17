@@ -27,21 +27,24 @@ export function ScrollSection({ number, title, description }: ScrollSectionProps
   return (
     <section
       ref={ref}
-      className="relative flex min-h-[100svh] snap-start snap-always items-center py-24"
+      data-snap
+      className="relative flex min-h-[100svh] items-center px-6 py-20 sm:px-10 lg:px-16"
     >
-      <Reveal duration={800} className="mx-auto w-full max-w-6xl px-8 sm:px-12">
+      <Reveal duration={800} className="mx-auto w-full max-w-[1280px]">
         <motion.div
           style={{ y: reduced ? 0 : yParallax }}
-          className="grid grid-cols-1 items-center gap-8 md:grid-cols-12"
+          className="grid grid-cols-1 items-end gap-10 md:grid-cols-12 md:gap-16"
         >
-          <div className="md:col-span-2">
-            <span className="font-mono text-sm text-muted">{number}</span>
+          <div className="md:col-span-3">
+            <span className="font-mono text-xs uppercase tracking-[0.18em] text-muted">
+              chapter {number}
+            </span>
           </div>
-          <div className="md:col-span-10">
-            <h2 className="text-balance text-4xl font-medium leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
+          <div className="md:col-span-9">
+            <h2 className="max-w-4xl text-balance text-4xl font-medium leading-[1.06] tracking-tight sm:text-5xl md:text-6xl">
               {title}
             </h2>
-            <p className="mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-muted sm:text-xl">
+            <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted sm:text-lg">
               {description}
             </p>
           </div>
