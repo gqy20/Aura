@@ -44,7 +44,9 @@ const fragmentShader = /* glsl */ `
 
   void main() {
     vec2 uv = vUv;
-    vec2 p = (uv - 0.5) * 2.0;
+    // 整体光晕右移 0.15（UV 空间），暗角跟随一起移动
+    vec2 shifted = uv - vec2(0.15, 0.0);
+    vec2 p = (shifted - 0.5) * 2.0;
     p.x *= uResolution.x / uResolution.y;
 
     float t = uTime * 0.04;

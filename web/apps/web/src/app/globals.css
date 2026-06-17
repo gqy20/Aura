@@ -42,6 +42,7 @@
   --font-sans: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
   --font-mono: var(--font-mono, ui-monospace), 'SF Mono', monospace;
   --font-serif: var(--font-serif, ui-serif-serif), Georgia, 'Times New Roman', serif;
+  --font-display: var(--font-display, ui-sans-serif), system-ui, sans-serif;
 
   /* 排版比例（基于 1.25 major third） */
   --text-xs: 0.75rem;

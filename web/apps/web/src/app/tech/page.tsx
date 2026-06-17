@@ -49,7 +49,6 @@ export default function TechPage() {
       number="04"
       category="System"
       title="它怎么跑起来"
-      subtitle="这里不再讲 Aura 为什么动人，而是讲这套体验如何被真实系统支撑起来。"
       active="tech"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 239, 255, 0.12), transparent 60%), radial-gradient(ellipse 60% 40% at 78% 82%, rgba(124, 92, 255, 0.08), transparent 60%), #08090a"
       hideMeta

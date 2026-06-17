@@ -51,7 +51,6 @@ export default function PresencePage() {
       number="01"
       category="Capability"
       title="它不是只会在你发消息时出现"
-      subtitle="Aura 的陪伴感来自持续在场、及时回应和克制打扰。"
       active="presence"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(124, 92, 255, 0.18), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(92, 167, 255, 0.10), transparent 60%), #08090a"
       hideMeta

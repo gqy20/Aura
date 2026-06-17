@@ -10,7 +10,6 @@ interface FeatureShellProps {
   number: string
   category: string
   title: string
-  subtitle: string
   active: 'presence' | 'memory' | 'agent' | 'tech'
   /** 首屏的 3D 主视觉 — 与标题共享第一屏 */
   heroStage: ReactNode
@@ -34,7 +33,6 @@ export function FeatureShell({
   number,
   category,
   title,
-  subtitle,
   active,
   heroStage,
   children,
@@ -76,12 +74,9 @@ export function FeatureShell({
                     <span>{category}</span>
                   </div>
                 )}
-                <h1 className="text-balance text-4xl font-medium leading-display tracking-tight sm:text-5xl md:text-6xl lg:text-[5rem]">
+                <h1 className="text-balance text-3xl font-medium leading-display tracking-tight sm:text-4xl md:text-5xl">
                   {title}
                 </h1>
-                <p className="mt-5 max-w-2xl text-pretty text-base leading-relaxed text-muted sm:text-lg md:text-xl">
-                  {subtitle}
-                </p>
               </motion.div>
             </div>
 

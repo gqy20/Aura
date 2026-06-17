@@ -16,7 +16,7 @@ interface StatBlockProps {
   /** 数字字号 — sm(60) / md(72) / lg(96) */
   size?: 'sm' | 'md' | 'lg'
   /** 数字字体族 */
-  family?: 'serif' | 'mono'
+  family?: 'serif' | 'mono' | 'display'
   /** Reveal 错落延迟 ms */
   delay?: number
   className?: string
@@ -27,7 +27,8 @@ interface StatBlockProps {
  *
  * 设计：
  * - 数字超大（衬线/等宽可切换）— text-7xl (112px) / text-8xl (144px)
- * - 默认用衬线（Instrument Serif），给人文/品牌感
+ * - 默认用 Space Grotesk（font-display）+ tracking-wide，几何圆润
+ * - 可选 serif（Instrument Serif）或 mono（JetBrains Mono）
  * - 标签用 mono uppercase tracking-wider
  * - 描述 14-16px muted，可选
  * - 入场用 Reveal 组件做 fade-up（SSR + 减少动效安全）
@@ -43,7 +44,7 @@ export function StatBlock({
   desc,
   color,
   size = 'md',
-  family = 'serif',
+  family = 'display',
   delay = 0,
   className,
 }: StatBlockProps) {
@@ -51,7 +52,7 @@ export function StatBlock({
   const numberClass = cn(
     'leading-none',
     size === 'sm' ? 'text-6xl' : size === 'lg' ? 'text-8xl' : 'text-7xl',
-    family === 'serif' ? 'font-serif' : 'font-mono font-medium tracking-tight',
+    family === 'serif' ? 'font-serif' : family === 'mono' ? 'font-mono font-medium tracking-tight' : 'font-display tracking-wide',
   )
 
   return (
@@ -60,14 +61,16 @@ export function StatBlock({
       delay={delay}
       distance={16}
       duration={700}
-      className={cn('flex flex-col gap-2', className)}
+      className={cn('flex flex-col gap-1', className)}
     >
-      <span className={numberClass} style={numberStyle}>
-        {n}
-      </span>
-      <span className="label-mono text-xs text-muted">
-        {label}
-      </span>
+      <div className="flex items-baseline gap-2">
+        <span className={numberClass} style={numberStyle}>
+          {n}
+        </span>
+        <span className="label-mono text-muted">
+          {label}
+        </span>
+      </div>
       {desc && (
         <p className="text-sm leading-relaxed text-muted/80">{desc}</p>
       )}

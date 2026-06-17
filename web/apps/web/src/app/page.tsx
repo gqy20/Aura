@@ -39,12 +39,17 @@ export default function Home() {
               transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
               className="flex h-20 items-center justify-between"
             >
-              <Link href="/" className="flex items-center gap-2" aria-label="Aura home">
-                <AuraLogo size={28} />
-                <span className="font-mono text-sm font-medium tracking-tight">
-                  Aura<span className="text-accent">.</span>
+              <div className="flex items-center gap-6">
+                <Link href="/" className="flex items-center gap-2" aria-label="Aura home">
+                  <AuraLogo size={28} />
+                  <span className="font-mono text-sm font-medium tracking-tight">
+                    Aura<span className="text-accent">.</span>
+                  </span>
+                </Link>
+                <span className="label-mono text-muted hidden sm:inline">
+                  Android AI Companion
                 </span>
-              </Link>
+              </div>
               <div className="flex items-center gap-6 text-sm sm:gap-8">
                 <Link href="/presence" className="text-muted transition-colors hover:text-foreground">
                   Presence
@@ -65,7 +70,7 @@ export default function Home() {
             </motion.nav>
           </div>
 
-          <div className="relative flex flex-1 items-center px-6 pt-6 pb-12 sm:px-10 sm:pt-8 lg:px-16">
+          <div className="relative flex flex-1 items-center px-6 pt-6 pb-8 sm:px-10 sm:pt-8 lg:px-16">
             <div
               className="pointer-events-none absolute inset-0 hidden md:block"
               style={{
@@ -85,23 +90,14 @@ export default function Home() {
               }}
             />
 
-            <div className="relative grid w-full grid-cols-1 items-center gap-12 md:grid-cols-2">
+            <div className="relative grid w-full grid-cols-1 items-start gap-12 md:grid-cols-2">
               <div className="flex max-w-[620px] flex-col">
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                  className="mb-8 label-mono text-muted"
-                >
-                  Android AI Companion
-                </motion.p>
-
-                <h1 className="relative z-10 max-w-[560px] text-balance text-5xl font-medium leading-display tracking-tight sm:text-6xl md:text-6xl lg:text-7xl">
+                <h1 className="relative z-10 mt-6 max-w-[560px] text-balance text-4xl font-medium leading-[1.62] tracking-tight sm:mt-8 sm:text-5xl md:text-5xl lg:text-6xl">
                   <span className="block">
                     <SplitText text="长期认识你的" stagger={0.045} delay={0.4} />
                   </span>
                   <span className="block">
-                    <SplitText text="AI 陪伴。" stagger={0.045} delay={0.95} />
+                    <SplitText text="AI 伙伴" stagger={0.045} delay={0.95} />
                   </span>
                 </h1>
 
@@ -109,7 +105,7 @@ export default function Home() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 1.6, ease: [0.22, 1, 0.36, 1] }}
-                  className="mt-8 max-w-[560px] text-pretty text-base leading-relaxed text-muted sm:text-lg"
+                  className="mt-10 max-w-[560px] text-pretty text-base leading-relaxed text-muted sm:mt-12 sm:text-lg"
                 >
                   Aura 不把所有能力都塞给一个模型，而是把对外办事、对内理解和长期陪伴拆成不同层次，让记忆、洞察与生活建议在手机里持续发生。
                 </motion.p>
@@ -150,7 +146,7 @@ export default function Home() {
                 </motion.div>
               </div>
 
-              <div className="pointer-events-none absolute right-0 top-1/2 hidden h-[460px] w-[52vw] max-w-[920px] -translate-y-1/2 md:block">
+              <div className="pointer-events-none absolute left-[58%] top-1/2 hidden h-[460px] w-[52vw] max-w-[920px] -translate-x-1/2 -translate-y-1/2 md:block">
                 <PhoneOrb />
               </div>
             </div>

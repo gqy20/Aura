@@ -65,7 +65,6 @@ export default function AgentPage() {
       number="03"
       category="Runtime"
       title="云端办事，本地懂你"
-      subtitle="Aura 不是把模型接进来就结束，而是把工具、MCP 和生活能力组织成真正可行动的智能体。"
       active="agent"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 124, 156, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(160, 92, 255, 0.10), transparent 60%), #08090a"
       hideMeta

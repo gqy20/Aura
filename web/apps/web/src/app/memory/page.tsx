@@ -46,7 +46,6 @@ export default function MemoryPage() {
       number="02"
       category="System"
       title="它不是记住一句话，而是在逐渐理解你"
-      subtitle="Aura 把对话、情绪和视觉线索沉淀成一个可追溯、可修正、可控制的个人模型。"
       active="memory"
       bgGradient="radial-gradient(ellipse 70% 50% at 50% 0%, rgba(92, 255, 176, 0.14), transparent 60%), radial-gradient(ellipse 60% 40% at 20% 80%, rgba(92, 239, 255, 0.10), transparent 60%), #08090a"
       hideMeta
