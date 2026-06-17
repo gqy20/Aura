@@ -90,7 +90,11 @@ data class MnnInferenceConfig(
 
         fun forCurrentDevice(): MnnInferenceConfig {
             val hardware = runCatching { Build.HARDWARE }.getOrNull().orEmpty().lowercase()
-            val socModel = runCatching { Build.SOC_MODEL }.getOrNull().orEmpty().lowercase()
+            val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                runCatching { Build.SOC_MODEL }.getOrNull().orEmpty().lowercase()
+            } else {
+                ""
+            }
             val supportedAbis = runCatching {
                 Build.SUPPORTED_ABIS?.joinToString(separator = ",").orEmpty()
             }.getOrDefault("").lowercase()
