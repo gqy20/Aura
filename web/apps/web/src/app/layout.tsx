@@ -19,7 +19,6 @@ const instrumentSerif = Instrument_Serif({
   display: 'swap',
   variable: '--font-serif',
   weight: '400',
-  style: ['normal', 'italic'],
 })
 
 const spaceGrotesk = Space_Grotesk({

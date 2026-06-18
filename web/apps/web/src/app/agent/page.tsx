@@ -3,13 +3,21 @@
 import dynamic from 'next/dynamic'
 import { FeatureShell } from '@/components/feature/FeatureShell'
 import { HeroStage } from '@/components/feature/HeroStage'
+import { ChapterBlock } from '@/components/feature/ChapterBlock'
+import { FooterMeta } from '@/components/feature/FooterMeta'
 import { Reveal } from '@/components/Reveal'
-import { ScreenSection } from '@/components/ScreenSection'
 
 const AgentGraphDynamic = dynamic(
   () => import('@/components/three/AgentGraph').then((m) => m.AgentGraph),
   { ssr: false },
 )
+
+const SIBLINGS = [
+  { href: '/presence', label: 'Presence', key: 'presence' as const },
+  { href: '/memory', label: 'Memory', key: 'memory' as const },
+  { href: '/agent', label: 'Agent', key: 'agent' as const },
+  { href: '/tech', label: 'Tech', key: 'tech' as const },
+]
 
 const TOOL_CATEGORIES = [
   {
@@ -59,6 +67,13 @@ const PROVIDERS = [
   { name: 'LOCAL_QWEN', model: 'Qwen3.5-{0.8B,2B,4B}-MNN', runtime: '本地陪伴体', color: 'var(--aura-memory)' },
 ] as const
 
+const SCENARIOS = [
+  ['下班后遛弯', '地图 + 天气 + 步数 + 情绪，给出一条能走、能逛、能吃的路线。'],
+  ['今天吃什么', 'howtocook + 口味偏好 + 体力 + 预算，给出做饭或外出就餐方案。'],
+  ['周末出行', '12306 + 地图 + 天气，把出发、接驳、目的地和返程串成计划。'],
+  ['咖啡与轻餐', '瑞幸、麦当劳等 MCP 可以和顺路、时段、步行意愿一起推荐。'],
+]
+
 export default function AgentPage() {
   return (
     <FeatureShell
@@ -71,28 +86,7 @@ export default function AgentPage() {
       heroStage={
         <HeroStage
           variant="agent"
-          three={
-            <>
-              <AgentGraphDynamic />
-              <div className="pointer-events-none absolute left-6 top-6 flex flex-col gap-1.5 font-mono text-[10px]">
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                  <span className="text-muted">智能体核心</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
-                  <span className="text-muted">工具 / MCP / 生活能力</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-1.5 w-1.5 rotate-45"
-                    style={{ background: 'transparent', border: '1px solid var(--aura-muted)' }}
-                  />
-                  <span className="text-muted">云端对话体 + 本地陪伴体</span>
-                </div>
-              </div>
-            </>
-          }
+          three={<AgentGraphDynamic />}
           stats={[
             { n: '10', label: '工具', desc: '记忆、上下文、设备、健康、动作五类能力' },
             { n: 'MCP', label: '扩展', desc: '地图、出行、咖啡、餐饮和开发者自建服务' },
@@ -102,146 +96,154 @@ export default function AgentPage() {
         />
       }
     >
+      <ChapterBlock
+        number="01"
+        eyebrow="Overview"
+        title="它怎么从聊天走向行动"
+        description="这一层不是「会调 API」，而是把记忆、设备、健康、提醒和 MCP 组织成可控的行动能力 —— 工具能调用、可被否决、可被复用。"
+        width="prose"
+      />
 
-      <ScreenSection innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">它怎么从聊天走向行动</h2>
-          <span className="font-mono text-xs text-muted">5 类能力</span>
-        </div>
-        <p className="mt-6 max-w-3xl text-pretty leading-relaxed text-muted">
-          这一层不是“会调 API”，而是把记忆、设备、健康、提醒和 MCP 组织成可控的行动能力。
-        </p>
-
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <ChapterBlock
+        number="02"
+        eyebrow="Tools"
+        title="5 类工具 · 10 个调用"
+        description="每个工具都属于一个清晰的能力分类，注册表保证可发现、可观测、可禁用。"
+      >
+        <div className="space-y-12">
           {TOOL_CATEGORIES.map((cat, i) => (
-            <Reveal
-              key={cat.name}
-              direction="y"
-              delay={i * 80}
-              className="rounded-xl border border-border p-6"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
-                  <span className="font-mono text-xs uppercase tracking-wider text-foreground">{cat.name}</span>
-                </div>
-                <span className="font-mono text-[10px] text-muted">{cat.tools.length} tools</span>
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-muted">{cat.desc}</p>
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {cat.tools.map((t) => (
-                  <span
-                    key={t}
-                    className="rounded-full border border-border bg-subtle/40 px-2.5 py-0.5 font-mono text-[10px] text-foreground"
-                  >
-                    {t}
+            <Reveal key={cat.name} direction="y" delay={i * 80}>
+              <div className="grid grid-cols-1 gap-6 border-t border-border pt-6 md:grid-cols-12 md:gap-12">
+                <div className="md:col-span-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: cat.color }}
+                    />
+                    <span className="font-mono text-xs uppercase tracking-wider text-foreground">
+                      {cat.name}
+                    </span>
+                  </div>
+                  <span className="label-mono mt-3 inline-block text-muted">
+                    {cat.tools.length} {cat.tools.length === 1 ? 'tool' : 'tools'}
                   </span>
-                ))}
+                </div>
+                <div className="md:col-span-9">
+                  <p className="max-w-prose text-base leading-relaxed text-foreground">
+                    {cat.desc}
+                  </p>
+                  <ul className="mt-4 flex flex-wrap gap-x-3 gap-y-2">
+                    {cat.tools.map((t) => (
+                      <li
+                        key={t}
+                        className="rounded-full border border-border bg-subtle/40 px-3 py-1 font-mono text-[11px] text-foreground"
+                      >
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </Reveal>
           ))}
         </div>
-      </ScreenSection>
+      </ChapterBlock>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">
-          <div className="md:col-span-7">
-            <div className="flex items-end justify-between border-b border-border pb-4">
-              <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">一条请求如何流动</h2>
-              <span className="font-mono text-xs text-muted">5 个阶段</span>
-            </div>
-
-            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {PIPELINE_STAGES.map((s, i) => (
-                <Reveal key={s.stage} delay={i * 70} className="rounded-xl border border-border p-5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-accent">0{i + 1}</span>
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.color }} />
-                  </div>
-                  <h3 className="mt-3 font-mono text-sm uppercase tracking-wider text-foreground">{s.stage}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">{s.desc}</p>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-
-          <div className="md:col-span-5">
-            <div className="flex items-end justify-between border-b border-border pb-4">
-              <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">双模路由</h2>
-              <span className="font-mono text-xs text-muted">云端 + 本地</span>
-            </div>
-            <p className="mt-6 text-pretty leading-relaxed text-muted">
-              Provider 的重点不在名字，而在分工: 云端负责连工具、办事情，本地负责理解你、保护你。
-            </p>
-
-            <div className="mt-8 grid grid-cols-1 gap-3">
-              {PROVIDERS.map((p, i) => (
-                <Reveal key={p.name} delay={i * 80} className="rounded-xl border border-border p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-mono text-xs uppercase tracking-wider" style={{ color: p.color }}>
-                        {p.name}
-                      </p>
-                      <p className="mt-2 text-sm text-foreground">{p.runtime}</p>
-                      <p className="mt-1 font-mono text-[10px] text-muted">{p.model}</p>
-                    </div>
-                    {p.name === 'LOCAL_QWEN' && (
-                      <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">
-                        on-device
-                      </span>
-                    )}
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </div>
-      </ScreenSection>
-
-      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">真实生活里的几个场景</h2>
-        </div>
-
-        <ol className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-          {[
-            ['下班后遛弯', '地图 + 天气 + 步数 + 情绪，给出一条能走、能逛、能吃的路线。'],
-            ['今天吃什么', 'howtocook + 口味偏好 + 体力 + 预算，给出做饭或外出就餐方案。'],
-            ['周末出行', '12306 + 地图 + 天气，把出发、接驳、目的地和返程串成计划。'],
-            ['咖啡与轻餐', '瑞幸、麦当劳等 MCP 可以和顺路、时段、步行意愿一起推荐。'],
-          ].map(([title, desc], i) => (
-            <Reveal key={title} as="li" delay={i * 60} className="flex gap-4 rounded-xl border border-border p-6">
-              <span className="shrink-0 font-mono text-xs text-accent">0{i + 1}</span>
-              <div>
-                <h3 className="font-medium text-foreground">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{desc}</p>
+      <ChapterBlock
+        number="03"
+        eyebrow="Pipeline"
+        title="一条请求如何流动"
+        description="一次请求的生命周期 = 5 个阶段。每一个都有明确的输入、产出和失败语义 —— 而不是黑盒等待。"
+      >
+        <div className="space-y-0">
+          {PIPELINE_STAGES.map((s, i) => (
+            <Reveal key={s.stage} delay={i * 70}>
+              <div className="grid grid-cols-1 items-baseline gap-4 border-t border-border py-6 md:grid-cols-12 md:gap-12">
+                <div className="md:col-span-3">
+                  <span className="font-mono text-xs text-accent">
+                    0{i + 1}
+                  </span>
+                  <h3 className="mt-1 font-mono text-base uppercase tracking-wider text-foreground">
+                    {s.stage}
+                  </h3>
+                </div>
+                <div className="md:col-span-9">
+                  <p className="max-w-prose text-pretty leading-relaxed text-muted">
+                    {s.desc}
+                  </p>
+                </div>
               </div>
             </Reveal>
           ))}
-        </ol>
-      </ScreenSection>
-
-      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">相关</h2>
         </div>
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { href: '/presence', label: 'Presence', desc: 'Aura 如何持续在场' },
-            { href: '/memory', label: 'Memory', desc: 'Aura 如何形成个人模型' },
-            { href: '/tech', label: 'Tech', desc: 'Aura 如何组织系统' },
-          ].map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="group rounded-xl border border-border p-6 transition-all hover:border-border-strong hover:bg-subtle/40"
-            >
-              <p className="font-mono text-xs uppercase tracking-wider text-muted">{link.label}</p>
-              <p className="mt-2 text-foreground transition-colors group-hover:text-accent">{link.desc} →</p>
-            </a>
+      </ChapterBlock>
+
+      <ChapterBlock
+        number="04"
+        eyebrow="Routing"
+        title="双模路由：云端 + 本地"
+        description="Provider 的重点不在名字，而在分工: 云端负责连工具、办事情，本地负责理解你、保护你。"
+      >
+        <div className="space-y-8">
+          {PROVIDERS.map((p, i) => (
+            <Reveal key={p.name} delay={i * 80}>
+              <div className="grid grid-cols-1 gap-4 border-t border-border pt-6 md:grid-cols-12 md:gap-12">
+                <div className="md:col-span-3">
+                  <p
+                    className="font-mono text-xs uppercase tracking-wider"
+                    style={{ color: p.color }}
+                  >
+                    {p.name}
+                  </p>
+                  <p className="label-mono mt-2 text-muted">{p.runtime}</p>
+                </div>
+                <div className="md:col-span-7">
+                  <p className="font-mono text-xs text-muted">{p.model}</p>
+                </div>
+                <div className="md:col-span-2 md:text-right">
+                  {p.name === 'LOCAL_QWEN' && (
+                    <span className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 font-mono text-[10px] text-accent">
+                      on-device
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Reveal>
           ))}
         </div>
-      </ScreenSection>
+      </ChapterBlock>
+
+      <ChapterBlock
+        number="05"
+        eyebrow="Scenarios"
+        title="真实生活里的几个场景"
+        description="Agent 不是 demo 数据 —— 它接 MCP、读设备、按你的偏好给你建议。"
+      >
+        <div className="space-y-12">
+          {SCENARIOS.map(([title, desc], i) => (
+            <Reveal key={title} direction="y" delay={i * 60}>
+              <div className="grid grid-cols-1 gap-4 border-t border-border pt-6 md:grid-cols-12 md:gap-12">
+                <div className="md:col-span-3">
+                  <span className="font-mono text-xs text-accent">0{i + 1}</span>
+                  <h3 className="mt-1 text-lg font-medium text-foreground">{title}</h3>
+                </div>
+                <div className="md:col-span-9">
+                  <p className="max-w-prose text-pretty leading-relaxed text-muted">
+                    {desc}
+                  </p>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </ChapterBlock>
+
+      <FooterMeta
+        number="03"
+        category="Runtime"
+        siblings={SIBLINGS}
+        currentKey="agent"
+      />
     </FeatureShell>
   )
 }

@@ -2,8 +2,16 @@
 
 import { FeatureShell } from '@/components/feature/FeatureShell'
 import { HeroStage } from '@/components/feature/HeroStage'
+import { ChapterBlock } from '@/components/feature/ChapterBlock'
+import { FooterMeta } from '@/components/feature/FooterMeta'
 import { Reveal } from '@/components/Reveal'
-import { ScreenSection } from '@/components/ScreenSection'
+
+const SIBLINGS = [
+  { href: '/presence', label: 'Presence', key: 'presence' as const },
+  { href: '/memory', label: 'Memory', key: 'memory' as const },
+  { href: '/agent', label: 'Agent', key: 'agent' as const },
+  { href: '/tech', label: 'Tech', key: 'tech' as const },
+]
 
 const SYSTEM_LAYERS = [
   {
@@ -78,85 +86,104 @@ export default function TechPage() {
         />
       }
     >
+      <ChapterBlock
+        number="01"
+        eyebrow="Overview"
+        title="四层结构 · 一条执行路径"
+        description="Aura 的代码主体由 4 层组成：陪伴运行时把一切连在一起，双心智负责分工，可信个人模型负责记忆边界，工具与 MCP 把外部世界接入。"
+        width="prose"
+      />
 
-      <ScreenSection innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">系统主线</h2>
-          <span className="font-mono text-xs text-muted">4 层结构</span>
-        </div>
-
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <ChapterBlock
+        number="02"
+        eyebrow="Architecture"
+        title="系统主线"
+        description="4 层结构，自下而上 —— 工具与 MCP 是接入层，个人模型是记忆层，双心智是分工层，运行时是入口层。"
+      >
+        <div className="space-y-12">
           {SYSTEM_LAYERS.map((layer, index) => (
-            <Reveal key={layer.name} delay={index * 80} className="rounded-xl border border-border p-6">
-              <p className="label-mono text-xs text-accent">{layer.name}</p>
-              <p className="mt-3 text-base leading-relaxed text-foreground">{layer.desc}</p>
-              <ul className="mt-4 flex flex-wrap gap-2">
-                {layer.points.map((point) => (
-                  <li key={point} className="rounded-full border border-border bg-subtle/40 px-3 py-1 font-mono text-[11px] text-muted">
-                    {point}
-                  </li>
-                ))}
-              </ul>
+            <Reveal key={layer.name} delay={index * 80}>
+              <div className="grid grid-cols-1 gap-6 border-t border-border pt-6 md:grid-cols-12 md:gap-12">
+                <div className="md:col-span-3">
+                  <span className="label-mono text-accent">{layer.name}</span>
+                </div>
+                <div className="md:col-span-9">
+                  <p className="max-w-prose text-base leading-relaxed text-foreground">
+                    {layer.desc}
+                  </p>
+                  <ul className="mt-4 flex flex-wrap gap-2">
+                    {layer.points.map((point) => (
+                      <li
+                        key={point}
+                        className="rounded-full border border-border bg-subtle/40 px-3 py-1 font-mono text-[11px] text-muted"
+                      >
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </Reveal>
           ))}
         </div>
-      </ScreenSection>
+      </ChapterBlock>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">执行路径</h2>
-          <span className="font-mono text-xs text-muted">一次请求怎么流动</span>
-        </div>
-
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <ChapterBlock
+        number="03"
+        eyebrow="Execution"
+        title="执行路径"
+        description="一次请求从组装到沉淀的 5 段路径 —— 每段都有清晰的输入、产出和失败语义。"
+      >
+        <div className="space-y-0">
           {EXECUTION_FLOW.map(([title, desc], index) => (
-            <Reveal key={title} delay={index * 70} className="rounded-xl border border-border p-6">
-              <p className="font-mono text-xs text-accent">0{index + 1}</p>
-              <h3 className="mt-3 text-lg font-medium text-foreground">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{desc}</p>
+            <Reveal key={title} delay={index * 70}>
+              <div className="grid grid-cols-1 items-baseline gap-4 border-t border-border py-6 md:grid-cols-12 md:gap-12">
+                <div className="md:col-span-3">
+                  <span className="font-mono text-xs text-accent">0{index + 1}</span>
+                  <h3 className="mt-1 text-lg font-medium text-foreground">{title}</h3>
+                </div>
+                <div className="md:col-span-9">
+                  <p className="max-w-prose text-pretty leading-relaxed text-muted">
+                    {desc}
+                  </p>
+                </div>
+              </div>
             </Reveal>
           ))}
         </div>
-      </ScreenSection>
+      </ChapterBlock>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">边界</h2>
-          <span className="font-mono text-xs text-muted">真实约束</span>
-        </div>
-
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <ChapterBlock
+        number="04"
+        eyebrow="Boundaries"
+        title="边界"
+        description="真实约束，不是设计愿景 —— 这些是我们主动选择不去做的事。"
+      >
+        <div className="space-y-10">
           {BOUNDARIES.map((item, index) => (
-            <Reveal key={item} delay={index * 70} className="rounded-xl border border-border p-6">
-              <p className="font-mono text-xs text-accent">0{index + 1}</p>
-              <p className="mt-3 text-sm leading-relaxed text-muted">{item}</p>
+            <Reveal key={item} delay={index * 70}>
+              <div className="grid grid-cols-1 gap-4 border-t border-border pt-6 md:grid-cols-12 md:gap-12">
+                <div className="md:col-span-3">
+                  <span className="font-mono text-xs text-accent">0{index + 1}</span>
+                  <span className="label-mono mt-2 inline-block text-muted">Constraint</span>
+                </div>
+                <div className="md:col-span-9">
+                  <p className="max-w-prose text-pretty text-base leading-relaxed text-foreground">
+                    {item}
+                  </p>
+                </div>
+              </div>
             </Reveal>
           ))}
         </div>
-      </ScreenSection>
+      </ChapterBlock>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">相关</h2>
-        </div>
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { href: '/presence', label: 'Presence', desc: '如何持续在场' },
-            { href: '/memory', label: 'Memory', desc: '如何形成个人模型' },
-            { href: '/agent', label: 'Agent', desc: '如何接入工具与 MCP' },
-            { href: '/', label: '返回首页', desc: 'Aura 总览' },
-          ].map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="group rounded-xl border border-border p-6 transition-all hover:border-border-strong hover:bg-subtle/40"
-            >
-              <p className="font-mono text-xs uppercase tracking-wider text-muted">{link.label}</p>
-              <p className="mt-2 text-foreground transition-colors group-hover:text-accent">{link.desc} →</p>
-            </a>
-          ))}
-        </div>
-      </ScreenSection>
+      <FooterMeta
+        number="04"
+        category="System"
+        siblings={SIBLINGS}
+        currentKey="tech"
+      />
     </FeatureShell>
   )
 }

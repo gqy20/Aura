@@ -131,7 +131,7 @@ function MemoryScene() {
   })
 
   return (
-    <group ref={group} scale={0.9}>
+    <group ref={group} scale={0.9} position={[-0.4, 0, 0]}>
       <Float speed={1.0} rotationIntensity={0.15} floatIntensity={0.3}>
         {/* Hub：Memory 总入口 */}
         <mesh ref={hub}>

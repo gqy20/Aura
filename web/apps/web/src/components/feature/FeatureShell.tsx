@@ -13,7 +13,7 @@ interface FeatureShellProps {
   active: 'presence' | 'memory' | 'agent' | 'tech'
   /** 首屏的 3D 主视觉 — 与标题共享第一屏 */
   heroStage: ReactNode
-  /** 后续 ScreenSection 列表 */
+  /** 后续 ChapterBlock 列表（不再强制 100svh，自然撑高） */
   children: ReactNode
   className?: string
   bgGradient?: string
@@ -85,18 +85,8 @@ export function FeatureShell({
           </div>
         </section>
 
-        {/* 后续 ScreenSection 列表 */}
-        <div className={cn('pb-24', className)}>{children}</div>
-
-        {/* footer snap 屏 — 必须 h-[100svh] 才能被浏览器 snap 停在这屏 */}
-        <section className="flex h-[100svh] snap-start snap-always flex-col justify-end border-t border-border px-6 pt-12 pb-12 sm:px-10 sm:pb-16 lg:px-16">
-          <div className="flex items-center justify-between font-mono text-xs text-muted">
-            <span>© 2026 Aura · 开源</span>
-            <span>
-              <span className="text-accent">{number}</span> · {category}
-            </span>
-          </div>
-        </section>
+        {/* 后续 ChapterBlock 列表 — 不再强制 100svh，章节间由 ChapterBlock 自己管 breathing room */}
+        <div className={cn(className)}>{children}</div>
       </main>
     </>
   )

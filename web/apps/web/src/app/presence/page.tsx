@@ -3,9 +3,10 @@
 import dynamic from 'next/dynamic'
 import { FeatureShell } from '@/components/feature/FeatureShell'
 import { HeroStage } from '@/components/feature/HeroStage'
+import { ChapterBlock } from '@/components/feature/ChapterBlock'
+import { FooterMeta } from '@/components/feature/FooterMeta'
 import { TimelineLightUp } from '@/components/feature/TimelineLightUp'
 import { Reveal } from '@/components/Reveal'
-import { ScreenSection } from '@/components/ScreenSection'
 import {
   STATES,
   STATE_ORDER,
@@ -17,6 +18,13 @@ const PresenceOrbDynamic = dynamic(
   () => import('@/components/three/PresenceOrb').then((m) => m.PresenceOrb),
   { ssr: false },
 )
+
+const SIBLINGS = [
+  { href: '/presence', label: 'Presence', key: 'presence' as const },
+  { href: '/memory', label: 'Memory', key: 'memory' as const },
+  { href: '/agent', label: 'Agent', key: 'agent' as const },
+  { href: '/tech', label: 'Tech', key: 'tech' as const },
+]
 
 const TIMELINE = [
   { time: '07:30', state: 'IDLE' as StateKey, label: '醒来' },
@@ -35,6 +43,13 @@ const TIMELINE_POINTS = TIMELINE.map((p) => ({
   label: STATES[p.state].label,
   note: p.label,
 }))
+
+const PRIORITY_RULES = [
+  ['错误优先级', '配置未就绪、出错或工具失败时，直接进入 ERROR 接管。'],
+  ['事件触发', 'MEMORY_SPARK、SEARCH_SWEEP 等事件会推高对应状态。'],
+  ['流式与加载', 'isStreaming、isLoading 和输入状态会切换显示层。'],
+  ['情绪映射', 'happy、sad、tired 等情绪会映射到可见状态。'],
+]
 
 const REACTIONS = [
   { name: 'ERROR_RECOVER', color: 'var(--aura-alert)', desc: '优先级最高，遇错直接接管。' },
@@ -91,105 +106,81 @@ export default function PresencePage() {
         />
       }
     >
+      <ChapterBlock
+        number="01"
+        eyebrow="Overview"
+        title="陪伴运行时，不只是聊天"
+        description="Aura 会根据输入、流式回复、工具状态、情绪和关系变化持续调整自己 —— 它是一段持续运行的状态流，而不只是你发消息时弹出的一次回复。"
+        width="prose"
+      />
 
-      <ScreenSection innerClassName="max-w-7xl justify-center">
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-16">
-          <div className="md:col-span-7">
-            <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-              陪伴运行时，不只是聊天
-            </h2>
-            <p className="mt-4 text-pretty leading-relaxed text-muted">
-              Aura 会根据输入、流式回复、工具状态、情绪和关系变化持续调整自己。
-            </p>
-
-            <ol className="mt-8 space-y-4">
-              {[
-                ['错误优先级', '配置未就绪、出错或工具失败时，直接进入 ERROR。'],
-                ['事件触发', 'MEMORY_SPARK、SEARCH_SWEEP 等事件会推高对应状态。'],
-                ['流式与加载', 'isStreaming、isLoading 和输入状态会切换显示层。'],
-                ['情绪映射', 'happy、sad、tired 等情绪会映射到可见状态。'],
-              ].map(([t, d], i) => (
-                <Reveal
-                  key={t}
-                  as="li"
-                  direction="x"
-                  delay={i * 60}
-                  className="flex gap-4 rounded-xl border border-border p-5"
-                >
-                  <span className="shrink-0 font-mono text-xs text-accent">
-                    0{i + 1}
-                  </span>
-                  <div>
-                    <h3 className="font-medium text-foreground">{t}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-muted">{d}</p>
+      <ChapterBlock
+        number="02"
+        eyebrow="Capability"
+        title="11 种状态 · 4 条优先级规则"
+        description="PresenceMode 是一组带权重的有限状态机。每种状态都有进入条件、停留时长和退出路径，状态之间由优先级规则推动切换。"
+      >
+        <div className="grid grid-cols-1 gap-x-12 gap-y-16 md:grid-cols-2">
+          <div>
+            <h3 className="label-mono mb-6 text-muted">Priority Rules</h3>
+            <ol className="space-y-8">
+              {PRIORITY_RULES.map(([title, desc], i) => (
+                <Reveal key={title} as="li" direction="y" delay={i * 60}>
+                  <div className="flex items-baseline gap-4">
+                    <span className="font-mono text-xs text-accent">0{i + 1}</span>
+                    <h4 className="text-lg font-medium text-foreground">{title}</h4>
                   </div>
+                  <p className="mt-2 max-w-md pl-8 text-pretty text-sm leading-relaxed text-muted">
+                    {desc}
+                  </p>
                 </Reveal>
               ))}
             </ol>
           </div>
 
-          <div className="md:col-span-5">
-            <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
-              反应为什么克制
-            </h2>
-            <p className="mt-4 text-pretty leading-relaxed text-muted">
-              PresenceReactionPolicy 会过滤冷却、优先级和任务态，确保不会一有风吹草动就打断你。
-            </p>
-
-            <div className="mt-8 grid grid-cols-1 gap-3">
-              {REACTIONS.map((reaction) => (
-                <div key={reaction.name} className="rounded-xl border border-border p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs uppercase tracking-wider" style={{ color: reaction.color }}>
+          <div>
+            <h3 className="label-mono mb-6 text-muted">Reaction Set</h3>
+            <ul className="space-y-6">
+              {REACTIONS.map((reaction, i) => (
+                <Reveal key={reaction.name} as="li" delay={i * 60}>
+                  <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                    <span
+                      className="font-mono text-xs uppercase tracking-wider"
+                      style={{ color: reaction.color }}
+                    >
                       {reaction.name}
                     </span>
-                    <span className="font-mono text-[10px] text-muted">quiet</span>
+                    <span className="label-mono text-muted">quiet</span>
                   </div>
-                  <p className="mt-2 text-sm text-muted">{reaction.desc}</p>
-                </div>
+                  <p className="mt-3 text-pretty text-sm leading-relaxed text-muted">
+                    {reaction.desc}
+                  </p>
+                </Reveal>
               ))}
-            </div>
+            </ul>
+            <p className="mt-10 max-w-md text-pretty text-sm leading-relaxed text-muted">
+              PresenceReactionPolicy 会过滤冷却、优先级和任务态，确保不会一有风吹草动就打断你 —— 陪伴是克制的，不是炫技的。
+            </p>
           </div>
         </div>
-      </ScreenSection>
+      </ChapterBlock>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">24 小时在场时间线</h2>
-          <span className="font-mono text-xs text-muted">示例 · 模拟数据</span>
-        </div>
-        <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-12">
-          <div className="md:col-span-2">
-            <p className="font-mono text-xs uppercase tracking-wider text-muted">时间线</p>
-            <p className="mt-2 text-sm text-muted">一天里 8 个关键时刻，Aura 如何从倾听、思考到休息。</p>
-          </div>
-          <div className="md:col-span-10">
-            <TimelineLightUp points={TIMELINE_POINTS} />
-          </div>
-        </div>
-      </ScreenSection>
+      <ChapterBlock
+        number="03"
+        eyebrow="Day Cycle"
+        title="24 小时在场时间线"
+        description="一天里 8 个关键时刻 —— 从清晨醒来、午间安静到渐入睡眠，Aura 的状态会跟着你的节奏切换。"
+      >
+        <TimelineLightUp points={TIMELINE_POINTS} />
+        <p className="label-mono mt-12 text-muted">示例 · 模拟数据</p>
+      </ChapterBlock>
 
-      <ScreenSection className="mt-0" innerClassName="max-w-7xl justify-center">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">相关</h2>
-        </div>
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { href: '/memory', label: '记忆系统', desc: 'Aura 如何记住你' },
-            { href: '/tech', label: '技术方案', desc: 'Aura 如何跑起来' },
-            { href: '/', label: '返回首页', desc: 'Aura 总览' },
-          ].map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="group rounded-xl border border-border p-6 transition-all hover:border-border-strong hover:bg-subtle/40"
-            >
-              <p className="font-mono text-xs uppercase tracking-wider text-muted">{link.label}</p>
-              <p className="mt-2 text-foreground transition-colors group-hover:text-accent">{link.desc} →</p>
-            </a>
-          ))}
-        </div>
-      </ScreenSection>
+      <FooterMeta
+        number="01"
+        category="Capability"
+        siblings={SIBLINGS}
+        currentKey="presence"
+      />
     </FeatureShell>
   )
 }

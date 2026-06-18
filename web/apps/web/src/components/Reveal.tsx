@@ -1,22 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 
 interface RevealProps {
   children: ReactNode
-  /** 延迟毫秒（错落入场用） */
   delay?: number
-  /** 位移方向 */
   direction?: 'y' | 'x'
-  /** 位移距离 px */
   distance?: number
-  /** 动画时长 ms */
   duration?: number
-  /** 触发阈值 — 元素露出多少时触发 */
   rootMargin?: string
   className?: string
   style?: CSSProperties
-  /** 渲染的 HTML 标签，默认 div */
   as?: 'div' | 'section' | 'li' | 'tr'
 }
 
@@ -24,12 +18,10 @@ interface RevealProps {
  * 替代 motion `whileInView` 的 Reveal 组件
  *
  * 设计目标：
- * - SSR / 禁用 JS / 爬虫：默认渲染显示（friendly fallback）
+ * - SSR / 禁用 JS / 爬虫 / Playwright fullPage 截图：默认渲染显示（friendly fallback）
  * - 首屏元素（mount 时已在视口内）：不跑动画，直接显示
- * - 视口外元素：进入视口时跑 fade-up 动画
- * - Playwright fullPage 截图：默认显示，IntersectionObserver 不触发也没事
- *
- * 实现：把 `as` 拆成 4 个具体组件，避免动态 Tag 字符串导致 ref 类型联合不收敛。
+ * - 视口外元素：进入视口时跑 fade-up 动画；不进入视口时也保持可见
+ * - prefers-reduced-motion：跳过动画
  */
 export function Reveal(props: RevealProps) {
   const { as = 'div', ...rest } = props
@@ -47,24 +39,13 @@ export function Reveal(props: RevealProps) {
 }
 
 interface RevealInnerProps extends Omit<RevealProps, 'as'> {
-  ref: React.RefObject<HTMLElement | null>
+  ref: RefObject<HTMLElement | null>
 }
 
-/**
- * Reveal 核心 hook — 给 4 个具名组件复用
- *
- * 行为：
- * 1. SSR + 首屏 = visible（`useState(true)`）
- * 2. mount 后立刻看元素是不是在视口内：
- *    - 在视口内 → 保持 visible，不跑动画
- *    - 在视口外 → 下一帧隐藏（避免一帧闪烁），注册 IO 等进入视口
- * 3. 进入视口后按 delay 触发 setShown(true)，并 disconnect observer
- */
-function useReveal(
-  ref: React.RefObject<HTMLElement | null>,
-  { delay = 0, rootMargin = '0px 0px -10% 0px' }: Pick<RevealProps, 'delay' | 'rootMargin'>,
-) {
-  const [shown, setShown] = useState(true) // SSR + 初始 = 可见
+function useReveal(ref: RefObject<HTMLElement | null>, options: Pick<RevealProps, 'delay' | 'rootMargin'>) {
+  const delay = options.delay ?? 0
+  const rootMargin = options.rootMargin ?? '0px 0px -10% 0px'
+  const [shown, setShown] = useState(true)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -72,26 +53,19 @@ function useReveal(
     if (!el) return
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduced) {
-      setShown(true)
-      return
-    }
+    if (reduced) return
 
-    // 检查元素当前是否已在视口内
     const rect = el.getBoundingClientRect()
     const inViewportNow = rect.top < window.innerHeight && rect.bottom > 0
-    if (inViewportNow) {
-      // 已经在视口内（首屏）→ 不做动画，直接显示
-      setShown(true)
-      return
-    }
+    if (inViewportNow) return
 
-    // 在视口外 → 隐藏后观察
-    setShown(false)
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          window.setTimeout(() => setShown(true), delay)
+          window.setTimeout(() => {
+            setShown(false)
+            requestAnimationFrame(() => setShown(true))
+          }, delay)
           observer.disconnect()
         }
       },
@@ -122,16 +96,8 @@ function buildBaseStyle(
   }
 }
 
-function RevealDiv({
-  children,
-  delay,
-  direction,
-  distance,
-  duration,
-  rootMargin,
-  className,
-  style,
-}: Omit<RevealInnerProps, 'ref'>) {
+function RevealDiv(props: Omit<RevealInnerProps, 'ref'>) {
+  const { children, delay, direction, distance, duration, rootMargin, className, style } = props
   const ref = useRef<HTMLDivElement>(null)
   const { shown } = useReveal(ref, { delay, rootMargin })
   return (
@@ -145,16 +111,8 @@ function RevealDiv({
   )
 }
 
-function RevealSection({
-  children,
-  delay,
-  direction,
-  distance,
-  duration,
-  rootMargin,
-  className,
-  style,
-}: Omit<RevealInnerProps, 'ref'>) {
+function RevealSection(props: Omit<RevealInnerProps, 'ref'>) {
+  const { children, delay, direction, distance, duration, rootMargin, className, style } = props
   const ref = useRef<HTMLElement>(null)
   const { shown } = useReveal(ref, { delay, rootMargin })
   return (
@@ -168,16 +126,8 @@ function RevealSection({
   )
 }
 
-function RevealLi({
-  children,
-  delay,
-  direction,
-  distance,
-  duration,
-  rootMargin,
-  className,
-  style,
-}: Omit<RevealInnerProps, 'ref'>) {
+function RevealLi(props: Omit<RevealInnerProps, 'ref'>) {
+  const { children, delay, direction, distance, duration, rootMargin, className, style } = props
   const ref = useRef<HTMLLIElement>(null)
   const { shown } = useReveal(ref, { delay, rootMargin })
   return (
@@ -191,16 +141,8 @@ function RevealLi({
   )
 }
 
-function RevealTr({
-  children,
-  delay,
-  direction,
-  distance,
-  duration,
-  rootMargin,
-  className,
-  style,
-}: Omit<RevealInnerProps, 'ref'>) {
+function RevealTr(props: Omit<RevealInnerProps, 'ref'>) {
+  const { children, delay, direction, distance, duration, rootMargin, className, style } = props
   const ref = useRef<HTMLTableRowElement>(null)
   const { shown } = useReveal(ref, { delay, rootMargin })
   return (

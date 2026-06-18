@@ -185,7 +185,7 @@ export function HeroStage({
   return (
     <section
       ref={sectionRef}
-      className={cn('relative flex h-full min-h-0 flex-col', className)}
+      className={cn('relative flex h-full min-h-0 flex-col snap-none', className)}
       style={
         statsPosition === 'right'
           ? ({

@@ -188,7 +188,7 @@ function AgentCore() {
 
 function AgentScene() {
   return (
-    <group scale={0.9}>
+    <group scale={0.9} position={[-0.4, 0, 0]}>
       <AgentCore />
 
       {/* 工具节点 + Core 连线（实线） */}
