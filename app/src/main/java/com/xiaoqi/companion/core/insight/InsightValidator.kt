@@ -40,11 +40,19 @@ class InsightValidator @Inject constructor(
             return null
         }
         if (!passesEvidenceRealityCheck(draft)) {
+            val total = draft.evidenceMessageIds.size + draft.evidenceMemoryIds.size + draft.evidenceMoodSnapshotIds.size
+            val realMsg = draft.evidenceMessageIds.count { messageDao.existsById(it) }
+            val realMem = draft.evidenceMemoryIds.count { memoryDao.existsById(it) }
+            val realMood = draft.evidenceMoodSnapshotIds.count { moodSnapshotDao.existsById(it) }
             AppLogger.debug(
                 LogTags.Repo,
                 "insight_rejected",
                 "stage" to "evidence_reality_check",
                 "trigger" to draft.triggerType,
+                "claimed" to total,
+                "real_msg" to realMsg,
+                "real_mem" to realMem,
+                "real_mood" to realMood,
             )
             return null
         }
@@ -115,9 +123,9 @@ class InsightValidator @Inject constructor(
     }
 
     private companion object {
-        const val MIN_CONFIDENCE = 0.6f
-        const val EVIDENCE_REALITY_THRESHOLD = 0.5
-        const val HEADING_SIMILARITY_THRESHOLD = 0.8
+        const val MIN_CONFIDENCE = 0.4f
+        const val EVIDENCE_REALITY_THRESHOLD = 0.25
+        const val HEADING_SIMILARITY_THRESHOLD = 0.65
         const val THIRTY_DAYS_MS = 30L * 24L * 60L * 60L * 1000L
     }
 }

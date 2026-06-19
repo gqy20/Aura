@@ -38,7 +38,7 @@
   - `DreamLoopWorker`（@HiltWorker + @AssistedInject 模式）
   - `DreamLoopScheduler`（**7 档可配置周期** OFF / 15min / 30min / 1h / 3h / 6h(默认) / 12h + **立即跑一次按钮**；`WorkScheduler` 接口 + `WorkManagerScheduler` 实现解耦 WorkManager 静态；Hilt 注入 `@ApplicationScope` CoroutineScope 跑 collector；改档位走 `ExistingPeriodicWorkPolicy.UPDATE`；默认 6h 向后兼容）
   - `BatteryHelper`（API 29+ / sticky broadcast 兜底）
-- Room 持久化：messages、memories、memory_summaries、agent_state、mood_snapshots、tool_calls、reminders、**insights**、**health_snapshots**（DB schema v9）。
+- Room 持久化：messages、memories、memory_summaries、agent_state、mood_snapshots、tool_calls、reminders、**insights**、**health_snapshots**（DB schema **v10**；9→10 加 FTS5 trigram 全文搜索 `message_search_docs` + `message_search_docs_fts`）。
 - DataStore 配置仓库：API key（实时写）、provider、model name、theme mode、**onboarding 相关 3 key**（user_patterns_json / recurring_topics_json / onboarding_completed_at）、**模型连通性检查 3 key**（PR-A）、`llm_provider` / `model_name` / `base_url` / `mcp_*`。
 - Agent tools：只读上下文工具、`search_memory`、`search_records`、`search_summaries`、时间/设备/天气/健康数据/提醒与远程 MCP 工具；记忆、情绪、关系写入改为回复完成后的系统阶段。
 - App 启动时恢复 Room 中的聊天历史。

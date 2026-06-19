@@ -54,6 +54,12 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         )
     }
 
+    /**
+     * Dream Loop 独立模型选择。空字符串表示"跟随主聊天模型"（向后兼容），
+     * 非 null/空则强制使用指定本地模型名，不受 Settings → MODEL 页影响。
+     */
+    val dreamLoopModelName: Flow<String> = dataStore.data.map { it[Keys.dreamLoopModelName] ?: "" }
+
     suspend fun setApiKey(value: String?) { dataStore.edit { if (value != null) it[Keys.apiKey] = value else it.remove(Keys.apiKey) } }
     suspend fun setBaseUrl(value: String) { dataStore.edit { it[Keys.baseUrl] = value } }
     suspend fun setCurrentCompanionId(value: String) { dataStore.edit { it[Keys.currentCompanionId] = value } }
@@ -80,6 +86,10 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         dataStore.edit { it[Keys.dreamLoopIntervalMinutes] = value.minutes.toInt() }
     }
 
+    suspend fun setDreamLoopModelName(value: String) {
+        dataStore.edit { it[Keys.dreamLoopModelName] = value }
+    }
+
     object Keys {
         val apiKey = stringPreferencesKey("api_key")
         val baseUrl = stringPreferencesKey("base_url")
@@ -102,6 +112,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val recurringTopicsJson = stringPreferencesKey("recurring_topics_json")
         val onboardingCompletedAt = stringPreferencesKey("onboarding_completed_at")
         val dreamLoopIntervalMinutes = intPreferencesKey("dream_loop_interval_minutes")
+        val dreamLoopModelName = stringPreferencesKey("dream_loop_model_name")
         val healthLastSyncAt = androidx.datastore.preferences.core.longPreferencesKey("health_last_sync_at")
         val healthAutoSyncEnabled = booleanPreferencesKey("health_auto_sync_enabled")
     }

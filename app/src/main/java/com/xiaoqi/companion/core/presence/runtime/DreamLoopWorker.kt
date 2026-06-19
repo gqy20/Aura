@@ -8,10 +8,12 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.InsightRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /**
@@ -31,6 +33,7 @@ class DreamLoopWorker @AssistedInject constructor(
     private val dataCollector: DreamDataCollector,
     private val executor: LocalQwenExecutor,
     private val insightRepository: InsightRepository,
+    private val appPreferences: AppPreferences,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
@@ -66,11 +69,20 @@ class DreamLoopWorker @AssistedInject constructor(
             return@withContext Result.success()
         }
 
+        val dreamModelName = appPreferences.dreamLoopModelName.first()
         val result = executor.execute(
             LocalQwenExecutor.Request(
                 systemPrompt = com.xiaoqi.companion.core.insight.InsightPrompts.patternDetect,
                 userMessage = dataCollector.render(snapshot),
+                modelName = dreamModelName.takeIf<String> { it.isNotBlank() },
             ),
+        )
+        AppLogger.info(
+            LogTags.Config,
+            "dream_loop_raw_output",
+            "textLength" to result.text.length,
+            "raw0" to result.text.take(120),
+            "model" to (dreamModelName.takeIf<String> { it.isNotBlank() } ?: "(follow)"),
         )
         if (result.errorMessage != null) {
             // 模型缺失是不该 retry 的硬错误(下个 6h 周期也不会自动下载模型),

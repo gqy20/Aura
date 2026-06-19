@@ -37,7 +37,7 @@ class DreamLoopWorkerTest {
         val executor = LocalQwenExecutor(engine, prefs, downloader)
         val insightRepo = mockk<InsightRepository>(relaxed = true)
 
-        val worker = DreamLoopWorker(ctx, params, dataCollector, executor, insightRepo)
+        val worker = DreamLoopWorker(ctx, params, dataCollector, executor, insightRepo, prefs)
 
         assertNotNull(worker)
     }

@@ -1,10 +1,12 @@
 package com.xiaoqi.companion.core.local
 
 import android.content.Context
+import android.os.SystemClock
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,12 +14,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
 interface LocalQwenModelDownloader {
     fun observeStatus(modelName: String): Flow<LocalQwenModelDownloadState>
-    fun download(modelName: String): Flow<LocalQwenModelDownloadState>
+    fun download(modelName: String, force: Boolean = false): Flow<LocalQwenModelDownloadState>
 
     /**
      * 扫 `filesDir/models/` 找到第一个 LOCAL_QWEN catalog model 文件全齐的 modelName;
@@ -43,6 +47,8 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
     private val httpClient: OkHttpClient,
 ) : LocalQwenModelDownloader {
 
+    private val downloadMutex = Mutex()
+
     override fun observeStatus(modelName: String): Flow<LocalQwenModelDownloadState> = flow {
         emit(status(modelName))
     }.flowOn(Dispatchers.IO)
@@ -51,128 +57,182 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
         val modelsDir = File(context.filesDir, "models")
         return LocalQwenModelCatalog.models.firstOrNull { spec ->
             val dir = File(modelsDir, spec.modelName)
-            LocalQwenModelCatalog.requiredFiles.all { File(dir, it).isFile }
+            LocalQwenModelCatalog.requiredFiles.all {
+                val f = File(dir, it)
+                f.isFile && f.length() > 0L
+            }
         }?.modelName
     }
 
-    override fun download(modelName: String): Flow<LocalQwenModelDownloadState> = flow {
-        val spec = LocalQwenModelCatalog.requireSpec(modelName)
-        val modelDir = File(context.filesDir, "models/${spec.modelName}")
-        val partialDir = File(context.filesDir, "models/.${spec.modelName}.partial")
-        AppLogger.info(
-            LogTags.LocalModel,
-            "local_model_download_started",
-            "model" to modelName,
-            "targetDir" to modelDir.absolutePath,
-            "requiredFileCount" to LocalQwenModelCatalog.requiredFiles.size,
-        )
-        partialDir.deleteRecursively()
-        if (!partialDir.mkdirs() && !partialDir.isDirectory) {
-            throw IOException("Cannot create model download directory: ${partialDir.absolutePath}")
-        }
-
-        emit(status(modelName).copy(isDownloading = true, message = "开始下载"))
-
-        var downloadedBytes = 0L
-        var totalBytes = LocalQwenCatalogSizes.estimatedTotalBytes(modelName)
-        LocalQwenModelCatalog.requiredFiles.forEachIndexed { index, fileName ->
-            val target = File(partialDir, fileName)
-            val existing = File(modelDir, fileName)
-            if (existing.isFile && existing.length() > 0L) {
-                AppLogger.debug(
-                    LogTags.LocalModel,
-                    "local_model_download_reusing_file",
-                    "model" to modelName,
-                    "file" to fileName,
-                    "bytes" to existing.length(),
-                )
-                existing.copyTo(target, overwrite = true)
-                downloadedBytes += existing.length()
-                emit(
-                    LocalQwenModelDownloadState(
-                        modelName = modelName,
-                        isInstalled = false,
-                        isDownloading = true,
-                        progress = progress(index, downloadedBytes, totalBytes),
-                        downloadedBytes = downloadedBytes,
-                        totalBytes = totalBytes,
-                        message = "Reusing $fileName",
-                    )
-                )
-                return@forEachIndexed
-            }
-            val url = spec.downloadUrl(fileName)
-            AppLogger.debug(
+    override fun download(modelName: String, force: Boolean): Flow<LocalQwenModelDownloadState> = flow {
+        downloadMutex.withLock {
+            val spec = LocalQwenModelCatalog.requireSpec(modelName)
+            val modelDir = File(context.filesDir, "models/${spec.modelName}")
+            val partialDir = File(context.filesDir, "models/.${spec.modelName}.partial")
+            AppLogger.info(
                 LogTags.LocalModel,
-                "local_model_download_file_started",
+                "local_model_download_started",
                 "model" to modelName,
-                "file" to fileName,
+                "targetDir" to modelDir.absolutePath,
+                "requiredFileCount" to LocalQwenModelCatalog.requiredFiles.size,
+                "force" to force,
             )
-            val request = Request.Builder().url(url).build()
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    AppLogger.warn(
+            if (force) {
+                modelDir.deleteRecursively()
+                partialDir.deleteRecursively()
+            }
+            if (!partialDir.exists() && !partialDir.mkdirs() && !partialDir.isDirectory) {
+                throw IOException("Cannot create model download directory: ${partialDir.absolutePath}")
+            }
+
+            emit(status(modelName).copy(isDownloading = true, message = "开始下载"))
+
+            var completedFilesBytes = 0L
+            var lastEmitTime = 0L
+            var lastEmitProgress = -1f
+            val fileCount = LocalQwenModelCatalog.requiredFiles.size
+
+            LocalQwenModelCatalog.requiredFiles.forEachIndexed { index, fileName ->
+                val target = File(partialDir, fileName)
+                val existing = File(modelDir, fileName)
+
+                // 复用 modelDir 里已完整的文件
+                if (existing.isFile && existing.length() > 0L) {
+                    AppLogger.debug(
                         LogTags.LocalModel,
-                        "local_model_download_file_failed",
+                        "local_model_download_reusing_file",
                         "model" to modelName,
                         "file" to fileName,
-                        "code" to response.code,
+                        "bytes" to existing.length(),
                     )
-                    throw IOException("ModelScope download failed (${response.code}): $fileName")
+                    existing.copyTo(target, overwrite = true)
+                    completedFilesBytes += existing.length()
+                    emit(
+                        LocalQwenModelDownloadState(
+                            modelName = modelName,
+                            isInstalled = false,
+                            isDownloading = true,
+                            progress = (index + 1).toFloat() / fileCount.toFloat(),
+                            downloadedBytes = completedFilesBytes,
+                            totalBytes = null,
+                            message = "Reusing $fileName",
+                        )
+                    )
+                    return@forEachIndexed
                 }
-                val body = response.body ?: throw IOException("Empty response body: $fileName")
-                val contentLength = body.contentLength().takeIf { it > 0L }
-                totalBytes = totalBytes ?: contentLength
-                target.outputStream().use { output ->
-                    body.byteStream().use { input ->
-                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read == -1) break
-                            output.write(buffer, 0, read)
-                            downloadedBytes += read
-                            emit(
-                                LocalQwenModelDownloadState(
-                                    modelName = modelName,
-                                    isInstalled = false,
-                                    isDownloading = true,
-                                    progress = progress(index, downloadedBytes, totalBytes),
-                                    downloadedBytes = downloadedBytes,
-                                    totalBytes = totalBytes,
-                                    message = "Downloading $fileName",
-                                )
-                            )
-                        }
-                    }
-                }
-                AppLogger.info(
+
+                val url = spec.downloadUrl(fileName)
+                val startByte = if (target.isFile && target.length() > 0L) target.length() else 0L
+                AppLogger.debug(
                     LogTags.LocalModel,
-                    "local_model_download_file_completed",
+                    "local_model_download_file_started",
                     "model" to modelName,
                     "file" to fileName,
-                    "bytes" to target.length(),
+                    "resumeByte" to startByte,
                 )
-            }
-        }
 
-        validateInstall(partialDir)
-        modelDir.deleteRecursively()
-        if (!partialDir.renameTo(modelDir)) {
-            partialDir.copyRecursively(modelDir, overwrite = true)
-            partialDir.deleteRecursively()
+                val request = Request.Builder().url(url).apply {
+                    if (startByte > 0L) header("Range", "bytes=$startByte-")
+                }.build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    // 416 = partial file 已完整（上次下载完毕但未来得及 rename）
+                    if (response.code == 416) {
+                        AppLogger.info(
+                            LogTags.LocalModel,
+                            "local_model_download_file_already_complete",
+                            "model" to modelName,
+                            "file" to fileName,
+                            "bytes" to target.length(),
+                        )
+                        completedFilesBytes += target.length()
+                        return@use
+                    }
+
+                    if (!response.isSuccessful) {
+                        AppLogger.warn(
+                            LogTags.LocalModel,
+                            "local_model_download_file_failed",
+                            "model" to modelName,
+                            "file" to fileName,
+                            "code" to response.code,
+                        )
+                        throw IOException("ModelScope download failed (${response.code}): $fileName")
+                    }
+
+                    val body = response.body ?: throw IOException("Empty response body: $fileName")
+                    // 206 Partial Content = 服务器支持 Range，追加写入；200 = 从头开始
+                    val isResume = response.code == 206
+                    val append = isResume && startByte > 0L
+                    val fileTotalBytes = if (isResume) {
+                        body.contentLength().takeIf { it > 0L }?.let { startByte + it }
+                    } else {
+                        body.contentLength().takeIf { it > 0L }
+                    }
+
+                    if (!isResume && startByte > 0L) {
+                        target.delete()
+                    }
+
+                    var currentFileBytes = if (append) startByte else 0L
+                    FileOutputStream(target, append).use { output ->
+                        body.byteStream().use { input ->
+                            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read == -1) break
+                                output.write(buffer, 0, read)
+                                currentFileBytes += read
+                                throttledEmit(
+                                    modelName = modelName,
+                                    fileIndex = index,
+                                    fileCount = fileCount,
+                                    completedFilesBytes = completedFilesBytes,
+                                    currentFileBytes = currentFileBytes,
+                                    fileTotalBytes = fileTotalBytes,
+                                    fileName = fileName,
+                                    lastEmitTime = lastEmitTime,
+                                    lastEmitProgress = lastEmitProgress,
+                                )?.let { (time, progress) ->
+                                    lastEmitTime = time
+                                    lastEmitProgress = progress
+                                }
+                            }
+                        }
+                    }
+                    completedFilesBytes += target.length()
+                    AppLogger.info(
+                        LogTags.LocalModel,
+                        "local_model_download_file_completed",
+                        "model" to modelName,
+                        "file" to fileName,
+                        "bytes" to target.length(),
+                    )
+                }
+            }
+
+            validateInstall(partialDir)
+            modelDir.deleteRecursively()
+            if (!partialDir.renameTo(modelDir)) {
+                partialDir.copyRecursively(modelDir, overwrite = true)
+                partialDir.deleteRecursively()
+            }
+            AppLogger.info(
+                LogTags.LocalModel,
+                "local_model_download_completed",
+                "model" to modelName,
+                "targetDir" to modelDir.absolutePath,
+            )
+            emit(status(modelName).copy(message = "下载完成"))
         }
-        AppLogger.info(
-            LogTags.LocalModel,
-            "local_model_download_completed",
-            "model" to modelName,
-            "targetDir" to modelDir.absolutePath,
-        )
-        emit(status(modelName).copy(message = "下载完成"))
     }.flowOn(Dispatchers.IO)
 
     private fun status(modelName: String): LocalQwenModelDownloadState {
         val modelDir = File(context.filesDir, "models/$modelName")
-        val installed = LocalQwenModelCatalog.requiredFiles.all { File(modelDir, it).isFile }
+        val installed = LocalQwenModelCatalog.requiredFiles.all {
+            val f = File(modelDir, it)
+            f.isFile && f.length() > 0L
+        }
         return LocalQwenModelDownloadState(
             modelName = modelName,
             isInstalled = installed,
@@ -182,29 +242,62 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
     }
 
     private fun validateInstall(modelDir: File) {
-        val missing = LocalQwenModelCatalog.requiredFiles.filterNot { File(modelDir, it).isFile }
-        if (missing.isNotEmpty()) {
-            throw IOException("Local Qwen model download incomplete: ${missing.joinToString()}")
+        val invalid = LocalQwenModelCatalog.requiredFiles.filter { name ->
+            val f = File(modelDir, name)
+            !f.isFile || f.length() == 0L
+        }
+        if (invalid.isNotEmpty()) {
+            throw IOException("Local Qwen model download incomplete: ${invalid.joinToString()}")
         }
     }
 
-    private fun progress(
+    /**
+     * 节流 emit：每 300ms 或进度变化 ≥ 0.5% 才 emit 一次，
+     * 返回 (emitTime, progress) 供调用方更新上次 emit 状态；null = 未 emit。
+     */
+    private suspend fun kotlinx.coroutines.flow.FlowCollector<LocalQwenModelDownloadState>.throttledEmit(
+        modelName: String,
         fileIndex: Int,
-        downloadedBytes: Long,
-        totalBytes: Long?,
-    ): Float {
-        val byBytes = totalBytes?.takeIf { it > 0L }?.let { downloadedBytes.toFloat() / it.toFloat() }
-        val byFiles = fileIndex.toFloat() / LocalQwenModelCatalog.requiredFiles.size.toFloat()
-        return (byBytes ?: byFiles).coerceIn(0f, 0.99f)
+        fileCount: Int,
+        completedFilesBytes: Long,
+        currentFileBytes: Long,
+        fileTotalBytes: Long?,
+        fileName: String,
+        lastEmitTime: Long,
+        lastEmitProgress: Float,
+    ): Pair<Long, Float>? {
+        val now = SystemClock.elapsedRealtime()
+        val totalDownloaded = completedFilesBytes + currentFileBytes
+        val progress = if (fileTotalBytes != null && fileTotalBytes > 0L) {
+            (completedFilesBytes + currentFileBytes).toFloat() /
+                (completedFilesBytes + fileTotalBytes).toFloat()
+        } else {
+            (fileIndex.toFloat() + currentFileBytes / 100_000_000f) / fileCount.toFloat()
+        }.coerceIn(0f, 0.99f)
+
+        val timePassed = now - lastEmitTime >= EMIT_INTERVAL_MS
+        val progressChanged = lastEmitProgress < 0f ||
+            kotlin.math.abs(progress - lastEmitProgress) >= EMIT_PROGRESS_DELTA
+
+        if (timePassed || progressChanged) {
+            emit(
+                LocalQwenModelDownloadState(
+                    modelName = modelName,
+                    isInstalled = false,
+                    isDownloading = true,
+                    progress = progress,
+                    downloadedBytes = totalDownloaded,
+                    totalBytes = if (fileTotalBytes != null) completedFilesBytes + fileTotalBytes else null,
+                    message = "Downloading $fileName",
+                )
+            )
+            return now to progress
+        }
+        return null
     }
 
-    private object LocalQwenCatalogSizes {
-        fun estimatedTotalBytes(modelName: String): Long? =
-            when (modelName) {
-                "Qwen3.5-0.8B-MNN" -> 600L * 1024L * 1024L
-                "Qwen3.5-2B-MNN" -> 1_600L * 1024L * 1024L
-                "Qwen3.5-4B-MNN" -> 3_200L * 1024L * 1024L
-                else -> null
-            }
+    private companion object {
+        const val EMIT_INTERVAL_MS = 300L
+        const val EMIT_PROGRESS_DELTA = 0.005f
     }
 }

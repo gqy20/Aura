@@ -148,7 +148,7 @@ class ChatViewModelTest {
                     message = if (installed) "Installed" else "Not installed",
                 )
             )
-        override fun download(modelName: String): Flow<LocalQwenModelDownloadState> = flowOf(
+        override fun download(modelName: String, force: Boolean): Flow<LocalQwenModelDownloadState> = flowOf(
             LocalQwenModelDownloadState(
                 modelName = modelName,
                 isInstalled = true,

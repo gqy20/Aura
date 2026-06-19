@@ -104,6 +104,7 @@ internal data class SettingsScreenState(
     val connectivityResult: ConnectivityResult?,
     val isCheckingConnectivity: Boolean,
     val dreamLoopInterval: DreamLoopInterval,
+    val dreamLoopModelName: String,
     val dreamRunState: DreamRunObserver.Snapshot,
     val lastDreamSuccessAtMs: Long,
     val lastDreamSuccessSavedCount: Int,
@@ -131,6 +132,7 @@ internal data class SettingsScreenActions(
     val onReminderToolEnabledChanged: (Boolean) -> Unit,
     val onNotificationEnabledChanged: (Boolean) -> Unit,
     val onDreamLoopIntervalChanged: (DreamLoopInterval) -> Unit,
+    val onDreamLoopModelNameChanged: (String) -> Unit,
     val onTriggerDreamLoopNow: () -> Unit,
     val onRequestContextPermissions: () -> Unit,
     val onHealthAutoSyncEnabledChanged: (Boolean) -> Unit,
@@ -161,6 +163,7 @@ internal data class SettingsScreenActions(
             onReminderToolEnabledChanged = viewModel::setReminderToolEnabled,
             onNotificationEnabledChanged = viewModel::setNotificationEnabled,
             onDreamLoopIntervalChanged = viewModel::setDreamLoopInterval,
+            onDreamLoopModelNameChanged = viewModel::setDreamLoopModelName,
             onTriggerDreamLoopNow = viewModel::triggerDreamLoopNow,
             onRequestContextPermissions = onRequestContextPermissions,
             onHealthAutoSyncEnabledChanged = viewModel::setHealthAutoSyncEnabled,
@@ -179,6 +182,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val dreamLoopInterval by viewModel.dreamLoopInterval.collectAsStateWithLifecycle()
+    val dreamLoopModelName by viewModel.dreamLoopModelName.collectAsStateWithLifecycle()
     val dreamRunState by viewModel.dreamRunState.collectAsStateWithLifecycle()
     val lastDreamSuccessAtMs by viewModel.lastDreamSuccessAtMs.collectAsStateWithLifecycle()
     val lastDreamSuccessSavedCount by viewModel.lastDreamSuccessSavedCount.collectAsStateWithLifecycle()
@@ -201,6 +205,7 @@ fun SettingsScreen(
             connectivityResult = uiState.connectivityResult,
             isCheckingConnectivity = uiState.isCheckingConnectivity,
             dreamLoopInterval = dreamLoopInterval,
+            dreamLoopModelName = dreamLoopModelName,
             dreamRunState = dreamRunState,
             lastDreamSuccessAtMs = lastDreamSuccessAtMs,
             lastDreamSuccessSavedCount = lastDreamSuccessSavedCount,
@@ -614,10 +619,12 @@ private fun LazyListScope.settingsSystemPage(
     item {
         DreamLoopSection(
             current = state.dreamLoopInterval,
+            modelName = state.dreamLoopModelName,
             runState = state.dreamRunState,
             lastSuccessAtMs = state.lastDreamSuccessAtMs,
             lastSuccessSavedCount = state.lastDreamSuccessSavedCount,
             onIntervalChanged = actions.onDreamLoopIntervalChanged,
+            onModelNameChanged = actions.onDreamLoopModelNameChanged,
             onTriggerNow = actions.onTriggerDreamLoopNow,
         )
     }
@@ -629,10 +636,12 @@ private fun LazyListScope.settingsSystemPage(
 @Composable
 private fun DreamLoopSection(
     current: DreamLoopInterval,
+    modelName: String,
     runState: DreamRunObserver.Snapshot,
     lastSuccessAtMs: Long,
     lastSuccessSavedCount: Int,
     onIntervalChanged: (DreamLoopInterval) -> Unit,
+    onModelNameChanged: (String) -> Unit,
     onTriggerNow: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -654,6 +663,38 @@ private fun DreamLoopSection(
                         selected = current == interval,
                         onClick = { onIntervalChanged(interval) },
                         label = { Text(interval.label()) },
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            Spacer(Modifier.height(4.dp))
+
+            // Dream Loop 独立模型选择：空=跟随主聊天，非空=强制指定本地模型。
+            val localOptions = DefaultLlmValues.modelOptions(LlmProvider.LOCAL_QWEN)
+            SettingsFieldLabel("后台模型")
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                // "跟随" chip — 与主聊天 MODEL 页选择的本地模型一致。
+                val isFollowing = modelName.isBlank()
+                FilterChip(
+                    selected = isFollowing,
+                    onClick = { onModelNameChanged("") },
+                    label = { Text("跟随主聊天") },
+                )
+                localOptions.forEach { option ->
+                    FilterChip(
+                        selected = !isFollowing && modelName == option,
+                        onClick = { onModelNameChanged(option) },
+                        label = {
+                            Text(
+                                text = option.modelOptionLabel(LlmProvider.LOCAL_QWEN),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
                     )
                 }
             }

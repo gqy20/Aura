@@ -174,7 +174,7 @@ class SettingsUseCase @Inject constructor(
         localQwenDownloadJob?.cancel()
         localQwenDownloadJob = scope.launch {
             try {
-                localQwenModelDownloader.download(modelName).collect { downloadState ->
+                localQwenModelDownloader.download(modelName, force = state.localQwenDownload.isInstalled).collect { downloadState ->
                     update {
                         copy(
                             configStatus = configStatus.withLocalQwenDownloadState(downloadState),

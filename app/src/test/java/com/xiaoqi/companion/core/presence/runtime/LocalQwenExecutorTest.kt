@@ -156,6 +156,110 @@ class LocalQwenExecutorTest {
         assertEquals(1.0f, drafts[0].confidence, 0.001f)
     }
 
+    // ── Layer 2: 归一化修复 ──
+
+    @Test
+    fun parsePatternDetectOutput_singleQuotes_normalized() {
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
+        // 0.8B 模型常见输出:单引号代替双引号
+        val raw = """[{'headline': '周日下午情绪偏低', 'body': '连续3周', 'evidence_ids': ['m1','m2'], 'confidence': 0.78}]"""
+
+        val drafts = executor.parsePatternDetectOutput(raw)
+
+        assertEquals(1, drafts.size)
+        assertEquals("周日下午情绪偏低", drafts[0].headline)
+        assertEquals(0.78f, drafts[0].confidence, 0.001f)
+    }
+
+    @Test
+    fun parsePatternDetectOutput_trailingComma_normalized() {
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
+        val raw = """[{"headline":"X","body":"Y","evidence_ids":[],"confidence":0.7,}]"""
+
+        val drafts = executor.parsePatternDetectOutput(raw)
+
+        assertEquals(1, drafts.size)
+        assertEquals("X", drafts[0].headline)
+    }
+
+    @Test
+    fun parsePatternDetectOutput_textAfterJsonArray_trimmed() {
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
+        // 模型常在 JSON 后追加解释文字
+        val raw = """[{"headline":"X","body":"Y","evidence_ids":[],"confidence":0.7}]
+以上是基于数据分析的结果。"""
+
+        val drafts = executor.parsePatternDetectOutput(raw)
+
+        assertEquals(1, drafts.size)
+        assertEquals("X", drafts[0].headline)
+    }
+
+    @Test
+    fun parsePatternDetectOutput_bareObjectWrapped() {
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
+        // 无方括号的裸对象
+        val raw = """这里是分析结果:{"headline":"X","body":"Y","evidence_ids":[],"confidence":0.6}结束"""
+
+        val drafts = executor.parsePatternDetectOutput(raw)
+
+        assertEquals(1, drafts.size)
+        assertEquals("X", drafts[0].headline)
+    }
+
+    @Test
+    fun parsePatternDetectOutput_chinesePunctuation_normalized() {
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
+        // 中文逗号/冒号
+        val raw = """[{"headline"："X"，"body"："Y"，"evidence_ids"：[]，"confidence"：0.7}]"""
+
+        val drafts = executor.parsePatternDetectOutput(raw)
+
+        assertEquals(1, drafts.size)
+        assertEquals("X", drafts[0].headline)
+    }
+
+    @Test
+    fun parsePatternDetectOutput_allLayer2IssuesCombined() {
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
+        // 单引号 + 尾逗号 + 后缀文字 + 中文标点 — 最坏情况
+        val raw = """[{'headline'：'测试标题'，'body'：'描述内容'，'evidence_ids'：[]，'confidence'：0.75，}]
+分析完成，共发现 1 条模式。
+"""
+
+        val drafts = executor.parsePatternDetectOutput(raw)
+
+        assertEquals(1, drafts.size)
+        assertEquals("测试标题", drafts[0].headline)
+        assertEquals("描述内容", drafts[0].bodyMarkdown)
+        assertEquals(0.75f, drafts[0].confidence, 0.001f)
+    }
+
+    // ── Layer 3: 正则兜底 ──
+
+    @Test
+    fun parsePatternDetectOutput_freeTextRegexExtractsHeadline() {
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
+        // 完全不是 JSON 的自由文本 — Layer 3 应该能抠出 headline
+        val raw = """基于数据分析,我发现以下模式:
+headline: 周末睡眠时间明显延长
+body: 相比工作日平均多睡 1.5 小时
+confidence: 0.72
+这个趋势在最近两周比较明显。"""
+
+        val drafts = executor.parsePatternDetectOutput(raw)
+
+        assertTrue(drafts.isNotEmpty())
+        assertEquals("周末睡眠时间明显延长", drafts[0].headline)
+    }
+
+    @Test
+    fun parsePatternDetectOutput_completelyGarbage_returnsEmpty() {
+        val executor = LocalQwenExecutor(StubLocalQwenEngine(flowOf("")), fakeAppPreferences(), fakeDownloader())
+        val drafts = executor.parsePatternDetectOutput("今天天气真好，没什么特别的发现")
+        assertTrue(drafts.isEmpty())
+    }
+
     private fun fakeAppPreferences(modelName: String = "Qwen3.5-0.8B-MNN"): AppPreferences {
         val prefs = mockk<AppPreferences>(relaxed = true)
         every { prefs.modelName } returns flowOf(modelName)

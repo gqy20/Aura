@@ -127,7 +127,7 @@ class SettingsUseCaseTest {
                 settingsModelName = DefaultLlmValues.LOCAL_QWEN_MODEL,
             )
         }
-        every { localQwenDownloader.download(DefaultLlmValues.LOCAL_QWEN_MODEL) } returns flow {
+        every { localQwenDownloader.download(DefaultLlmValues.LOCAL_QWEN_MODEL, any()) } returns flow {
             emit(
                 LocalQwenModelDownloadState(
                     modelName = DefaultLlmValues.LOCAL_QWEN_MODEL,

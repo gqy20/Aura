@@ -117,6 +117,17 @@ class ChatViewModel @Inject constructor(
             initialValue = DreamLoopInterval.DEFAULT,
         )
 
+    /**
+     * Dream Loop 独立模型选择。空字符串=跟随主聊天模型（默认/向后兼容），
+     * 非 null/空=强制指定本地模型名，不受 MODEL 页影响。
+     */
+    val dreamLoopModelName: StateFlow<String> = appPreferences.dreamLoopModelName
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = "",
+        )
+
     /** "立即跑一次"按钮对应的 Worker 状态(Idle / Queued / Running / Succeeded / Failed)。 */
     val dreamRunState: StateFlow<DreamRunObserver.Snapshot> = dreamRunObserver.state
 
@@ -844,6 +855,12 @@ class ChatViewModel @Inject constructor(
     fun setDreamLoopInterval(value: DreamLoopInterval) {
         viewModelScope.launch {
             appPreferences.setDreamLoopInterval(value)
+        }
+    }
+
+    fun setDreamLoopModelName(value: String) {
+        viewModelScope.launch {
+            appPreferences.setDreamLoopModelName(value)
         }
     }
 

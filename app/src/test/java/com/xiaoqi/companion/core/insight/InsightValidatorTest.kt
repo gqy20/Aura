@@ -75,9 +75,10 @@ class InsightValidatorTest {
 
     @Test
     fun validate_lowConfidence_returnsNull() = runTest {
+        // confidence 0.35 < 0.4 (降低后的门槛)，仍应被拒
         val draft = emptyEvidenceDraft().copy(
             evidenceMoodSnapshotIds = listOf("mood-1"),
-            confidence = 0.55f,  // < 0.6
+            confidence = 0.35f,
         )
         coEvery { moodSnapshotDao.existsById("mood-1") } returns true
 
@@ -122,15 +123,13 @@ class InsightValidatorTest {
 
     @Test
     fun validate_halfEvidenceMissingBelowThreshold_returnsNull() = runTest {
-        // 4 个 id, 只有 1 个真实 → 25% 命中,不过门槛
+        // 4 个 id, 全部 fake → 0% 命中,低于 0.25 门槛
         val draft = emptyEvidenceDraft().copy(
-            evidenceMessageIds = listOf("m-real", "m-fake-1", "m-fake-2"),
+            evidenceMessageIds = listOf("m-fake-1", "m-fake-2", "m-fake-3"),
             evidenceMemoryIds = listOf("mem-fake"),
         )
-        coEvery { messageDao.existsById("m-real") } returns true
-        coEvery { messageDao.existsById("m-fake-1") } returns false
-        coEvery { messageDao.existsById("m-fake-2") } returns false
-        coEvery { memoryDao.existsById("mem-fake") } returns false
+        coEvery { messageDao.existsById(any()) } returns false
+        coEvery { memoryDao.existsById(any()) } returns false
 
         val result = validator.validate(draft)
 

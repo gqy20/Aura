@@ -27,7 +27,7 @@
 | 记忆系统 | 过期过滤 / 敏感过滤 / 相似合并 / JSON 容错 | `MemoryRepository` |
 | MCP 远程工具 | 协议版本协商 / 404 自动重连 / 通知失败容错 | `McpHttpClient`、`CompanionToolRegistry` |
 | 本地 LLM (MNN) | JNI 库懒加载 + 失败容错 + 路径多候选 | `NativeMnnLlmBridge`、`MnnLocalQwenEngine`、`LocalQwenModelLocator` |
-| 模型下载 | 断点续传 / partial 切换失败回退 / 进度估算降级 | `LocalQwenModelDownloader` |
+| 模型下载 | HTTP Range 断点续传 / partial 切换失败回退 / 进度 per-file Content-Length / emit 节流 / Mutex 防并发 / 完整性校验(size>0) | `LocalQwenModelDownloader` |
 | 提示词系统 | YAML 解析容错 / 模板字段缺失 / 占位符 `[MISSING:key]` / fallback yml | `PromptConfigLoader`、`SystemPersona`、`PromptBuilder` |
 | Reminder | SDK 版本分支 / 精确闹钟权限缺失降级 / `delay_too_small_minute` 显式拒 | `AndroidReminderScheduler`、`CreateLocalReminderTool`、`ContextPermissionReader`、`ReminderNotificationPoster` |
 | Context Provider | 权限缺失 → null / 设备服务不可用 → "other" / weather `"未知天气"` | `CurrentLocationProvider`、`DeviceStatusProvider`、`OpenMeteoWeatherProvider` |
@@ -413,10 +413,13 @@
 
 ## 九、模型下载兜底
 
-### 9.1 单文件断点续传 / 复用
+### 9.1 HTTP Range 断点续传 + 完整文件复用 + 强制重下载
 
-- **触发**：某个 `requiredFile` 已在 `modelDir` 存在
-- **兜底**：复制到 `partialDir` 计入进度，跳过下载
+- **触发**：下载开始时检查每个 `requiredFile`
+- **兜底**（三层）：
+  - `force = true`（UI 显示"重新下载"时自动传入）→ 先删除 `modelDir` 和 `partialDir`，全部从网络重新下载
+  - `modelDir` 中已有完整文件 → 复制到 `partialDir` 并跳过下载
+  - `partialDir` 中已有半成品 → 发送 `Range: bytes=<已下载字节>-` header，206 响应追加写入；若服务器返回 200（不支持 Range）则删除 partial 从头开始；416 响应视为已完整
 - **位置**：[`ModelScopeLocalQwenModelDownloader.download`](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
 
 ### 9.2 `partial → modelDir` 原子切换失败回退
@@ -426,12 +429,12 @@
 - **位置**：[`ModelScopeLocalQwenModelDownloader.download`](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
 - **风险**：外置存储跨设备时可能两份并存，要靠 `modelDir.deleteRecursively()` 之前已经被调用来保证清理。
 
-### 9.3 进度条降级
+### 9.3 进度条 per-file Content-Length 计算
 
-- **触发**：`totalBytes` 未知（catalog 表里没列）
-- **兜底**：`byBytes` 为空时用 `byFiles`（已下载文件数 / 总文件数）
-- **位置**：[`ModelScopeLocalQwenModelDownloader.progress`](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
-- **风险**：文件大小差异巨大时，按"文件数"算的进度会与实际字节数差距明显。
+- **触发**：每个文件开始下载时从响应 `Content-Length` header 获取实际大小
+- **兜底**：进度 = `(completedFilesBytes + currentFileBytes) / (completedFilesBytes + fileTotalBytes)`；
+  若 Content-Length 不可得（null / ≤ 0），降级为 `(fileIndex + currentFileBytes/100MB) / fileCount` 粗估
+- **位置**：[`ModelScopeLocalQwenModelDownloader.throttledEmit`](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
 
 ### 9.4 进度上限 0.99
 
@@ -440,25 +443,25 @@
 - **位置**：[同上](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
 - **风险**：100% 仅在 UI 显式发 `Download complete` 时出现，下载真实结束时可能跳变较大。
 
-### 9.5 模型大小预估表（私有 object）
+### 9.5 emit 节流 + Mutex 防并发
 
-- **触发**：下载时拿不到 `Content-Length`
-- **兜底**：`LocalQwenModelDownloader` 内私有 `object LocalQwenCatalogSizes.estimatedTotalBytes` 给 0.8B/2B/4B 写死 600/1600/3200 MB；未知模型返回 `null`
-- **位置**：[`LocalQwenModelDownloader.LocalQwenCatalogSizes`](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
-- **风险**：加新模型忘记更新这个表，会让进度条完全依赖文件数；应改为读远端 manifest。
+- **触发**（节流）：下载循环每读取一个 buffer 都会尝试 emit；节流条件为时间间隔 ≥ 300ms 或进度变化 ≥ 0.5%
+- **触发**（Mutex）：`download()` 入口 `downloadMutex.withLock` 保证同一时刻只有一个下载流在运行，避免并发写 partial 目录导致文件损坏
+- **兜底**：节流连同 `lastEmitProgress` / `lastEmitTime` 状态记录在 flow 内部；Mutex 由 Kotlin coroutines `sync.Mutex` 实现，Flow 取消时自动释放
+- **位置**：[`ModelScopeLocalQwenModelDownloader.throttledEmit`](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
 
-### 9.6 完整性校验
+### 9.6 完整性校验（含 size > 0 检查）
 
 - **触发**：下载完成时
-- **兜底**：`validateInstall` 检查 `requiredFiles` 全部存在；不满足则抛 `IOException("Local Qwen model download incomplete: ...")`
+- **兜底**：`validateInstall` 检查 `requiredFiles` 全部存在且 `length() > 0`；不满足则抛 `IOException("Local Qwen model download incomplete: ...")`
 - **位置**：[`ModelScopeLocalQwenModelDownloader.validateInstall`](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
 
-### 9.7 单文件 404
+### 9.7 单文件 HTTP 失败（含 Range 续传保护）
 
-- **触发**：某个文件 HTTP 不成功
-- **兜底**：`throw IOException("ModelScope download failed (${code}): $fileName")`
+- **触发**：某个文件 HTTP 不成功（非 206/416/200）
+- **兜底**：`throw IOException("ModelScope download failed (${code}): $fileName")`；
+  已下载的 partial 文件保留在 `.partial` 目录，下次重新下载时通过 Range header 续传，不丢进度
 - **位置**：[`ModelScopeLocalQwenModelDownloader.download`](../app/src/main/java/com/xiaoqi/companion/core/local/LocalQwenModelDownloader.kt)
-- **风险**：会丢已下完的进度，下次重下需要从头来（目前没接 resume）。
 
 ---
 
