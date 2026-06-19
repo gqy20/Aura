@@ -111,7 +111,6 @@ export default function PresencePage() {
         eyebrow="Overview"
         title="陪伴运行时，不只是聊天"
         description="Aura 会根据输入、流式回复、工具状态、情绪和关系变化持续调整自己 —— 它是一段持续运行的状态流，而不只是你发消息时弹出的一次回复。"
-        width="prose"
       />
 
       <ChapterBlock

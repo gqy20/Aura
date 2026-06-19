@@ -55,7 +55,15 @@ export function FeatureShell({
 
         {/* 第一屏：nav + 标题 + 3D 共享 100svh */}
         <section className="relative flex h-[100svh] snap-start snap-always flex-col overflow-hidden">
-          <div className="px-6 sm:px-10 lg:px-16">
+          {/* 导航栏到内容区的渐变过渡 */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32"
+            style={{
+              background: 'linear-gradient(to bottom, #08090a 0%, transparent 100%)',
+            }}
+          />
+          <div className="relative z-20 px-6 sm:px-10 lg:px-16">
             <FeatureNav active={active} />
           </div>
 

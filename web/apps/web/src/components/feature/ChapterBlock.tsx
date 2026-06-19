@@ -50,7 +50,7 @@ export function ChapterBlock({
   return (
     <section
       className={cn(
-        'relative flex min-h-[100svh] snap-start snap-always flex-col justify-center px-6 pt-24 pb-24 sm:px-10 sm:pt-32 sm:pb-32 lg:px-16 lg:pt-40 lg:pb-40',
+        'relative flex min-h-[100svh] snap-start snap-always flex-col justify-start px-6 pt-28 pb-20 sm:px-10 sm:pt-36 sm:pb-28 lg:px-16 lg:pt-44 lg:pb-36',
         className,
       )}
     >

@@ -30,7 +30,7 @@ export function FooterMeta({
   currentKey,
 }: FooterMetaProps) {
   return (
-    <footer className="flex min-h-[100svh] snap-start snap-always flex-col justify-end border-t border-border px-6 pt-16 pb-12 sm:px-10 sm:pt-20 sm:pb-16 lg:px-16">
+    <footer className="flex min-h-[100svh] snap-start snap-always flex-col justify-end border-t border-border px-6 pt-28 pb-12 sm:px-10 sm:pt-36 sm:pb-16 lg:px-16 lg:pb-20">
       <div className="mx-auto w-full max-w-7xl">
         <div className="label-mono flex items-center gap-4 text-muted">
           <span className="text-accent">{number}</span>

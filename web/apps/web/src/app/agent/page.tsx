@@ -101,7 +101,6 @@ export default function AgentPage() {
         eyebrow="Overview"
         title="它怎么从聊天走向行动"
         description="这一层不是「会调 API」，而是把记忆、设备、健康、提醒和 MCP 组织成可控的行动能力 —— 工具能调用、可被否决、可被复用。"
-        width="prose"
       />
 
       <ChapterBlock

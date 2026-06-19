@@ -81,7 +81,6 @@ export default function MemoryPage() {
         eyebrow="Overview"
         title="记住什么，不记住什么"
         description="Aura 不把你压成一句标签，而是把稳定事实、阶段经历和长期偏好分开存放。摘要负责压缩长程上下文，关系与偏好负责细节回流 —— 用户始终可以否决任何一条。"
-        width="prose"
       />
 
       <ChapterBlock

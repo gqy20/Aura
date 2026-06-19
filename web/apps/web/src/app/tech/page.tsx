@@ -91,7 +91,6 @@ export default function TechPage() {
         eyebrow="Overview"
         title="四层结构 · 一条执行路径"
         description="Aura 的代码主体由 4 层组成：陪伴运行时把一切连在一起，双心智负责分工，可信个人模型负责记忆边界，工具与 MCP 把外部世界接入。"
-        width="prose"
       />
 
       <ChapterBlock

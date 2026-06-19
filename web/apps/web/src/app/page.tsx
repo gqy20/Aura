@@ -32,7 +32,15 @@ export default function Home() {
 
         {/* 首屏（snap，整屏 100svh）：nav + hero */}
         <section className="relative flex h-[100svh] snap-start snap-always flex-col overflow-hidden">
-          <div className="px-6 sm:px-10 lg:px-16">
+          {/* 导航栏到内容区的渐变过渡 */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32"
+            style={{
+              background: 'linear-gradient(to bottom, #08090a 0%, transparent 100%)',
+            }}
+          />
+          <div className="relative z-20 px-6 sm:px-10 lg:px-16">
             <motion.nav
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -74,8 +82,8 @@ export default function Home() {
             <div
               className="pointer-events-none absolute inset-0 hidden md:block"
               style={{
-                WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
-                maskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 14%, black 70%, transparent 100%)',
+                maskImage: 'linear-gradient(to bottom, transparent 0%, black 14%, black 70%, transparent 100%)',
               }}
             >
               <MeshGradient />
