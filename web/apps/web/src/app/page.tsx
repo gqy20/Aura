@@ -228,23 +228,43 @@ export default function Home() {
   )
 }
 
-/** 场景 01 · 聊天流：模板回复（划掉）对比 Aura 的克制追问 */
+/** 场景 01 · 情绪感知：模板 vs 克制追问 —— 核心是「越熟越懂分寸」 */
 function TiredChatPhone() {
   return (
-    <PhoneMockup badge={{ label: '23:47 ·', value: '情绪 偏低', color: 'var(--aura-speaking)' }}>
+    <PhoneMockup badge={{ label: '23:47 ·', value: '情绪 偏低 · 亲密度 高', color: 'var(--aura-speaking)' }}>
       <div className="flex flex-1 flex-col justify-center gap-3">
-        <p className="pl-1 font-mono text-[10px] text-white/40 line-through">辛苦了。</p>
-
+        {/* 用户消息 + 情绪色条 */}
         <div className="flex justify-end">
-          <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-accent/15 px-3.5 py-2.5 text-[13px] text-foreground">
-            今天好累
+          <div className="max-w-[78%]">
+            <div className="rounded-2xl rounded-br-sm bg-accent/15 px-3.5 py-2.5 text-[13px] text-foreground">
+              今天好累
+            </div>
+            <div className="mt-1 h-0.5 w-full rounded-full bg-gradient-to-r from-[var(--aura-speaking)] via-[var(--aura-speaking)]/40 to-transparent" />
           </div>
         </div>
 
+        {/* 模板回复（划掉）—— 大多数 AI 的反应 */}
+        <div className="flex justify-start opacity-30">
+          <div className="max-w-[82%] rounded-2xl rounded-bl-sm border border-dashed border-white/10 px-3.5 py-2">
+            <p className="text-[12.5px] text-muted line-through">辛苦了！早点休息吧 💪</p>
+            <p className="mt-1 font-mono text-[9px] text-muted/50">← 模板回复</p>
+          </div>
+        </div>
+
+        {/* Aura 回复 —— 基于情绪状态机 + 亲密度 */}
         <div className="flex justify-start">
-          <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white/[0.06] px-3.5 py-2.5 text-[13px] leading-relaxed text-foreground">
-            最近几天好像都比较辛苦？
-            <span className="mt-1 block text-muted">要不要聊聊，还是就安静待会儿。</span>
+          <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white/[0.06] px-3.5 py-2.5">
+            <p className="text-[13px] leading-relaxed text-foreground">
+              连续第三天加班了？
+            </p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-foreground/70">
+              要不要聊聊，还是就安静待会儿。
+            </p>
+            {/* 底部状态机标签 */}
+            <div className="mt-2.5 flex items-center gap-1.5">
+              <span className="rounded-md bg-[var(--aura-speaking)]/10 px-1.5 font-mono text-[8.5px]" style={{ color: 'var(--aura-speaking)' }}>state: low_energy</span>
+              <span className="rounded-md bg-white/5 px-1.5 font-mono text-[8.5px] text-muted/60">intimacy: 0.84 → 收敛语调</span>
+            </div>
           </div>
         </div>
       </div>
@@ -252,14 +272,33 @@ function TiredChatPhone() {
   )
 }
 
-/** 场景 02 · Insight 卡片：带类型、来源、置信度、用户控制（C 位） */
+/** 场景 02 · Dream Loop：锁屏后本地推理，证据链可追溯 —— 核心是「0 联网也能认识你」 */
 function DreamInsightPhone() {
   return (
     <PhoneMockup
       badge={{ label: '23:30 ·', value: 'Dream Loop 运行中', color: 'var(--aura-thinking)', pulse: true }}
       screenGlow="radial-gradient(ellipse 80% 45% at 50% 115%, color-mix(in srgb, var(--aura-thinking) 24%, transparent), transparent)"
     >
-      <div className="flex flex-1 flex-col justify-center">
+      <div className="flex flex-1 flex-col justify-center gap-3.5">
+        {/* 本地处理流水线 */}
+        <div className="flex items-center gap-1.5 font-mono text-[8.5px]">
+          {[
+            { label: '收集数据', done: true },
+            { label: 'Qwen 推理', done: true },
+            { label: '校验 Evidence', done: true },
+            { label: '生成 Insight', done: false },
+          ].map((step, i) => (
+            <div key={step.label} className="flex items-center gap-1.5">
+              <span className={`flex h-4.5 w-4.5 items-center justify-center rounded-full ${step.done ? 'bg-[var(--aura-thinking)]/25 text-[var(--aura-thinking)]' : 'bg-white/5 text-muted'}`}>
+                {step.done ? '✓' : `${i + 1}`}
+              </span>
+              <span className={step.done ? 'text-foreground/70' : 'text-muted/50'}>{step.label}</span>
+              {i < 3 && <span className="mx-0.5 text-white/10">→</span>}
+            </div>
+          ))}
+        </div>
+
+        {/* Insight 卡片 */}
         <div
           className="rounded-2xl border p-4"
           style={{
@@ -277,9 +316,19 @@ function DreamInsightPhone() {
             你最近 3 周都 <span className="rounded bg-accent/25 px-1">周日下午</span> 情绪偏低。
           </p>
 
-          <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted">
-            来源 · 7 条情绪记录 · 本地生成 · 0 联网
-          </p>
+          {/* Evidence 来源 chips */}
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {[
+              { n: '6/15 日记', t: '情绪低' },
+              { n: '6/8 对话', t: '疲惫' },
+              { n: '6/1 记录', t: '不想说话' },
+            ].map((e) => (
+              <span key={e.n} className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-1 font-mono text-[9px]">
+                <span className="text-foreground/70">{e.n}</span>
+                <span className="ml-1 text-muted/50">·{e.t}</span>
+              </span>
+            ))}
+          </div>
 
           <div className="mt-4 flex gap-2">
             <span className="rounded-full bg-accent px-3 py-1 text-[11px] font-medium text-accent-foreground">
@@ -290,142 +339,173 @@ function DreamInsightPhone() {
             </span>
           </div>
         </div>
+
+        {/* 底部隐私强调 */}
+        <div className="flex items-center justify-center gap-1.5 font-mono text-[9px] text-muted/50">
+          <span className="inline-block h-1 w-1 rounded-full bg-emerald-500/50" />
+          本地 Qwen 0.8B · 数据零上传 · 锁屏后自动运行
+        </div>
       </div>
     </PhoneMockup>
   )
 }
 
-/** 场景 03 · 路线 + 数据 chip + 终点卡：多源数据拼成一条可执行方案 */
+/** 场景 03 · 多工具编排流程：不是给链接，而是把步数/天气/口味/地图融合成一条可走的路 */
 function WalkRoutePhone() {
   return (
-    <PhoneMockup badge={{ label: '18:20 ·', value: '今日步数 1,840', color: 'var(--aura-health)' }}>
-      <div className="flex flex-1 flex-col gap-3.5">
-        <div className="rounded-xl border border-border bg-subtle/30 p-3">
-          <svg viewBox="0 0 220 90" className="w-full">
-            <path
-              d="M16 74 C 66 72, 78 42, 110 40 S 176 24, 202 14"
-              fill="none"
-              stroke="var(--aura-health)"
-              strokeWidth="2"
-              strokeDasharray="3 4"
-              strokeLinecap="round"
-            />
-            <circle cx="16" cy="74" r="4.5" fill="var(--aura-health)" />
-            <circle cx="110" cy="40" r="4.5" fill="var(--aura-health)" />
-            <circle cx="202" cy="14" r="4.5" fill="var(--aura-health)" />
-          </svg>
-          <div className="mt-1 flex justify-between font-mono text-[9px] text-muted">
-            <span>公司</span>
-            <span>河边散步点</span>
-            <span>小馆</span>
+    <PhoneMockup badge={{ label: '18:21 ·', value: '工具编排中', color: 'var(--aura-health)' }}>
+      <div className="flex flex-1 flex-col gap-3">
+        {/* 用户请求 */}
+        <div className="flex justify-end">
+          <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-accent/15 px-3 py-2 text-[12.5px] text-foreground">
+            下班帮我规划条散步路线
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {['22° 微风', '偏好清淡', '树荫优先'].map((c) => (
-            <span
-              key={c}
-              className="rounded-full border border-border bg-subtle/40 px-2.5 py-1 font-mono text-[10px] text-foreground"
-            >
-              {c}
-            </span>
+        {/* 工具调用流 —— 核心差异化：多源数据同时拉取 */}
+        <div className="space-y-2">
+          {[
+            { tool: 'Health Connect', status: 'done', result: '今日步数 1,840 / 偏低' },
+            { tool: '高德地图', status: 'done', result: '周边 3 条步行路线' },
+            { tool: '天气', status: 'done', result: '22°C 微风 · 无雨' },
+            { tool: '记忆', status: 'done', result: '偏好清淡 · 常去小馆' },
+          ].map((t) => (
+            <div key={t.tool} className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-2.5 py-1.5">
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${t.status === 'done' ? 'bg-emerald-400' : 'bg-[var(--aura-health)] animate-pulse'}`} />
+              <span className="w-22 shrink-0 font-mono text-[9.5px] text-muted">{t.tool}</span>
+              <span className="h-px flex-1 bg-white/[0.04]" />
+              <span className={`font-mono text-[9.5px] ${t.status === 'done' ? 'text-foreground/60' : 'text-muted/50'}`}>{t.result}</span>
+            </div>
           ))}
         </div>
 
-        <div className="rounded-xl border border-border bg-subtle/30 p-3">
-          <p className="text-[13px] font-medium text-foreground">老王小馆</p>
-          <p className="mt-0.5 font-mono text-[10px] text-muted">步行 18min · 一个人也好坐</p>
+        {/* 融合结果 —— 一条完整路线 */}
+        <div className="rounded-xl border border-[var(--aura-health)]/20 bg-[var(--aura-health)]/[0.04] p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <svg className="h-3 w-3 text-[var(--aura-health)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+            <span className="font-mono text-[10px] font-medium text-[var(--aura-health)]">推荐路线 · 1.2km · 约14min</span>
+          </div>
+          <svg viewBox="0 0 220 60" className="w-full">
+            <path d="M16 48 C 56 46, 70 28, 110 26 S 170 14, 202 6" fill="none" stroke="var(--aura-health)" strokeWidth="1.8" strokeDasharray="3 3" strokeLinecap="round" />
+            <circle cx="16" cy="48" r="3" fill="var(--aura-health)" /><circle cx="110" cy="26" r="3" fill="var(--aura-health)" /><circle cx="202" cy="6" r="3" fill="var(--aura-health)" />
+          </svg>
+          <div className="mt-1.5 flex justify-between font-mono text-[8.5px] text-muted px-0.5">
+            <span>公司<span className="text-foreground/30 ml-0.5">起点</span></span>
+            <span>河边散步道<span className="text-foreground/30 ml-0.5">树荫</span></span>
+            <span>老王小馆<span className="text-foreground/30 ml-0.5">终点</span></span>
+          </div>
+        </div>
+
+        {/* Aura 补充建议 */}
+        <div className="flex justify-start">
+          <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white/[0.04] px-3 py-2 text-[11.5px] leading-relaxed text-foreground/75">
+            如果今天太累，也可以直接回家路上买杯咖啡——瑞幸文三路店顺路，步行 6min。
+          </div>
         </div>
       </div>
     </PhoneMockup>
   )
 }
 
-/** 场景 04 · 夕阳照片 → Vision 理解 → Connection Insight 关联发现 */
+/** 场景 04 · 视觉记忆：拍照 → Vision 理解 → 跨时间关联发现 —— 核心是「它记得你拍过什么」 */
 function SunsetMemoryPhone() {
   return (
     <PhoneMockup
-      badge={{ label: '18:32 ·', value: 'Vision 记忆', color: 'var(--aura-speaking)' }}
+      badge={{ label: '18:32 ·', value: 'Vision 记忆已存', color: 'var(--aura-speaking)' }}
       screenGlow="radial-gradient(ellipse 80% 45% at 50% 115%, color-mix(in srgb, var(--aura-speaking) 18%, transparent), transparent)"
     >
-      <div className="flex flex-1 flex-col justify-center gap-3.5">
-        {/* 用户发送的夕阳照片 */}
+      <div className="flex flex-1 flex-col justify-center gap-3">
+        {/* 用户发送的夕阳照片 —— 更有画面感 */}
         <div className="flex justify-end">
-          <div className="max-w-[70%] overflow-hidden rounded-2xl rounded-br-sm">
+          <div className="max-w-[72%] overflow-hidden rounded-2xl rounded-br-sm">
             <div
-              className="flex h-28 w-full items-end justify-center rounded-2xl"
+              className="relative flex h-32 w-full items-end justify-center rounded-2xl"
               style={{
                 background:
-                  'linear-gradient(to top, #1a0a1e 0%, #4a1942 25%, #c44b3a 55%, #f0a030 78%, #ffd060 95%)',
+                  'linear-gradient(to top, #1a0a1e 0%, #4a1942 20%, #c44b3a 48%, #f0a030 75%, #ffd060 92%, #fff8e0 100%)',
               }}
             >
-              <span className="mb-2 font-mono text-[9px] text-white/60">📷 2026-06-15 18:32</span>
+              {/* 太阳圆 */}
+              <div className="absolute right-6 top-6 h-10 w-10 rounded-full bg-gradient-to-br from-yellow-200 via-orange-400 to-red-500 opacity-70 blur-[2px]" />
+              {/* 地平线剪影 */}
+              <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-black/60 to-transparent" />
+              <span className="relative z-10 mb-2 font-mono text-[9px] text-white/70">📷 2026-06-15 18:32</span>
             </div>
           </div>
         </div>
 
-        {/* Aura 的 Vision 回应 */}
+        {/* Aura 的 Vision 回应 —— 说明它真的「看懂」了 */}
         <div className="flex justify-start">
-          <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white/[0.06] px-3.5 py-2.5 text-[13px] leading-relaxed text-foreground">
-            好好看的夕阳，橙红色那层很厚——今天心情怎么样？
+          <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white/[0.06] px-3 py-2.5">
+            <p className="text-[12.5px] leading-relaxed text-foreground">
+              好好看的夕阳，橙红色那层很厚——今天心情怎么样？
+            </p>
+            <div className="mt-2 flex items-center gap-1.5 font-mono text-[8.5px] text-muted/50">
+              <span className="rounded bg-[var(--aura-speaking)]/10 px-1" style={{ color: 'var(--aura-speaking)' }}>Qwen3-VL</span>
+              <span>识别：夕阳 · 橙红渐变 · 高饱和度</span>
+            </div>
           </div>
         </div>
 
-        {/* Connection Insight 卡片 */}
-        <div
-          className="rounded-2xl border p-3.5"
-          style={{
-            borderColor: 'color-mix(in srgb, var(--aura-speaking) 28%, transparent)',
-            backgroundColor: 'color-mix(in srgb, var(--aura-speaking) 7%, transparent)',
-          }}
-        >
+        {/* 记忆时间线 —— 展示跨时间关联能力 */}
+        <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
+          <p className="mb-2 font-mono text-[9.5px] text-muted">视觉记忆时间线</p>
           <div className="flex items-center gap-2">
-            <span className="label-mono text-accent">Connection</span>
-            <span className="h-px flex-1 bg-border" />
-            <span className="font-mono text-[10px] text-muted">conf 0.76</span>
+            {[
+              { date: '6/1', label: '夕阳', active: false },
+              { date: '6/8', label: '晚霞', active: false },
+              { date: '6/15', label: '夕阳 ★', active: true },
+            ].map((m) => (
+              <div key={m.date} className={`flex flex-col items-center ${m.active ? '' : 'opacity-40'}`}>
+                <div className={`h-8 w-8 overflow-hidden rounded-lg ${m.active ? 'ring-1 ring-[var(--aura-speaking)]/40' : ''}`}
+                  style={{
+                    background: m.active
+                      ? 'linear-gradient(135deg, #c44b3a, #f0a030)'
+                      : 'linear-gradient(135deg, #4a1942, #c44b3a)',
+                  }}
+                />
+                <span className={`mt-1 font-mono text-[8px] ${m.active ? 'text-foreground' : 'text-muted/50'}`}>{m.date}</span>
+              </div>
+            ))}
+            <div className="ml-auto pl-2 border-l border-white/[0.08]">
+              <p className="text-[11px] leading-snug text-foreground/85">每次拍完第二天<span className="text-[var(--aura-speaking)]">心情都不错</span></p>
+              <p className="font-mono text-[8.5px] text-muted/50 mt-0.5">Connection Insight · conf 0.76</p>
+            </div>
           </div>
-          <p className="mt-2.5 text-[13px] leading-relaxed text-foreground">
-            你上次拍夕阳是{' '}
-            <span className="rounded bg-accent/20 px-1">6 月 1 号</span>
-            ，好像每次拍完第二天心情都不错？
-          </p>
-          <p className="mt-2 font-mono text-[10px] text-muted">
-            来源 · 2 条视觉记忆 · 本地关联
-          </p>
         </div>
       </div>
     </PhoneMockup>
   )
 }
 
-/** 场景 05 · Weekly Insight 推送卡片：主动关怀，不是群发模板 */
+/** 场景 05 · Weekly Insight：基于真实对话数据的主动推送 —— 核心是「它来找你，且说的都是你说过的话」 */
 function WeeklyInsightPhone() {
   return (
     <PhoneMockup
-      badge={{ label: '周日 21:00 ·', value: '本周洞察', color: 'var(--aura-thinking)', pulse: true }}
+      badge={{ label: '周日 21:03 ·', value: 'Weekly Insight', color: 'var(--aura-thinking)', pulse: true }}
       screenGlow="radial-gradient(ellipse 80% 45% at 50% 115%, color-mix(in srgb, var(--aura-thinking) 22%, transparent), transparent)"
     >
-      <div className="flex flex-1 flex-col justify-center">
-        {/* 周报头部 */}
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1.5">
-            {['一', '二', '三', '四', '五', '六', '日'].map((d, i) => (
-              <div
-                key={d}
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] ${
-                  i < 5 ? 'bg-accent/20 text-foreground' : 'bg-white/[0.04] text-muted'
-                }`}
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-          <span className="font-mono text-[10px] text-muted">06/16 – 06/22</span>
+      <div className="flex flex-1 flex-col justify-center gap-3.5">
+        {/* 推送通知条 —— 营造「主动找你」的感觉 */}
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-white/[0.08] bg-white/[0.015] px-3 py-2">
+          <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--aura-thinking)]/40" /><span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--aura-thinking)]" /></span>
+          <span className="font-mono text-[10px] text-muted">Aura 每周洞察 · 自动推送</span>
+          <span className="ml-auto font-mono text-[9px] text-white/20">刚刚</span>
         </div>
 
-        {/* Insight 卡片主体 */}
+        {/* 本周概览 —— 简洁的日历行 */}
+        <div className="flex items-center gap-1.5">
+          {['一', '二', '三', '四', '五', '六', '日'].map((d, i) => (
+            <div key={d} className={`flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-mono ${i < 5 ? 'bg-[var(--aura-thinking)]/15 text-foreground/80' : 'bg-white/[0.03] text-muted/50'}`}>
+              {d}
+            </div>
+          ))}
+          <span className="ml-auto font-mono text-[9px] text-muted/50">06/16 – 06/22</span>
+        </div>
+
+        {/* Insight 卡片 —— 引用用户原话作为证据 */}
         <div
-          className="mt-4 rounded-2xl border p-4"
+          className="rounded-2xl border p-4"
           style={{
             borderColor: 'color-mix(in srgb, var(--aura-thinking) 32%, transparent)',
             backgroundColor: 'color-mix(in srgb, var(--aura-thinking) 8%, transparent)',
@@ -437,11 +517,23 @@ function WeeklyInsightPhone() {
             <span className="font-mono text-[10px] text-muted">5 条来源</span>
           </div>
 
-          <p className="mt-3 text-[14px] leading-relaxed text-foreground">
-            这周你提到{' '}
-            <span className="rounded bg-accent/25 px-1">'deadline'</span>{' '}
-            5 次，但周五之后就没再提了——是搞定了还是暂时放下了？
+          <p className="mt-3 text-[13.5px] leading-relaxed text-foreground">
+            这周你提到 <span className="rounded bg-accent/20 px-1 font-medium">'deadline'</span> 5 次，
+            但周五之后就没再提了——搞定了还是放下了？
           </p>
+
+          {/* 用户原话引用 —— 让人感觉「它真的在听」 */}
+          <div className="mt-3 space-y-1.5">
+            {[
+              { day: '周二', quote: '"这个 deadline 要命…"' },
+              { day: '周四', quote: '"又加班到 11 点"' },
+            ].map((q) => (
+              <div key={q.day} className="flex items-start gap-2 rounded-md bg-white/[0.02] px-2 py-1.5">
+                <span className="shrink-0 font-mono text-[8.5px] text-muted pt-0.5">{q.day}</span>
+                <span className="text-[11px] italic text-foreground/60">{q.quote}</span>
+              </div>
+            ))}
+          </div>
 
           <div className="mt-4 flex gap-2">
             <span className="rounded-full bg-accent px-3 py-1 text-[11px] font-medium text-accent-foreground">
@@ -453,74 +545,90 @@ function WeeklyInsightPhone() {
           </div>
         </div>
 
-        {/* 底部元信息 */}
-        <p className="mt-3 text-center font-mono text-[9px] text-muted">
-          本地生成 · 0 联网 · 可在设置中调整频率
+        <p className="text-center font-mono text-[8.5px] text-muted/40">
+          本地生成 · 0 联网 · 设置中可调频率 / 关闭
         </p>
       </div>
     </PhoneMockup>
   )
 }
 
-/** 场景 06 · 出行方案：12306 + 地图 + 天气 → 完整周末计划 */
+/** 场景 06 · 出行方案：12306 + 地图 + 天气多工具编排 —— 核心是「一句话给出一整套计划」 */
 function TravelPlanPhone() {
   return (
-    <PhoneMockup badge={{ label: '周五 20:15 ·', value: '出行方案', color: 'var(--aura-health)' }}>
+    <PhoneMockup badge={{ label: '周五 20:15 ·', value: '出行方案已生成', color: 'var(--aura-health)' }}>
       <div className="flex flex-1 flex-col gap-3">
-        {/* 高铁票卡片 */}
-        <div className="rounded-xl border border-border bg-subtle/30 p-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[12px] font-medium text-foreground">G1234</p>
-              <p className="font-mono text-[10px] text-muted">杭州东 → 上海虹桥</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[14px] font-semibold text-foreground">08:30</p>
-              <p className="font-mono text-[10px] text-muted">→ 10:12 · 1h42m</p>
-            </div>
-          </div>
-          <div className="mt-2 h-px bg-border" />
-          <div className="mt-2 flex items-center justify-between font-mono text-[10px]">
-            <span className="text-muted">二等座 · ¥73</span>
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400">
-              余票充足
-            </span>
+        {/* 用户请求 */}
+        <div className="flex justify-end">
+          <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-accent/15 px-3 py-2 text-[12.5px] text-foreground">
+            周末想去上海逛逛，帮我规划一下
           </div>
         </div>
 
-        {/* 目的地天气 + 数据 chips */}
+        {/* 高铁票卡片 —— 更有真实感 */}
+        <div className="rounded-xl border border-[var(--aura-health)]/15 bg-subtle/30 p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--aura-health)]/10">
+                <span className="font-mono text-[11px] font-bold text-[var(--aura-health)]">G1234</span>
+              </div>
+              <div>
+                <p className="text-[12px] font-medium text-foreground">杭州东 → 上海虹桥</p>
+                <p className="font-mono text-[9.5px] text-muted">二等座 · ¥73 · 余票充足</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[15px] font-semibold text-foreground tracking-tight">08:30</p>
+              <p className="font-mono text-[9.5px] text-muted">→ 10:12</p>
+              <p className="font-mono text-[8.5px] text-[var(--aura-health)]">1h42m</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 完整行程时间线 —— 多步骤编排的核心展示 */}
+        <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-3">
+          <p className="mb-2.5 flex items-center gap-1.5 font-mono text-[9.5px] text-muted">
+            <svg className="h-3 w-3 text-[var(--aura-health)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+            完整行程
+          </p>
+          <div className="space-y-2">
+            {[
+              { time: '07:50', label: '地铁 → 杭州东站', icon: '🚇', tool: '' },
+              { time: '08:30', label: '高铁 G1234 出发', icon: '🚄', tool: '12306' },
+              { time: '10:12', label: '地铁 → 武康路', icon: '🚇', tool: '' },
+              { time: '10:40', label: 'brunch + 漫步梧桐区', icon: '🥐', tool: '' },
+              { time: '13:30', label: '外滩 / 城隍庙', icon: '📸', tool: '' },
+              { time: '16:00', label: '返程 G1567 → 17:42 到', icon: '🚄', tool: '12306' },
+            ].map((step, i) => (
+              <div key={step.label} className="flex items-center gap-2">
+                <span className="w-9 shrink-0 text-right font-mono text-[9.5px] text-muted">{step.time}</span>
+                <span className="h-1 w-1 shrink-0 rounded-full bg-[var(--aura-health)]" />
+                <span className="text-[11px] text-foreground/90">{step.icon} {step.label}</span>
+                {step.tool && (
+                  <span className="ml-auto rounded bg-[var(--aura-health)]/10 px-1.5 font-mono text-[8px]" style={{ color: 'var(--aura-health)' }}>{step.tool}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 目的地数据 chips */}
         <div className="flex flex-wrap gap-1.5">
-          {['上海 26° 晴', '武康路散步', '外滩夜景', '17:00 返程'].map((c) => (
-            <span
-              key={c}
-              className="rounded-full border border-border bg-subtle/40 px-2.5 py-1 font-mono text-[10px] text-foreground"
-            >
-              {c}
+          {[
+            { label: '上海 26° 晴', icon: '☀' },
+            { label: '武康路 人少', icon: '📍' },
+            { label: '预算 ~¥300', icon: '💰' },
+          ].map((c) => (
+            <span key={c.label} className="inline-flex items-center gap-1 rounded-full border border-border bg-subtle/30 px-2 py-1 font-mono text-[9.5px] text-foreground/80">
+              <span>{c.icon}</span>{c.label}
             </span>
           ))}
         </div>
 
-        {/* 完整行程时间线 */}
-        <div className="rounded-xl border border-border bg-subtle/30 p-3">
-          <p className="mb-2 text-[12px] font-medium text-foreground">完整行程</p>
-          <div className="space-y-2 font-mono text-[10px]">
-            {[
-              { time: '07:50', label: '地铁 → 杭州东站', dot: true },
-              { time: '08:30', label: '高铁 G1234 出发', dot: true },
-              { time: '10:12', label: '地铁 → 武康路', dot: true },
-              { time: '10:40', label: ' brunch + 漫步', dot: false },
-              { time: '15:00', label: '外滩 / 城隍庙', dot: false },
-              { time: '17:00', label: '返程高铁 G1567', dot: true },
-            ].map((step) => (
-              <div key={step.label} className="flex items-center gap-2.5">
-                <span className="w-8 shrink-0 text-right text-muted">{step.time}</span>
-                {step.dot && (
-                  <span className="h-1 w-1 shrink-0 rounded-full bg-[var(--aura-health)]" />
-                )}
-                {!step.dot && <span className="w-1 shrink-0" />}
-                <span className="text-foreground">{step.label}</span>
-              </div>
-            ))}
+        {/* Aura 补充 */}
+        <div className="flex justify-start">
+          <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white/[0.04] px-3 py-2 text-[11px] leading-relaxed text-foreground/70">
+            记得带伞——周日午后有短暂阵雨 🌦️
           </div>
         </div>
       </div>
