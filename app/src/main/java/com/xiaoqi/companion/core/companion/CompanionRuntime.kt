@@ -4,10 +4,13 @@ import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
+import com.xiaoqi.companion.core.context.CurrentLocationProvider
+import com.xiaoqi.companion.core.context.toPromptContext
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.core.tools.parseOrNull
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -32,6 +35,8 @@ open class CompanionRuntime @Inject constructor(
     private val conversationContextBuilder: ConversationContextBuilder,
     private val emotionMachine: EmotionStateMachine,
     private val relationshipModel: RelationshipModel,
+    private val locationProvider: CurrentLocationProvider,
+    private val appPreferences: AppPreferences,
 ) {
     open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
         val startedAt = System.currentTimeMillis()
@@ -46,6 +51,12 @@ open class CompanionRuntime @Inject constructor(
 
             val memoryContext = memoryRepository.selectPromptContext(input.content)
             val conversationContext = conversationContextBuilder.build(DEFAULT_SESSION_ID)
+            val locationContext = if (appPreferences.locationContextEnabled.first()) {
+                withContext(Dispatchers.IO) { locationProvider.getLastKnownLocation() }?.let { loc ->
+                    "用户当前设备位置:${loc.toPromptContext()}。调用地图、周边搜索、路径规划等需要坐标的工具时," +
+                        "请用此坐标作为 location 中心点,不要自行编造坐标。"
+                }
+            } else null
             val prompt = promptBuilder.build(
                 input = input,
                 emotionContext = emotionMachine.getContext(),
@@ -53,6 +64,7 @@ open class CompanionRuntime @Inject constructor(
                 recentConversation = conversationContext.recentMessages,
                 memories = memoryContext.memorySnippets,
                 summaries = memoryContext.summarySnippets,
+                locationContext = locationContext,
             )
             AppLogger.debug(
                 LogTags.Runtime,

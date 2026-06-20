@@ -70,3 +70,19 @@ class AndroidCurrentLocationProvider @Inject constructor(
             }
     }
 }
+
+// 标注缓存时效: getLastKnownLocation 可能是旧缓存, 让模型知道坐标可能不精准, 不过度自信
+fun CurrentLocation.toPromptContext(nowMs: Long = System.currentTimeMillis()): String {
+    val acc = accuracyMeters?.let { "约 ${it.toInt()} 米" } ?: "未知"
+    return "纬度 $latitude, 经度 $longitude(精度 $acc, ${ageDescription(nowMs - timestamp)}的定位缓存)"
+}
+
+private fun ageDescription(ageMs: Long): String {
+    val minutes = ageMs / 60_000
+    return when {
+        minutes >= 24 * 60 -> "${minutes / (24 * 60)} 天前"
+        minutes >= 60 -> "${minutes / 60} 小时前"
+        minutes >= 1 -> "$minutes 分钟前"
+        else -> "刚刚"
+    }
+}

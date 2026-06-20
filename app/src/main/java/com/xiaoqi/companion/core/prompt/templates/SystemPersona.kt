@@ -20,6 +20,9 @@ object SystemPersona {
     var memorySectionTemplate: String = ""
         private set
 
+    var locationSectionTemplate: String = ""
+        private set
+
     var toolsSectionTemplate: String = ""
         private set
 
@@ -52,6 +55,7 @@ object SystemPersona {
         emotionSectionTemplate = buildSectionRaw(config, "emotion")
         relationshipSectionTemplate = buildSectionRaw(config, "relationship")
         memorySectionTemplate = buildSectionRaw(config, "memory")
+        locationSectionTemplate = buildSectionRaw(config, "location")
         toolsSectionTemplate = buildSectionRaw(config, "tools")
         summariesTitle = config.sections["summaries"]?.title?.takeIf { it.isNotBlank() } ?: "会话摘要"
         recentTitle = config.sections["recent"]?.title?.takeIf { it.isNotBlank() } ?: "最近对话"

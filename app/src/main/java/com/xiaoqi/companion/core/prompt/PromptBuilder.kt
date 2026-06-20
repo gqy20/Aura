@@ -23,6 +23,7 @@ class PromptBuilder {
         recentConversation: List<String> = emptyList(),
         memories: List<String> = emptyList(),
         summaries: List<String> = emptyList(),
+        locationContext: String? = null,
     ): BuiltPrompt {
         val systemPrompt = buildSystemPrompt(
             emotionContext = emotionContext,
@@ -30,6 +31,7 @@ class PromptBuilder {
             recentConversation = recentConversation,
             memories = memories,
             summaries = summaries,
+            locationContext = locationContext,
         )
         AppLogger.debug(
             LogTags.Prompt,
@@ -61,6 +63,7 @@ class PromptBuilder {
         recentConversation: List<String>,
         memories: List<String>,
         summaries: List<String>,
+        locationContext: String?,
     ): String {
         val sb = StringBuilder(SystemPersona.base)
 
@@ -87,6 +90,10 @@ class PromptBuilder {
         if (memories.isNotEmpty()) {
             val memoryText = memories.joinToString("\n")
             sb.append(replacePlaceholders(SystemPersona.memorySectionTemplate, mapOf("memories" to memoryText)))
+        }
+
+        locationContext?.let {
+            sb.append(replacePlaceholders(SystemPersona.locationSectionTemplate, mapOf("location_context" to it)))
         }
 
         if (SystemPersona.toolsSectionTemplate.isNotEmpty()) {

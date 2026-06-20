@@ -132,6 +132,7 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
                 )
 
                 val request = Request.Builder().url(url).apply {
+                    header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36")
                     if (startByte > 0L) header("Range", "bytes=$startByte-")
                 }.build()
 

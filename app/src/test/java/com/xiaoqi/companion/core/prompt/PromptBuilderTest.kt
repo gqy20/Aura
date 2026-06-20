@@ -115,6 +115,28 @@ class PromptBuilderTest {
         assertFalse(result.systemPrompt.contains("相关记忆"))
     }
 
+    // --- Location context injection ---
+
+    @Test
+    fun build_withLocationContext_injectsCoordinates() {
+        val result = builder.build(
+            input = UserInput.Text("附近有什么好吃的"),
+            locationContext = "纬度 25.06, 经度 102.74(精度 约 35 米, 8 天前的定位缓存)",
+        )
+        assertTrue(result.systemPrompt.contains("25.06"))
+        assertTrue(result.systemPrompt.contains("102.74"))
+        assertTrue(result.systemPrompt.contains("## 设备位置"))
+    }
+
+    @Test
+    fun build_withoutLocation_omitsSection() {
+        val result = builder.build(
+            input = UserInput.Text("test"),
+            locationContext = null,
+        )
+        assertFalse(result.systemPrompt.contains("## 设备位置"))
+    }
+
     // --- User message handling ---
 
     @Test
@@ -191,6 +213,9 @@ class PromptBuilderTest {
                   memory:
                     title: "相关记忆"
                     placeholder: "{{memories}}"
+                  location:
+                    title: "设备位置"
+                    placeholder: "{{location_context}}"
             """.trimIndent()
             val config = PromptConfigLoader.parseLines(yaml.lines())
             SystemPersona.initForTesting(config)

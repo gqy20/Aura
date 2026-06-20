@@ -6,8 +6,10 @@ import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
+import com.xiaoqi.companion.core.context.CurrentLocationProvider
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.prompt.PromptBuilder
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
@@ -43,7 +45,7 @@ class CompanionRuntimeTest {
     }
 
     private val promptBuilder: PromptBuilder = mockk {
-        every { build(any(), any(), any(), any(), any(), any()) } returns BuiltPrompt(
+        every { build(any(), any(), any(), any(), any(), any(), any()) } returns BuiltPrompt(
             systemPrompt = "system", userMessage = "hello",
         )
     }
@@ -61,6 +63,12 @@ class CompanionRuntimeTest {
     }
     private val emotionMachine: EmotionStateMachine = mockk(relaxed = true)
     private val relationshipModel: RelationshipModel = mockk(relaxed = true)
+    private val locationProvider: CurrentLocationProvider = mockk {
+        every { getLastKnownLocation() } returns null
+    }
+    private val appPreferences: AppPreferences = mockk {
+        every { locationContextEnabled } returns flowOf(true)
+    }
 
     private class FakeKoogAgentFactory : KoogAgentFactory {
         var lastConfig: com.xiaoqi.companion.data.repository.LlmConfig? = null
@@ -115,6 +123,8 @@ class CompanionRuntimeTest {
         conversationContextBuilder = ConversationContextBuilder(messageRepo),
         emotionMachine = emotionMachine,
         relationshipModel = relationshipModel,
+        locationProvider = locationProvider,
+        appPreferences = appPreferences,
     )
 
     @Test
@@ -147,7 +157,7 @@ class CompanionRuntimeTest {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify { promptBuilder.build(match<UserInput> { it.content == "你好世界" }, any(), any(), any(), any(), any()) }
+        coVerify { promptBuilder.build(match<UserInput> { it.content == "你好世界" }, any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -207,7 +217,7 @@ class CompanionRuntimeTest {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify { promptBuilder.build(match<UserInput> { it is UserInput.Vision }, any(), any(), any(), any(), any()) }
+        coVerify { promptBuilder.build(match<UserInput> { it is UserInput.Vision }, any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -275,6 +285,7 @@ class CompanionRuntimeTest {
                 any(),
                 match { it == listOf("User likes jasmine tea") },
                 match { it == listOf("Tea preferences: User enjoys jasmine tea.") },
+                any(),
             )
             memoryRepository.selectPromptContext("what do I like?")
         }
@@ -316,6 +327,7 @@ class CompanionRuntimeTest {
                         "Aura: We discussed adding a short-term context window.",
                     )
                 },
+                any(),
                 any(),
                 any(),
             )

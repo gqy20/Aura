@@ -10,6 +10,7 @@ import com.xiaoqi.companion.core.companion.model.AgentEvent
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.companion.model.UserInput
+import com.xiaoqi.companion.core.context.CurrentLocationProvider
 import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.tools.ToolDisplayRegistry
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -123,6 +124,8 @@ class SendMessageUseCaseTest {
         conversationContextBuilder = ConversationContextBuilder(messageRepo),
         emotionMachine = emotionMachine,
         relationshipModel = relationshipModel,
+        locationProvider = mockk<CurrentLocationProvider>(relaxed = true),
+        appPreferences = mockk<AppPreferences>(relaxed = true),
     ) {
         var rawResponse = "你好呀！"
         var shouldFail = false

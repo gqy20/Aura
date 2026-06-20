@@ -25,6 +25,10 @@ sections:
     title: "相关记忆"
     placeholder: "{{memories}}"
 
+  location:
+    title: "设备位置"
+    placeholder: "{{location_context}}"
+
   tools:
     title: "可用工具"
     placeholder: |
