@@ -533,27 +533,7 @@ private fun McpEditorScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                item {
-                    ChatCardSurface {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text(
-                                text = "接入地址（只读）",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = preset.urlTemplate.replace(
-                                    "{key}",
-                                    settings.mcpSettingsApiKey.ifBlank { "<your-key>" },
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                }
+
             } else {
                 item {
                     OutlinedTextField(
