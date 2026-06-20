@@ -45,7 +45,7 @@ export function PhoneMockup({ children, badge, screenGlow, className }: PhoneMoc
 
           {/* 左上状态徽标 */}
           {badge && (
-            <div className="absolute left-3.5 top-3.5 z-20 flex items-center gap-1.5 font-mono text-[10px]">
+            <div className="absolute left-3.5 top-3.5 z-40 flex items-center gap-1.5 font-mono text-[10px]">
               <span
                 className={cn('h-1.5 w-1.5 rounded-full', badge.pulse && 'animate-pulse')}
                 style={{ backgroundColor: badge.color }}
