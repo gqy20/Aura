@@ -65,13 +65,11 @@ class SendMessageUseCase @Inject constructor(
     companion object {
         private const val DEFAULT_SESSION_ID = "default"
         private const val STREAMING_IDLE_TIMEOUT_MS = 30_000L
-        // 流式 trailing 兜底窗口——8ms (~120Hz 节奏)。
-        // 在 60Hz 屏幕上 vsync 会把相邻 flush 合并到同一帧,UI 仍按 16.67ms 节奏更新;
-        // timer 频率加倍缩短"未达字符阈值的小增量"的兜底延迟。
-        private const val STREAMING_RENDER_BATCH_MS = 8L
-        private const val STREAMING_RENDER_BATCH_CHARS = 48
-        // Leading flush 阈值——首字符到达后立即 flush 到 UI。
-        private const val STREAMING_LEADING_FLUSH_CHARS = 1
+        // 流式 batch 渲染：攒够 64 字符或 16ms 才 flush，减少 Compose 重绘频率。
+        // 首字符立即 flush（让用户看到"在动"），之后 batch 减少 jitter。
+        private const val STREAMING_RENDER_BATCH_MS = 16L
+        private const val STREAMING_RENDER_BATCH_CHARS = 64
+        private const val STREAMING_LEADING_FLUSH_CHARS = 4
         private const val IMAGE_ONLY_PROMPT = "我想给你看这张图片。先说说你看到了什么，再自然地回应我。"
         private const val LOCAL_GENERATION_STATUS = "本地模型加载并生成中"
     }

@@ -164,12 +164,18 @@ private fun MessageBubbleContent(
             )
         }
         if (!isUser && !message.isStreaming && message.performanceInfo != null) {
-            Spacer(modifier = Modifier.size(4.dp))
-            Text(
-                text = message.performanceInfo.format(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            )
+            Spacer(modifier = Modifier.size(6.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    text = message.performanceInfo.format(),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
         }
     }
 }

@@ -35,7 +35,9 @@ class MnnLocalQwenEngine @Inject constructor(
     }
 
     /**
-     * 预加载模型权重到内存，让首次 [stream] 调用时跳过 4B 模型 ~11s 的 loadUs。
+     * 预加载模型权重 + 跑一次 dummy 推理预热 prefix cache。
+     * 加载完后用固定 system prompt + "hi" 跑一次推理，让 MNN prefix cache
+     * 预热固定前缀。用户第一条消息命中 cache，跳过 prefill。
      * App 启动时由 LocalModelPreloader fire-and-forget 调用。
      */
     override suspend fun preload(modelName: String) {
@@ -67,6 +69,31 @@ class MnnLocalQwenEngine @Inject constructor(
             "local_qwen_preload_completed",
             "model" to modelName,
         )
+        // Dummy 推理：跑一次短推理让 prefix cache 预热，
+        // 用户首条消息命中 cache 跳过固定前缀的 prefill。
+        runCatching {
+            stream(
+                LocalQwenRequest(
+                    systemPrompt = "",
+                    userMessage = "hi",
+                    modelName = modelName,
+                    allowTools = false,
+                    inferenceConfig = inferenceConfig,
+                )
+            ).collect { /* discard tokens */ }
+            AppLogger.info(
+                LogTags.LocalModel,
+                "local_qwen_preload_cache_warmed",
+                "model" to modelName,
+            )
+        }.onFailure { e ->
+            AppLogger.warn(
+                LogTags.LocalModel,
+                e,
+                "local_qwen_preload_cache_warm_failed",
+                "model" to modelName,
+            )
+        }
     }
 
     override fun stream(request: LocalQwenRequest): Flow<String> = callbackFlow {
