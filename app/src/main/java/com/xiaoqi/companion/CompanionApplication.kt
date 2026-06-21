@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.local.LocalModelPreloader
 import com.xiaoqi.companion.core.presence.runtime.DreamLoopScheduler
 import com.xiaoqi.companion.core.prompt.templates.SystemPersona
 import com.xiaoqi.companion.data.source.HealthSyncLifecycleObserver
@@ -23,6 +24,9 @@ class CompanionApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var healthSyncObserver: HealthSyncLifecycleObserver
 
+    @Inject
+    lateinit var localModelPreloader: LocalModelPreloader
+
     override fun onCreate() {
         super.onCreate()
 
@@ -34,6 +38,7 @@ class CompanionApplication : Application(), Configuration.Provider {
         // M7 Health Connect: 冷启动 + 进入前台时自动同步(尊重 DataStore 偏好 + 30 分钟防抖)
         ProcessLifecycleOwner.get().lifecycle.addObserver(healthSyncObserver)
         healthSyncObserver.onColdStart()
+        localModelPreloader.preloadIfNeeded()
     }
 
     override val workManagerConfiguration: Configuration

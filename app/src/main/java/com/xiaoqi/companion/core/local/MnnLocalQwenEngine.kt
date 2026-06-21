@@ -34,6 +34,41 @@ class MnnLocalQwenEngine @Inject constructor(
         inferenceConfig = config
     }
 
+    /**
+     * 预加载模型权重到内存，让首次 [stream] 调用时跳过 4B 模型 ~11s 的 loadUs。
+     * App 启动时由 LocalModelPreloader fire-and-forget 调用。
+     */
+    override suspend fun preload(modelName: String) {
+        val modelDir = modelLocator.findModelDir(modelName) ?: run {
+            AppLogger.warn(
+                LogTags.LocalModel,
+                "local_qwen_preload_skipped",
+                "model" to modelName,
+                "reason" to "model not found",
+            )
+            return
+        }
+        val configFile = File(modelDir, CONFIG_FILE_NAME)
+        if (!configFile.isFile) {
+            AppLogger.warn(
+                LogTags.LocalModel,
+                "local_qwen_preload_skipped",
+                "model" to modelName,
+                "reason" to "config.json missing",
+            )
+            return
+        }
+        val runtimeConfig = inferenceConfig.toJson()
+        bridgeMutex.withLock {
+            ensureBridgeLoaded(configFile.absolutePath, runtimeConfig)
+        }
+        AppLogger.info(
+            LogTags.LocalModel,
+            "local_qwen_preload_completed",
+            "model" to modelName,
+        )
+    }
+
     override fun stream(request: LocalQwenRequest): Flow<String> = callbackFlow {
         val job = launch(Dispatchers.IO) {
             try {
