@@ -72,7 +72,7 @@ class McpHttpClientTest {
 
     @Test
     fun listTools_initializesAndReadsToolSchemas() = runTest {
-        val client = McpHttpClient()
+        val client: RemoteMcpClient = McpHttpClient()
 
         val tools = client.listTools(serverUrl)
 
@@ -88,7 +88,7 @@ class McpHttpClientTest {
 
     @Test
     fun callTool_returnsTextContent() = runTest {
-        val client = McpHttpClient()
+        val client: RemoteMcpClient = McpHttpClient()
 
         val result = client.callTool(
             serverUrl = serverUrl,
@@ -106,7 +106,7 @@ class McpHttpClientTest {
     @Test
     fun listTools_reinitializesWhenSessionIsInvalid() = runTest {
         rejectFirstToolsCallWithInvalidSession = true
-        val client = McpHttpClient()
+        val client: RemoteMcpClient = McpHttpClient()
 
         val tools = client.listTools(serverUrl)
 

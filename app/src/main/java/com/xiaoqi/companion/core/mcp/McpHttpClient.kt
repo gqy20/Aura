@@ -34,8 +34,16 @@ data class McpToolSpec(
 )
 
 interface RemoteMcpClient {
-    suspend fun listTools(serverUrl: String): List<McpToolSpec>
-    suspend fun callTool(serverUrl: String, toolName: String, arguments: JsonObject): String
+    /**
+     * @param headers 自定义请求头（如瑞幸的 `Authorization: Bearer <token>`）；空 = 纯 URL 模式（魔搭等）
+     */
+    suspend fun listTools(serverUrl: String, headers: Map<String, String> = emptyMap()): List<McpToolSpec>
+    suspend fun callTool(
+        serverUrl: String,
+        toolName: String,
+        arguments: JsonObject,
+        headers: Map<String, String> = emptyMap(),
+    ): String
 
     /**
      * 探活 + 拉取工具清单:对 MCP server 做一次完整的 initialize + tools/list 握手。
@@ -43,7 +51,7 @@ interface RemoteMcpClient {
      * - 抛 [McpUnreachableException] → 网络/协议层面连不上
      * - 返回空 list → 握手成功但 server 没声明 tools(理论上不应该)
      */
-    suspend fun probe(serverUrl: String): List<McpToolSpec>
+    suspend fun probe(serverUrl: String, headers: Map<String, String> = emptyMap()): List<McpToolSpec>
 }
 
 class McpUnreachableException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
@@ -60,7 +68,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     private val toolCache = mutableMapOf<String, List<McpToolSpec>>()
     private val ids = AtomicLong(1)
 
-    override suspend fun listTools(serverUrl: String): List<McpToolSpec> =
+    override suspend fun listTools(serverUrl: String, headers: Map<String, String>): List<McpToolSpec> =
         withContext(Dispatchers.IO) {
             if (serverUrl.isBlank()) return@withContext emptyList()
             val startedAt = System.currentTimeMillis()
@@ -70,13 +78,14 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             }
             AppLogger.info(LogTags.Tools, "mcp_list_tools_started", "serverHost" to serverUrl.hostForLog())
             try {
-                ensureInitialized(serverUrl)
+                ensureInitialized(serverUrl, headers)
                 val requestId = ids.getAndIncrement()
                 val response = rpc(
                     serverUrl = serverUrl,
                     requestId = requestId,
                     method = "tools/list",
                     params = buildJsonObject {},
+                    headers = headers,
                 )
                 response.resultObject()["tools"]?.jsonArray
                     ?.mapNotNull { element -> element.jsonObject.toToolSpecOrNull() }
@@ -103,7 +112,12 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             }
         }
 
-    override suspend fun callTool(serverUrl: String, toolName: String, arguments: JsonObject): String =
+    override suspend fun callTool(
+        serverUrl: String,
+        toolName: String,
+        arguments: JsonObject,
+        headers: Map<String, String>,
+    ): String =
         withContext(Dispatchers.IO) {
             val startedAt = System.currentTimeMillis()
             AppLogger.info(
@@ -114,7 +128,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                 "argumentLength" to arguments.toString().length,
             )
             try {
-                ensureInitialized(serverUrl)
+                ensureInitialized(serverUrl, headers)
                 val requestId = ids.getAndIncrement()
                 val response = rpc(
                     serverUrl = serverUrl,
@@ -124,6 +138,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                         put("name", toolName)
                         put("arguments", arguments)
                     },
+                    headers = headers,
                 )
                 response.resultObject().toToolResultString().also {
                     AppLogger.info(
@@ -157,17 +172,18 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
      *
      * 失败时抛 [McpUnreachableException] 让上层统一处理 + 在 UI 展示。
      */
-    override suspend fun probe(serverUrl: String): List<McpToolSpec> = withContext(Dispatchers.IO) {
+    override suspend fun probe(serverUrl: String, headers: Map<String, String>): List<McpToolSpec> = withContext(Dispatchers.IO) {
         if (serverUrl.isBlank()) throw McpUnreachableException("URL 为空")
         val startedAt = System.currentTimeMillis()
         try {
-            ensureInitialized(serverUrl)
+            ensureInitialized(serverUrl, headers)
             val requestId = ids.getAndIncrement()
             val response = rpc(
                 serverUrl = serverUrl,
                 requestId = requestId,
                 method = "tools/list",
                 params = buildJsonObject {},
+                headers = headers,
             )
             val tools = response.resultObject()["tools"]?.jsonArray
                 ?.mapNotNull { element -> element.jsonObject.toToolSpecOrNull() }
@@ -197,7 +213,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         }
     }
 
-    private fun ensureInitialized(serverUrl: String) {
+    private fun ensureInitialized(serverUrl: String, headers: Map<String, String>) {
         if (sessions.containsKey(serverUrl)) return
 
         val startedAt = System.currentTimeMillis()
@@ -221,6 +237,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             ),
             includeSession = false,
             retryOnInvalidSession = false,
+            headers = headers,
         )
         response.sessionId?.let { sessions[serverUrl] = it }
         response.json?.throwIfJsonRpcError()
@@ -243,6 +260,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                 },
                 includeSession = true,
                 retryOnInvalidSession = false,
+                headers = headers,
             )
         }.onFailure {
             AppLogger.debug(
@@ -253,12 +271,19 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         }
     }
 
-    private fun rpc(serverUrl: String, requestId: Long, method: String, params: JsonObject): JsonObject {
+    private fun rpc(
+        serverUrl: String,
+        requestId: Long,
+        method: String,
+        params: JsonObject,
+        headers: Map<String, String>,
+    ): JsonObject {
         val response = postJson(
             serverUrl = serverUrl,
             payload = buildRequest(requestId = requestId, method = method, params = params),
             includeSession = true,
             retryOnInvalidSession = true,
+            headers = headers,
             expectedResponseId = requestId,
         )
         response.sessionId?.let { sessions[serverUrl] = it }
@@ -273,6 +298,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         payload: JsonObject,
         includeSession: Boolean,
         retryOnInvalidSession: Boolean,
+        headers: Map<String, String>,
         expectedResponseId: Long? = payload["id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull(),
     ): McpHttpResponse {
         val startedAt = System.currentTimeMillis()
@@ -283,6 +309,8 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             .header("content-type", "application/json")
             .header("accept", "application/json, text/event-stream")
             .post(body)
+        // 自定义鉴权头（瑞幸等 Authorization: Bearer <token>），每个请求都带
+        headers.forEach { (k, v) -> requestBuilder.header(k, v) }
         if (includeSession) {
             sessions[serverUrl]?.let { requestBuilder.header("Mcp-Session-Id", it) }
             requestBuilder.header("MCP-Protocol-Version", protocolVersions[serverUrl] ?: MCP_PROTOCOL_VERSION)
@@ -299,12 +327,13 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                 )
                 sessions.remove(serverUrl)
                 protocolVersions.remove(serverUrl)
-                ensureInitialized(serverUrl)
+                ensureInitialized(serverUrl, headers)
                 return postJson(
                     serverUrl = serverUrl,
                     payload = payload,
                     includeSession = true,
                     retryOnInvalidSession = false,
+                    headers = headers,
                     expectedResponseId = expectedResponseId,
                 )
             }

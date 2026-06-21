@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        android:name="com.xiaoqi.companion.test.TestApplication"
+        tools:replace="android:name">
         <activity
             android:name="com.xiaoqi.companion.test.HiltTestActivity"
             android:exported="true">

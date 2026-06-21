@@ -702,7 +702,7 @@ class ChatViewModel @Inject constructor(
             }
             val perServer = targets.associate { server ->
                 server.id to runCatching {
-                    remoteMcpClient.probe(server.resolvedUrl).map { spec -> spec.name }
+                    remoteMcpClient.probe(server.resolvedUrl, server.authHeaders).map { spec -> spec.name }
                 }.getOrDefault(emptyList())
             }
             val okCount = perServer.values.count { it.isNotEmpty() }

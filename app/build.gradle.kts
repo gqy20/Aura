@@ -34,6 +34,26 @@ val brandPackage: String = brand("PACKAGE", "com.xiaoqi.companion")
 val brandVersionName: String = brand("VERSION_NAME", "0.1.3")
 val brandVersionCode: String = brand("VERSION_CODE", "4")
 
+// ---------------------------------------------------------------------------
+// Local dev/.env config — debug-only BuildConfig injection.
+// .env is gitignored; copy .env.example -> .env and fill your keys.
+// 消费链：.env -> envProps -> BuildConfig.ENV_* -> DebugConfigSeeder 预填 DataStore
+// ---------------------------------------------------------------------------
+val envProps = Properties().apply {
+    val f = rootProject.file(".env")
+    if (f.exists()) {
+        f.inputStream().use { load(it) }
+        logger.lifecycle("Loaded .env from ${f.absolutePath}")
+    } else {
+        logger.warn(".env not found at ${f.absolutePath}; debug BuildConfig.ENV_* will be empty.")
+    }
+}
+fun env(key: String, default: String = ""): String =
+    providers.environmentVariable(key).orNull ?: envProps.getProperty(key) ?: default
+
+// buildConfigField String 值需要把 \ 和 " 转义，避免 API key / URL 里的特殊字符破坏生成代码
+fun escForBuildConfig(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
+
 val auraMnnHomeProvider = providers
     .gradleProperty("auraMnnHome")
     .orElse(providers.environmentVariable("AURA_MNN_HOME"))
@@ -100,6 +120,20 @@ android {
         buildConfigField("String", "BRAND_VERSION_NAME", "\"$brandVersionName\"")
         buildConfigField("int",    "BRAND_VERSION_CODE", brandVersionCode)
 
+        // .env -> BuildConfig.ENV_*：defaultConfig 给空占位，保证 main 源码（DebugConfigSeeder）
+        // 在 release 编译也能找到符号；debug buildType 用 .env 真实值覆盖。release 不含敏感值。
+        buildConfigField("boolean", "ENV_FORCE_SEED", "false")
+        buildConfigField("String", "ENV_LLM_PROVIDER", "\"GLM\"")
+        buildConfigField("String", "ENV_LLM_API_KEY", "\"\"")
+        buildConfigField("String", "ENV_LLM_MODEL", "\"\"")
+        buildConfigField("String", "ENV_LOCAL_QWEN_MODEL", "\"\"")
+        buildConfigField("String", "ENV_MCP_AMAP_KEY", "\"\"")
+        for (i in 1..6) {
+            buildConfigField("String", "ENV_MCP_CUSTOM_${i}_NAME", "\"\"")
+            buildConfigField("String", "ENV_MCP_CUSTOM_${i}_URL", "\"\"")
+            buildConfigField("String", "ENV_MCP_CUSTOM_${i}_TOKEN", "\"\"")
+        }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -147,6 +181,20 @@ android {
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
+
+            // .env -> BuildConfig.ENV_*（仅 debug；release 不注入敏感配置）
+            val forceSeed = env("ENV_FORCE_SEED", "false").trim().equals("true", ignoreCase = true)
+            buildConfigField("boolean", "ENV_FORCE_SEED", forceSeed.toString())
+            buildConfigField("String", "ENV_LLM_PROVIDER", "\"${escForBuildConfig(env("LLM_PROVIDER", "GLM"))}\"")
+            buildConfigField("String", "ENV_LLM_API_KEY", "\"${escForBuildConfig(env("LLM_API_KEY"))}\"")
+            buildConfigField("String", "ENV_LLM_MODEL", "\"${escForBuildConfig(env("LLM_MODEL"))}\"")
+            buildConfigField("String", "ENV_LOCAL_QWEN_MODEL", "\"${escForBuildConfig(env("LOCAL_QWEN_MODEL"))}\"")
+            buildConfigField("String", "ENV_MCP_AMAP_KEY", "\"${escForBuildConfig(env("MCP_AMAP_API_KEY"))}\"")
+            for (i in 1..6) {
+                buildConfigField("String", "ENV_MCP_CUSTOM_${i}_NAME", "\"${escForBuildConfig(env("MCP_CUSTOM_${i}_NAME"))}\"")
+                buildConfigField("String", "ENV_MCP_CUSTOM_${i}_URL", "\"${escForBuildConfig(env("MCP_CUSTOM_${i}_URL"))}\"")
+                buildConfigField("String", "ENV_MCP_CUSTOM_${i}_TOKEN", "\"${escForBuildConfig(env("MCP_CUSTOM_${i}_TOKEN"))}\"")
+            }
         }
     }
 

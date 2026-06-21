@@ -20,6 +20,8 @@ data class McpServerConfig(
     val providerId: String = "amap",
     val apiKey: String = "",
     val customUrl: String = "",
+    /** 自定义 MCP 的 Bearer token（瑞幸等需要 Authorization header 的 server）；空 = 纯 URL 模式（魔搭等）。 */
+    val authToken: String = "",
     val enabled: Boolean = true,
 ) {
     /** 派生 final url — 用 provider 模板拼。custom preset 直接用 customUrl。 */
@@ -33,6 +35,12 @@ data class McpServerConfig(
     /** 是否已就绪 (有可用的 resolvedUrl)。 */
     val isReady: Boolean
         get() = resolvedUrl.isNotBlank()
+
+    /** 自定义鉴权头：authToken 非空 → Authorization: Bearer <token>；空 → 无（纯 URL 模式）。 */
+    val authHeaders: Map<String, String>
+        get() = authToken.takeIf { it.isNotBlank() }
+            ?.let { mapOf("Authorization" to "Bearer $it") }
+            ?: emptyMap()
 
     val provider: McpServerPreset
         get() = McpServerPresets.byId(providerId)

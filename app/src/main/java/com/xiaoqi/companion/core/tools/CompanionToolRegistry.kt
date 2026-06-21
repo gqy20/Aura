@@ -68,7 +68,7 @@ class CompanionToolRegistry @Inject constructor(
             val url = server.resolvedUrl
             val name = server.resolvedName
             runCatching {
-                runBlocking { remoteMcpClient.listTools(url) }
+                runBlocking { remoteMcpClient.listTools(url, server.authHeaders) }
             }.onSuccess { specs ->
                 specs.forEach { spec ->
                     builder.tool(
@@ -77,6 +77,7 @@ class CompanionToolRegistry @Inject constructor(
                             serverName = name,
                             spec = spec,
                             client = remoteMcpClient,
+                            headers = server.authHeaders,
                         )
                     )
                 }

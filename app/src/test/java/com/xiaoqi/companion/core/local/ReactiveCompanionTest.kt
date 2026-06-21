@@ -328,15 +328,15 @@ class ReactiveCompanionTest {
         var calledToolName: String? = null
         var arguments: kotlinx.serialization.json.JsonObject? = null
 
-        override suspend fun listTools(serverUrl: String): List<McpToolSpec> = emptyList()
+        override suspend fun listTools(serverUrl: String, headers: Map<String, String>): List<McpToolSpec> = emptyList()
 
-        override suspend fun callTool(serverUrl: String, toolName: String, arguments: kotlinx.serialization.json.JsonObject): String {
+        override suspend fun callTool(serverUrl: String, toolName: String, arguments: kotlinx.serialization.json.JsonObject, headers: Map<String, String>): String {
             calledToolName = toolName
             this.arguments = arguments
             return """{"content":[{"type":"text","text":"mcp-result"}]}"""
         }
 
-        override suspend fun probe(serverUrl: String): List<McpToolSpec> = emptyList()
+        override suspend fun probe(serverUrl: String, headers: Map<String, String>): List<McpToolSpec> = emptyList()
     }
 
     @Serializable

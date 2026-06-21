@@ -53,14 +53,14 @@ class McpToolAdapterTest {
         lateinit var calledToolName: String
         lateinit var arguments: JsonObject
 
-        override suspend fun listTools(serverUrl: String): List<McpToolSpec> = emptyList()
+        override suspend fun listTools(serverUrl: String, headers: Map<String, String>): List<McpToolSpec> = emptyList()
 
-        override suspend fun callTool(serverUrl: String, toolName: String, arguments: JsonObject): String {
+        override suspend fun callTool(serverUrl: String, toolName: String, arguments: JsonObject, headers: Map<String, String>): String {
             calledToolName = toolName
             this.arguments = arguments
             return "ok"
         }
 
-        override suspend fun probe(serverUrl: String): List<McpToolSpec> = emptyList()
+        override suspend fun probe(serverUrl: String, headers: Map<String, String>): List<McpToolSpec> = emptyList()
     }
 }

@@ -17,6 +17,7 @@ class McpRemoteTool(
     serverName: String,
     spec: McpToolSpec,
     private val client: RemoteMcpClient,
+    private val headers: Map<String, String> = emptyMap(),
 ) : Tool<JsonObject, String>(
     typeToken<JsonObject>(),
     typeToken<String>(),
@@ -30,6 +31,7 @@ class McpRemoteTool(
             serverUrl = remoteServerUrl,
             toolName = remoteName,
             arguments = args,
+            headers = headers,
         )
 }
 
