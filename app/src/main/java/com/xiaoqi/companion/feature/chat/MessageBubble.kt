@@ -163,6 +163,14 @@ private fun MessageBubbleContent(
                 onClick = onToolStatusClick,
             )
         }
+        if (!isUser && !message.isStreaming && message.performanceInfo != null) {
+            Spacer(modifier = Modifier.size(4.dp))
+            Text(
+                text = message.performanceInfo.format(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            )
+        }
     }
 }
 

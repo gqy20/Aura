@@ -20,6 +20,7 @@ import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.feature.chat.ChatConfigStatus
 import com.xiaoqi.companion.feature.chat.ChatImageAttachment
 import com.xiaoqi.companion.feature.chat.ChatMessage
+import com.xiaoqi.companion.feature.chat.PerformanceInfo
 import com.xiaoqi.companion.feature.chat.ChatPermissionPrompt
 import com.xiaoqi.companion.feature.chat.ChatPermissionType
 import com.xiaoqi.companion.feature.chat.ChatUiState
@@ -83,6 +84,7 @@ class SendMessageUseCase @Inject constructor(
         update: (ChatUiState.() -> ChatUiState) -> Unit,
     ) {
         val trimmed = text.trim()
+        val startedAt = System.currentTimeMillis()
         if (trimmed.isEmpty() && pendingImage == null) return
         if (!configStatus.isReady) {
             update { copy(error = configStatus.detail.ifBlank { "模型配置未完成" }) }
@@ -347,11 +349,20 @@ class SendMessageUseCase @Inject constructor(
                             "len" to finalReply.length,
                             "preview" to finalReply.take(200),
                         )
+                        val durationMs = System.currentTimeMillis() - startedAt
+                        val estimatedTokens = estimateTokens(finalReply)
+                        val perfInfo = PerformanceInfo(
+                            durationMs = durationMs,
+                            estimatedTokens = estimatedTokens,
+                        )
                         AppLogger.info(
                             LogTags.Chat,
                             "message_send_completed",
                             "requestHash" to LogFieldSanitizer.hash(requestId),
                             "replyLength" to finalReply.length,
+                            "durationMs" to durationMs,
+                            "estimatedTokens" to estimatedTokens,
+                            "tokensPerSecond" to perfInfo.tokensPerSecond,
                         )
                         updateAssistantMessage(assistantId, update) {
                             it.copy(
@@ -365,6 +376,7 @@ class SendMessageUseCase @Inject constructor(
                                 } else {
                                     it.toolStatus
                                 },
+                                performanceInfo = perfInfo,
                             )
                         }
                         update {
@@ -487,5 +499,23 @@ class SendMessageUseCase @Inject constructor(
                 )
             )
         }
+    }
+
+    /**
+     * 粗估 token 数:中文字符≈1 token,英文≈4 char/token。
+     * CJK Unified Ideographs 范围 U+4E00–U+9FFF 覆盖常用中文。
+     */
+    private fun estimateTokens(text: String): Int {
+        if (text.isEmpty()) return 0
+        var cjk = 0
+        var other = 0
+        for (c in text) {
+            if (c.code in 0x4E00..0x9FFF || c.code in 0x3000..0x303F) {
+                cjk++
+            } else if (!c.isWhitespace()) {
+                other++
+            }
+        }
+        return cjk + other / 4
     }
 }

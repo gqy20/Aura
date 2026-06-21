@@ -26,6 +26,11 @@ data class ChatMessage(
      * 用于 detail panel 反查 `uiState.toolCalls`,避免整个 `toolCalls` 池混淆。
      */
     val toolCallIds: List<String> = emptyList(),
+    /**
+     * ASSISTANT 消息的性能指标(wall clock + 字符数估算 tok/s)。
+     * 只在消息完成后填充,流式中为 null。
+     */
+    val performanceInfo: PerformanceInfo? = null,
 )
 
 data class ChatToolCall(
@@ -213,3 +218,26 @@ data class ChatUiState(
     val moodTrend: List<com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity> = emptyList(),
     val pendingPrefill: String? = null,
 )
+
+/**
+ * ASSISTANT 消息的性能指标。
+ * - [durationMs]: 从发消息到回复完成的总耗时(wall clock)
+ * - [estimatedTokens]: 根据输出字符数粗估的 token 数(中文≈1.2 char/token,英文≈4 char/token)
+ * - [tokensPerSecond]: estimatedTokens / (durationMs / 1000)
+ */
+data class PerformanceInfo(
+    val durationMs: Long,
+    val estimatedTokens: Int,
+) {
+    val tokensPerSecond: Float
+        get() = if (durationMs > 0) estimatedTokens * 1000f / durationMs else 0f
+
+    fun format(): String {
+        val seconds = durationMs / 1000.0
+        return if (estimatedTokens > 0 && durationMs > 0) {
+            "%.1fs · %.0f tok/s".format(seconds, tokensPerSecond)
+        } else {
+            "%.1fs".format(seconds)
+        }
+    }
+}

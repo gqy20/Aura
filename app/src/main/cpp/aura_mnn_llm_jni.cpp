@@ -28,8 +28,8 @@
 namespace {
 
 constexpr const char* LOG_TAG = "Companion.LocalModel.Native";
-constexpr int DEFAULT_MAX_NEW_TOKENS = 192;
-constexpr int MOBILE_MAX_NEW_TOKENS_CAP = 192;
+constexpr int DEFAULT_MAX_NEW_TOKENS = 256;
+constexpr int MOBILE_MAX_NEW_TOKENS_CAP = 256;
 
 void logInfo(const std::string& message) {
     __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "%s", message.c_str());
