@@ -152,7 +152,7 @@ private fun MessageBubbleContent(
             MarkdownMessageText(
                 text = message.content,
                 color = contentColor,
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp),
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
             )
         }
         if (!isUser && message.toolStatus != null) {

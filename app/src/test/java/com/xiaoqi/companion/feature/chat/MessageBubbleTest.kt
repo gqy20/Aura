@@ -47,7 +47,7 @@ class MessageBubbleTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Thinking......").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Thinking...").assertIsDisplayed()
     }
 
     @Test

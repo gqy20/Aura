@@ -3,7 +3,6 @@ package com.xiaoqi.companion.feature.chat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.graphics.Color
@@ -42,23 +41,20 @@ fun StreamingMessageText(
                 MessageRenderBlockText(
                     block = block,
                     color = color,
-                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp),
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
                 )
             }
         }
         if (draftText.isNotBlank()) {
-            // P4: 流式 Markdown 渲染——draft 也走 formatted 渲染,避免"等 LLM 关闭 fence 才
-            // 看到 formatted"的视觉延迟。
-            // - code draft → MarkdownCodeBlock(有 background + padding + monospace)
-            // - text draft → MarkdownMessageText(走 parseInlineMarkdown 解析 **, *, ` 实时生效)
-            // 保留 "..." 拼接作为流式视觉提示(active tail cursor)。
+            // draft 裸走 Markdown 渲染,不再拼 "...";流式增量本身已是足够的光标提示,
+            // 拼 "..." 会污染 markdown 解析(如 **未闭合** 后跟 ...)并让中文排版发紧。
             if (isRenderDraftCode) {
-                MarkdownCodeBlock(text = "$draftText...")
+                MarkdownCodeBlock(text = draftText)
             } else {
                 MarkdownMessageText(
-                    text = "$draftText...",
+                    text = draftText,
                     color = color,
-                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp),
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
                 )
             }
         }
