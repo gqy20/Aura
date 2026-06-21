@@ -131,13 +131,14 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
                     "resumeByte" to startByte,
                 )
 
+                var retryFromScratch = false
                 val request = Request.Builder().url(url).apply {
                     header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36")
                     if (startByte > 0L) header("Range", "bytes=$startByte-")
                 }.build()
 
                 httpClient.newCall(request).execute().use { response ->
-                    // 416 = partial file 已完整（上次下载完毕但未来得及 rename）
+                    // 416 = partial file 已完整
                     if (response.code == 416) {
                         AppLogger.info(
                             LogTags.LocalModel,
@@ -147,6 +148,21 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
                             "bytes" to target.length(),
                         )
                         completedFilesBytes += target.length()
+                        return@use
+                    }
+
+                    // 404 + partial file: CDN 不支持 Range，删 partial 重试
+                    if (response.code == 404 && startByte > 0L) {
+                        AppLogger.info(
+                            LogTags.LocalModel,
+                            "local_model_download_file_range_fallback",
+                            "model" to modelName,
+                            "file" to fileName,
+                            "resumeByte" to startByte,
+                            "reason" to "CDN returned 404 for Range request",
+                        )
+                        target.delete()
+                        retryFromScratch = true
                         return@use
                     }
 
@@ -209,6 +225,38 @@ class ModelScopeLocalQwenModelDownloader @Inject constructor(
                         "file" to fileName,
                         "bytes" to target.length(),
                     )
+                }
+
+                // CDN 返回 404 且有 partial 文件时，删 partial 后从头重试
+                if (retryFromScratch) {
+                    val retryRequest = Request.Builder().url(url).apply {
+                        header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36")
+                    }.build()
+                    httpClient.newCall(retryRequest).execute().use { retryResponse ->
+                        if (!retryResponse.isSuccessful) {
+                            throw IOException("ModelScope download failed (${retryResponse.code}) on retry: $fileName")
+                        }
+                        val retryBody = retryResponse.body ?: throw IOException("Empty response body on retry: $fileName")
+                        FileOutputStream(target, false).use { output ->
+                            retryBody.byteStream().use { input ->
+                                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                                while (true) {
+                                    val read = input.read(buffer)
+                                    if (read == -1) break
+                                    output.write(buffer, 0, read)
+                                }
+                            }
+                        }
+                        completedFilesBytes += target.length()
+                        AppLogger.info(
+                            LogTags.LocalModel,
+                            "local_model_download_file_completed",
+                            "model" to modelName,
+                            "file" to fileName,
+                            "bytes" to target.length(),
+                            "retried" to true,
+                        )
+                    }
                 }
             }
 
