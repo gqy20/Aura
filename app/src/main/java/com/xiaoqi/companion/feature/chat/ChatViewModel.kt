@@ -279,8 +279,11 @@ class ChatViewModel @Inject constructor(
                 messageRepository.getMessagesBySession(sessionId)
             }.collect { messages ->
                 _uiState.update { state ->
-                    if (state.isLoading || state.messages.any { it.isStreaming }) {
-                        state
+                    // AI 流式回复进行中时,只保护最后一条 streaming 消息不被 DB 旧状态覆盖,
+                    // 但仍允许前面已完成的 messages 更新(避免切换会话时整个列表被阻塞)。
+                    val streamingTail = state.messages.lastOrNull { it.isStreaming }
+                    if (streamingTail != null) {
+                        state.copy(messages = messages.map { it.toChatMessage() } + streamingTail)
                     } else {
                         state.copy(messages = messages.map { it.toChatMessage() })
                     }
@@ -748,6 +751,15 @@ class ChatViewModel @Inject constructor(
 
     fun switchConversation(sessionId: String) {
         viewModelScope.launch {
+            // 主动清空 + 重置 streaming/loading,给用户即时视觉反馈(弹窗关闭瞬间消息变空),
+            // 同时避免 collect 里的 streaming 保护条件阻塞新会话消息加载。
+            _uiState.update {
+                it.copy(
+                    messages = emptyList(),
+                    toolCalls = emptyList(),
+                    isLoading = false,
+                )
+            }
             appPreferences.setCurrentSessionId(sessionId)
         }
     }

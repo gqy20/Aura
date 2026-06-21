@@ -101,11 +101,15 @@ internal fun ConversationListSheet(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(conversations, key = { it.id }) { conversation ->
+                    val isCurrentConversation = conversation.id == currentSessionId
                     ConversationItemCard(
                         conversation = conversation,
-                        isCurrent = conversation.id == currentSessionId,
+                        isCurrent = isCurrentConversation,
                         onClick = {
-                            onSwitchConversation(conversation.id)
+                            // 点击当前会话只关弹窗,不触发 switch(写入相同 sessionId 不会触发 flow)
+                            if (!isCurrentConversation) {
+                                onSwitchConversation(conversation.id)
+                            }
                             onDismiss()
                         },
                         onDelete = { onDeleteConversation(conversation.id) },
