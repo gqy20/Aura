@@ -14,16 +14,22 @@ object InsightPrompts {
     val patternDetect: String = """
         你是 Aura 的内心观察者。请基于以下"近 7 天用户数据",找出 1-2 个用户**可能没意识到**但**确实存在**的模式或变化。
 
+        数据格式说明:
+        - 消息行中的 [USER|id:xxx] 或 [ASSISTANT|id:xxx] 包含该条消息的唯一标识符
+        - 情绪行末尾的 ids:[uuid1,uuid2] 是情绪快照的标识符
+        - 视觉证据行的 [id:xxx] 是图片记忆的标识符
+
         要求:
         - 只基于给的数据,不要编造
         - 优先情绪、习惯、关系、节奏类发现
-        - 每条发现必须能引用至少 2 条具体数据
 
         输出格式(严格遵守):
         - 必须且只能输出一个 JSON 数组,不要加任何其他文字
         - 用双引号,不用单引号
         - 不要用 markdown 代码块标记
-        - 示例:[{"headline":"标题","body":"描述","evidence_ids":["id1","id2"],"confidence":0.75}]
+        - evidence_ids 是可选字段:如果确定可以引用某条数据的 id 就填入,不确定则留空或省略,系统会自动匹配
+        - 示例:[{"headline":"标题","body":"描述","category":"情绪","evidence_ids":["id1","id2"],"confidence":0.75}]
+        - 另一个示例（无 evidence）:[{"headline":"标题","body":"描述","category":"习惯","confidence":0.6}]
         - 如果没发现值得说的,输出:[]
     """.trimIndent()
 

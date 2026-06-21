@@ -9,6 +9,7 @@ import androidx.work.workDataOf
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.datastore.AppPreferences
+import com.xiaoqi.companion.core.insight.EvidenceResolver
 import com.xiaoqi.companion.data.repository.InsightRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -33,6 +34,7 @@ class DreamLoopWorker @AssistedInject constructor(
     private val dataCollector: DreamDataCollector,
     private val executor: LocalQwenExecutor,
     private val insightRepository: InsightRepository,
+    private val evidenceResolver: EvidenceResolver,
     private val appPreferences: AppPreferences,
 ) : CoroutineWorker(appContext, params) {
 
@@ -121,8 +123,11 @@ class DreamLoopWorker @AssistedInject constructor(
             return@withContext Result.success()
         }
 
+        // Post-hoc evidence resolution: 从 LLM 文本反查真实 DB ID，解决小模型无法输出有效 evidence_ids 的问题
+        val resolvedDrafts = evidenceResolver.resolve(drafts, snapshot)
+
         var savedCount = 0
-        drafts.forEach { draft ->
+        resolvedDrafts.forEach { draft ->
             val id = insightRepository.saveIfValid(draft)
             if (id != null) savedCount++
         }

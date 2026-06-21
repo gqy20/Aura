@@ -118,12 +118,13 @@ class DreamDataCollector @Inject constructor(
             val avgIntensity = list.map { it.intensity }.average().toFloat()
             val moods = list.groupingBy { it.mood.ifBlank { "neutral" } }.eachCount()
                 .entries.joinToString(", ") { "${it.key}×${it.value}" }
-            appendLine("- $day: 平均 intensity=$avgIntensity, 分布=$moods")
+            val idList = list.joinToString(",") { it.id }
+            appendLine("- $day: 平均 intensity=$avgIntensity, 分布=$moods, ids:[$idList]")
         }
         appendLine()
         appendLine("## 消息(${snapshot.messages.size} 条)")
         snapshot.messages.take(20).forEach { msg ->
-            appendLine("- [${msg.role}] ${msg.content.take(80)}")
+            appendLine("- [${msg.role}|id:${msg.id}] ${msg.content.take(80)}")
         }
         if (snapshot.messages.size > 20) {
             appendLine("... 还有 ${snapshot.messages.size - 20} 条")
@@ -135,7 +136,7 @@ class DreamDataCollector @Inject constructor(
             appendLine()
             appendLine("## 视觉证据(${snapshot.imageMemories.size} 张)")
             snapshot.imageMemories.forEach { img ->
-                appendLine("- ${formatTimestamp(img.timestamp)} ${img.content}")
+                appendLine("- [id:${img.id}] ${formatTimestamp(img.timestamp)} ${img.content}")
             }
         }
         // Health Connect 健康快照(小米运动健康等)
