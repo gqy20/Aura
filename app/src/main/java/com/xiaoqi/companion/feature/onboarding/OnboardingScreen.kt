@@ -62,7 +62,7 @@ fun OnboardingScreen(
     var step by rememberSaveable { mutableStateOf(0) }
     var q1 by rememberSaveable { mutableStateOf("") }
     var q2 by rememberSaveable { mutableStateOf("") }
-    var q3 by rememberSaveable { mutableStateOf("就叫我 Aura 吧,语气放松一点") }
+    var q3 by rememberSaveable { mutableStateOf("") }
     val q4Friends = remember { mutableStateOf(listOf("", "", "")) }
     var q5Choice by rememberSaveable { mutableStateOf("") }
 
@@ -140,6 +140,7 @@ fun OnboardingScreen(
                                 value = q3,
                                 onValueChange = { q3 = it },
                                 modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("例：叫我小王，语气像朋友聊天") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     capitalization = KeyboardCapitalization.Sentences,
@@ -220,6 +221,9 @@ fun OnboardingScreen(
                             step++
                         }
                     },
+                    // 称呼是用户身份的核心信息,必须填,否则 LLM 后续不知道怎么称呼用户。
+                    // 其他步 q1/q2/q4/q5 是次要信息,空也能跳过。
+                    enabled = step != 2 || q3.isNotBlank(),
                 ) {
                     Text(if (isLast) "完成" else "下一步")
                     if (!isLast) {

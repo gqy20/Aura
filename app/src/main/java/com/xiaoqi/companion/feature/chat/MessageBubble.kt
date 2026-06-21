@@ -11,6 +11,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -155,28 +156,44 @@ private fun MessageBubbleContent(
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
             )
         }
-        if (!isUser && message.toolStatus != null) {
+        val toolStatus = message.toolStatus
+        val performanceInfo = message.performanceInfo
+        val showToolStatus = !isUser && toolStatus != null
+        val showPerformance = !isUser && !message.isStreaming && performanceInfo != null
+        if (showToolStatus || showPerformance) {
             Spacer(modifier = Modifier.size(6.dp))
-            ToolStatusPill(
-                text = message.toolStatus,
-                status = message.toolStatusType,
-                onClick = onToolStatusClick,
-            )
-        }
-        if (!isUser && !message.isStreaming && message.performanceInfo != null) {
-            Spacer(modifier = Modifier.size(6.dp))
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                shape = RoundedCornerShape(8.dp),
+            // 工具状态 pill 和 耗时/tok/s pill 同一行（FlowRow 兜底换行），间距 10dp
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    text = message.performanceInfo.format(),
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
+                if (showToolStatus) {
+                    ToolStatusPill(
+                        text = toolStatus!!,
+                        status = message.toolStatusType,
+                        onClick = onToolStatusClick,
+                    )
+                }
+                if (showPerformance) {
+                    PerformancePill(performanceInfo!!)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PerformancePill(performance: PerformanceInfo) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Text(
+            text = performance.format(),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 
