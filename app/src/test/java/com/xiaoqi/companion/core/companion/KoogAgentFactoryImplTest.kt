@@ -255,11 +255,13 @@ class KoogAgentFactoryImplTest {
     }
 
     @Test
-    fun create_localQwenProvider_withTools_executesLocalToolLoop() = runTest {
+    fun create_localQwenProvider_withTools_skipsLocalToolLoop() = runTest {
+        // 本地 LLM 路径不再注入工具（0.8B/4B JSON 产出不稳定 + 多轮推理惩罚严重）。
+        // 即使 AgentToolRegistry 有工具，ReactiveCompanion 也应拿 ToolRegistry.EMPTY，
+        // 直接走纯文本路径，不进入工具循环。
         val localEngine = SequencedLocalQwenEngine(
             listOf(
-                listOf("""{"tool_calls":[{"name":"test_note","arguments":{"content":"User likes jasmine tea"}}]}"""),
-                listOf("remembered"),
+                listOf("plain reply without tool"),
             )
         )
         val factory = KoogAgentFactoryImpl(
@@ -284,16 +286,13 @@ class KoogAgentFactoryImplTest {
             )
         ).toList()
 
-        assertTrue(events.any {
-            val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
-            call?.name == "test_note" && call.status == ToolCallStatus.STARTED
+        // 没有工具调用事件，只有纯文本输出
+        assertTrue(events.none {
+            (it as? KoogAgentEvent.ToolCallUpdated)?.call != null
         })
-        assertTrue(events.any {
-            val call = (it as? KoogAgentEvent.ToolCallUpdated)?.call
-            call?.name == "test_note" && call.status == ToolCallStatus.SUCCEEDED
-        })
-        assertTrue(events.contains(KoogAgentEvent.TextDelta("remembered")))
-        assertEquals(2, localEngine.requests.size)
+        assertTrue(events.contains(KoogAgentEvent.TextDelta("plain reply without tool")))
+        // 只调用了一次 engine（没有第二轮工具循环）
+        assertEquals(1, localEngine.requests.size)
     }
 
     private class ToolCallingPromptExecutor : PromptExecutor() {

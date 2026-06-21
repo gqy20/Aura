@@ -37,7 +37,11 @@ object SystemPersona {
 
     fun init(context: Context) {
         val config = PromptConfigLoader.load(context)
-        applyConfig(config)
+        // BuildConfig.BRAND_NAME 是 brand.properties 的单一真相，优先于 yml 的 name。
+        // 这样换品牌时只需改 brand.properties，prompt 自动跟随。
+        val effectiveName = com.xiaoqi.companion.BuildConfig.BRAND_NAME.takeIf { it.isNotBlank() }
+            ?: config.name
+        applyConfig(config.copy(name = effectiveName))
     }
 
     fun reload(context: Context) {

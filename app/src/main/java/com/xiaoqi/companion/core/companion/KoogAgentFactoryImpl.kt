@@ -65,11 +65,15 @@ class KoogAgentFactoryImpl @Inject constructor(
             "hasApiKey" to config.apiKey.isNotBlank(),
         )
         if (config.provider == LlmProvider.LOCAL_QWEN) {
+            // 0.8B/4B 量化模型在端侧产出 JSON 质量不稳定（0.8B 成功率 < 70%），
+            // 且每轮工具调用 = 一次完整 LLM 推理，多轮惩罚严重（最坏 5x）。
+            // 工具调用统一走云端原生 function calling；本地路径只做纯文本陪伴对话。
+            // 见 docs/roadmap.md §dual-mind 分工。
             @Suppress("DEPRECATION_RENAMED_TO_REACTIVE_COMPANION")
             return ReactiveCompanion(
                 engine = localQwenEngine,
                 modelName = config.modelName,
-                toolRegistry = if (config.provider == LlmProvider.LOCAL_QWEN) toolRegistry.create() else ToolRegistry.EMPTY,
+                toolRegistry = ToolRegistry.EMPTY,
                 toolCallRecorder = toolCallRecorder,
                 sessionId = sessionId,
             )
