@@ -136,8 +136,10 @@ private fun MessageBubbleContent(
             Spacer(modifier = Modifier.size(8.dp))
         }
         if (!isUser && message.isStreaming && message.content.isBlank()) {
-            // 有 tool chip（查找记忆 / 已创建提醒 等）时不叠安抚文案，避免两行字打架。
-            if (message.toolStatus == null) {
+            // toolStatusType==null 表示本地模型加载占位（toolStatus="本地模型加载并生成中"）
+            // 或云端纯空，两种都走 carousel 安抚；真实工具调用（type!=null）才回退老 spinner，
+            // 避免"查找记忆"chip 与安抚文案两行字打架。
+            if (message.toolStatusType == null) {
                 ThinkingHintCarousel(
                     indicatorColor = MaterialTheme.colorScheme.primary,
                     textColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -166,7 +168,9 @@ private fun MessageBubbleContent(
         }
         val toolStatus = message.toolStatus
         val performanceInfo = message.performanceInfo
-        val showToolStatus = !isUser && toolStatus != null
+        // 本地加载占位（toolStatus!=null 但 type==null）已被上面的 carousel 接管，
+        // 这里不重复渲染 pill，避免与安抚文案同时出现。
+        val showToolStatus = !isUser && toolStatus != null && message.toolStatusType != null
         val showPerformance = !isUser && !message.isStreaming && performanceInfo != null
         if (showToolStatus || showPerformance) {
             Spacer(modifier = Modifier.size(6.dp))
