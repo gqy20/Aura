@@ -35,4 +35,8 @@
 
     <!-- 清空类反馈 (Settings → 数据透明) -->
     <string name="data_clear_done">已清空 %1$d 条</string>
+
+    <!-- 字体出处 (MiSans 许可协议第 1 条要求「在软件中特别注明使用了 MiSans 字体」) -->
+    <string name="font_credit_misans">字体: MiSans by Xiaomi HyperOS (免费商用)</string>
+    <string name="font_credit_misans_url">https://hyperos.mi.com/font</string>
 </resources>

@@ -74,6 +74,12 @@ docs/plan/visual-audit-assets/
 tmp-adb-screens/
 tmp-adb-db/
 
+# Font subsetting 中间产物 (原始 ttf 大、子集脚本本身可入库)
+# 子集后成品在 app/src/main/res/font/, 那个要入库
+tmp-fonts/*.ttf
+tmp-fonts/*.zip
+tmp-fonts/*.txt
+
 # Device/UI dumps
 ui*.xml
 

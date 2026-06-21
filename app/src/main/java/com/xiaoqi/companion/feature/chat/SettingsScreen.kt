@@ -600,6 +600,25 @@ private fun LazyListScope.settingsCapabilitiesPage(
         }
     }
     item {
+        // 位置/通知权限入口：之前「位置」开关只是 toggle，没有请求/跳转入口，
+        // 导致权限没授予时位置拿不到。这里直接跳系统「应用详情 → 权限」页让用户开位置。
+        val context = androidx.compose.ui.platform.LocalContext.current
+        OutlinedButton(
+            onClick = {
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.fromParts("package", context.packageName, null),
+                )
+                runCatching { context.startActivity(intent) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Outlined.Lock, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("授予位置 / 通知权限（跳转系统设置）")
+        }
+    }
+    item {
         HealthDataSection(
             syncState = state.healthSyncState,
             autoSyncEnabled = state.healthAutoSyncEnabled,
@@ -630,6 +649,24 @@ private fun LazyListScope.settingsSystemPage(
     }
     item {
         DataTransparencySection(viewModel = actions.viewModel)
+    }
+    item {
+        AboutSection()
+    }
+}
+
+@Composable
+private fun AboutSection() {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        SettingsSectionTitle(
+            title = "关于",
+            subtitle = "版本与素材声明",
+        )
+        Text(
+            text = stringResource(R.string.font_credit_misans),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
