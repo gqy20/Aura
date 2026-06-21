@@ -6,6 +6,7 @@ import { HeroStage } from '@/components/feature/HeroStage'
 import { ChapterBlock } from '@/components/feature/ChapterBlock'
 import { FooterMeta } from '@/components/feature/FooterMeta'
 import { Reveal } from '@/components/Reveal'
+import { StaggerIn } from '@/components/StaggerIn'
 
 const AgentGraphDynamic = dynamic(
   () => import('@/components/three/AgentGraph').then((m) => m.AgentGraph),
@@ -101,7 +102,13 @@ export default function AgentPage() {
         eyebrow="Overview"
         title="它怎么从聊天走向行动"
         description="这一层不是「会调 API」，而是把记忆、设备、健康、提醒和 MCP 组织成可控的行动能力 —— 工具能调用、可被否决、可被复用。"
-      />
+      >
+        <Reveal>
+          <p className="max-w-prose text-base leading-relaxed text-muted">
+            这一层不是「会调 API」，而是把记忆、设备、健康、提醒和 MCP 组织成可控的行动能力 —— 工具能调用、可被否决、可被复用。
+          </p>
+        </Reveal>
+      </ChapterBlock>
 
       <ChapterBlock
         number="02"
@@ -135,7 +142,7 @@ export default function AgentPage() {
                     {cat.tools.map((t) => (
                       <li
                         key={t}
-                        className="rounded-full border border-border bg-subtle/40 px-3 py-1 font-mono text-[11px] text-foreground"
+                        className="glass-hover rounded-full border border-border bg-subtle/40 px-3 py-1 font-mono text-[11px] text-foreground transition-colors hover:text-accent"
                       >
                         {t}
                       </li>
@@ -157,12 +164,16 @@ export default function AgentPage() {
         <div className="space-y-0">
           {PIPELINE_STAGES.map((s, i) => (
             <Reveal key={s.stage} delay={i * 70}>
-              <div className="grid grid-cols-1 items-baseline gap-4 border-t border-border py-6 md:grid-cols-12 md:gap-12">
-                <div className="md:col-span-3">
+              <div className="glass-hover grid grid-cols-1 items-baseline gap-4 rounded-lg border-t border-border py-6 md:grid-cols-12 md:gap-12">
+                <div className="md:col-span-3 flex items-center gap-3">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: s.color }}
+                  />
                   <span className="font-mono text-xs text-accent">
                     0{i + 1}
                   </span>
-                  <h3 className="mt-1 font-mono text-base uppercase tracking-wider text-foreground">
+                  <h3 className="font-mono text-base uppercase tracking-wider text-foreground">
                     {s.stage}
                   </h3>
                 </div>
@@ -186,7 +197,7 @@ export default function AgentPage() {
         <div className="space-y-8">
           {PROVIDERS.map((p, i) => (
             <Reveal key={p.name} delay={i * 80}>
-              <div className="grid grid-cols-1 gap-4 border-t border-border pt-6 md:grid-cols-12 md:gap-12">
+              <div className="glass-hover grid grid-cols-1 gap-4 rounded-lg border-t border-border pt-6 md:grid-cols-12 md:gap-12">
                 <div className="md:col-span-3">
                   <p
                     className="font-mono text-xs uppercase tracking-wider"
@@ -201,7 +212,7 @@ export default function AgentPage() {
                 </div>
                 <div className="md:col-span-2 md:text-right">
                   {p.name === 'LOCAL_QWEN' && (
-                    <span className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 font-mono text-[10px] text-accent">
+                    <span className="tool-dot-done rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 font-mono text-[10px] text-accent">
                       on-device
                     </span>
                   )}
@@ -221,7 +232,7 @@ export default function AgentPage() {
         <div className="space-y-12">
           {SCENARIOS.map(([title, desc], i) => (
             <Reveal key={title} direction="y" delay={i * 60}>
-              <div className="grid grid-cols-1 gap-4 border-t border-border pt-6 md:grid-cols-12 md:gap-12">
+              <div className="glass-hover grid grid-cols-1 gap-4 rounded-lg border-t border-border pt-6 md:grid-cols-12 md:gap-12">
                 <div className="md:col-span-3">
                   <span className="font-mono text-xs text-accent">0{i + 1}</span>
                   <h3 className="mt-1 text-lg font-medium text-foreground">{title}</h3>

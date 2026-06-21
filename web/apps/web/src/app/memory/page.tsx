@@ -6,6 +6,7 @@ import { HeroStage } from '@/components/feature/HeroStage'
 import { ChapterBlock } from '@/components/feature/ChapterBlock'
 import { FooterMeta } from '@/components/feature/FooterMeta'
 import { Reveal } from '@/components/Reveal'
+import { StaggerIn } from '@/components/StaggerIn'
 
 const MemoryNetworkDynamic = dynamic(
   () => import('@/components/three/MemoryNetwork').then((m) => m.MemoryNetwork),
@@ -81,7 +82,13 @@ export default function MemoryPage() {
         eyebrow="Overview"
         title="记住什么，不记住什么"
         description="Aura 不把你压成一句标签，而是把稳定事实、阶段经历和长期偏好分开存放。摘要负责压缩长程上下文，关系与偏好负责细节回流 —— 用户始终可以否决任何一条。"
-      />
+      >
+        <Reveal>
+          <p className="max-w-prose text-base leading-relaxed text-muted">
+            Aura 不把你压成一句标签，而是把稳定事实、阶段经历和长期偏好分开存放。摘要负责压缩长程上下文，关系与偏好负责细节回流 —— 用户始终可以否决任何一条。
+          </p>
+        </Reveal>
+      </ChapterBlock>
 
       <ChapterBlock
         number="02"
@@ -108,9 +115,12 @@ export default function MemoryPage() {
                   <p className="max-w-prose text-base leading-relaxed text-foreground">
                     {t.desc}
                   </p>
-                  <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
+                  <ul className="mt-4 flex flex-wrap gap-2 text-sm text-muted">
                     {t.examples.map((ex) => (
-                      <li key={ex} className="font-mono text-xs">
+                      <li
+                        key={ex}
+                        className="glass-hover rounded-full border border-border/60 bg-subtle/40 px-3 py-1 font-mono text-xs transition-colors hover:text-foreground"
+                      >
                         {ex}
                       </li>
                     ))}
@@ -128,22 +138,25 @@ export default function MemoryPage() {
         title="怎么长大"
         description="记忆负责长期理解，摘要负责压缩，关系与偏好负责细节回流。本地 SQLite · 281 条演示数据。"
       >
-        <div className="flex h-3 w-full overflow-hidden rounded-full bg-subtle">
-          {STORAGE_BREAKDOWN.map((row, i) => (
-            <div
-              key={row.type}
-              className="h-full"
-              style={{
-                width: `${row.weight * 100}%`,
-                backgroundColor: STORAGE_COLORS[i],
-              }}
-            />
-          ))}
-        </div>
+        <Reveal delay={120}>
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-subtle">
+            {STORAGE_BREAKDOWN.map((row, i) => (
+              <div
+                key={row.type}
+                className="h-full animate-bar-fill"
+                style={{
+                  width: `${row.weight * 100}%`,
+                  backgroundColor: STORAGE_COLORS[i],
+                  animationDelay: `${i * 200 + 300}ms`,
+                }}
+              />
+            ))}
+          </div>
+        </Reveal>
 
-        <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3">
+        <StaggerIn stagger={140} distance={12} baseDelay={400}>
           {STORAGE_BREAKDOWN.map((row, i) => (
-            <div key={row.type}>
+            <div key={row.type} className="glass-hover rounded-xl border border-border/50 p-5 transition-colors hover:bg-subtle/60">
               <div className="flex items-center gap-2">
                 <span
                   className="h-1.5 w-1.5 rounded-full"
@@ -159,7 +172,7 @@ export default function MemoryPage() {
               </p>
             </div>
           ))}
-        </div>
+        </StaggerIn>
       </ChapterBlock>
 
       <ChapterBlock
@@ -171,7 +184,7 @@ export default function MemoryPage() {
         <div className="space-y-10">
           {TRUST_BOUNDARIES.map(([title, desc], i) => (
             <Reveal key={title} direction="y" delay={i * 80}>
-              <div className="grid grid-cols-1 gap-4 border-t border-border pt-6 md:grid-cols-12 md:gap-12">
+              <div className="glass-hover grid grid-cols-1 gap-4 rounded-lg border-t border-border pt-6 md:grid-cols-12 md:gap-12">
                 <div className="md:col-span-3">
                   <span className="label-mono text-muted">
                     0{i + 1} · Boundary

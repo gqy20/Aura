@@ -5,6 +5,7 @@ import { HeroStage } from '@/components/feature/HeroStage'
 import { ChapterBlock } from '@/components/feature/ChapterBlock'
 import { FooterMeta } from '@/components/feature/FooterMeta'
 import { Reveal } from '@/components/Reveal'
+import { TechArch } from '@/components/three/TechArch'
 
 const SIBLINGS = [
   { href: '/presence', label: 'Presence', key: 'presence' as const },
@@ -62,21 +63,8 @@ export default function TechPage() {
       hideMeta
       heroStage={
         <HeroStage
-          variant="presence"
-          three={
-            <div className="relative h-full w-full overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,92,255,0.16),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(92,239,255,0.12),transparent_28%),radial-gradient(circle_at_60%_80%,rgba(92,255,176,0.10),transparent_26%)]" />
-              <div className="absolute inset-0 grid place-items-center">
-                <div className="grid gap-4 text-center md:grid-cols-3">
-                  {['云端', '本地', '运行时'].map((item) => (
-                    <div key={item} className="rounded-xl border border-border bg-background/25 p-5 backdrop-blur-sm">
-                      <p className="label-mono text-accent">{item}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          }
+          variant="agent"
+          three={<TechArch />}
           stats={[
             { n: '4', label: '核心层', desc: '运行时、双心智、个人模型、工具与 MCP' },
             { n: '5', label: '执行段', desc: '输入、路由、执行、返回、沉淀' },

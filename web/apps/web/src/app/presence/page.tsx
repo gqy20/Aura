@@ -7,6 +7,7 @@ import { ChapterBlock } from '@/components/feature/ChapterBlock'
 import { FooterMeta } from '@/components/feature/FooterMeta'
 import { TimelineLightUp } from '@/components/feature/TimelineLightUp'
 import { Reveal } from '@/components/Reveal'
+import { StaggerIn } from '@/components/StaggerIn'
 import {
   STATES,
   STATE_ORDER,
@@ -111,7 +112,13 @@ export default function PresencePage() {
         eyebrow="Overview"
         title="陪伴运行时，不只是聊天"
         description="Aura 会根据输入、流式回复、工具状态、情绪和关系变化持续调整自己 —— 它是一段持续运行的状态流，而不只是你发消息时弹出的一次回复。"
-      />
+      >
+        <Reveal>
+          <p className="max-w-prose text-base leading-relaxed text-muted">
+            Aura 会根据输入、流式回复、工具状态、情绪和关系变化持续调整自己 —— 它是一段持续运行的状态流，而不只是你发消息时弹出的一次回复。
+          </p>
+        </Reveal>
+      </ChapterBlock>
 
       <ChapterBlock
         number="02"
@@ -125,7 +132,7 @@ export default function PresencePage() {
             <ol className="space-y-8">
               {PRIORITY_RULES.map(([title, desc], i) => (
                 <Reveal key={title} as="li" direction="y" delay={i * 60}>
-                  <div className="flex items-baseline gap-4">
+                  <div className="glass-hover flex items-baseline gap-4 rounded-lg px-3 py-2 -mx-3 transition-colors hover:bg-subtle/40">
                     <span className="font-mono text-xs text-accent">0{i + 1}</span>
                     <h4 className="text-lg font-medium text-foreground">{title}</h4>
                   </div>
@@ -142,7 +149,7 @@ export default function PresencePage() {
             <ul className="space-y-6">
               {REACTIONS.map((reaction, i) => (
                 <Reveal key={reaction.name} as="li" delay={i * 60}>
-                  <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                  <div className="glass-hover insight-glow flex items-center justify-between rounded-lg border-b border-border/60 pb-3 transition-colors hover:bg-subtle/30">
                     <span
                       className="font-mono text-xs uppercase tracking-wider"
                       style={{ color: reaction.color }}
