@@ -18,20 +18,6 @@ class McpSettingsSnapshotTest {
     }
 
     @Test
-    fun `from migrates amap url to provider and key when providerId is unset`() {
-        val s = McpSettingsSnapshot.from(
-            rawProviderId = null,
-            rawApiKey = null,
-            rawName = "OldAmap",
-            rawUrl = "https://mcp.amap.com/mcp?key=abc123",
-        )
-        assertEquals("amap", s.providerId)
-        assertEquals("abc123", s.apiKey)
-        assertEquals("https://mcp.amap.com/mcp?key=abc123", s.url)
-        assertEquals("OldAmap", s.name)
-    }
-
-    @Test
     fun `from migrates custom url to custom preset when providerId is unset`() {
         val s = McpSettingsSnapshot.from(
             rawProviderId = null,

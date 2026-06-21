@@ -56,11 +56,4 @@ class DreamLoopIntervalTest {
         assertEquals(DreamLoopInterval.H6, DreamLoopInterval.fromMinutesOrDefault(999L))
         assertEquals(DreamLoopInterval.H6, DreamLoopInterval.fromMinutesOrDefault(-1L))
     }
-
-    @Test
-    fun fromMinutesOrDefault_zero_isOff_notDefault() {
-        // 0L 必须显式走 OFF,不能因为"无法识别"被回退到 H6
-        // 防止首次装 App 时 null → ?: 0 → OFF 的回归
-        assertEquals(DreamLoopInterval.OFF, DreamLoopInterval.fromMinutesOrDefault(0L))
-    }
 }

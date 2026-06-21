@@ -203,9 +203,6 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
-            // 让未被 mock 的 Android API 返默认值(0/false/null) 而不是抛 "not mocked!"
-            // 这样纯 JVM 测试不需要为一句 Context.getString 付出 Robolectric 启动成本
-            isReturnDefaultValues = true
 
             // 并行跑测试类 —— 每类独立 JVM fork,避免 Robolectric static state 互相干扰
             // CI 跟本地开发都能提速(本机 4 workers,上限于 gradle.workers.max)

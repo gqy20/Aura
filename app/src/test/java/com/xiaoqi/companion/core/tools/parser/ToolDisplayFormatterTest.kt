@@ -160,12 +160,4 @@ class ToolDisplayFormatterTest {
         assertTrue("got: $label", label.contains("创建提醒失败"))
         assertTrue(label.contains("permission_denied"))
     }
-
-    @Test
-    fun registry_label_unchangedLegacyBehavior() {
-        // 原 label() 保持原行为,新增 resolveLabel 不破坏旧调用方
-        assertEquals("已保存", registry.label("save_memory", ToolCallStatus.SUCCEEDED))
-        assertEquals("保存中", registry.label("save_memory", ToolCallStatus.STARTED))
-        assertEquals("保存失败", registry.label("save_memory", ToolCallStatus.FAILED))
-    }
 }

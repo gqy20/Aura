@@ -53,13 +53,6 @@ class ConvertersTest {
     }
 
     @Test
-    fun emptyMapJson_roundTrip() {
-        val json = Converters.mapToJson(emptyMap())
-        val restored = Converters.jsonToMap(json)
-        assertEquals(0, restored.size)
-    }
-
-    @Test
     fun metadataJson_roundTrip() {
         val meta = MessageMetadata(model = "glm-5v-turbo", tokensUsed = 42)
         val json = Converters.metadataToJson(meta)

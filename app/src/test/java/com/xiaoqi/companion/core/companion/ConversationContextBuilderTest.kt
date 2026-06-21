@@ -7,6 +7,7 @@ import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -65,17 +66,49 @@ class ConversationContextBuilderTest {
         assertTrue(context.estimatedTokens <= 12)
     }
 
+    @Test
+    fun build_imageMessagesAreRepresentedWithoutEmbeddingImagePayloadAgain() = runTest {
+        coEvery { messageRepository.getRecentMessages("default", 10) } returns listOf(
+            message(
+                id = "m2",
+                role = MessageRole.USER,
+                content = "Shared a picture",
+                timestamp = 2_000L,
+                imageBase64 = "base64-payload",
+            ),
+            message("m1", MessageRole.ASSISTANT, "我看到了一张桌面照片。", timestamp = 1_000L),
+        )
+        val builder = ConversationContextBuilder(
+            messageRepository = messageRepository,
+            rawTokenBudget = 100,
+            candidateLimit = 10,
+        )
+
+        val context = builder.build("default")
+
+        assertEquals(
+            listOf(
+                "Aura: 我看到了一张桌面照片。",
+                "User [image attached]: Shared a picture",
+            ),
+            context.recentMessages,
+        )
+        assertFalse(context.recentMessages.joinToString("\n").contains("base64-payload"))
+    }
+
     private fun message(
         id: String,
         role: MessageRole,
         content: String,
         timestamp: Long,
+        imageBase64: String? = null,
     ): MessageEntity =
         MessageEntity(
             id = id,
             sessionId = "default",
             role = role,
             content = content,
+            imageBase64 = imageBase64,
             timestamp = timestamp,
         )
 }
