@@ -19,8 +19,10 @@ interface SceneSectionProps {
 
 /**
  * 整屏 snap 场景屏：左文案右手机。
- * 与主页 ScrollSection / ScreenSection 同一套一屏一节奏语言，
- * 区别是右栏从「抽象标题」换成「手机里的真实一刻」。
+ *
+ * 布局关键：右侧手机（~620px）远高于左侧文字（~370px），
+ * 所以用 items-start 顶部对齐 + 左侧 pt 偏移让文字区与手机视觉重心对齐，
+ * 而不是 items-center 把文字挤在中间一坨。
  */
 export function SceneSection({
   index,
@@ -32,7 +34,7 @@ export function SceneSection({
   accent = 'var(--color-accent)',
 }: SceneSectionProps) {
   return (
-    <section className="relative flex h-[100svh] snap-start snap-always items-center overflow-hidden px-6 py-20 sm:px-10 lg:px-16">
+    <section className="relative flex h-[100svh] snap-start snap-always items-start overflow-hidden px-6 py-20 sm:px-10 lg:px-16">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10"
@@ -41,19 +43,19 @@ export function SceneSection({
         }}
       />
 
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 md:grid-cols-12 md:gap-16">
-        <Reveal direction="y" className="md:col-span-5">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-start gap-16 md:grid-cols-2 lg:gap-24">
+        <Reveal direction="y" className="pt-12 md:pt-16 lg:pt-20">
           <span className="label-mono text-xs text-muted">moment {index}</span>
-          <p className="label-mono mt-6 text-[0.7rem]" style={{ color: accent }}>
+          <p className="label-mono mt-11 text-[0.72rem]" style={{ color: accent }}>
             {eyebrow}
           </p>
-          <h2 className="mt-4 max-w-md text-balance text-3xl font-medium leading-display tracking-tight sm:text-4xl md:text-[2.6rem]">
+          <h2 className="mt-9 text-balance text-3xl font-medium leading-[1.08] tracking-tight sm:text-4xl md:text-[3.15rem]">
             {title}
           </h2>
-          <p className="mt-5 max-w-md text-pretty text-sm leading-relaxed text-muted sm:text-base">
+          <p className="mt-10 text-pretty text-lg leading-[1.7] text-muted">
             {description}
           </p>
-          <ul className="mt-7 flex flex-wrap gap-2">
+          <ul className="mt-12 flex flex-wrap gap-3">
             {abilityTags.map((t) => (
               <li
                 key={t}
@@ -65,7 +67,7 @@ export function SceneSection({
           </ul>
         </Reveal>
 
-        <Reveal direction="y" delay={120} className="flex md:col-span-7 md:justify-center">
+        <Reveal direction="y" delay={120} className="flex justify-center">
           {phone}
         </Reveal>
       </div>
