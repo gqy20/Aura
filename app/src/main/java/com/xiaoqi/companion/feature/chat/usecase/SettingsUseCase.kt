@@ -471,6 +471,20 @@ class SettingsUseCase @Inject constructor(
         appPreferences.setLocalToolsEnabled(value)
     }
 
+    suspend fun setMcpEnabled(
+        value: Boolean,
+        update: (ChatUiState.() -> ChatUiState) -> Unit,
+    ) = updateBooleanPreference("mcp_enabled", value, update) {
+        appPreferences.setMcpEnabled(value)
+    }
+
+    suspend fun setSystemToolsEnabled(
+        value: Boolean,
+        update: (ChatUiState.() -> ChatUiState) -> Unit,
+    ) = updateBooleanPreference("system_tools", value, update) {
+        appPreferences.setSystemToolsEnabled(value)
+    }
+
     suspend fun setNotificationEnabled(
         value: Boolean,
         update: (ChatUiState.() -> ChatUiState) -> Unit,

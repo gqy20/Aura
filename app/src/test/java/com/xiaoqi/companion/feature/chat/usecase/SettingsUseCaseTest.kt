@@ -304,6 +304,20 @@ class SettingsUseCaseTest {
     }
 
     @Test
+    fun setMcpEnabled_persistsToAppPreferences() = runTest {
+        useCase.setMcpEnabled(false, update)
+        advanceUntilIdle()
+        coVerify { appPreferences.setMcpEnabled(false) }
+    }
+
+    @Test
+    fun setSystemToolsEnabled_persistsToAppPreferences() = runTest {
+        useCase.setSystemToolsEnabled(false, update)
+        advanceUntilIdle()
+        coVerify { appPreferences.setSystemToolsEnabled(false) }
+    }
+
+    @Test
     fun saveMcpSettings_preservesDisabledStateWhenEditingExistingServer() = runTest {
         state.update {
             it.copy(

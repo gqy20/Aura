@@ -115,6 +115,10 @@ data class ChatToolCapabilitySettings(
     val notificationEnabled: Boolean = true,
     /** 本地模型工具调用开关。默认 false。 */
     val localToolsEnabled: Boolean = false,
+    /** MCP 总开关。默认 true,关掉后所有 MCP server 的工具都不注册。 */
+    val mcpEnabled: Boolean = true,
+    /** 系统默认工具(记忆/时间/提醒/Health 等)开关。默认 true。 */
+    val systemToolsEnabled: Boolean = true,
     /** 多 MCP server 列表 — 替代老的单 server 字段 (mcpProviderId/mcpApiKey/mcpServerName/mcpHttpUrl)。 */
     val mcpServers: List<McpServerConfig> = emptyList(),
 )

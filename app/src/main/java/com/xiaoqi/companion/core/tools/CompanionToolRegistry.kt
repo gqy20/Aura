@@ -5,6 +5,7 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.mcp.McpRemoteTool
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.McpServerListRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
@@ -28,23 +29,42 @@ class CompanionToolRegistry @Inject constructor(
     private val updateStateTool: UpdateStateTool,
     private val remoteMcpClient: RemoteMcpClient,
     private val mcpServerListRepository: McpServerListRepository,
+    private val appPreferences: AppPreferences,
 ) : AgentToolRegistry {
     override fun create(): ToolRegistry {
         val builder = ToolRegistry.builder()
-            .tool(searchMemoryTool)
-            .tool(searchRecordsTool)
-            .tool(searchSummariesTool)
-            .tool(getCurrentTimeTool)
-            .tool(getRecentInteractionContextTool)
-            .tool(getUserContextSettingsTool)
-            .tool(getDeviceStatusTool)
-            .tool(getWeatherTool)
-            .tool(createLocalReminderTool)
-            .tool(queryHealthDataTool)
-            .tool(updateStateTool)
+        val systemToolsEnabled = runCatching {
+            runBlocking { appPreferences.systemToolsEnabled.first() }
+        }.getOrElse {
+            AppLogger.warn(LogTags.Llm, "system_tools_pref_read_failed", "message" to (it.message ?: ""))
+            true
+        }
+        if (systemToolsEnabled) {
+            builder
+                .tool(searchMemoryTool)
+                .tool(searchRecordsTool)
+                .tool(searchSummariesTool)
+                .tool(getCurrentTimeTool)
+                .tool(getRecentInteractionContextTool)
+                .tool(getUserContextSettingsTool)
+                .tool(getDeviceStatusTool)
+                .tool(getWeatherTool)
+                .tool(createLocalReminderTool)
+                .tool(queryHealthDataTool)
+                .tool(updateStateTool)
+        }
 
-        addRemoteMcpTools(builder)
+        if (systemToolsEnabled && isMcpEnabled()) {
+            addRemoteMcpTools(builder)
+        }
         return builder.build()
+    }
+
+    private fun isMcpEnabled(): Boolean = runCatching {
+        runBlocking { appPreferences.mcpEnabled.first() }
+    }.getOrElse {
+        AppLogger.warn(LogTags.Llm, "mcp_pref_read_failed", "message" to (it.message ?: ""))
+        true
     }
 
     private fun addRemoteMcpTools(builder: ai.koog.agents.core.tools.ToolRegistryBuilder) {

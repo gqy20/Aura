@@ -133,6 +133,8 @@ internal data class SettingsScreenActions(
     val onReminderToolEnabledChanged: (Boolean) -> Unit,
     val onNotificationEnabledChanged: (Boolean) -> Unit,
     val onLocalToolsEnabledChanged: (Boolean) -> Unit,
+    val onMcpEnabledChanged: (Boolean) -> Unit,
+    val onSystemToolsEnabledChanged: (Boolean) -> Unit,
     val onDreamLoopIntervalChanged: (DreamLoopInterval) -> Unit,
     val onDreamLoopModelNameChanged: (String) -> Unit,
     val onTriggerDreamLoopNow: () -> Unit,
@@ -165,6 +167,8 @@ internal data class SettingsScreenActions(
             onReminderToolEnabledChanged = viewModel::setReminderToolEnabled,
             onNotificationEnabledChanged = viewModel::setNotificationEnabled,
             onLocalToolsEnabledChanged = viewModel::setLocalToolsEnabled,
+            onMcpEnabledChanged = viewModel::setMcpEnabled,
+            onSystemToolsEnabledChanged = viewModel::setSystemToolsEnabled,
             onDreamLoopIntervalChanged = viewModel::setDreamLoopInterval,
             onDreamLoopModelNameChanged = viewModel::setDreamLoopModelName,
             onTriggerDreamLoopNow = viewModel::triggerDreamLoopNow,
@@ -584,6 +588,14 @@ private fun LazyListScope.settingsCapabilitiesPage(
             )
             DividerSpacer()
             SettingsToggleRow(
+                title = "系统工具",
+                detail = "记忆/时间/提醒/Health 等内置工具",
+                meta = "",
+                checked = state.toolSettings.systemToolsEnabled,
+                onCheckedChange = actions.onSystemToolsEnabledChanged,
+            )
+            DividerSpacer()
+            SettingsToggleRow(
                 title = "上下文",
                 detail = "时间与近期对话",
                 meta = "固定开启",
@@ -599,15 +611,13 @@ private fun LazyListScope.settingsCapabilitiesPage(
                     ?: "未配置（缺密钥/地址）",
                 meta = "高级",
                 metaIcon = Icons.Outlined.Bolt,
-                checked = state.toolSettings.mcpServers.any { it.isReady },
-                enabled = false,
-                locked = true,
-                statusDotColor = if (state.toolSettings.mcpServers.any { it.enabled && it.isReady }) {
+                checked = state.toolSettings.mcpEnabled && state.toolSettings.mcpServers.any { it.isReady },
+                statusDotColor = if (state.toolSettings.mcpEnabled && state.toolSettings.mcpServers.any { it.enabled && it.isReady }) {
                     ChatStatusColors.SuccessDot
                 } else {
                     ChatStatusColors.Unknown
                 },
-                onCheckedChange = {},
+                onCheckedChange = actions.onMcpEnabledChanged,
             )
         }
     }

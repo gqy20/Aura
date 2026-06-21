@@ -257,16 +257,22 @@ class ChatViewModel @Inject constructor(
                 ) { deviceStatus, location, weather, reminder, notification ->
                     Quintuple(deviceStatus, location, weather, reminder, notification)
                 },
-                appPreferences.localToolsEnabled,
+                combine(
+                    appPreferences.localToolsEnabled,
+                    appPreferences.mcpEnabled,
+                    appPreferences.systemToolsEnabled,
+                ) { localTools, mcp, systemTools -> Triple(localTools, mcp, systemTools) },
                 mcpServerListRepository.observeAll,
-            ) { quintuple, localTools, mcpServers ->
+            ) { quintuple, toolsTriple, mcpServers ->
                 ChatToolCapabilitySettings(
                     deviceStatusEnabled = quintuple.first,
                     locationContextEnabled = quintuple.second,
                     weatherContextEnabled = quintuple.third,
                     reminderToolEnabled = quintuple.fourth,
                     notificationEnabled = quintuple.fifth,
-                    localToolsEnabled = localTools,
+                    localToolsEnabled = toolsTriple.first,
+                    mcpEnabled = toolsTriple.second,
+                    systemToolsEnabled = toolsTriple.third,
                     mcpServers = mcpServers,
                 )
             }.collect { settings ->
@@ -927,6 +933,18 @@ class ChatViewModel @Inject constructor(
     fun setLocalToolsEnabled(value: Boolean) {
         viewModelScope.launch {
             settingsUseCase.setLocalToolsEnabled(value) { reducer -> _uiState.update(reducer) }
+        }
+    }
+
+    fun setMcpEnabled(value: Boolean) {
+        viewModelScope.launch {
+            settingsUseCase.setMcpEnabled(value) { reducer -> _uiState.update(reducer) }
+        }
+    }
+
+    fun setSystemToolsEnabled(value: Boolean) {
+        viewModelScope.launch {
+            settingsUseCase.setSystemToolsEnabled(value) { reducer -> _uiState.update(reducer) }
         }
     }
 

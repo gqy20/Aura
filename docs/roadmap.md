@@ -21,7 +21,7 @@
 ./gradlew.bat assembleDebug
 ```
 
-以上命令均已在 2026-06-17 验证通过（`testDebugUnitTest` **483 个测试全绿**；PR A + PR B 之后）。
+以上命令均已在 2026-06-22 验证通过（`testDebugUnitTest` **497 个测试全绿**；含工具系统双开关用例）。
 
 ## 已实现
 
@@ -81,7 +81,14 @@
 - **PR A：2-way 分支契约对齐**（2026-06-17）：`ReactiveCompanion` 与 `KoogPromptExecutorWrapper` 接口 4 方法契约对齐 — `runStreaming` 走 `runEvents` 单一入口；`runStructured` 改 `Json.decodeFromString` 解析（不再硬抛）；`toLocalRequest` 读 `BuiltPrompt.allowTools` 并打 warn 日志；新增 `StructuredLocalParser` 做 JSON block 提取 + 围栏剥离 + 兜底示例。`ReactiveCompanionTest` 4 → 8 用例。
 - **PR B：本地 vision 支持**（2026-06-17）：`LocalQwenRequest` 加 `imageBase64/imageMediaType` 字段；`MnnLlmBridge` 加 `generateWithImage(imageBytes, mediaType)`；`NativeMnnLlmBridge` + JNI 加 `submitWithImageNative`；`aura_mnn_llm_jni.cpp` 用 stb_image 解码 JPEG/PNG → MNN `ImageProcess` 转 448x448 float tensor → 构造 `PromptImagePart` + `MultimodalPrompt` → 调 `llm->response(multimodal_prompt, ...)`。`CMakeLists.txt` 加 stb_image include 路径。ReactiveCompanionTest 新增 image 透传用例，FakeBridge/RecordingNativeApi 同步补 method。
 
-> 备注：上述打磨期间测试用例从 372 → 483（PR A +8、PR B 测试覆盖增加）；Kotlin 编译通过，native 端需真机 NDK 编译验证（CMake 路径与 MNN_HOME 假设 `../mnn/3rd_party/imageHelper` + MNN `libMNN.so` 链接）。
+### 近期打磨（2026-06-22）
+
+- **工具系统双开关**（feat `tools-switch`）：`AppPreferences` 加 `mcpEnabled`（MCP 总开关，默认 true）+ `systemToolsEnabled`（系统内置工具开关，默认 true）两个 key。`CompanionToolRegistry.create()` 按两个开关短路——`systemToolsEnabled=false` 时 11 个内置工具全不注册（MCP 也跟着短路，避免出现"只有 MCP 没有记忆"的怪状态）；`mcpEnabled=false` 时只关 MCP，系统工具照常。`mcpEnabled` 与 per-server 的 `McpServerConfig.enabled` 是"总闸 vs 分闸"关系。Settings "MCP" 行由假开关（`enabled=false/locked=true`）改成真 toggle；新增"系统工具"开关行。测试 483 → 497（`CompanionToolRegistryTest` +4 开关组合 / `SettingsUseCaseTest` +2 setter / `ChatViewModelTest` 补 3 个 Flow stub）。
+- **本地工具开关**（feat `d397db3`）：`local_tools_enabled` DataStore key 控制 LOCAL_QWEN 路径是否注入 `AgentToolRegistry.create()`，走 LocalToolProtocol 软协议（0.8B JSON 质量不稳定 + 多轮推理慢，默认 false）。
+- **安抚文案轮播**（`90151ca` / `d618038`）：首字到达前加随时间升级的安抚文案轮播；本地模型加载态走 carousel 而非静态 pill。
+- **Onboarding 称谓清理**（`b83b0e2`）：Onboarding 称呼默认值清零 + MessageBubble 字体与工具状态显示。
+
+> 备注：测试用例 372（06-15）→ 483（06-17）→ 497（06-22）；native 端需真机 NDK 编译验证。
 
 ## 部分实现
 

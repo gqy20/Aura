@@ -4,11 +4,11 @@
 
 - 项目名称：Aura · 奥拉（Android AI 陪伴应用）
 - 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形
-- 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系/Health/Insight/Reminder）；NavHost 六条路由（Home/Chat/Settings/McpSettings/MemoryRoom/Onboarding）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`OnboardingScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）；`LlmConnectivityChecker`；`DataTransparencySection`；`HealthSyncManager` / `HealthDataSection`
+- 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系/Health/Insight/Reminder）；**工具系统双开关**（`mcpEnabled` MCP 总开关 + `systemToolsEnabled` 系统内置工具开关，`CompanionToolRegistry.create()` 按开关短路，与 per-server `enabled` 是"总闸 vs 分闸"关系）；NavHost 六条路由（Home/Chat/Settings/McpSettings/MemoryRoom/Onboarding）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`OnboardingScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）；`LlmConnectivityChecker`；`DataTransparencySection`；`HealthSyncManager` / `HealthDataSection`
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪与关系的头像/表情层由 Compose Canvas 临时替代；Presence Layer 的 Rive/Lottie 动画资源仍缺；Pulse 的离线衰减/回归反应/主动通知仍缺
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest）、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
-- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-06-21 通过（**491 个测试，0 失败**；含 11 个 M4 vision memory 用例。Robolectric 单 fork 复用后 DAO 总耗 -87%）
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-06-22 通过（**497 个测试，0 失败**；含工具系统双开关 4 例组合测试。Robolectric 单 fork 复用后 DAO 总耗 -87%）
 
 ## 常用验证命令
 
@@ -42,7 +42,7 @@ make test-one T=CompanionRuntimeTest
 ./gradlew.bat build
 ```
 
-以上 Gradle 命令已在 2026-06-21 验证通过（`testDebugUnitTest` **491 个测试全绿**）。测试性能优化详见 CLAUDE.md “并发配置：单 fork 复用 Robolectric Runtime” 段落。
+以上 Gradle 命令已在 2026-06-22 验证通过（`testDebugUnitTest` **497 个测试全绿**）。测试性能优化详见 CLAUDE.md “并发配置：单 fork 复用 Robolectric Runtime” 段落。
 
 ## MNN Benchmark 流程
 
