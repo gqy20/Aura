@@ -1,0 +1,2 @@
+# PDF 为 md-to-pdf 生成物，不入库；需要时本地 `npx md-to-pdf <file>.md` 生成
+*.pdf

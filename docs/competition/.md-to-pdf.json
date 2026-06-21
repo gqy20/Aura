@@ -1,0 +1,12 @@
+{
+  "stylesheet": "proposal.css",
+  "body_class": "proposal",
+  "pdf_options": {
+    "format": "A4",
+    "printBackground": true,
+    "displayHeaderFooter": true,
+    "margin": { "top": "20mm", "bottom": "16mm", "left": "14mm", "right": "14mm" },
+    "headerTemplate": "<div style=\"width:100%;font-size:8px;color:#cfd5d2;padding:6px 14mm 0;border-bottom:0.5px solid #eef0ef;\"></div>",
+    "footerTemplate": "<div style=\"width:100%;text-align:center;font-size:8.5px;color:#9aa39e;font-family:'PingFang SC','Microsoft YaHei',sans-serif;padding:0 14mm;\">Aura · 奥拉 · 创意方案　　|　　第 <span class=\"pageNumber\"></span> 页 / 共 <span class=\"totalPages\"></span> 页</div>"
+  }
+}
