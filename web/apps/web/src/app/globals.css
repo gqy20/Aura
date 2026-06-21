@@ -201,3 +201,50 @@ body {
   border-color: var(--color-accent);
   background: var(--color-accent-muted);
 }
+
+/* ═════════════ 场景手机动画增强 ═════════════ */
+
+/* SVG 路径绘制 —— stroke-dashoffset 从全长 → 0 */
+.draw-path {
+  stroke-dasharray: var(--path-length, 200);
+  stroke-dashoffset: var(--path-length, 200);
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.3s;
+}
+.draw-path.is-visible {
+  stroke-dashoffset: 0;
+}
+
+/* 玻璃卡片悬停抬升 */
+.glass-hover {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.glass-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 24px 70px -20px rgba(0, 0, 0, 0.55);
+}
+
+/* 工具调用完成点弹入 */
+@keyframes dot-bounce-in {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.tool-dot-done {
+  animation: dot-bounce-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Insight 卡片内边框微光脉冲（Dream Loop / Weekly 用） */
+@keyframes insight-glow {
+  0%, 100% { border-color: color-mix(in srgb, var(--aura-thinking) 20%, transparent); }
+  50% { border-color: color-mix(in srgb, var(--aura-thinking) 40%, transparent); }
+}
+.insight-glow {
+  animation: insight-glow 4s ease-in-out infinite;
+}

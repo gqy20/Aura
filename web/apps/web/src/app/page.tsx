@@ -9,6 +9,7 @@ import { Reveal } from '@/components/Reveal'
 import { AuraLogo } from '@/components/AuraLogo'
 import { SceneSection } from '@/components/scene/SceneSection'
 import { PhoneMockup } from '@/components/scene/PhoneMockup'
+import { StaggerIn } from '@/components/StaggerIn'
 
 const MeshGradient = dynamic(
   () => import('@/components/three/MeshGradient').then((m) => m.MeshGradient),
@@ -232,8 +233,8 @@ export default function Home() {
 function TiredChatPhone() {
   return (
     <PhoneMockup badge={{ label: '23:47 ·', value: '情绪 偏低 · 亲密度 高', color: 'var(--aura-speaking)' }}>
-      <div className="flex flex-1 flex-col justify-center gap-3">
-        {/* 用户消息 + 情绪色条 */}
+      <StaggerIn stagger={180} duration={480} distance={14}>
+        {/* 节拍 1：用户消息 + 情绪色条 */}
         <div className="flex justify-end">
           <div className="max-w-[78%]">
             <div className="rounded-2xl rounded-br-sm bg-accent/15 px-3.5 py-2.5 text-[13px] text-foreground">
@@ -243,7 +244,7 @@ function TiredChatPhone() {
           </div>
         </div>
 
-        {/* 模板回复（划掉）—— 大多数 AI 的反应 */}
+        {/* 节拍 2：模板回复（划掉）—— 大多数 AI 的反应 */}
         <div className="flex justify-start opacity-30">
           <div className="max-w-[82%] rounded-2xl rounded-bl-sm border border-dashed border-white/10 px-3.5 py-2">
             <p className="text-[12.5px] text-muted line-through">辛苦了！早点休息吧 💪</p>
@@ -251,7 +252,7 @@ function TiredChatPhone() {
           </div>
         </div>
 
-        {/* Aura 回复 —— 基于情绪状态机 + 亲密度 */}
+        {/* 节拍 3：Aura 回复 —— 基于情绪状态机 + 亲密度 */}
         <div className="flex justify-start">
           <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white/[0.06] px-3.5 py-2.5">
             <p className="text-[13px] leading-relaxed text-foreground">
@@ -267,7 +268,7 @@ function TiredChatPhone() {
             </div>
           </div>
         </div>
-      </div>
+      </StaggerIn>
     </PhoneMockup>
   )
 }
@@ -279,8 +280,8 @@ function DreamInsightPhone() {
       badge={{ label: '23:30 ·', value: 'Dream Loop 运行中', color: 'var(--aura-thinking)', pulse: true }}
       screenGlow="radial-gradient(ellipse 80% 45% at 50% 115%, color-mix(in srgb, var(--aura-thinking) 24%, transparent), transparent)"
     >
-      <div className="flex flex-1 flex-col justify-center gap-3.5">
-        {/* 本地处理流水线 */}
+      <StaggerIn stagger={220} duration={500} distance={14}>
+        {/* 节拍 1：本地处理流水线 */}
         <div className="flex items-center gap-1.5 font-mono text-[8.5px]">
           {[
             { label: '收集数据', done: true },
@@ -298,9 +299,9 @@ function DreamInsightPhone() {
           ))}
         </div>
 
-        {/* Insight 卡片 */}
+        {/* 节拍 2：Insight 卡片 + Evidence chips */}
         <div
-          className="rounded-2xl border p-4"
+          className="insight-glow glass-hover rounded-2xl border p-4"
           style={{
             borderColor: 'color-mix(in srgb, var(--aura-thinking) 32%, transparent)',
             backgroundColor: 'color-mix(in srgb, var(--aura-thinking) 8%, transparent)',
@@ -317,18 +318,20 @@ function DreamInsightPhone() {
           </p>
 
           {/* Evidence 来源 chips */}
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {[
-              { n: '6/15 日记', t: '情绪低' },
-              { n: '6/8 对话', t: '疲惫' },
-              { n: '6/1 记录', t: '不想说话' },
-            ].map((e) => (
-              <span key={e.n} className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-1 font-mono text-[9px]">
-                <span className="text-foreground/70">{e.n}</span>
-                <span className="ml-1 text-muted/50">·{e.t}</span>
-              </span>
-            ))}
-          </div>
+          <StaggerIn stagger={60} duration={350} distance={6}>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {[
+                { n: '6/15 日记', t: '情绪低' },
+                { n: '6/8 对话', t: '疲惫' },
+                { n: '6/1 记录', t: '不想说话' },
+              ].map((e) => (
+                <span key={e.n} className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-1 font-mono text-[9px]">
+                  <span className="text-foreground/70">{e.n}</span>
+                  <span className="ml-1 text-muted/50">·{e.t}</span>
+                </span>
+              ))}
+            </div>
+          </StaggerIn>
 
           <div className="mt-4 flex gap-2">
             <span className="rounded-full bg-accent px-3 py-1 text-[11px] font-medium text-accent-foreground">
@@ -340,12 +343,12 @@ function DreamInsightPhone() {
           </div>
         </div>
 
-        {/* 底部隐私强调 */}
+        {/* 节拍 3：底部隐私强调 */}
         <div className="flex items-center justify-center gap-1.5 font-mono text-[9px] text-muted/50">
           <span className="inline-block h-1 w-1 rounded-full bg-emerald-500/50" />
           本地 Qwen 0.8B · 数据零上传 · 锁屏后自动运行
         </div>
-      </div>
+      </StaggerIn>
     </PhoneMockup>
   )
 }
@@ -354,15 +357,15 @@ function DreamInsightPhone() {
 function WalkRoutePhone() {
   return (
     <PhoneMockup badge={{ label: '18:21 ·', value: '工具编排中', color: 'var(--aura-health)' }}>
-      <div className="flex flex-1 flex-col gap-3">
-        {/* 用户请求 */}
+      <StaggerIn stagger={160} duration={480} distance={14}>
+        {/* 节拍 1：用户请求 */}
         <div className="flex justify-end">
           <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-accent/15 px-3 py-2 text-[12.5px] text-foreground">
             下班帮我规划条散步路线
           </div>
         </div>
 
-        {/* 工具调用流 —— 核心差异化：多源数据同时拉取 */}
+        {/* 节拍 2：工具调用流（4 行依次出现 + 绿点弹入） */}
         <div className="space-y-2">
           {[
             { tool: 'Health Connect', status: 'done', result: '今日步数 1,840 / 偏低' },
@@ -371,7 +374,7 @@ function WalkRoutePhone() {
             { tool: '记忆', status: 'done', result: '偏好清淡 · 常去小馆' },
           ].map((t) => (
             <div key={t.tool} className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-2.5 py-1.5">
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${t.status === 'done' ? 'bg-emerald-400' : 'bg-[var(--aura-health)] animate-pulse'}`} />
+              <span className={`tool-dot-done h-1.5 w-1.5 shrink-0 rounded-full ${t.status === 'done' ? 'bg-emerald-400' : 'bg-[var(--aura-health)] animate-pulse'}`} />
               <span className="w-22 shrink-0 font-mono text-[9.5px] text-muted">{t.tool}</span>
               <span className="h-px flex-1 bg-white/[0.04]" />
               <span className={`font-mono text-[9.5px] ${t.status === 'done' ? 'text-foreground/60' : 'text-muted/50'}`}>{t.result}</span>
@@ -379,14 +382,17 @@ function WalkRoutePhone() {
           ))}
         </div>
 
-        {/* 融合结果 —— 一条完整路线 */}
-        <div className="rounded-xl border border-[var(--aura-health)]/20 bg-[var(--aura-health)]/[0.04] p-3">
+        {/* 节拍 3：融合结果 —— 双路径（底层虚线草图 + 上层绘制动画） */}
+        <div className="glass-hover rounded-xl border border-[var(--aura-health)]/20 bg-[var(--aura-health)]/[0.04] p-3">
           <div className="flex items-center gap-1.5 mb-2">
             <svg className="h-3 w-3 text-[var(--aura-health)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
             <span className="font-mono text-[10px] font-medium text-[var(--aura-health)]">推荐路线 · 1.2km · 约14min</span>
           </div>
           <svg viewBox="0 0 220 60" className="w-full">
-            <path d="M16 48 C 56 46, 70 28, 110 26 S 170 14, 202 6" fill="none" stroke="var(--aura-health)" strokeWidth="1.8" strokeDasharray="3 3" strokeLinecap="round" />
+            {/* 底层：虚线草图（始终可见） */}
+            <path d="M16 48 C 56 46, 70 28, 110 26 S 170 14, 202 6" fill="none" stroke="var(--aura-health)" strokeWidth="1.8" strokeDasharray="3 3" strokeLinecap="round" opacity="0.25" />
+            {/* 上层：实线绘制动画 */}
+            <path className="draw-path" d="M16 48 C 56 46, 70 28, 110 26 S 170 14, 202 6" fill="none" stroke="var(--aura-health)" strokeWidth="1.8" strokeLinecap="round" />
             <circle cx="16" cy="48" r="3" fill="var(--aura-health)" /><circle cx="110" cy="26" r="3" fill="var(--aura-health)" /><circle cx="202" cy="6" r="3" fill="var(--aura-health)" />
           </svg>
           <div className="mt-1.5 flex justify-between font-mono text-[8.5px] text-muted px-0.5">
@@ -396,13 +402,13 @@ function WalkRoutePhone() {
           </div>
         </div>
 
-        {/* Aura 补充建议 */}
+        {/* 节拍 4：Aura 补充建议 */}
         <div className="flex justify-start">
           <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white/[0.04] px-3 py-2 text-[11.5px] leading-relaxed text-foreground/75">
             如果今天太累，也可以直接回家路上买杯咖啡——瑞幸文三路店顺路，步行 6min。
           </div>
         </div>
-      </div>
+      </StaggerIn>
     </PhoneMockup>
   )
 }
@@ -414,8 +420,8 @@ function SunsetMemoryPhone() {
       badge={{ label: '18:32 ·', value: 'Vision 记忆已存', color: 'var(--aura-speaking)' }}
       screenGlow="radial-gradient(ellipse 80% 45% at 50% 115%, color-mix(in srgb, var(--aura-speaking) 18%, transparent), transparent)"
     >
-      <div className="flex flex-1 flex-col justify-center gap-3">
-        {/* 用户发送的夕阳照片 —— 更有画面感 */}
+      <StaggerIn stagger={200} duration={480} distance={14}>
+        {/* 节拍 1：用户发送的夕阳照片 */}
         <div className="flex justify-end">
           <div className="max-w-[72%] overflow-hidden rounded-2xl rounded-br-sm">
             <div
@@ -425,16 +431,14 @@ function SunsetMemoryPhone() {
                   'linear-gradient(to top, #1a0a1e 0%, #4a1942 20%, #c44b3a 48%, #f0a030 75%, #ffd060 92%, #fff8e0 100%)',
               }}
             >
-              {/* 太阳圆 */}
               <div className="absolute right-6 top-6 h-10 w-10 rounded-full bg-gradient-to-br from-yellow-200 via-orange-400 to-red-500 opacity-70 blur-[2px]" />
-              {/* 地平线剪影 */}
               <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-black/60 to-transparent" />
               <span className="relative z-10 mb-2 font-mono text-[9px] text-white/70">📷 2026-06-15 18:32</span>
             </div>
           </div>
         </div>
 
-        {/* Aura 的 Vision 回应 —— 说明它真的「看懂」了 */}
+        {/* 节拍 2：Aura 的 Vision 回复 */}
         <div className="flex justify-start">
           <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white/[0.06] px-3 py-2.5">
             <p className="text-[12.5px] leading-relaxed text-foreground">
@@ -447,8 +451,8 @@ function SunsetMemoryPhone() {
           </div>
         </div>
 
-        {/* 记忆时间线 —— 展示跨时间关联能力 */}
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
+        {/* 节拍 3：记忆时间线 */}
+        <div className="glass-hover rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
           <p className="mb-2 font-mono text-[9.5px] text-muted">视觉记忆时间线</p>
           <div className="flex items-center gap-2">
             {[
@@ -473,7 +477,7 @@ function SunsetMemoryPhone() {
             </div>
           </div>
         </div>
-      </div>
+      </StaggerIn>
     </PhoneMockup>
   )
 }
@@ -485,27 +489,28 @@ function WeeklyInsightPhone() {
       badge={{ label: '周日 21:03 ·', value: 'Weekly Insight', color: 'var(--aura-thinking)', pulse: true }}
       screenGlow="radial-gradient(ellipse 80% 45% at 50% 115%, color-mix(in srgb, var(--aura-thinking) 22%, transparent), transparent)"
     >
-      <div className="flex flex-1 flex-col justify-center gap-3.5">
-        {/* 推送通知条 —— 营造「主动找你」的感觉 */}
-        <div className="flex items-center gap-2 rounded-lg border border-dashed border-white/[0.08] bg-white/[0.015] px-3 py-2">
-          <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--aura-thinking)]/40" /><span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--aura-thinking)]" /></span>
-          <span className="font-mono text-[10px] text-muted">Aura 每周洞察 · 自动推送</span>
-          <span className="ml-auto font-mono text-[9px] text-white/20">刚刚</span>
+      <StaggerIn stagger={200} duration={500} distance={14}>
+        {/* 节拍 1：推送通知条 + 周历 */}
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2 rounded-lg border border-dashed border-white/[0.08] bg-white/[0.015] px-3 py-2">
+            <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--aura-thinking)]/40" /><span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--aura-thinking)]" /></span>
+            <span className="font-mono text-[10px] text-muted">Aura 每周洞察 · 自动推送</span>
+            <span className="ml-auto font-mono text-[9px] text-white/20">刚刚</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {['一', '二', '三', '四', '五', '六', '日'].map((d, i) => (
+              <div key={d} className={`flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-mono ${i < 5 ? 'bg-[var(--aura-thinking)]/15 text-foreground/80' : 'bg-white/[0.03] text-muted/50'}`}>
+                {d}
+              </div>
+            ))}
+            <span className="ml-auto font-mono text-[9px] text-muted/50">06/16 – 06/22</span>
+          </div>
         </div>
 
-        {/* 本周概览 —— 简洁的日历行 */}
-        <div className="flex items-center gap-1.5">
-          {['一', '二', '三', '四', '五', '六', '日'].map((d, i) => (
-            <div key={d} className={`flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-mono ${i < 5 ? 'bg-[var(--aura-thinking)]/15 text-foreground/80' : 'bg-white/[0.03] text-muted/50'}`}>
-              {d}
-            </div>
-          ))}
-          <span className="ml-auto font-mono text-[9px] text-muted/50">06/16 – 06/22</span>
-        </div>
-
-        {/* Insight 卡片 —— 引用用户原话作为证据 */}
+        {/* 节拍 2：Insight 卡片（带微光脉冲 + 悬停抬升） */}
         <div
-          className="rounded-2xl border p-4"
+          className="insight-glow glass-hover rounded-2xl border p-4"
           style={{
             borderColor: 'color-mix(in srgb, var(--aura-thinking) 32%, transparent)',
             backgroundColor: 'color-mix(in srgb, var(--aura-thinking) 8%, transparent)',
@@ -522,18 +527,20 @@ function WeeklyInsightPhone() {
             但周五之后就没再提了——搞定了还是放下了？
           </p>
 
-          {/* 用户原话引用 —— 让人感觉「它真的在听」 */}
-          <div className="mt-3 space-y-1.5">
-            {[
-              { day: '周二', quote: '"这个 deadline 要命…"' },
-              { day: '周四', quote: '"又加班到 11 点"' },
-            ].map((q) => (
-              <div key={q.day} className="flex items-start gap-2 rounded-md bg-white/[0.02] px-2 py-1.5">
-                <span className="shrink-0 font-mono text-[8.5px] text-muted pt-0.5">{q.day}</span>
-                <span className="text-[11px] italic text-foreground/60">{q.quote}</span>
-              </div>
-            ))}
-          </div>
+          {/* 用户原话引用 */}
+          <StaggerIn stagger={60} duration={350} distance={6}>
+            <div className="mt-3 space-y-1.5">
+              {[
+                { day: '周二', quote: '"这个 deadline 要命…"' },
+                { day: '周四', quote: '"又加班到 11 点"' },
+              ].map((q) => (
+                <div key={q.day} className="flex items-start gap-2 rounded-md bg-white/[0.02] px-2 py-1.5">
+                  <span className="shrink-0 font-mono text-[8.5px] text-muted pt-0.5">{q.day}</span>
+                  <span className="text-[11px] italic text-foreground/60">{q.quote}</span>
+                </div>
+              ))}
+            </div>
+          </StaggerIn>
 
           <div className="mt-4 flex gap-2">
             <span className="rounded-full bg-accent px-3 py-1 text-[11px] font-medium text-accent-foreground">
@@ -545,10 +552,11 @@ function WeeklyInsightPhone() {
           </div>
         </div>
 
+        {/* 节拍 3：底部元信息 */}
         <p className="text-center font-mono text-[8.5px] text-muted/40">
           本地生成 · 0 联网 · 设置中可调频率 / 关闭
         </p>
-      </div>
+      </StaggerIn>
     </PhoneMockup>
   )
 }
@@ -557,16 +565,16 @@ function WeeklyInsightPhone() {
 function TravelPlanPhone() {
   return (
     <PhoneMockup badge={{ label: '周五 20:15 ·', value: '出行方案已生成', color: 'var(--aura-health)' }}>
-      <div className="flex flex-1 flex-col gap-3">
-        {/* 用户请求 */}
+      <StaggerIn stagger={160} duration={480} distance={14}>
+        {/* 节拍 1：用户请求 */}
         <div className="flex justify-end">
           <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-accent/15 px-3 py-2 text-[12.5px] text-foreground">
             周末想去上海逛逛，帮我规划一下
           </div>
         </div>
 
-        {/* 高铁票卡片 —— 更有真实感 */}
-        <div className="rounded-xl border border-[var(--aura-health)]/15 bg-subtle/30 p-3">
+        {/* 节拍 2：高铁票卡片（带悬停抬升） */}
+        <div className="glass-hover rounded-xl border border-[var(--aura-health)]/15 bg-subtle/30 p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--aura-health)]/10">
@@ -585,7 +593,7 @@ function TravelPlanPhone() {
           </div>
         </div>
 
-        {/* 完整行程时间线 —— 多步骤编排的核心展示 */}
+        {/* 节拍 3：完整行程时间线 */}
         <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-3">
           <p className="mb-2.5 flex items-center gap-1.5 font-mono text-[9.5px] text-muted">
             <svg className="h-3 w-3 text-[var(--aura-health)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
@@ -599,7 +607,7 @@ function TravelPlanPhone() {
               { time: '10:40', label: 'brunch + 漫步梧桐区', icon: '🥐', tool: '' },
               { time: '13:30', label: '外滩 / 城隍庙', icon: '📸', tool: '' },
               { time: '16:00', label: '返程 G1567 → 17:42 到', icon: '🚄', tool: '12306' },
-            ].map((step, i) => (
+            ].map((step) => (
               <div key={step.label} className="flex items-center gap-2">
                 <span className="w-9 shrink-0 text-right font-mono text-[9.5px] text-muted">{step.time}</span>
                 <span className="h-1 w-1 shrink-0 rounded-full bg-[var(--aura-health)]" />
@@ -612,26 +620,29 @@ function TravelPlanPhone() {
           </div>
         </div>
 
-        {/* 目的地数据 chips */}
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            { label: '上海 26° 晴', icon: '☀' },
-            { label: '武康路 人少', icon: '📍' },
-            { label: '预算 ~¥300', icon: '💰' },
-          ].map((c) => (
-            <span key={c.label} className="inline-flex items-center gap-1 rounded-full border border-border bg-subtle/30 px-2 py-1 font-mono text-[9.5px] text-foreground/80">
-              <span>{c.icon}</span>{c.label}
-            </span>
-          ))}
-        </div>
+        {/* 节拍 4：目的地 chips + 天气提醒 */}
+        <div className="space-y-2">
+          <StaggerIn stagger={60} duration={350} distance={6}>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: '上海 26° 晴', icon: '☀' },
+                { label: '武康路 人少', icon: '📍' },
+                { label: '预算 ~¥300', icon: '💰' },
+              ].map((c) => (
+                <span key={c.label} className="inline-flex items-center gap-1 rounded-full border border-border bg-subtle/30 px-2 py-1 font-mono text-[9.5px] text-foreground/80">
+                  <span>{c.icon}</span>{c.label}
+                </span>
+              ))}
+            </div>
+          </StaggerIn>
 
-        {/* Aura 补充 */}
-        <div className="flex justify-start">
-          <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white/[0.04] px-3 py-2 text-[11px] leading-relaxed text-foreground/70">
-            记得带伞——周日午后有短暂阵雨 🌦️
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white/[0.04] px-3 py-2 text-[11px] leading-relaxed text-foreground/70">
+              记得带伞——周日午后有短暂阵雨 🌦️
+            </div>
           </div>
         </div>
-      </div>
+      </StaggerIn>
     </PhoneMockup>
   )
 }
@@ -646,7 +657,7 @@ function TravelPlanPhone() {
  */
 function HeroPhone() {
   const glassCard = (className?: string) =>
-    `rounded-xl border backdrop-blur-xl shadow-2xl shadow-black/40 ${className ?? ''}`
+    `glass-hover rounded-xl border backdrop-blur-xl shadow-2xl shadow-black/40 ${className ?? ''}`
 
   return (
     <div className="relative" style={{ width: 760 }}>
