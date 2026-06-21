@@ -8,6 +8,7 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.xiaoqi.companion.data.db.converter.Converters
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.ConversationDao
 import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
@@ -18,6 +19,7 @@ import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
+import com.xiaoqi.companion.data.db.entity.ConversationEntity
 import com.xiaoqi.companion.data.db.entity.HealthSnapshotEntity
 import com.xiaoqi.companion.data.db.entity.InsightEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
@@ -38,8 +40,9 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         ReminderEntity::class,
         InsightEntity::class,
         HealthSnapshotEntity::class,
+        ConversationEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -55,6 +58,7 @@ abstract class CompanionDatabase : RoomDatabase() {
     abstract fun reminderDao(): ReminderDao
     abstract fun insightDao(): InsightDao
     abstract fun healthSnapshotDao(): HealthSnapshotDao
+    abstract fun conversationDao(): ConversationDao
 
     companion object {
         val MIGRATION_1_2 = object : DualMigration(1, 2) {
@@ -222,6 +226,37 @@ abstract class CompanionDatabase : RoomDatabase() {
             override fun apply(executor: SqlExecutor) {
                 createMessageSearchTables(executor)
                 rebuildMessageSearchIndex(executor)
+            }
+        }
+
+        val MIGRATION_10_11 = object : DualMigration(10, 11) {
+            override fun apply(executor: SqlExecutor) {
+                executor.exec(
+                    """
+                    CREATE TABLE IF NOT EXISTS `conversations` (
+                        `id` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `messageCount` INTEGER NOT NULL DEFAULT 0,
+                        `summary` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                executor.exec("CREATE INDEX IF NOT EXISTS `index_conversations_updatedAt` ON `conversations` (`updatedAt`)")
+                // Seed default conversation for existing data
+                val now = System.currentTimeMillis()
+                executor.exec(
+                    """
+                    INSERT OR IGNORE INTO `conversations` (`id`, `title`, `createdAt`, `updatedAt`, `messageCount`)
+                    SELECT 'default', 'Default',
+                           COALESCE(MIN(timestamp), $now),
+                           COALESCE(MAX(timestamp), $now),
+                           COUNT(*)
+                    FROM messages WHERE session_id = 'default'
+                    """.trimIndent()
+                )
             }
         }
 

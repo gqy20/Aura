@@ -5,12 +5,14 @@ import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -21,6 +23,7 @@ import kotlinx.serialization.json.put
 class SearchRecordsTool @Inject constructor(
     private val messageDao: MessageDao,
     private val messageSearchDao: MessageSearchDao,
+    private val appPreferences: AppPreferences,
 ) : SimpleTool<SearchRecordsTool.Args>(
     typeToken<Args>(),
     name = "search_records",
@@ -57,6 +60,11 @@ class SearchRecordsTool @Inject constructor(
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.IO) {
             val query = args.query.trim()
+            val resolvedSessionId = if (args.sessionId == DEFAULT_SESSION_ID) {
+                appPreferences.currentSessionId.first()
+            } else {
+                args.sessionId
+            }
             val role = args.role.uppercase()
                 .takeIf { it.isNotBlank() }
                 ?.let { role ->
@@ -68,7 +76,7 @@ class SearchRecordsTool @Inject constructor(
             val candidateLimit = (limit * CANDIDATE_MULTIPLIER).coerceAtMost(MAX_CANDIDATES)
             val matches = if (query.isBlank()) {
                 messageDao.getRecentMessages(
-                    sessionId = args.sessionId,
+                    sessionId = resolvedSessionId,
                     limit = candidateLimit,
                 )
                     .map { message -> RecordSearchHit(message, score = 1f, source = "recent") }
@@ -77,7 +85,7 @@ class SearchRecordsTool @Inject constructor(
             } else {
                 val ftsMatches = runCatching {
                     messageSearchDao.searchRecordsFts(
-                        sessionId = args.sessionId,
+                        sessionId = resolvedSessionId,
                         matchQuery = query.toFtsQuery(),
                         role = role,
                         after = args.after,

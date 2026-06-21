@@ -35,6 +35,7 @@ class ReactiveCompanion(
     private val modelName: String = "",
     private val toolRegistry: ToolRegistry = ToolRegistry.EMPTY,
     private val toolCallRecorder: ToolCallRecorder? = null,
+    private val sessionId: String = DEFAULT_SESSION_ID,
 ) : KoogAgentWrapper {
 
     override suspend fun run(prompt: BuiltPrompt): String =
@@ -83,7 +84,7 @@ class ReactiveCompanion(
             val execution = LocalToolExecutor(
                 registry = toolRegistry,
                 recorder = toolCallRecorder,
-                sessionId = DEFAULT_SESSION_ID,
+                sessionId = sessionId,
             ).execute(toolCalls)
             execution.events.forEach { emit(it) }
             allToolResults += execution.transcripts

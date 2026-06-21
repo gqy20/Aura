@@ -24,6 +24,7 @@ import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.ConversationRepository
 import com.xiaoqi.companion.data.repository.InsightRepository
 import com.xiaoqi.companion.data.repository.McpServerListRepository
 import com.xiaoqi.companion.data.repository.MemoryRepository
@@ -46,12 +47,15 @@ import com.xiaoqi.companion.feature.chat.mapper.withLocalQwenDownloadState
 import com.xiaoqi.companion.feature.chat.usecase.SendMessageUseCase
 import com.xiaoqi.companion.feature.chat.usecase.SettingsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -71,6 +75,7 @@ import javax.inject.Inject
  * - 本类测试(ChatViewModelTest)→ 仅覆盖 8 个订阅 + Presence + 简单反馈
  * - 复杂业务测试 → SendMessageUseCaseTest / SettingsUseCaseTest
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val sendMessageUseCase: SendMessageUseCase,
@@ -97,6 +102,7 @@ class ChatViewModel @Inject constructor(
     private val dreamLoopScheduler: DreamLoopScheduler,
     private val dreamRunObserver: DreamRunObserver,
     private val healthSyncManager: HealthSyncManager,
+    private val conversationRepository: ConversationRepository,
     /** 对 Settings 暴露,用于查询 SDK 状态和已授权权限。 */
     val healthConnectDataSource: HealthConnectDataSource,
     /** 对 Settings 暴露,用于显示本机传感器兜底状态。 */
@@ -166,6 +172,21 @@ class ChatViewModel @Inject constructor(
             initialValue = _uiState.value.withPresence(),
         )
 
+    val currentSessionId: StateFlow<String> = appPreferences.currentSessionId
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = com.xiaoqi.companion.data.datastore.AppPreferences.DEFAULT_SESSION_ID,
+        )
+
+    val conversations: StateFlow<List<com.xiaoqi.companion.data.repository.ConversationItem>> =
+        conversationRepository.observeAll()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = emptyList(),
+            )
+
     init {
         viewModelScope.launch {
             configRepository.observeLlmConfigStatus().collect { status ->
@@ -210,7 +231,7 @@ class ChatViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            agentStateDao.observeByCompanionId(DEFAULT_SESSION_ID).collect { savedState ->
+            agentStateDao.observeByCompanionId(DEFAULT_COMPANION_ID).collect { savedState ->
                 if (savedState != null) {
                     _uiState.update { state ->
                         state.copy(
@@ -252,7 +273,9 @@ class ChatViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            messageRepository.getMessagesBySession(DEFAULT_SESSION_ID).collect { messages ->
+            appPreferences.currentSessionId.flatMapLatest { sessionId ->
+                messageRepository.getMessagesBySession(sessionId)
+            }.collect { messages ->
                 _uiState.update { state ->
                     if (state.isLoading || state.messages.any { it.isStreaming }) {
                         state
@@ -280,7 +303,9 @@ class ChatViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            toolCallRepository.observeBySession(DEFAULT_SESSION_ID).collect { calls ->
+            appPreferences.currentSessionId.flatMapLatest { sessionId ->
+                toolCallRepository.observeBySession(sessionId)
+            }.collect { calls ->
                 var shouldClearReaction = false
                 _uiState.update { state ->
                     val visibleCalls = calls.take(RECENT_TOOL_CALL_LIMIT)
@@ -707,6 +732,35 @@ class ChatViewModel @Inject constructor(
 
     //region 委托给 UseCase
 
+    fun startNewConversation() {
+        viewModelScope.launch {
+            val conversation = conversationRepository.createNew()
+            appPreferences.setCurrentSessionId(conversation.id)
+            _uiState.update { it.copy(messages = emptyList(), toolCalls = emptyList()) }
+        }
+    }
+
+    fun switchConversation(sessionId: String) {
+        viewModelScope.launch {
+            appPreferences.setCurrentSessionId(sessionId)
+        }
+    }
+
+    fun deleteConversation(sessionId: String) {
+        viewModelScope.launch {
+            conversationRepository.delete(sessionId)
+            val current = appPreferences.currentSessionId.first()
+            if (current == sessionId) {
+                val remaining = conversations.value.firstOrNull { it.id != sessionId }
+                if (remaining != null) {
+                    appPreferences.setCurrentSessionId(remaining.id)
+                } else {
+                    startNewConversation()
+                }
+            }
+        }
+    }
+
     fun sendMessage(text: String) {
         val pendingImage = _uiState.value.pendingImage
         AppLogger.info(
@@ -968,7 +1022,6 @@ class ChatViewModel @Inject constructor(
     //endregion
 
     companion object {
-        private const val DEFAULT_SESSION_ID = "default"
         private const val DEFAULT_COMPANION_ID = "default"
         private const val RECENT_TOOL_CALL_LIMIT = 3
         private const val INSIGHT_CARD_LIMIT = 3

@@ -13,6 +13,7 @@ import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.ConversationRepository
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.PromptMemoryContext
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -68,7 +69,10 @@ class CompanionRuntimeTest {
     }
     private val appPreferences: AppPreferences = mockk {
         every { locationContextEnabled } returns flowOf(true)
+        every { currentSessionId } returns flowOf("default")
     }
+
+    private val conversationRepository: ConversationRepository = mockk(relaxed = true)
 
     private class FakeKoogAgentFactory : KoogAgentFactory {
         var lastConfig: com.xiaoqi.companion.data.repository.LlmConfig? = null
@@ -79,7 +83,7 @@ class CompanionRuntimeTest {
         var runCallCount = 0
         var runEventsCallCount = 0
 
-        override fun create(config: com.xiaoqi.companion.data.repository.LlmConfig): KoogAgentWrapper {
+        override fun create(config: com.xiaoqi.companion.data.repository.LlmConfig, sessionId: String): KoogAgentWrapper {
             lastConfig = config
             return object : KoogAgentWrapper {
                 override suspend fun run(prompt: BuiltPrompt): String {
@@ -125,6 +129,7 @@ class CompanionRuntimeTest {
         relationshipModel = relationshipModel,
         locationProvider = locationProvider,
         appPreferences = appPreferences,
+        conversationRepository = conversationRepository,
     )
 
     @Test

@@ -44,6 +44,8 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val healthLastSyncAt: Flow<Long> = dataStore.data.map { it[Keys.healthLastSyncAt] ?: 0L }
     val healthAutoSyncEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.healthAutoSyncEnabled] ?: true }
 
+    val currentSessionId: Flow<String> = dataStore.data.map { it[Keys.currentSessionId] ?: DEFAULT_SESSION_ID }
+
     /**
      * Dream Loop 周期档位(分钟数)。缺失或未知值回退到 [DreamLoopInterval.DEFAULT]。
      * 存储为 Long minutes,OFF 用 0L 显式表示,落库数据可通过 [DreamLoopInterval.fromMinutesOrDefault] 反解。
@@ -82,6 +84,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     suspend fun setOnboardingCompletedAt(value: String) { dataStore.edit { it[Keys.onboardingCompletedAt] = value } }
     suspend fun setHealthLastSyncAt(value: Long) { dataStore.edit { it[Keys.healthLastSyncAt] = value } }
     suspend fun setHealthAutoSyncEnabled(value: Boolean) { dataStore.edit { it[Keys.healthAutoSyncEnabled] = value } }
+    suspend fun setCurrentSessionId(value: String) { dataStore.edit { it[Keys.currentSessionId] = value } }
     suspend fun setDreamLoopInterval(value: DreamLoopInterval) {
         dataStore.edit { it[Keys.dreamLoopIntervalMinutes] = value.minutes.toInt() }
     }
@@ -115,10 +118,12 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val dreamLoopModelName = stringPreferencesKey("dream_loop_model_name")
         val healthLastSyncAt = androidx.datastore.preferences.core.longPreferencesKey("health_last_sync_at")
         val healthAutoSyncEnabled = booleanPreferencesKey("health_auto_sync_enabled")
+        val currentSessionId = stringPreferencesKey("current_session_id")
     }
 
     companion object {
         val defaultThemeMode = ThemeMode.SYSTEM
         val defaultLlmProvider = LlmProvider.GLM
+        const val DEFAULT_SESSION_ID = "default"
     }
 }

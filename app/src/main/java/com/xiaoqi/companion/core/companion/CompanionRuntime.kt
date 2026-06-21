@@ -37,9 +37,11 @@ open class CompanionRuntime @Inject constructor(
     private val relationshipModel: RelationshipModel,
     private val locationProvider: CurrentLocationProvider,
     private val appPreferences: AppPreferences,
+    private val conversationRepository: com.xiaoqi.companion.data.repository.ConversationRepository,
 ) {
     open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
         val startedAt = System.currentTimeMillis()
+        val sessionId = appPreferences.currentSessionId.first()
         try {
             AppLogger.info(
                 LogTags.Runtime,
@@ -47,10 +49,11 @@ open class CompanionRuntime @Inject constructor(
                 "inputType" to input::class.simpleName,
                 "inputLength" to input.content.length,
                 "hasImage" to (input is UserInput.Vision),
+                "sessionId" to sessionId,
             )
 
             val memoryContext = memoryRepository.selectPromptContext(input.content)
-            val conversationContext = conversationContextBuilder.build(DEFAULT_SESSION_ID)
+            val conversationContext = conversationContextBuilder.build(sessionId)
             val locationContext = if (appPreferences.locationContextEnabled.first()) {
                 withContext(Dispatchers.IO) { locationProvider.getLastKnownLocation() }?.let { loc ->
                     "用户当前设备位置:${loc.toPromptContext()}。调用地图、周边搜索、路径规划等需要坐标的工具时," +
@@ -87,13 +90,14 @@ open class CompanionRuntime @Inject constructor(
                 "model" to config.modelName,
                 "hasApiKey" to config.apiKey.isNotBlank(),
             )
-            val agent = koogAgentFactory.create(config)
+            val agent = koogAgentFactory.create(config, sessionId)
 
             val userMessageId = messageRepository.sendMessage(
-                sessionId = DEFAULT_SESSION_ID,
+                sessionId = sessionId,
                 content = input.content,
                 imageBase64 = (input as? UserInput.Vision)?.imageBase64,
             )
+            conversationRepository.onMessageSent(sessionId, input.content)
 
             var rawResponse = ""
             val job = launch(Dispatchers.IO) {
@@ -142,7 +146,7 @@ open class CompanionRuntime @Inject constructor(
                 trySend(AgentEvent.Error(AgentError.ParseError("Empty model response")))
             } else {
                 val assistantMessageId = messageRepository.saveAssistantMessage(
-                    sessionId = DEFAULT_SESSION_ID,
+                    sessionId = sessionId,
                     content = rawResponse,
                 )
                 AppLogger.debug(

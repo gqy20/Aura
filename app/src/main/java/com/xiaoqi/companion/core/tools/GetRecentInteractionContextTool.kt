@@ -3,11 +3,13 @@ package com.xiaoqi.companion.core.tools
 import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
@@ -15,6 +17,7 @@ import kotlinx.serialization.json.put
 
 class GetRecentInteractionContextTool(
     private val messageDao: MessageDao,
+    private val appPreferences: AppPreferences,
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
     private val zoneProvider: () -> ZoneId = { ZoneId.systemDefault() },
 ) : SimpleTool<GetRecentInteractionContextTool.Args>(
@@ -26,8 +29,10 @@ class GetRecentInteractionContextTool(
     @Inject
     constructor(
         messageDao: MessageDao,
+        appPreferences: AppPreferences,
     ) : this(
         messageDao = messageDao,
+        appPreferences = appPreferences,
         nowProvider = { System.currentTimeMillis() },
         zoneProvider = { ZoneId.systemDefault() },
     )
@@ -40,7 +45,12 @@ class GetRecentInteractionContextTool(
 
     override suspend fun execute(args: Args): String =
         withContext(Dispatchers.IO) {
-            val sessionId = args.sessionId.ifBlank { DEFAULT_SESSION_ID }
+            val requestedSessionId = args.sessionId.ifBlank { DEFAULT_SESSION_ID }
+            val sessionId = if (requestedSessionId == DEFAULT_SESSION_ID) {
+                appPreferences.currentSessionId.first()
+            } else {
+                requestedSessionId
+            }
             val now = nowProvider()
             val startOfToday = Instant.ofEpochMilli(now)
                 .atZone(zoneProvider())

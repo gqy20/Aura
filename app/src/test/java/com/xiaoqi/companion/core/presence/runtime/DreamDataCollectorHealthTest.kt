@@ -1,11 +1,14 @@
 package com.xiaoqi.companion.core.presence.runtime
 
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.entity.HealthSnapshotEntity
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.flowOf
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.test.runTest
@@ -25,8 +28,11 @@ class DreamDataCollectorHealthTest {
     private val messageDao: MessageDao = mockk(relaxed = true)
     private val memoryDao: com.xiaoqi.companion.data.db.dao.MemoryDao = mockk(relaxed = true)
     private val healthDao: HealthSnapshotDao = mockk(relaxed = true)
+    private val appPreferences: AppPreferences = mockk {
+        every { currentSessionId } returns flowOf("default")
+    }
 
-    private val collector = DreamDataCollector(moodDao, messageDao, memoryDao, healthDao)
+    private val collector = DreamDataCollector(moodDao, messageDao, memoryDao, healthDao, appPreferences)
 
     @Test fun `snapshot includes health data`() = runTest {
         coEvery { moodDao.findInRange(any(), any(), any()) } returns emptyList()

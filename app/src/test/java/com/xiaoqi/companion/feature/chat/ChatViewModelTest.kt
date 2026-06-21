@@ -20,6 +20,7 @@ import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.ConversationRepository
 import com.xiaoqi.companion.data.repository.InsightRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
@@ -73,6 +74,7 @@ class ChatViewModelTest {
     private lateinit var messageDao: MessageDao
     private lateinit var agentStateDao: AgentStateDao
     private lateinit var appPreferences: AppPreferences
+    private lateinit var conversationRepository: ConversationRepository
     private lateinit var remoteMcpClient: RemoteMcpClient
     private lateinit var dreamLoopScheduler: DreamLoopScheduler
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -113,6 +115,7 @@ class ChatViewModelTest {
             every { mcpHttpUrl } returns flowOf("https://old.example/mcp")
             every { healthAutoSyncEnabled } returns flowOf(true)
             every { healthLastSyncAt } returns flowOf(0L)
+            every { currentSessionId } returns flowOf("default")
         }
 
     private class FakeToolCallRepository : ToolCallRepository {
@@ -202,6 +205,9 @@ class ChatViewModelTest {
         }
         appPreferences = mockAppPreferences()
         dreamLoopScheduler = io.mockk.mockk(relaxed = true)
+        conversationRepository = mockk(relaxed = true) {
+            every { observeAll() } returns flowOf(emptyList())
+        }
         viewModel = ChatViewModel(
             sendMessageUseCase = sendMessageUseCase,
             settingsUseCase = settingsUseCase,
@@ -233,6 +239,7 @@ class ChatViewModelTest {
                 every { lastSuccessSavedCount } returns kotlinx.coroutines.flow.MutableStateFlow(0)
             },
             healthSyncManager = io.mockk.mockk(relaxed = true),
+            conversationRepository = conversationRepository,
             healthConnectDataSource = io.mockk.mockk(relaxed = true),
             sensorHealthSource = io.mockk.mockk(relaxed = true),
         )
@@ -405,6 +412,7 @@ class ChatViewModelTest {
                 every { lastSuccessSavedCount } returns kotlinx.coroutines.flow.MutableStateFlow(0)
             },
             healthSyncManager = io.mockk.mockk(relaxed = true),
+            conversationRepository = conversationRepository,
             healthConnectDataSource = io.mockk.mockk(relaxed = true),
             sensorHealthSource = io.mockk.mockk(relaxed = true),
         )

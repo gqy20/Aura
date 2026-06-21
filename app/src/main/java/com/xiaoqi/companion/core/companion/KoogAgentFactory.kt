@@ -21,7 +21,7 @@ interface KoogAgentWrapper {
 }
 
 interface KoogAgentFactory {
-    fun create(config: LlmConfig): KoogAgentWrapper
+    fun create(config: LlmConfig, sessionId: String = "default"): KoogAgentWrapper
 }
 
 sealed class KoogAgentEvent {

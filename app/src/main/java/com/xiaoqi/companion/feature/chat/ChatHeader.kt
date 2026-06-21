@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -57,6 +58,7 @@ internal fun CompanionHeader(
     mcpLabel: String,
     onOpenMemoryRoom: () -> Unit,
     onOpenReminders: () -> Unit,
+    onOpenConversations: () -> Unit,
     onOpenMcpSettings: () -> Unit,
     onOpenSettings: () -> Unit,
     onPresenceTapped: () -> Unit,
@@ -70,7 +72,7 @@ internal fun CompanionHeader(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AuraPetAvatar(
@@ -111,31 +113,41 @@ internal fun CompanionHeader(
                     )
                 }
             }
-            HeaderActionIcon(
-                imageVector = Icons.Default.Favorite,
-                onClick = onOpenMemoryRoom,
-                contentDescription = "打开记忆",
-                badge = memories.size,
-            )
-            if (scheduledReminderCount > 0) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 HeaderActionIcon(
-                    imageVector = Icons.Default.Notifications,
-                    onClick = onOpenReminders,
-                    contentDescription = "打开提醒",
-                    badge = scheduledReminderCount,
+                    imageVector = Icons.AutoMirrored.Filled.List,
+                    onClick = onOpenConversations,
+                    contentDescription = "对话列表",
+                )
+                HeaderActionIcon(
+                    imageVector = Icons.Default.Favorite,
+                    onClick = onOpenMemoryRoom,
+                    contentDescription = "打开记忆",
+                    badge = memories.size,
+                )
+                if (scheduledReminderCount > 0) {
+                    HeaderActionIcon(
+                        imageVector = Icons.Default.Notifications,
+                        onClick = onOpenReminders,
+                        contentDescription = "打开提醒",
+                        badge = scheduledReminderCount,
+                    )
+                }
+                HeaderActionIcon(
+                    imageVector = Icons.Default.Build,
+                    onClick = onOpenMcpSettings,
+                    contentDescription = "打开 MCP",
+                    active = mcpLabel != "MCP",
+                )
+                HeaderActionIcon(
+                    imageVector = Icons.Default.Settings,
+                    onClick = onOpenSettings,
+                    contentDescription = "打开设置",
                 )
             }
-            HeaderActionIcon(
-                imageVector = Icons.Default.Build,
-                onClick = onOpenMcpSettings,
-                contentDescription = "打开 MCP",
-                active = mcpLabel != "MCP",
-            )
-            HeaderActionIcon(
-                imageVector = Icons.Default.Settings,
-                onClick = onOpenSettings,
-                contentDescription = "打开设置",
-            )
         }
 
         if (!configStatus.isReady) {

@@ -56,7 +56,7 @@ class KoogAgentFactoryImpl @Inject constructor(
     private val toolCallRecorder: ToolCallRecorder,
 ) : KoogAgentFactory {
 
-    override fun create(config: LlmConfig): KoogAgentWrapper {
+    override fun create(config: LlmConfig, sessionId: String): KoogAgentWrapper {
         AppLogger.debug(
             LogTags.Llm,
             "agent_created",
@@ -71,6 +71,7 @@ class KoogAgentFactoryImpl @Inject constructor(
                 modelName = config.modelName,
                 toolRegistry = if (config.provider == LlmProvider.LOCAL_QWEN) toolRegistry.create() else ToolRegistry.EMPTY,
                 toolCallRecorder = toolCallRecorder,
+                sessionId = sessionId,
             )
         }
         return KoogPromptExecutorWrapper(
@@ -78,6 +79,7 @@ class KoogAgentFactoryImpl @Inject constructor(
             executor = executorFactory.create(config),
             toolRegistry = toolRegistry,
             toolCallRecorder = toolCallRecorder,
+            sessionId = sessionId,
         )
     }
 }
@@ -87,6 +89,7 @@ private class KoogPromptExecutorWrapper(
     private val executor: PromptExecutor,
     private val toolRegistry: AgentToolRegistry,
     private val toolCallRecorder: ToolCallRecorder,
+    private val sessionId: String = DEFAULT_SESSION_ID,
 ) : KoogAgentWrapper {
 
     private val model = LLModel(
@@ -189,7 +192,7 @@ private class KoogPromptExecutorWrapper(
                         val callId = context.toolCallId?.ifBlank { context.eventId } ?: context.eventId
                         val argumentsJson = context.toolArgs.toString()
                         toolCallRecorder.start(
-                            sessionId = DEFAULT_SESSION_ID,
+                            sessionId = sessionId,
                             callId = callId,
                             toolName = context.toolName,
                             argumentsJson = argumentsJson,

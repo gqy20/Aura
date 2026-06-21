@@ -13,6 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.db.CompanionDatabase
 import com.xiaoqi.companion.data.db.dao.AgentStateDao
+import com.xiaoqi.companion.data.db.dao.ConversationDao
 import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.InsightDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
@@ -78,6 +79,7 @@ object DataModule {
                 CompanionDatabase.MIGRATION_7_8,
                 CompanionDatabase.MIGRATION_8_9,
                 CompanionDatabase.MIGRATION_9_10,
+                CompanionDatabase.MIGRATION_10_11,
             )
             .addCallback(
                 object : RoomDatabase.Callback() {
@@ -131,4 +133,8 @@ object DataModule {
     @Provides
     fun provideHealthSnapshotDao(database: CompanionDatabase): HealthSnapshotDao =
         database.healthSnapshotDao()
+
+    @Provides
+    fun provideConversationDao(database: CompanionDatabase): ConversationDao =
+        database.conversationDao()
 }

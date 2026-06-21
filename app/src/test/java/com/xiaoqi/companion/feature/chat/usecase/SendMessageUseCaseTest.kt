@@ -18,6 +18,7 @@ import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.ConversationRepository
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
@@ -126,6 +127,7 @@ class SendMessageUseCaseTest {
         relationshipModel = relationshipModel,
         locationProvider = mockk<CurrentLocationProvider>(relaxed = true),
         appPreferences = mockk<AppPreferences>(relaxed = true),
+        conversationRepository = mockk<ConversationRepository>(relaxed = true),
     ) {
         var rawResponse = "你好呀！"
         var shouldFail = false

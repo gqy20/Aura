@@ -84,6 +84,8 @@ fun ChatScreen(
     onOpenMcpSettings: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val conversations by viewModel.conversations.collectAsStateWithLifecycle()
+    val currentSessionId by viewModel.currentSessionId.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // M3 prefill:从主页 Insight 卡片"和 Aura 聊聊"带过来的预填 prompt
@@ -96,6 +98,8 @@ fun ChatScreen(
 
     ChatScreenContent(
         uiState = uiState,
+        conversations = conversations,
+        currentSessionId = currentSessionId,
         onSendMessage = { viewModel.sendMessage(uiState.inputText) },
         onInputTextChanged = { viewModel.updateInputText(it) },
         onClearError = { viewModel.clearError() },
@@ -121,12 +125,17 @@ fun ChatScreen(
         onAttachImage = { viewModel.attachImage(it.toString()) },
         onRemoveImage = { viewModel.removePendingImage() },
         onPresenceTapped = { viewModel.onPresenceTapped() },
+        onNewConversation = { viewModel.startNewConversation() },
+        onSwitchConversation = { viewModel.switchConversation(it) },
+        onDeleteConversation = { viewModel.deleteConversation(it) },
     )
 }
 
 @Composable
 fun ChatScreenContent(
     uiState: ChatUiState,
+    conversations: List<com.xiaoqi.companion.data.repository.ConversationItem> = emptyList(),
+    currentSessionId: String = "default",
     onSendMessage: () -> Unit,
     onInputTextChanged: (String) -> Unit,
     onClearError: () -> Unit,
@@ -139,6 +148,9 @@ fun ChatScreenContent(
     onAttachImage: (Uri) -> Unit,
     onRemoveImage: () -> Unit,
     onPresenceTapped: () -> Unit,
+    onNewConversation: () -> Unit = {},
+    onSwitchConversation: (String) -> Unit = {},
+    onDeleteConversation: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -148,6 +160,7 @@ fun ChatScreenContent(
         uri?.let(onAttachImage)
     }
     var isRemindersOpen by remember { mutableStateOf(false) }
+    var isConversationsOpen by remember { mutableStateOf(false) }
     var selectedToolCall by remember { mutableStateOf<ChatToolCall?>(null) }
     val messages = uiState.messages
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
@@ -291,6 +304,7 @@ fun ChatScreenContent(
                 mcpLabel = uiState.toolCapabilitySettings.mcpDisplayLabel(),
                 onOpenMemoryRoom = onOpenMemoryRoom,
                 onOpenReminders = { isRemindersOpen = true },
+                onOpenConversations = { isConversationsOpen = true },
                 onOpenMcpSettings = onOpenMcpSettings,
                 onOpenSettings = onOpenSettings,
                 onPresenceTapped = onPresenceTapped,
@@ -383,6 +397,20 @@ fun ChatScreenContent(
             reminders = uiState.reminders,
             onDismiss = { isRemindersOpen = false },
             onCancelReminder = onCancelReminder,
+        )
+    }
+
+    if (isConversationsOpen) {
+        ConversationListSheet(
+            conversations = conversations,
+            currentSessionId = currentSessionId,
+            onDismiss = { isConversationsOpen = false },
+            onNewConversation = {
+                onNewConversation()
+                isConversationsOpen = false
+            },
+            onSwitchConversation = onSwitchConversation,
+            onDeleteConversation = onDeleteConversation,
         )
     }
 }

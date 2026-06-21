@@ -1,5 +1,6 @@
 package com.xiaoqi.companion.core.presence.runtime
 
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
@@ -10,6 +11,7 @@ import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /**
@@ -24,6 +26,7 @@ class DreamDataCollector @Inject constructor(
     private val messageDao: MessageDao,
     private val memoryDao: com.xiaoqi.companion.data.db.dao.MemoryDao,
     private val healthSnapshotDao: HealthSnapshotDao,
+    private val appPreferences: AppPreferences,
 ) {
 
     /**
@@ -67,7 +70,8 @@ class DreamDataCollector @Inject constructor(
         val end = now
 
         val moods = moodSnapshotDao.findInRange(companionId, start, end)
-        val msgs = messageDao.getRecentMessages(DEFAULT_SESSION_ID, RECENT_MESSAGE_LIMIT)
+        val sessionId = appPreferences.currentSessionId.first()
+        val msgs = messageDao.getRecentMessages(sessionId, RECENT_MESSAGE_LIMIT)
             .filter { it.timestamp in start..end }
         val memoryCount = memoryDao.countAll()
 

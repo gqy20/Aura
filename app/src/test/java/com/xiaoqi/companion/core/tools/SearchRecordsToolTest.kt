@@ -1,5 +1,6 @@
 package com.xiaoqi.companion.core.tools
 
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MessageSearchDao
@@ -7,7 +8,9 @@ import com.xiaoqi.companion.data.db.dao.MessageSearchHit
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,6 +21,9 @@ class SearchRecordsToolTest {
 
     private val messageDao: MessageDao = mockk()
     private val messageSearchDao: MessageSearchDao = mockk()
+    private val appPreferences: AppPreferences = mockk {
+        every { currentSessionId } returns flowOf("default")
+    }
 
     @Test
     fun execute_returnsRawRecordHitsWithContext() = runTest {
@@ -32,7 +38,7 @@ class SearchRecordsToolTest {
             message(id = "after", role = MessageRole.ASSISTANT, content = "Later context", timestamp = 3_000L)
         )
 
-        val result = SearchRecordsTool(messageDao, messageSearchDao).execute(SearchRecordsTool.Args(query = "summaries"))
+        val result = SearchRecordsTool(messageDao, messageSearchDao, appPreferences).execute(SearchRecordsTool.Args(query = "summaries"))
 
         assertTrue(result.contains("\"count\":1"))
         assertTrue(result.contains("raw records and summaries"))
@@ -56,7 +62,7 @@ class SearchRecordsToolTest {
         coEvery { messageDao.getMessagesBefore("default", any(), any()) } returns emptyList()
         coEvery { messageDao.getMessagesAfter("default", any(), any()) } returns emptyList()
 
-        val result = SearchRecordsTool(messageDao, messageSearchDao).execute(
+        val result = SearchRecordsTool(messageDao, messageSearchDao, appPreferences).execute(
             SearchRecordsTool.Args(query = "photo", role = "USER", hasImage = true)
         )
 
@@ -77,7 +83,7 @@ class SearchRecordsToolTest {
 
     @Test
     fun descriptor_exposesKoogToolMetadata() {
-        val tool = SearchRecordsTool(mockk(), mockk())
+        val tool = SearchRecordsTool(mockk(), mockk(), appPreferences)
 
         assertEquals("search_records", tool.name)
         assertTrue(tool.descriptor.description.contains("raw", ignoreCase = true))
@@ -119,13 +125,16 @@ class SearchRecordsToolEnvelopeTest {
 
     private val messageDao: MessageDao = mockk()
     private val messageSearchDao: MessageSearchDao = mockk()
+    private val appPreferences: AppPreferences = mockk {
+        every { currentSessionId } returns flowOf("default")
+    }
 
     @Test
     fun execute_ftsFailure_returnsEnvelopeErrorInsteadOfEmptyList() = runTest {
         coEvery { messageSearchDao.searchRecordsFts(any(), any(), any(), any(), any(), any(), any()) } throws
             RuntimeException("no such column: rowid")
 
-        val result = SearchRecordsTool(messageDao, messageSearchDao)
+        val result = SearchRecordsTool(messageDao, messageSearchDao, appPreferences)
             .execute(SearchRecordsTool.Args(query = "jasmine"))
 
         // 之前:静默返空 list;现在:envelope error,告诉 LLM 检索失败 + 怎么兜底
@@ -138,7 +147,7 @@ class SearchRecordsToolEnvelopeTest {
 
     @Test
     fun execute_invalidRole_returnsEnvelopeErrorWithAllowedRoles() = runTest {
-        val result = SearchRecordsTool(messageDao, messageSearchDao)
+        val result = SearchRecordsTool(messageDao, messageSearchDao, appPreferences)
             .execute(SearchRecordsTool.Args(query = "x", role = "WIZARD"))
 
         assertTrue(isError(result))

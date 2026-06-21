@@ -1,5 +1,6 @@
 package com.xiaoqi.companion.core.presence.runtime
 
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.converter.MemoryType
 import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
@@ -11,7 +12,9 @@ import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,6 +23,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DreamDataCollectorTest {
+
+    private val appPreferences: AppPreferences = mockk {
+        every { currentSessionId } returns flowOf("default")
+    }
 
     @Test
     fun collectLast7Days_returnsEmptyWhenNoData() = runTest {
@@ -33,7 +40,7 @@ class DreamDataCollectorTest {
             coEvery { countAll() } returns 0
             coEvery { getRecentImages(any()) } returns emptyList()
         }
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
+        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true), appPreferences)
 
         val snapshot = collector.collectLast7Days()
 
@@ -61,7 +68,7 @@ class DreamDataCollectorTest {
             coEvery { countAll() } returns 12
             coEvery { getRecentImages(any()) } returns emptyList()
         }
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
+        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true), appPreferences)
 
         val snapshot = collector.collectLast7Days(now = now)
 
@@ -83,7 +90,7 @@ class DreamDataCollectorTest {
             coEvery { countAll() } returns 5
             coEvery { getRecentImages(any()) } returns emptyList()
         }
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
+        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true), appPreferences)
 
         val snapshot = collector.collectLast7Days()
         val rendered = collector.render(snapshot)
@@ -138,7 +145,7 @@ class DreamDataCollectorTest {
                 ),
             )
         }
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
+        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true), appPreferences)
 
         val snapshot = collector.collectLast7Days(now = now)
 
@@ -160,7 +167,7 @@ class DreamDataCollectorTest {
             coEvery { countAll() } returns 0
             coEvery { getRecentImages(any()) } returns emptyList()
         }
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
+        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true), appPreferences)
 
         collector.collectLast7Days()
 
@@ -192,7 +199,7 @@ class DreamDataCollectorTest {
                 ),
             )
         }
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
+        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true), appPreferences)
 
         val snapshot = collector.collectLast7Days(now = now)
 
@@ -230,7 +237,7 @@ class DreamDataCollectorTest {
         val moodDao = mockk<MoodSnapshotDao>()
         val messageDao = mockk<MessageDao>()
         val memoryDao = mockk<MemoryDao>()
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
+        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true), appPreferences)
 
         val rendered = collector.render(snapshot)
 
@@ -244,7 +251,7 @@ class DreamDataCollectorTest {
         val moodDao = mockk<MoodSnapshotDao>()
         val messageDao = mockk<MessageDao>()
         val memoryDao = mockk<MemoryDao>()
-        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true))
+        val collector = DreamDataCollector(moodDao, messageDao, memoryDao, mockk<HealthSnapshotDao>(relaxed = true), appPreferences)
         val snapshot = DreamDataCollector.Snapshot(
             rangeStart = 0L,
             rangeEnd = 1L,
@@ -285,6 +292,7 @@ class DreamDataCollectorTest {
             mockk<MessageDao>(),
             mockk<MemoryDao>(),
             mockk<HealthSnapshotDao>(),
+            appPreferences,
         )
 
         val rendered = collector.render(snapshot)
