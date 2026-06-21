@@ -11,6 +11,7 @@ import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.core.tools.parseOrNull
 import com.xiaoqi.companion.data.datastore.AppPreferences
+import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -60,6 +61,17 @@ open class CompanionRuntime @Inject constructor(
                         "请用此坐标作为 location 中心点,不要自行编造坐标。"
                 }
             } else null
+            val config = configRepository.getCurrentLlmConfig().first()
+            AppLogger.debug(
+                LogTags.Runtime,
+                "llm_config_loaded",
+                "provider" to config.provider,
+                "model" to config.modelName,
+                "hasApiKey" to config.apiKey.isNotBlank(),
+            )
+            // 本地 LLM 路径走 splitForCache，让 systemPrompt 只含固定部分（人设+工具），
+            // 动态上下文由 ReactiveCompanion 拼进 userMessage 前面，让 MNN prefix cache 持久命中。
+            val splitForCache = config.provider == LlmProvider.LOCAL_QWEN
             val prompt = promptBuilder.build(
                 input = input,
                 emotionContext = emotionMachine.getContext(),
@@ -68,6 +80,7 @@ open class CompanionRuntime @Inject constructor(
                 memories = memoryContext.memorySnippets,
                 summaries = memoryContext.summarySnippets,
                 locationContext = locationContext,
+                splitForCache = splitForCache,
             )
             AppLogger.debug(
                 LogTags.Runtime,
@@ -80,15 +93,8 @@ open class CompanionRuntime @Inject constructor(
                 "recentConversationCount" to conversationContext.recentMessages.size,
                 "recentConversationTokens" to conversationContext.estimatedTokens,
                 "omittedOlderMessages" to conversationContext.omittedOlderMessageCount,
-            )
-
-            val config = configRepository.getCurrentLlmConfig().first()
-            AppLogger.debug(
-                LogTags.Runtime,
-                "llm_config_loaded",
-                "provider" to config.provider,
-                "model" to config.modelName,
-                "hasApiKey" to config.apiKey.isNotBlank(),
+                "splitForCache" to splitForCache,
+                "dynamicContextLength" to (prompt.dynamicContext?.length ?: 0),
             )
             val agent = koogAgentFactory.create(config, sessionId)
 

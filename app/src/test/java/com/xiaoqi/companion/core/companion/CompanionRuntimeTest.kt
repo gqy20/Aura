@@ -46,7 +46,7 @@ class CompanionRuntimeTest {
     }
 
     private val promptBuilder: PromptBuilder = mockk {
-        every { build(any(), any(), any(), any(), any(), any(), any()) } returns BuiltPrompt(
+        every { build(any(), any(), any(), any(), any(), any(), any(), any()) } returns BuiltPrompt(
             systemPrompt = "system", userMessage = "hello",
         )
     }

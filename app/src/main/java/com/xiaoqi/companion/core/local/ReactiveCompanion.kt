@@ -114,9 +114,21 @@ class ReactiveCompanion(
                 "reason" to "No registered local tools; allowTools ignored",
             )
         }
+        // splitForCache 路径：systemPrompt 仅含固定部分（人设+工具），dynamicContext 拼进 userMessage 前面，
+        // 让 MNN prefix cache 持久命中 systemPrompt，避免每轮重 prefill 固定前缀。
+        val effectiveUserMessage = if (!dynamicContext.isNullOrEmpty()) {
+            buildString {
+                append(dynamicContext)
+                appendLine()
+                appendLine()
+                append(userMessage)
+            }
+        } else {
+            userMessage
+        }
         return LocalQwenRequest(
             systemPrompt = systemPrompt,
-            userMessage = userMessage,
+            userMessage = effectiveUserMessage,
             modelName = modelName,
             allowTools = allowTools,
             imageBase64 = imageBase64,
