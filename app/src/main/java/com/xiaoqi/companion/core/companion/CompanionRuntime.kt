@@ -151,23 +151,25 @@ open class CompanionRuntime @Inject constructor(
                 )
                 trySend(AgentEvent.Error(AgentError.ParseError("Empty model response")))
             } else {
+                val finalResponse = stripStructuredTags(rawResponse)
                 val assistantMessageId = messageRepository.saveAssistantMessage(
                     sessionId = sessionId,
-                    content = rawResponse,
+                    content = finalResponse,
                 )
                 AppLogger.debug(
                     LogTags.Runtime,
                     "response_saved",
-                    "replyLength" to rawResponse.length,
+                    "replyLength" to finalResponse.length,
+                    "strippedTags" to (rawResponse.length - finalResponse.length),
                 )
 
                 AppLogger.info(
                     LogTags.Runtime,
                     "pipeline_completed",
                     "durationMs" to (System.currentTimeMillis() - startedAt),
-                    "replyLength" to rawResponse.length,
+                    "replyLength" to finalResponse.length,
                 )
-                trySend(AgentEvent.Complete(rawResponse))
+                trySend(AgentEvent.Complete(finalResponse))
             }
         } catch (e: Exception) {
             AppLogger.error(
@@ -189,5 +191,11 @@ open class CompanionRuntime @Inject constructor(
 
     private companion object {
         const val DEFAULT_SESSION_ID = "default"
+        // [mood:xxx] [intensity:0.5] [affinity:+1] [topics:tag1,tag2]
+        val STRUCTURED_TAG_REGEX = Regex("^\\s*(\\[mood:[^\\]]*\\]\\s*|\\[intensity:[^\\]]*\\]\\s*|\\[affinity:[^\\]]*\\]\\s*|\\[topics:[^\\]]*\\]\\s*)+")
+    }
+
+    private fun stripStructuredTags(text: String): String {
+        return STRUCTURED_TAG_REGEX.replace(text, "").trimStart()
     }
 }
