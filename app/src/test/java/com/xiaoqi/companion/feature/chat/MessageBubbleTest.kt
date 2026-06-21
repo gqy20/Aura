@@ -51,13 +51,32 @@ class MessageBubbleTest {
     }
 
     @Test
-    fun streamingMessage_withoutContent_showsLoadingSpinner() {
+    fun streamingMessage_withoutContent_showsThinkingHint() {
         composeTestRule.setContent {
             MessageBubble(
                 message = ChatMessage(id = "1", role = "ASSISTANT", content = "", isStreaming = true)
             )
         }
 
+        // 无 tool chip 时走 ThinkingHintCarousel，首条文案为档0 第 0 条
+        composeTestRule.onNodeWithText(ThinkingHints.hintFor(0L, 0)).assertIsDisplayed()
+    }
+
+    @Test
+    fun streamingMessage_withoutContent_butWithToolStatus_showsSpinner() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "",
+                    isStreaming = true,
+                    toolStatus = "查找记忆",
+                )
+            )
+        }
+
+        // 有 tool chip 时不应叠安抚文案，回退到老 spinner
         composeTestRule.onNodeWithContentDescription("Aura 正在回复").assertIsDisplayed()
     }
 

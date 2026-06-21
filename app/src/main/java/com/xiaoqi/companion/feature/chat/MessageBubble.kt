@@ -136,11 +136,19 @@ private fun MessageBubbleContent(
             Spacer(modifier = Modifier.size(8.dp))
         }
         if (!isUser && message.isStreaming && message.content.isBlank()) {
-            AuraLoadingIndicator(
-                modifier = Modifier.size(18.dp),
-                color = MaterialTheme.colorScheme.primary,
-                contentDescription = "Aura 正在回复",
-            )
+            // 有 tool chip（查找记忆 / 已创建提醒 等）时不叠安抚文案，避免两行字打架。
+            if (message.toolStatus == null) {
+                ThinkingHintCarousel(
+                    indicatorColor = MaterialTheme.colorScheme.primary,
+                    textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                AuraLoadingIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    contentDescription = "Aura 正在回复",
+                )
+            }
         } else if (message.isStreaming) {
             StreamingMessageText(
                 renderBlocks = message.renderBlocks,
