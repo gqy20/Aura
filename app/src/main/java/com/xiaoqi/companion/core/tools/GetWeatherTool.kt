@@ -47,10 +47,10 @@ class GetWeatherTool @Inject constructor(
                 args.city.isNotBlank() -> weatherProvider.getByCity(args.city)
                 args.latitude != null && args.longitude != null -> weatherProvider.getByCoordinates(args.latitude, args.longitude)
                 appPreferences.locationContextEnabled.first() -> {
-                    val location = locationProvider.getLastKnownLocation()
+                    val location = locationProvider.requestCurrentLocation()
                         ?: return@withContext disabled(
-                            reason = "last_known_location_unavailable",
-                            hint = "系统拿不到最近一次定位,无法按当前位置查天气。请让用户显式提供城市名或经纬度。",
+                            reason = "location_unavailable",
+                            hint = "系统拿不到定位（last known 为空且主动请求失败/超时），无法按当前位置查天气。请让用户显式提供城市名或经纬度。",
                         )
                     weatherProvider.getByCoordinates(
                         latitude = location.latitude,

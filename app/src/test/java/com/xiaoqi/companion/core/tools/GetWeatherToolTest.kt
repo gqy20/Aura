@@ -90,6 +90,7 @@ class GetWeatherToolTest {
     private fun locationProvider(location: CurrentLocation?): CurrentLocationProvider =
         object : CurrentLocationProvider {
             override fun getLastKnownLocation() = location
+            override suspend fun requestCurrentLocation(timeoutMs: Long): CurrentLocation? = location
         }
 
     private fun report(locationName: String) = WeatherReport(

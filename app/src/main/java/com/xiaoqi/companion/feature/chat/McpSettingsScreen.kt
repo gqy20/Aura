@@ -546,6 +546,37 @@ private fun McpEditorScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                item {
+                    OutlinedTextField(
+                        value = settings.mcpSettingsAuthToken,
+                        onValueChange = viewModel::updateMcpSettingsAuthToken,
+                        label = { Text("Token（可选 · 需登录态的 MCP，如瑞幸）") },
+                        placeholder = { Text("粘贴登录后复制的 Token") },
+                        singleLine = true,
+                        visualTransformation = if (settings.mcpSettingsKeyVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = viewModel::toggleMcpKeyVisibility) {
+                                Icon(
+                                    imageVector = if (settings.mcpSettingsKeyVisible) {
+                                        Icons.Filled.VisibilityOff
+                                    } else {
+                                        Icons.Filled.Visibility
+                                    },
+                                    contentDescription = if (settings.mcpSettingsKeyVisible) {
+                                        "隐藏"
+                                    } else {
+                                        "显示"
+                                    },
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
 
             settings.mcpSettingsMessage?.let { msg ->
