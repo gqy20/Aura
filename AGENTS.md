@@ -8,7 +8,7 @@
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪与关系的头像/表情层由 Compose Canvas 临时替代；Presence Layer 的 Rive/Lottie 动画资源仍缺；Pulse 的离线衰减/回归反应/主动通知仍缺
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest）、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
-- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-06-15 通过（**372 个测试，0 失败**；含 11 个 M4 vision memory 用例）
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-06-21 通过（**491 个测试，0 失败**；含 11 个 M4 vision memory 用例。Robolectric 单 fork 复用后 DAO 总耗 -87%）
 
 ## 常用验证命令
 
@@ -19,11 +19,17 @@ make test
 make build
 make release
 make check
+make test-fast   # 跳过 Robolectric,只跑纯 JVM 测试(~10s)
+make test-db     # 只跑 DAO/Repo
+make test-one T=CompanionRuntimeTest
 ```
 
 其中：
 
-- `make test`：运行 debug 单元测试。
+- `make test`：运行 debug 单元测试（全量 ~60-90s,缓存后 ~20s）。
+- `make test-fast`：开发期迭代,跳过 DAO/UI/Downloader。
+- `make test-db`：修改 schema / DAO 查询后验证。
+- `make test-one T=<类名>`：单一类。
 - `make build`：构建 debug APK。
 - `make release`：构建 release APK。
 - `make check`：运行 lint + test + debug build 级别检查。
@@ -36,7 +42,7 @@ make check
 ./gradlew.bat build
 ```
 
-以上 Gradle 命令已在 2026-06-15 验证通过（`testDebugUnitTest` **372 个测试全绿**）。
+以上 Gradle 命令已在 2026-06-21 验证通过（`testDebugUnitTest` **491 个测试全绿**）。测试性能优化详见 CLAUDE.md “并发配置：单 fork 复用 Robolectric Runtime” 段落。
 
 ## MNN Benchmark 流程
 

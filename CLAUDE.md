@@ -16,7 +16,7 @@
 - 已实现（按代码核对，2026-06-19）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`（Koog `AIAgent` 多轮 tool-use + SSE 流式）、`AnthropicMessagesLLMClient`（手写 OkHttp SSE 解析）；**Room v10**（9→10 新增 FTS5 trigram 全文搜索 `message_search_docs_fts`）/DataStore/Hilt；NavHost 六条路由；`SettingsScreen`（MODEL/CAPABILITIES/SYSTEM 三 Tab + Dream Loop 间隔选择 + 数据导出/清空）+ `McpSettingsScreen`（多 server CRUD + 工具发现）；`MemoryRoomScreen`（类型筛选/置顶/归档/删除）；`OnboardingScreen`（5 问双写 LTM+DataStore）；**11 个内置 Agent tools**（`search_memory` / `search_records` FTS5 / `search_summaries` / `get_weather` OpenMeteo / `query_health_data` / `get_device_status` / `get_current_time` / `get_recent_interaction_context` / `get_user_context_settings` / `create_local_reminder` / `update_state`）+ **MCP 生产级客户端**（`McpHttpClient`：JSON-RPC 2.0 over HTTP + session 握手 + SSE 解析 + 404 重连，内置高德地图 preset）；`PresenceController` + `PresenceReactionPolicy`；Reminder 四件套（AlarmManager + WorkManager + Receiver + Poster）；**本地 LLM 全链路**（`LocalQwenModelCatalog` + `LocalQwenModelDownloader` ModelScope 下载 + `MnnLocalQwenEngine` + `NativeMnnLlmBridge` JNI + `ReactiveCompanion` 文本协议 tool calling，支持图文多模态）；**Dream Loop 后台任务**（`DreamLoopScheduler` 7 档周期 + `DreamLoopWorker`：数据收集 → 本地 Qwen 推理 → `InsightValidator` 4 道校验 → 存储，电量约束 + 立即跑一次）；**M4 Vision→Memory 闭环**（`MemoryEntity.imageBase64/imageMediaType` + MIGRATION_7_8 + `MemoryRepository.saveVisionMemory` + `DreamDataCollector` 跨模态 evidence，**base64 不进 DreamPrompt**）；Health 双源（`HealthConnectDataSource` 主 + `SensorManagerHealthSource` 步数兜底，含 realme 半装误报的"真 read 探测"）；`InsightCardList` + 自绘 `MoodTrendChart`；`LlmConnectivityChecker`；`DataTransparencySection`。
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪/关系头像由 Compose Canvas 自绘替代，Rive/Lottie 动画资源仍缺；记忆的完整编辑/全文搜索框/批量管理仍缺；**Insight 只启用 `patternDetect` 一个 prompt**（`anniversaryScan` / `connectionDetect` 已写好但无调用入口）；`AutoMemoryStore` MVP 阶段 Onboarding 答案只当 String 存、未接 LLM 解析；本地 vision 的 native `aura_mnn_llm.so` 真机 NDK 编译验证待补。
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O（仅 DataStore 开关、无实现）、`PulseWorker`（离线衰减/回归反应/主动通知；Dream Loop 周期任务已落，Reminder 走 OneTimeWorkRequest）、Weekly Insight / AnniversaryScanner / InsightLog 反馈回路、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`。
-- 已验证：`./gradlew.bat testDebugUnitTest` 通过（**483 个测试，0 失败**；最近核对 2026-06-17，含 Dream Loop / InsightValidator / ReactiveCompanion / FTS5 / Health 双源等用例）。
+- 已验证：`./gradlew.bat testDebugUnitTest` 通过（**491 个测试，0 失败**；最近核对 2026-06-21，含 Dream Loop / InsightValidator / ReactiveCompanion / FTS5 / Health 双源等用例）。
 
 ## Compose UI: Window Insets 速查
 
@@ -200,11 +200,21 @@ private val testDispatcher = UnconfinedTestDispatcher()
 - `@Before` 创建 Room in-memory DB + 调用 `initDaos()` 初始化 DAO
 - `@After` 关闭 DB
 - 子类只需声明 DAO 字段并实现 `initDaos()`
-- **不要尝试跨 test class 共享 DB 实例** — Robolectric 的 `ShadowLegacySQLiteConnection` 不支持，会导致连接状态冲突
+- **每个测试类创建独立 Room in-memory DB** — `@Before`/`@After` 保证隔离
+- **Robolectric RuntimeEnvironment 全进程复用** — 依赖 `maxParallelForks = 1`(见下文),8 个 DAO 测试类在同 JVM 内依次跑,启动成本只付一次
 
 ### 测试运行规范
 
-**一次运行，一次分析。** 不要反复重跑测试：
+**开发期快速迭代优先用 Makefile 快捷目标：**
+
+```bash
+make test-fast    # 跳过 Robolectric 类(DAO/UI/Downloader),只跑纯 JVM 测试 (~10s)
+make test-db      # 只跑 DAO/Repo(Robolectric + Room 集成)
+make test-one T=CompanionRuntimeTest   # 单一类
+make test         # 全量(~60-90s 首跑,缓存后 ~20s)
+```
+
+**全量验证（一次运行，一次分析）：**
 
 ```bash
 ./gradlew testDebugUnitTest 2>&1 | tee build/test-run.log
@@ -214,6 +224,15 @@ grep -oh 'tests="[0-9]*"' app/build/test-results/testDebugUnitTest/TEST-*.xml | 
 
 - 用 `tee` 保存完整日志，从日志和 XML 报告中提取所有信息
 - 首次构建较慢（~40s），缓存命中后仅需 ~6s（已开启 configuration-cache）
+
+### 并发配置：单 fork 复用 Robolectric Runtime
+
+`app/build.gradle.kts` 中 `testOptions.unitTests.all.maxParallelForks = 1` 是有意为之：
+
+- 多 fork 时每个 fork 独立加载 Android runtime,8 个 DAO 测试类各自启动一次 Robolectric (~3-5s/次)
+- 单 fork 后 RuntimeEnvironment 在进程内全局复用,MemoryDaoTest 从 13.77s 降到 0.96s (-93%)
+- 纯 JVM 测试串行损失远小于 Robolectric 启动节省,实测总耗时下降 ~40s
+- **不要改回 `maxParallelForks = Runtime.getRuntime().availableProcessors()`**
 
 ## 注释规范
 
