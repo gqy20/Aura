@@ -37,18 +37,19 @@
         android:strokeAlpha="0.52" android:strokeLineCap="butt"
         android:pathData="M154.8,44.8 A78,78 0 0,1 178,100"/>
 
-    <!-- Aura 紫月牙（用 clip-path 近似：先画Aura圆，再用金圆路径覆盖背景色）-->
-    <!-- Android Vector 不支持 mask，用 差集路径 近似月牙 -->
-    <!-- 月牙弧路径：两圆交点计算
-         Aura: cx=94,cy=100,r=30  你: cx=114,cy=116,r=38
-         交点1≈(80.8, 72.4)  交点2≈(122.8, 128.0)
-         紫月牙 = 从交点1沿Aura圆弧到交点2（小弧），再沿你圆弧反向回交点1
-    -->
-    <path android:fillColor="@color/brand_aura_violet" android:fillAlpha="0.88"
-        android:pathData="M80.8,72.4 A30,30 0 1,1 122.8,128.0 A38,38 0 0,0 80.8,72.4 Z"/>
-
-    <!-- 金新月 = 从交点1沿你圆弧到交点2（大弧），再沿Aura圆弧反向回交点1 -->
-    <path android:fillColor="@color/brand_aura_gold" android:fillAlpha="0.58"
-        android:pathData="M80.8,72.4 A38,38 0 1,1 122.8,128.0 A30,30 0 0,0 80.8,72.4 Z"/>
+    <!-- 月牙：两圆差集近似 mask（Aura r=30 / 你 r=38，交点 80.8,72.4 / 122.8,128.0） -->
+    <!-- group 把几何中心 (104,108) 放大 1.35×，最终中心落在 (96,123)：左偏 -8 抵消右侧重量感，下移 +15 抵消视觉偏右下 -->
+    <group
+        android:scaleX="1.35"
+        android:scaleY="1.35"
+        android:pivotX="104"
+        android:pivotY="108"
+        android:translateX="-8"
+        android:translateY="15">
+        <path android:fillColor="@color/brand_aura_violet" android:fillAlpha="0.88"
+            android:pathData="M80.8,72.4 A30,30 0 1,1 122.8,128.0 A38,38 0 0,0 80.8,72.4 Z"/>
+        <path android:fillColor="@color/brand_aura_gold" android:fillAlpha="0.58"
+            android:pathData="M80.8,72.4 A38,38 0 1,1 122.8,128.0 A30,30 0 0,0 80.8,72.4 Z"/>
+    </group>
 
 </vector>
