@@ -31,6 +31,7 @@ import com.xiaoqi.companion.data.repository.ToolCallRepository
 import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import com.xiaoqi.companion.feature.chat.usecase.SendMessageUseCase
 import com.xiaoqi.companion.feature.chat.usecase.SettingsUseCase
+import com.xiaoqi.companion.testing.FakeChatImageProcessor
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -159,18 +160,6 @@ class ChatViewModelTest {
             )
         )
         override fun findAnyInstalledModel(): String? = if (installed) "Qwen3.5-0.8B-MNN" else null
-    }
-
-    private class FakeChatImageProcessor : ChatImageProcessor {
-        var shouldFail = false
-        override suspend fun prepare(uriString: String): PreparedChatImage {
-            if (shouldFail) error("bad image")
-            return PreparedChatImage(
-                uriString = uriString,
-                imageBase64 = "prepared-base64",
-                mediaType = "image/jpeg",
-            )
-        }
     }
 
     @Before

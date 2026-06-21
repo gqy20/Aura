@@ -10,6 +10,7 @@ import com.xiaoqi.companion.core.mcp.McpRemoteTool
 import com.xiaoqi.companion.core.mcp.McpToolSpec
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
+import com.xiaoqi.companion.testing.FakeLocalQwenEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
@@ -341,17 +342,6 @@ class ReactiveCompanionTest {
 
     @Serializable
     private data class Dummy(val value: String = "")
-
-    private class FakeLocalQwenEngine(
-        private val chunks: List<String>,
-    ) : LocalQwenEngine {
-        var lastRequest: LocalQwenRequest? = null
-
-        override fun stream(request: LocalQwenRequest): Flow<String> = flow {
-            lastRequest = request
-            chunks.forEach { emit(it) }
-        }
-    }
 
     private class SequencedLocalQwenEngine(
         private val responses: List<List<String>>,

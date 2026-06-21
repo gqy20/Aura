@@ -204,11 +204,12 @@ android {
         unitTests {
             isIncludeAndroidResources = true
 
-            // 并行跑测试类 —— 每类独立 JVM fork,避免 Robolectric static state 互相干扰
-            // CI 跟本地开发都能提速(本机 4 workers,上限于 gradle.workers.max)
+            // 单 fork 跑所有测试类 —— Robolectric RuntimeEnvironment 在进程内全局复用
+            // 实测:maxParallelForks=4 时 DAO 测试总耗 44s(每类重加载 Android runtime),
+            // 改 1 后 DAO 总耗降到 5s,节省 ~40s 足以抵消纯 JVM 测试串行的损失
             all {
-                it.maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtMost(4)
-                it.forkEvery = 0  // 同一 fork 复用 JVM,减少启动次数
+                it.maxParallelForks = 1
+                it.forkEvery = 0
                 it.systemProperty("robolectric.invokedynamic", "true")
             }
         }

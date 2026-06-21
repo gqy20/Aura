@@ -23,6 +23,7 @@ import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.ToolCallEntity
 import com.xiaoqi.companion.data.repository.LlmConfig
+import com.xiaoqi.companion.testing.FakeLocalQwenEngine
 import ai.koog.serialization.typeToken
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -390,17 +391,6 @@ class KoogAgentFactoryImplTest {
             ModerationResult(isHarmful = false, categories = emptyMap())
 
         override fun close() = Unit
-    }
-
-    private class FakeLocalQwenEngine(
-        private val chunks: List<String>,
-    ) : LocalQwenEngine {
-        var lastRequest: LocalQwenRequest? = null
-
-        override fun stream(request: LocalQwenRequest): Flow<String> = flow {
-            lastRequest = request
-            chunks.forEach { emit(it) }
-        }
     }
 
     private class SequencedLocalQwenEngine(

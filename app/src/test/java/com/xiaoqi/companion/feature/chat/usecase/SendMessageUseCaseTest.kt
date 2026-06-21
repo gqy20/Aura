@@ -32,6 +32,7 @@ import com.xiaoqi.companion.feature.chat.ChatMessage
 import com.xiaoqi.companion.feature.chat.ChatPermissionType
 import com.xiaoqi.companion.feature.chat.ChatUiState
 import com.xiaoqi.companion.feature.chat.PreparedChatImage
+import com.xiaoqi.companion.testing.FakeChatImageProcessor
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -164,18 +165,6 @@ class SendMessageUseCaseTest {
                 if (completeDelayMs > 0L) delay(completeDelayMs)
                 emit(AgentEvent.Complete(rawResponse))
             }
-        }
-    }
-
-    private class FakeChatImageProcessor : com.xiaoqi.companion.feature.chat.ChatImageProcessor {
-        var shouldFail = false
-        override suspend fun prepare(uriString: String): PreparedChatImage {
-            if (shouldFail) error("bad image")
-            return PreparedChatImage(
-                uriString = uriString,
-                imageBase64 = "prepared-base64",
-                mediaType = "image/jpeg",
-            )
         }
     }
 
