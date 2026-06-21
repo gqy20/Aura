@@ -21,7 +21,11 @@ interface KoogAgentWrapper {
 }
 
 interface KoogAgentFactory {
-    fun create(config: LlmConfig, sessionId: String = "default"): KoogAgentWrapper
+    /**
+     * @param allowLocalTools 仅 LOCAL_QWEN provider 生效。true = 注入 AgentToolRegistry,走软协议工具循环;
+     * false(默认) = ToolRegistry.EMPTY,纯文本陪伴对话。云端 provider 忽略此参数。
+     */
+    fun create(config: LlmConfig, sessionId: String = "default", allowLocalTools: Boolean = false): KoogAgentWrapper
 }
 
 sealed class KoogAgentEvent {

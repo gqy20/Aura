@@ -273,6 +273,7 @@ class SettingsUseCase @Inject constructor(
             mcpSettingsName = server.displayName,
             mcpSettingsProviderId = server.providerId,
             mcpSettingsApiKey = server.apiKey,
+            mcpSettingsAuthToken = server.authToken,
             mcpSettingsUrl = server.customUrl,
             mcpSettingsKeyVisible = false,
             mcpSettingsMessage = null,
@@ -283,6 +284,7 @@ class SettingsUseCase @Inject constructor(
         mcpSettingsName = "",
         mcpSettingsProviderId = "amap",
         mcpSettingsApiKey = "",
+        mcpSettingsAuthToken = "",
         mcpSettingsUrl = "",
         mcpSettingsKeyVisible = false,
         mcpSettingsMessage = null,
@@ -298,6 +300,10 @@ class SettingsUseCase @Inject constructor(
 
     fun updateMcpSettingsApiKey(value: String, update: (ChatUiState.() -> ChatUiState) -> Unit) {
         update { copy(mcpSettingsApiKey = value, mcpSettingsMessage = null) }
+    }
+
+    fun updateMcpSettingsAuthToken(value: String, update: (ChatUiState.() -> ChatUiState) -> Unit) {
+        update { copy(mcpSettingsAuthToken = value, mcpSettingsMessage = null) }
     }
 
     fun toggleMcpKeyVisibility(update: (ChatUiState.() -> ChatUiState) -> Unit) {
@@ -339,6 +345,7 @@ class SettingsUseCase @Inject constructor(
         val name = state.mcpSettingsName.trim()
         val apiKey = state.mcpSettingsApiKey.trim()
         val customUrl = state.mcpSettingsUrl.trim()
+        val authToken = state.mcpSettingsAuthToken.trim()
 
         when {
             provider is CustomMcpServerPreset -> {
@@ -367,6 +374,7 @@ class SettingsUseCase @Inject constructor(
             providerId = provider.id,
             apiKey = apiKey,
             customUrl = if (provider is CustomMcpServerPreset) customUrl else "",
+            authToken = if (provider is CustomMcpServerPreset) authToken else "",
             enabled = existingServer?.enabled ?: true,
         )
 
@@ -454,6 +462,13 @@ class SettingsUseCase @Inject constructor(
         update: (ChatUiState.() -> ChatUiState) -> Unit,
     ) = updateBooleanPreference("reminder_tool", value, update) {
         appPreferences.setReminderToolEnabled(value)
+    }
+
+    suspend fun setLocalToolsEnabled(
+        value: Boolean,
+        update: (ChatUiState.() -> ChatUiState) -> Unit,
+    ) = updateBooleanPreference("local_tools", value, update) {
+        appPreferences.setLocalToolsEnabled(value)
     }
 
     suspend fun setNotificationEnabled(

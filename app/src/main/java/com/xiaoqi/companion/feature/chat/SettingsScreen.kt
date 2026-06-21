@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.Button
@@ -131,6 +132,7 @@ internal data class SettingsScreenActions(
     val onWeatherContextEnabledChanged: (Boolean) -> Unit,
     val onReminderToolEnabledChanged: (Boolean) -> Unit,
     val onNotificationEnabledChanged: (Boolean) -> Unit,
+    val onLocalToolsEnabledChanged: (Boolean) -> Unit,
     val onDreamLoopIntervalChanged: (DreamLoopInterval) -> Unit,
     val onDreamLoopModelNameChanged: (String) -> Unit,
     val onTriggerDreamLoopNow: () -> Unit,
@@ -162,6 +164,7 @@ internal data class SettingsScreenActions(
             onWeatherContextEnabledChanged = viewModel::setWeatherContextEnabled,
             onReminderToolEnabledChanged = viewModel::setReminderToolEnabled,
             onNotificationEnabledChanged = viewModel::setNotificationEnabled,
+            onLocalToolsEnabledChanged = viewModel::setLocalToolsEnabled,
             onDreamLoopIntervalChanged = viewModel::setDreamLoopInterval,
             onDreamLoopModelNameChanged = viewModel::setDreamLoopModelName,
             onTriggerDreamLoopNow = viewModel::triggerDreamLoopNow,
@@ -569,6 +572,15 @@ private fun LazyListScope.settingsCapabilitiesPage(
                 metaIcon = Icons.Outlined.NotificationsOff,
                 checked = state.toolSettings.notificationEnabled,
                 onCheckedChange = actions.onNotificationEnabledChanged,
+            )
+            DividerSpacer()
+            SettingsToggleRow(
+                title = "本地工具调用",
+                detail = "本地模型可调记忆/提醒等工具(实验)",
+                meta = "实验",
+                metaIcon = Icons.Outlined.Science,
+                checked = state.toolSettings.localToolsEnabled,
+                onCheckedChange = actions.onLocalToolsEnabledChanged,
             )
             DividerSpacer()
             SettingsToggleRow(

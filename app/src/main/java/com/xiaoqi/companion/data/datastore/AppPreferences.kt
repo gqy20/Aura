@@ -28,6 +28,11 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val locationContextEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.locationContextEnabled] ?: true }
     val weatherContextEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.weatherContextEnabled] ?: true }
     val reminderToolEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.reminderToolEnabled] ?: true }
+    /**
+     * 本地模型工具调用开关。默认 false(0.8B JSON 质量不稳定 + 多轮推理慢)。
+     * 开启后 ReactiveCompanion 会注入 AgentToolRegistry.create(),走 LocalToolProtocol 软协议。
+     */
+    val localToolsEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.localToolsEnabled] ?: false }
     val mcpServerName: Flow<String> = dataStore.data.map { it[Keys.mcpServerName] ?: "" }
     val mcpHttpUrl: Flow<String> = dataStore.data.map { it[Keys.mcpHttpUrl] ?: "" }
     val mcpProviderId: Flow<String> = dataStore.data.map { it[Keys.mcpProviderId] ?: "" }
@@ -72,6 +77,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     suspend fun setLocationContextEnabled(value: Boolean) { dataStore.edit { it[Keys.locationContextEnabled] = value } }
     suspend fun setWeatherContextEnabled(value: Boolean) { dataStore.edit { it[Keys.weatherContextEnabled] = value } }
     suspend fun setReminderToolEnabled(value: Boolean) { dataStore.edit { it[Keys.reminderToolEnabled] = value } }
+    suspend fun setLocalToolsEnabled(value: Boolean) { dataStore.edit { it[Keys.localToolsEnabled] = value } }
     suspend fun setMcpServerName(value: String) { dataStore.edit { it[Keys.mcpServerName] = value } }
     suspend fun setMcpHttpUrl(value: String) { dataStore.edit { it[Keys.mcpHttpUrl] = value } }
     suspend fun setMcpProviderId(value: String) { dataStore.edit { it[Keys.mcpProviderId] = value } }
@@ -104,6 +110,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
         val locationContextEnabled = booleanPreferencesKey("location_context_enabled")
         val weatherContextEnabled = booleanPreferencesKey("weather_context_enabled")
         val reminderToolEnabled = booleanPreferencesKey("reminder_tool_enabled")
+        val localToolsEnabled = booleanPreferencesKey("local_tools_enabled")
         val mcpServerName = stringPreferencesKey("mcp_server_name")
         val mcpHttpUrl = stringPreferencesKey("mcp_http_url")
         val mcpProviderId = stringPreferencesKey("mcp_provider_id")

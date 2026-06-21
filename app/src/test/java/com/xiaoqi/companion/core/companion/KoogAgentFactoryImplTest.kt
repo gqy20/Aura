@@ -255,10 +255,10 @@ class KoogAgentFactoryImplTest {
     }
 
     @Test
-    fun create_localQwenProvider_withTools_skipsLocalToolLoop() = runTest {
-        // 本地 LLM 路径不再注入工具（0.8B/4B JSON 产出不稳定 + 多轮推理惩罚严重）。
-        // 即使 AgentToolRegistry 有工具，ReactiveCompanion 也应拿 ToolRegistry.EMPTY，
-        // 直接走纯文本路径，不进入工具循环。
+    fun create_localQwenProvider_withTools_defaultDisabled_skipsLocalToolLoop() = runTest {
+        // 默认 allowLocalTools=false(与历史行为一致):即使 AgentToolRegistry 有工具,
+        // ReactiveCompanion 仍拿 ToolRegistry.EMPTY,走纯文本路径,不进工具循环。
+        // 用户需要在 Settings 里手动打开「本地工具调用」开关才会启用。
         val localEngine = SequencedLocalQwenEngine(
             listOf(
                 listOf("plain reply without tool"),
@@ -286,13 +286,59 @@ class KoogAgentFactoryImplTest {
             )
         ).toList()
 
-        // 没有工具调用事件，只有纯文本输出
+        // 没有工具调用事件,只有纯文本输出
         assertTrue(events.none {
             (it as? KoogAgentEvent.ToolCallUpdated)?.call != null
         })
         assertTrue(events.contains(KoogAgentEvent.TextDelta("plain reply without tool")))
-        // 只调用了一次 engine（没有第二轮工具循环）
+        // 只调用了一次 engine(没有第二轮工具循环)
         assertEquals(1, localEngine.requests.size)
+    }
+
+    @Test
+    fun create_localQwenProvider_allowLocalToolsTrue_injectsToolRegistry() = runTest {
+        // 开关打开后:AgentToolRegistry.create() 返回的真实 registry 被注入到 ReactiveCompanion,
+        // 软协议工兵循环起作用(模型输出 tool_calls JSON -> parseToolCalls -> execute)。
+        val localEngine = SequencedLocalQwenEngine(
+            listOf(
+                // 第一轮:模型输出 tool_calls JSON
+                listOf("{\"tool_calls\":[{\"name\":\"note\",\"arguments\":{\"text\":\"hello\"}}]}"),
+                // 第二轮:工具执行完,模型输出纯文本收尾
+                listOf("done"),
+            )
+        )
+        val factory = KoogAgentFactoryImpl(
+            executorFactory = object : KoogPromptExecutorFactory {
+                override fun create(config: LlmConfig): PromptExecutor = error("remote executor should not be used")
+            },
+            localQwenEngine = localEngine,
+            toolCallRecorder = toolCallRecorder,
+            toolRegistry = object : AgentToolRegistry {
+                override fun create(): ToolRegistry =
+                    ToolRegistry.builder()
+                        .tool(noteTool)
+                        .build()
+            },
+        )
+
+        val events = factory.create(
+            config = testConfig.copy(provider = LlmProvider.LOCAL_QWEN),
+            sessionId = "default",
+            allowLocalTools = true,
+        ).runEvents(
+            BuiltPrompt(
+                systemPrompt = "system",
+                userMessage = "remember this",
+                allowTools = true,
+            )
+        ).toList()
+
+        // 应该看到 note 工具的 STARTED + SUCCEEDED 事件
+        val toolEvents = events.filterIsInstance<KoogAgentEvent.ToolCallUpdated>()
+        assertTrue("should have tool events", toolEvents.isNotEmpty())
+        assertTrue("note tool should be called", toolEvents.any { it.call.name == "note" })
+        // 应该调了两次 engine(第一轮 tool_calls + 第二轮总结)
+        assertEquals(2, localEngine.requests.size)
     }
 
     private class ToolCallingPromptExecutor : PromptExecutor() {

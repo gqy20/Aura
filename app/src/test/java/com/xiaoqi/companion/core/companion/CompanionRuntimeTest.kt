@@ -70,6 +70,7 @@ class CompanionRuntimeTest {
     private val appPreferences: AppPreferences = mockk {
         every { locationContextEnabled } returns flowOf(true)
         every { currentSessionId } returns flowOf("default")
+        every { localToolsEnabled } returns flowOf(false)
     }
 
     private val conversationRepository: ConversationRepository = mockk(relaxed = true)
@@ -83,7 +84,7 @@ class CompanionRuntimeTest {
         var runCallCount = 0
         var runEventsCallCount = 0
 
-        override fun create(config: com.xiaoqi.companion.data.repository.LlmConfig, sessionId: String): KoogAgentWrapper {
+        override fun create(config: com.xiaoqi.companion.data.repository.LlmConfig, sessionId: String, allowLocalTools: Boolean): KoogAgentWrapper {
             lastConfig = config
             return object : KoogAgentWrapper {
                 override suspend fun run(prompt: BuiltPrompt): String {

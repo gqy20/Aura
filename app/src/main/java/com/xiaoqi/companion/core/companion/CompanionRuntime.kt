@@ -96,7 +96,10 @@ open class CompanionRuntime @Inject constructor(
                 "splitForCache" to splitForCache,
                 "dynamicContextLength" to (prompt.dynamicContext?.length ?: 0),
             )
-            val agent = koogAgentFactory.create(config, sessionId)
+            // 本地路径读一次 localToolsEnabled 快照,让用户在 Settings 里切换后下一条消息生效。
+            // 云端 provider 此参数被 factory 忽略。
+            val allowLocalTools = appPreferences.localToolsEnabled.first()
+            val agent = koogAgentFactory.create(config, sessionId, allowLocalTools = allowLocalTools)
 
             val userMessageId = messageRepository.sendMessage(
                 sessionId = sessionId,

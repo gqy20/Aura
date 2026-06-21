@@ -257,14 +257,16 @@ class ChatViewModel @Inject constructor(
                 ) { deviceStatus, location, weather, reminder, notification ->
                     Quintuple(deviceStatus, location, weather, reminder, notification)
                 },
+                appPreferences.localToolsEnabled,
                 mcpServerListRepository.observeAll,
-            ) { quintuple, mcpServers ->
+            ) { quintuple, localTools, mcpServers ->
                 ChatToolCapabilitySettings(
                     deviceStatusEnabled = quintuple.first,
                     locationContextEnabled = quintuple.second,
                     weatherContextEnabled = quintuple.third,
                     reminderToolEnabled = quintuple.fourth,
                     notificationEnabled = quintuple.fifth,
+                    localToolsEnabled = localTools,
                     mcpServers = mcpServers,
                 )
             }.collect { settings ->
@@ -700,10 +702,15 @@ class ChatViewModel @Inject constructor(
                 }
                 return@launch
             }
-            val perServer = targets.associate { server ->
-                server.id to runCatching {
+            // 逐个 probe，每个测完立即刷新 mcpServerTools[id]，UI 实时"测一个亮一个"，
+            // 而不是 associate 一把全测完才一次性更新。
+            val perServer = linkedMapOf<String, List<String>>()
+            targets.forEach { server ->
+                val tools = runCatching {
                     remoteMcpClient.probe(server.resolvedUrl, server.authHeaders).map { spec -> spec.name }
                 }.getOrDefault(emptyList())
+                perServer[server.id] = tools
+                _uiState.update { it.copy(mcpServerTools = it.mcpServerTools + (server.id to tools)) }
             }
             val okCount = perServer.values.count { it.isNotEmpty() }
             val firstOk = targets.firstOrNull { perServer[it.id]?.isNotEmpty() == true }
@@ -721,7 +728,6 @@ class ChatViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     mcpConnectivityResult = result,
-                    mcpServerTools = perServer,
                     isCheckingConnectivity = false,
                 )
             }
@@ -836,6 +842,10 @@ class ChatViewModel @Inject constructor(
         settingsUseCase.updateMcpSettingsApiKey(value) { reducer -> _uiState.update(reducer) }
     }
 
+    fun updateMcpSettingsAuthToken(value: String) {
+        settingsUseCase.updateMcpSettingsAuthToken(value) { reducer -> _uiState.update(reducer) }
+    }
+
     fun selectMcpProvider(providerId: String) {
         settingsUseCase.selectMcpProvider(providerId) { reducer -> _uiState.update(reducer) }
     }
@@ -899,6 +909,12 @@ class ChatViewModel @Inject constructor(
     fun setNotificationEnabled(value: Boolean) {
         viewModelScope.launch {
             settingsUseCase.setNotificationEnabled(value) { reducer -> _uiState.update(reducer) }
+        }
+    }
+
+    fun setLocalToolsEnabled(value: Boolean) {
+        viewModelScope.launch {
+            settingsUseCase.setLocalToolsEnabled(value) { reducer -> _uiState.update(reducer) }
         }
     }
 

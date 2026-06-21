@@ -113,6 +113,8 @@ data class ChatToolCapabilitySettings(
     val weatherContextEnabled: Boolean = true,
     val reminderToolEnabled: Boolean = true,
     val notificationEnabled: Boolean = true,
+    /** 本地模型工具调用开关。默认 false。 */
+    val localToolsEnabled: Boolean = false,
     /** 多 MCP server 列表 — 替代老的单 server 字段 (mcpProviderId/mcpApiKey/mcpServerName/mcpHttpUrl)。 */
     val mcpServers: List<McpServerConfig> = emptyList(),
 )
@@ -181,6 +183,7 @@ data class ChatUiState(
     val mcpSettingsUrl: String = "",
     val mcpSettingsProviderId: String = "amap",
     val mcpSettingsApiKey: String = "",
+    val mcpSettingsAuthToken: String = "",
     val mcpSettingsKeyVisible: Boolean = false,
     /** 当前 editor 正在编辑的 server id;null = 新建。 */
     val mcpEditingServerId: String? = null,
