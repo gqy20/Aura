@@ -395,7 +395,7 @@ private fun PresenceStage(
                     reaction = uiState.presence.reaction,
                     modifier = Modifier.fillMaxSize(),
                 )
-                LuminousAuraAvatar(
+                AuraPetAvatar(
                     presence = uiState.presence,
                     animationState = uiState.presenceAnimation,
                     size = avatarSize,

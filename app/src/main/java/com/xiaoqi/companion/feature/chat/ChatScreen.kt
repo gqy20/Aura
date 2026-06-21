@@ -54,6 +54,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.ui.theme.ChatColors
@@ -316,7 +317,10 @@ fun ChatScreenContent(
                         .fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    EmptyChatState()
+                    EmptyChatState(
+                        presence = uiState.presence,
+                        presenceAnimation = uiState.presenceAnimation,
+                    )
                 }
             } else {
                 LazyColumn(
@@ -416,26 +420,20 @@ fun ChatScreenContent(
 }
 
 @Composable
-private fun EmptyChatState() {
+private fun EmptyChatState(
+    presence: PresenceUiState,
+    presenceAnimation: PresenceAnimationState,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.padding(horizontal = 32.dp),
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.74f),
-            shape = CircleShape,
-            modifier = Modifier.size(56.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "A",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-        }
+        AuraPetAvatar(
+            presence = presence,
+            animationState = presenceAnimation,
+            size = 64.dp,
+        )
         Text(
             text = "Aura 在这里",
             style = MaterialTheme.typography.titleMedium,
@@ -443,7 +441,7 @@ private fun EmptyChatState() {
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            text = "告诉我今天发生了什么，或发张图片。",
+            text = "想聊什么都可以，我一直在。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

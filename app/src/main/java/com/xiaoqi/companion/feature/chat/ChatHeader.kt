@@ -39,13 +39,13 @@ import androidx.compose.ui.unit.dp
 import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceUiState
+import com.xiaoqi.companion.data.db.converter.LlmProvider
 
 /**
- * 聊天页顶栏:头像 + 标题 + Memory/Reminders/MCP/Settings 入口按钮,
+ * 聊天页顶栏:头像 + 标题 + 状态动画点 + Memory/Reminders/MCP/Settings 入口按钮,
  * 以及模型未就绪时的 [ConfigStatusCard] 提示。
  *
  * 配套扩展:
- * - [PresenceUiState.chatHeaderStatus]:Presence 状态映射到顶栏副标题
  * - [ChatToolCapabilitySettings.mcpDisplayLabel]:MCP 入口按钮文案
  */
 @Composable
@@ -79,10 +79,10 @@ internal fun CompanionHeader(
                 presence = presence,
                 animationState = presenceAnimation,
                 size = 40.dp,
+                isLocalModel = configStatus.provider == LlmProvider.LOCAL_QWEN,
                 onClick = onPresenceTapped,
             )
-            // 副标题为空时不渲染,避免空 Text 撑高 Row。
-            val subtitle = presence.chatHeaderStatus(configStatus)
+            // 动画点指示器代替文字 subtitle，保持顶栏轻盈。
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -102,19 +102,23 @@ internal fun CompanionHeader(
                         .height(48.dp)
                         .wrapContentHeight(align = Alignment.CenterVertically),
                 )
-                if (subtitle.isNotBlank()) {
+                if (!configStatus.isReady) {
                     Text(
-                        text = subtitle,
+                        text = "待配置",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.error,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.wrapContentHeight(align = Alignment.CenterVertically),
+                    )
+                } else {
+                    PresenceStatusDots(
+                        mode = presence.mode,
                         modifier = Modifier.wrapContentHeight(align = Alignment.CenterVertically),
                     )
                 }
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy((-4).dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 HeaderActionIcon(
@@ -192,12 +196,6 @@ private fun HeaderActionIcon(
         }
     }
 }
-
-private fun PresenceUiState.chatHeaderStatus(configStatus: ChatConfigStatus): String =
-    when {
-        !configStatus.isReady -> "待配置"
-        else -> label
-    }
 
 @Composable
 private fun ConfigStatusCard(

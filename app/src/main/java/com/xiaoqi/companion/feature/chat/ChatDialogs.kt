@@ -296,20 +296,7 @@ internal fun AuraEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Surface(
-            shape = CircleShape,
-            color = ChatColors.BubbleAi,
-            modifier = Modifier.size(52.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "A",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
+        AuraMark(size = 52.dp)
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,

@@ -135,7 +135,7 @@ internal fun InputBar(
                         .heightIn(min = 48.dp),
                     placeholder = {
                         Text(
-                            text = "说点什么",
+                            text = "和 Aura 说点什么…",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     },
@@ -263,7 +263,7 @@ private fun PendingImagePreview(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = "已选图片 · 加句话或直接发",
+                    text = "选好了，想说什么就写吧",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

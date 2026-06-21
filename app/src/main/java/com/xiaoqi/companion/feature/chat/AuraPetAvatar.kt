@@ -1,5 +1,11 @@
 package com.xiaoqi.companion.feature.chat
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -15,9 +21,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.res.imageResource
@@ -30,6 +40,8 @@ import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.core.presence.animationState
+import kotlin.math.PI
+import kotlin.math.sin
 
 @Composable
 fun AuraPetAvatar(
@@ -37,6 +49,7 @@ fun AuraPetAvatar(
     animationState: PresenceAnimationState = presence.animationState(),
     modifier: Modifier = Modifier,
     size: Dp = 54.dp,
+    isLocalModel: Boolean = false,
     onClick: () -> Unit = {},
 ) {
     val sheet = ImageBitmap.imageResource(R.drawable.aura_pet_spritesheet)
@@ -57,6 +70,9 @@ fun AuraPetAvatar(
             .clickable(onClick = onClick)
             .semantics { contentDescription = presence.label },
     ) {
+        if (isLocalModel) {
+            LocalModelGlow(modifier = Modifier.fillMaxSize())
+        }
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawSpriteFrame(
                 sheet = sheet,
@@ -68,6 +84,52 @@ fun AuraPetAvatar(
         }
     }
 }
+
+/** 本地模型呼吸光环：绿色脉冲 ring + 柔 radial glow，绘在 sprite 下层。 */
+@Composable
+private fun LocalModelGlow(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "local-model-glow")
+    val pulse by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "glow-pulse",
+    )
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val center = Offset(w / 2f, h / 2f)
+        // 呼吸因子：0.6 ~ 1.0 平滑正弦
+        val breath = 0.6f + 0.4f * ((sin(pulse * 2f * PI).toFloat() + 1f) / 2f)
+        val baseRadius = w * 0.42f
+        val ringRadius = baseRadius * (0.92f + breath * 0.08f)
+        // 外圈 ring
+        drawCircle(
+            color = LocalModelGlowColor.copy(alpha = 0.30f * breath),
+            radius = ringRadius,
+            center = center,
+            style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round),
+        )
+        // 内层柔光
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    LocalModelGlowColor.copy(alpha = 0.18f * breath),
+                    Color.Transparent,
+                ),
+                center = center,
+                radius = baseRadius,
+            ),
+            radius = baseRadius,
+            center = center,
+        )
+    }
+}
+
+private val LocalModelGlowColor = Color(0xFF4ADE80)
 
 private data class PetFrame(
     val sprite: Int,

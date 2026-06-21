@@ -87,21 +87,6 @@ fun MessageBubble(
                 )
             }
         } else {
-            Surface(
-                color = ChatColors.BubbleAi,
-                shape = CircleShape,
-                tonalElevation = 0.dp,
-                modifier = Modifier.size(26.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "A",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
             MessageBubbleContent(
                 message = message,
                 isUser = false,

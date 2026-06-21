@@ -434,3 +434,49 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPresenceMouth(
         }
     }
 }
+
+// 静态 Aura 光球：复用 PresenceAvatar 的色彩语言（primaryContainer → tertiaryContainer + primary 光晕/描边），
+// 不画脸、不动画，用于空状态等需要克制视觉标记的位置。动画由 PresenceAvatar 承担，AuraMark 只承担色彩一致性。
+@Composable
+fun AuraMark(
+    modifier: Modifier = Modifier,
+    size: Dp = 52.dp,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = modifier.size(size),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = this.size.width
+            val h = this.size.height
+            val center = Offset(w / 2f, h / 2f)
+            val glowRadius = w * 0.5f
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(scheme.primary.copy(alpha = 0.26f), Color.Transparent),
+                    center = center,
+                    radius = glowRadius,
+                ),
+                radius = glowRadius,
+                center = center,
+            )
+            drawCircle(
+                brush = Brush.linearGradient(
+                    colors = listOf(scheme.primaryContainer, scheme.tertiaryContainer),
+                    start = Offset(w * 0.28f, h * 0.12f),
+                    end = Offset(w * 0.76f, h * 0.9f),
+                ),
+                radius = w * 0.32f,
+                center = center,
+            )
+            drawCircle(
+                color = scheme.primary.copy(alpha = 0.42f),
+                radius = w * 0.32f,
+                center = center,
+                style = Stroke(width = w * 0.035f),
+            )
+        }
+    }
+}
