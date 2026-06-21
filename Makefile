@@ -71,6 +71,20 @@ uninstall:
 test:
 	./gradlew testDebugUnitTest --stacktrace
 
+# 快速跑 —— 跳过 Robolectric 类(DAO/UI/Downloader),只跑纯 JVM 测试
+# 场景:开发期迭代“修改逻辑 → 快速验证”,不做 DB/UI/集成验证
+test-fast:
+	./gradlew testDebugUnitTest --stacktrace --tests "com.xiaoqi.companion.core.*" --tests "com.xiaoqi.companion.feature.chat.ChatViewModelTest" --tests "com.xiaoqi.companion.feature.chat.usecase.*" --tests "com.xiaoqi.companion.feature.onboarding.*" --tests "com.xiaoqi.companion.data.datastore.*" --tests "com.xiaoqi.companion.data.repository.ConfigRepositoryTest" --tests "com.xiaoqi.companion.data.repository.ConversationRepositoryTest" --tests "com.xiaoqi.companion.data.repository.McpServerListRepositoryTest" --tests "com.xiaoqi.companion.data.repository.MessageRepositoryTest" --tests "com.xiaoqi.companion.data.repository.ToolCallRepositoryTest"
+
+# 只跑 DAO/Repo(集成性) —— 使用 Robolectric + Room
+# 场景:修改 schema / DAO 查询后验证
+test-db:
+	./gradlew testDebugUnitTest --stacktrace --tests "com.xiaoqi.companion.data.db.*" --tests "com.xiaoqi.companion.data.repository.MemoryRepositoryTest"
+
+# 只跑单一类 —— 调用: make test-one T=CompanionRuntimeTest
+test-one:
+	./gradlew testDebugUnitTest --stacktrace --tests "*$(T)*"
+
 atest:
 	./gradlew connectedDebugAndroidTest
 

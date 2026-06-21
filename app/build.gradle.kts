@@ -42,7 +42,9 @@ val brandVersionCode: String = brand("VERSION_CODE", "4")
 val envProps = Properties().apply {
     val f = rootProject.file(".env")
     if (f.exists()) {
-        f.inputStream().use { load(it) }
+        // Properties.load(InputStream) 默认 ISO-8859-1，会让 UTF-8 中文（如"麦当劳""瑞幸"）乱码；
+        // 显式用 UTF-8 Reader 读，保证 server 名等中文正确注入 BuildConfig。
+        f.inputStream().reader(Charsets.UTF_8).use { load(it) }
         logger.lifecycle("Loaded .env from ${f.absolutePath}")
     } else {
         logger.warn(".env not found at ${f.absolutePath}; debug BuildConfig.ENV_* will be empty.")
@@ -201,6 +203,17 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            // 让未被 mock 的 Android API 返默认值(0/false/null) 而不是抛 "not mocked!"
+            // 这样纯 JVM 测试不需要为一句 Context.getString 付出 Robolectric 启动成本
+            isReturnDefaultValues = true
+
+            // 并行跑测试类 —— 每类独立 JVM fork,避免 Robolectric static state 互相干扰
+            // CI 跟本地开发都能提速(本机 4 workers,上限于 gradle.workers.max)
+            all {
+                it.maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtMost(4)
+                it.forkEvery = 0  // 同一 fork 复用 JVM,减少启动次数
+                it.systemProperty("robolectric.invokedynamic", "true")
+            }
         }
     }
 
