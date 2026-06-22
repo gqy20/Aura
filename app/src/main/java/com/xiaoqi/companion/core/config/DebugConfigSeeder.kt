@@ -11,6 +11,7 @@ import com.xiaoqi.companion.data.repository.McpServerListRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
+import org.json.JSONObject
 
 /**
  * Debug 构建专用：把 `.env -> BuildConfig.ENV_*` 的配置预填进 DataStore，
@@ -42,12 +43,26 @@ class DebugConfigSeeder @Inject constructor(
     private suspend fun seedLlm(force: Boolean) {
         val provider = runCatching { LlmProvider.valueOf(BuildConfig.ENV_LLM_PROVIDER) }
             .getOrNull() ?: return
-        val apiKey = BuildConfig.ENV_LLM_API_KEY
         val model = BuildConfig.ENV_LLM_MODEL
 
-        if (apiKey.isNotBlank() && (force || appPreferences.apiKey.first().isNullOrBlank())) {
-            appPreferences.setApiKey(apiKey)
+        // 构建 per-provider key map，所有非空 key 同时注入
+        val keyMap = mapOf(
+            LlmProvider.GLM to BuildConfig.ENV_GLM_API_KEY,
+            LlmProvider.MODELSCOPE to BuildConfig.ENV_MODELSCOPE_API_KEY,
+            LlmProvider.KIMI to BuildConfig.ENV_KIMI_API_KEY,
+        ).filterValues { it.isNotBlank() }
+
+        if (keyMap.isNotEmpty()) {
+            val existingJson = appPreferences.apiKeysJson.first()
+            val existing = runCatching { JSONObject(existingJson) }.getOrNull() ?: JSONObject()
+            val shouldSeed = force || existing.length() == 0
+            if (shouldSeed) {
+                val json = JSONObject()
+                keyMap.forEach { (p, k) -> json.put(p.name, k) }
+                appPreferences.setApiKeysJson(json.toString())
+            }
         }
+
         if (force || appPreferences.llmProvider.first() == AppPreferences.defaultLlmProvider) {
             appPreferences.setLlmProvider(provider)
         }

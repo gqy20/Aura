@@ -27,6 +27,7 @@ class ConfigRepositoryTest {
     fun getCurrentLlmConfig_returnsCombinedConfig() = runTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf("test-key-123")
+            every { apiKeysJson } returns flowOf("""{"GLM":"test-key-123"}""")
             every { llmProvider } returns flowOf(LlmProvider.GLM)
             every { modelName } returns flowOf("glm-5v-turbo")
             every { baseUrl } returns flowOf("https://example.test/v1")
@@ -48,6 +49,7 @@ class ConfigRepositoryTest {
     fun getCurrentLlmConfig_kimiProvider() = runTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf("kimi-key")
+            every { apiKeysJson } returns flowOf("""{"KIMI":"kimi-key"}""")
             every { llmProvider } returns flowOf(LlmProvider.KIMI)
             every { modelName } returns flowOf(DefaultLlmValues.KIMI_MODEL)
             every { baseUrl } returns flowOf("")
@@ -68,6 +70,7 @@ class ConfigRepositoryTest {
     fun getCurrentLlmConfig_modelScopeProvider_usesAnthropicCompatibleEndpoint() = runTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf("ms-test-token")
+            every { apiKeysJson } returns flowOf("""{"MODELSCOPE":"ms-test-token"}""")
             every { llmProvider } returns flowOf(LlmProvider.MODELSCOPE)
             every { modelName } returns flowOf(DefaultLlmValues.MODELSCOPE_MODEL)
             every { baseUrl } returns flowOf("https://stale.example.com/v1")
@@ -89,6 +92,7 @@ class ConfigRepositoryTest {
     fun getCurrentLlmConfig_localQwenProvider_doesNotRequireApiKey() = runTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf(null)
+            every { apiKeysJson } returns flowOf("{}")
             every { llmProvider } returns flowOf(LlmProvider.LOCAL_QWEN)
             every { modelName } returns flowOf("")
             every { baseUrl } returns flowOf("")
@@ -107,9 +111,48 @@ class ConfigRepositoryTest {
     }
 
     @Test
+    fun getCurrentLlmConfig_perProviderKey_takesPrecedenceOverLegacy() = runTest {
+        val prefs: AppPreferences = mockk {
+            every { apiKey } returns flowOf("old-legacy-key")
+            every { apiKeysJson } returns flowOf("""{"GLM":"new-per-provider-key"}""")
+            every { llmProvider } returns flowOf(LlmProvider.GLM)
+            every { modelName } returns flowOf(DefaultLlmValues.GLM_MODEL)
+            every { baseUrl } returns flowOf("")
+        }
+
+        val repo = buildRepo(prefs)
+
+        repo.getCurrentLlmConfig().test {
+            val config = awaitItem()
+            assertEquals("new-per-provider-key", config.apiKey)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun getCurrentLlmConfig_fallsBackToLegacyKey_whenPerProviderEmpty() = runTest {
+        val prefs: AppPreferences = mockk {
+            every { apiKey } returns flowOf("legacy-fallback")
+            every { apiKeysJson } returns flowOf("{}")
+            every { llmProvider } returns flowOf(LlmProvider.GLM)
+            every { modelName } returns flowOf(DefaultLlmValues.GLM_MODEL)
+            every { baseUrl } returns flowOf("")
+        }
+
+        val repo = buildRepo(prefs)
+
+        repo.getCurrentLlmConfig().test {
+            val config = awaitItem()
+            assertEquals("legacy-fallback", config.apiKey)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun observeLlmConfigStatus_localQwenProvider_isReadyWithoutApiKey() = runTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf(null)
+            every { apiKeysJson } returns flowOf("{}")
             every { llmProvider } returns flowOf(LlmProvider.LOCAL_QWEN)
             every { modelName } returns flowOf(DefaultLlmValues.LOCAL_QWEN_MODEL)
             every { baseUrl } returns flowOf("")
@@ -143,13 +186,18 @@ class ConfigRepositoryTest {
     }
 
     @Test
-    fun setApiKey_delegatesToPrefs() = runTest {
+    fun setApiKey_savesPerProviderAndLegacy() = runTest {
         val prefs: AppPreferences = mockk(relaxed = true) {
+            every { llmProvider } returns flowOf(LlmProvider.GLM)
             coEvery { setApiKey(any()) } returns Unit
+            coEvery { setApiKeyForProvider(any(), any()) } returns Unit
         }
 
         val repo = buildRepo(prefs)
         repo.setApiKey("new-key")
+
+        coVerify { prefs.setApiKeyForProvider(LlmProvider.GLM, "new-key") }
+        coVerify { prefs.setApiKey("new-key") }
     }
 
     @Test
@@ -188,6 +236,7 @@ class ConfigRepositoryTest {
     fun checkConnectivity_delegatesToChecker() = runTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf("key-abc")
+            every { apiKeysJson } returns flowOf("""{"GLM":"key-abc"}""")
             every { llmProvider } returns flowOf(LlmProvider.GLM)
             every { modelName } returns flowOf("glm-5v-turbo")
             every { baseUrl } returns flowOf("")
@@ -207,6 +256,7 @@ class ConfigRepositoryTest {
     fun checkConnectivity_propagatesUnreachable() = runTest {
         val prefs: AppPreferences = mockk {
             every { apiKey } returns flowOf("k")
+            every { apiKeysJson } returns flowOf("""{"GLM":"k"}""")
             every { llmProvider } returns flowOf(LlmProvider.GLM)
             every { modelName } returns flowOf("glm-5v-turbo")
             every { baseUrl } returns flowOf("")

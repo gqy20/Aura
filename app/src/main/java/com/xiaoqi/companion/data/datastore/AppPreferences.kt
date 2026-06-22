@@ -12,11 +12,15 @@ import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.ThemeMode
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 
 class AppPreferences @Inject constructor(private val dataStore: DataStore<Preferences>) {
 
     val apiKey: Flow<String?> = dataStore.data.map { it[Keys.apiKey] }
+    /** per-provider API keys，JSON map 格式: {"GLM":"xxx","MODELSCOPE":"yyy"} */
+    val apiKeysJson: Flow<String> = dataStore.data.map { it[Keys.apiKeysJson] ?: "{}" }
     val baseUrl: Flow<String> = dataStore.data.map { it[Keys.baseUrl] ?: "" }
     val currentCompanionId: Flow<String> = dataStore.data.map { it[Keys.currentCompanionId] ?: "" }
     val themeMode: Flow<ThemeMode> = dataStore.data.map {
@@ -78,6 +82,22 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
     val dreamLoopModelName: Flow<String> = dataStore.data.map { it[Keys.dreamLoopModelName] ?: "" }
 
     suspend fun setApiKey(value: String?) { dataStore.edit { if (value != null) it[Keys.apiKey] = value else it.remove(Keys.apiKey) } }
+    suspend fun setApiKeysJson(value: String) { dataStore.edit { it[Keys.apiKeysJson] = value } }
+
+    /** 为指定 provider 保存 key（读→改→写 JSON map）。 */
+    suspend fun setApiKeyForProvider(provider: LlmProvider, key: String) {
+        val current = apiKeysJson.first()
+        val json = runCatching { JSONObject(current) }.getOrNull() ?: JSONObject()
+        json.put(provider.name, key)
+        setApiKeysJson(json.toString())
+    }
+
+    /** 从 JSON map 中取指定 provider 的 key，无则返回 null。 */
+    suspend fun getApiKeyForProvider(provider: LlmProvider): String? {
+        val current = apiKeysJson.first()
+        val json = runCatching { JSONObject(current) }.getOrNull() ?: return null
+        return if (json.has(provider.name)) json.getString(provider.name).takeIf { it.isNotBlank() } else null
+    }
     suspend fun setBaseUrl(value: String) { dataStore.edit { it[Keys.baseUrl] = value } }
     suspend fun setCurrentCompanionId(value: String) { dataStore.edit { it[Keys.currentCompanionId] = value } }
     suspend fun setThemeMode(value: ThemeMode) { dataStore.edit { it[Keys.themeMode] = value.name } }
@@ -113,6 +133,7 @@ class AppPreferences @Inject constructor(private val dataStore: DataStore<Prefer
 
     object Keys {
         val apiKey = stringPreferencesKey("api_key")
+        val apiKeysJson = stringPreferencesKey("api_keys_json")
         val baseUrl = stringPreferencesKey("base_url")
         val currentCompanionId = stringPreferencesKey("current_companion_id")
         val themeMode = stringPreferencesKey("theme_mode")

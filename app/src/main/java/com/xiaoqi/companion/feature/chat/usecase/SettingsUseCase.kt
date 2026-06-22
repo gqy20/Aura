@@ -55,6 +55,11 @@ class SettingsUseCase @Inject constructor(
                 settingsMessage = null,
             )
         }
+        // 加载当前 provider 的 per-provider key 填入输入框
+        scope.launch {
+            val key = appPreferences.getApiKeyForProvider(state.configStatus.provider).orEmpty()
+            update { copy(settingsApiKey = key) }
+        }
         refreshLocalQwenModelStatus(state.configStatus.modelName, scope, update)
     }
 
@@ -85,6 +90,11 @@ class SettingsUseCase @Inject constructor(
                 settingsBaseUrl = defaultBaseUrl(value),
                 settingsMessage = null,
             )
+        }
+        // 切换 provider 后加载该 provider 已保存的 key
+        scope.launch {
+            val key = appPreferences.getApiKeyForProvider(value).orEmpty()
+            update { copy(settingsApiKey = key) }
         }
         if (value == LlmProvider.LOCAL_QWEN) {
             refreshLocalQwenModelStatus(defaultModel, scope, update)

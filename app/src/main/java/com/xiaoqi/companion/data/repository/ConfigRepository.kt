@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 
 data class LlmConfig(
     val provider: LlmProvider,
@@ -90,6 +91,7 @@ private fun modelNameText(): String = "模型名称"
 
 interface ConfigRepository {
     val apiKey: Flow<String?>
+    val apiKeysJson: Flow<String>
     val baseUrl: Flow<String>
     val llmProvider: Flow<LlmProvider>
     val modelName: Flow<String>
@@ -110,16 +112,21 @@ class ConfigRepositoryImpl @Inject constructor(
 ) : ConfigRepository {
 
     override val apiKey get() = prefs.apiKey
+    override val apiKeysJson get() = prefs.apiKeysJson
     override val baseUrl get() = prefs.baseUrl
     override val llmProvider get() = prefs.llmProvider
     override val modelName get() = prefs.modelName
     override val themeMode get() = prefs.themeMode
 
     override fun getCurrentLlmConfig(): Flow<LlmConfig> =
-        combine(prefs.llmProvider, prefs.apiKey, prefs.modelName, prefs.baseUrl) { provider, key, model, _ ->
+        combine(prefs.llmProvider, prefs.apiKeysJson, prefs.apiKey, prefs.modelName) { provider, keysJson, legacyKey, model ->
             val resolvedModel = model.takeIf { it in DefaultLlmValues.modelOptions(provider) }
                 ?: DefaultLlmValues.defaultModel(provider)
-            val resolvedKey = key?.takeIf { it.isNotBlank() }.orEmpty()
+            val perProviderKey = runCatching { JSONObject(keysJson) }
+                .getOrNull()
+                ?.optString(provider.name, "")
+                ?.takeIf { it.isNotBlank() }
+            val resolvedKey = perProviderKey ?: legacyKey?.takeIf { it.isNotBlank() }.orEmpty()
             val resolvedBaseUrl = DefaultLlmValues.defaultBaseUrl(provider)
             LlmConfig(
                 provider = provider,
@@ -140,6 +147,10 @@ class ConfigRepositoryImpl @Inject constructor(
         }
 
     override suspend fun setApiKey(key: String?) {
+        val provider = prefs.llmProvider.first()
+        if (key != null && key.isNotBlank()) {
+            prefs.setApiKeyForProvider(provider, key)
+        }
         prefs.setApiKey(key)
     }
 

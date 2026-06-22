@@ -126,8 +126,10 @@ android {
         // 在 release 编译也能找到符号；debug buildType 用 .env 真实值覆盖。release 不含敏感值。
         buildConfigField("boolean", "ENV_FORCE_SEED", "false")
         buildConfigField("String", "ENV_LLM_PROVIDER", "\"GLM\"")
-        buildConfigField("String", "ENV_LLM_API_KEY", "\"\"")
         buildConfigField("String", "ENV_LLM_MODEL", "\"\"")
+        buildConfigField("String", "ENV_GLM_API_KEY", "\"\"")
+        buildConfigField("String", "ENV_MODELSCOPE_API_KEY", "\"\"")
+        buildConfigField("String", "ENV_KIMI_API_KEY", "\"\"")
         buildConfigField("String", "ENV_LOCAL_QWEN_MODEL", "\"\"")
         buildConfigField("String", "ENV_MCP_AMAP_KEY", "\"\"")
         for (i in 1..6) {
@@ -188,8 +190,10 @@ android {
             val forceSeed = env("ENV_FORCE_SEED", "false").trim().equals("true", ignoreCase = true)
             buildConfigField("boolean", "ENV_FORCE_SEED", forceSeed.toString())
             buildConfigField("String", "ENV_LLM_PROVIDER", "\"${escForBuildConfig(env("LLM_PROVIDER", "GLM"))}\"")
-            buildConfigField("String", "ENV_LLM_API_KEY", "\"${escForBuildConfig(env("LLM_API_KEY"))}\"")
             buildConfigField("String", "ENV_LLM_MODEL", "\"${escForBuildConfig(env("LLM_MODEL"))}\"")
+            buildConfigField("String", "ENV_GLM_API_KEY", "\"${escForBuildConfig(env("GLM_API_KEY"))}\"")
+            buildConfigField("String", "ENV_MODELSCOPE_API_KEY", "\"${escForBuildConfig(env("MODELSCOPE_API_KEY"))}\"")
+            buildConfigField("String", "ENV_KIMI_API_KEY", "\"${escForBuildConfig(env("KIMI_API_KEY"))}\"")
             buildConfigField("String", "ENV_LOCAL_QWEN_MODEL", "\"${escForBuildConfig(env("LOCAL_QWEN_MODEL"))}\"")
             buildConfigField("String", "ENV_MCP_AMAP_KEY", "\"${escForBuildConfig(env("MCP_AMAP_API_KEY"))}\"")
             for (i in 1..6) {
@@ -327,6 +331,7 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
     testImplementation(libs.turbine)
     testImplementation(libs.mockk)
     testImplementation(libs.room.testing)
