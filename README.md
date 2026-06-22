@@ -31,7 +31,7 @@
 Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
 
 - **跨会话长期记忆** — 事实 / 时刻 / 习惯自动归档，回复前自动召回相关条目
-- **后台 Dream Loop** — 6h 周期的本地 Qwen 模式识别，把"近 7 天值得说的"生成 Insight 卡片
+- **后台 Dream Loop + 对话后即时洞察** — 6h 周期本地 Qwen 模式识别 + 每次对话结束 3 分钟后即时分析，生成 Insight 卡片
 - **图 + 工具** — 发图能记住画面；Health Connect 步数 / 心率 / 睡眠；定时提醒；MCP server 可配置
 
 云端走 Anthropic Messages 兼容接口（GLM / Kimi）；本地 Qwen（MNN 引擎）
@@ -72,7 +72,7 @@ Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
 
 ## 当前状态
 
-**最新版本：v0.1.3** · 483 个单元测试通过 · 0 失败 · CI: ✅ passing
+**最新版本：v0.1.4** · 561 个单元测试通过 · 0 失败 · CI: ✅ passing
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
@@ -82,7 +82,7 @@ Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
 | 情绪 / 关系 | ✅ 完整 | 状态机 + 关系模型已接入 Agent 主循环 |
 | 图片理解 | ✅ MVP | Photo Picker 选图，CameraX 拍摄 UI 未做 |
 | 设置 / 可观测性 | ✅ 完整 | Provider、API Key、连通性检查、数据导出 |
-| Insight / Onboarding / Presence | ✅ 完整 | Insight 卡片、Mood Trend、引导流程、Presence 反应策略 |
+| Insight / Onboarding / Presence | ✅ 完整 | Dream Loop 周期 + POST_CHAT 即时洞察、Mood Trend、引导流程、Presence 反应策略 |
 | Reminder | ✅ 完整 | AlarmManager + Worker + 通知 |
 | Health Connect | ✅ 完整 | HealthDataSection + HealthSyncManager |
 | 本地 LLM (Qwen MNN) | ✅ MVP | MNN 推理 + 模型下载器，UI 走 `Local Qwen` Provider |
@@ -144,7 +144,7 @@ make run    # 构建 + 安装 + 启动
 
 ```bash
 ./gradlew assembleDebug              # 构建 Debug APK
-./gradlew testDebugUnitTest          # 跑 483 个单元测试
+./gradlew testDebugUnitTest          # 跑 561 个单元测试
 ./gradlew connectedDebugAndroidTest  # 仪器测试（需连真机）
 make run                              # 构建 + 安装 + 启动
 make logcat                           # 查看应用日志

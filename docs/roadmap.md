@@ -1,6 +1,6 @@
 # Aura Roadmap
 
-> 最后核对：2026-06-17
+> 最后核对：2026-06-22
 >
 > 本文档用于跟踪当前实现进度，并把 `README.md` / `docs/architecture.md` 中的产品愿景拆成可执行里程碑。
 
@@ -21,7 +21,7 @@
 ./gradlew.bat assembleDebug
 ```
 
-以上命令均已在 2026-06-22 验证通过（`testDebugUnitTest` **497 个测试全绿**；含工具系统双开关用例）。
+以上命令均已在 2026-06-22 验证通过（`testDebugUnitTest` **561 个测试全绿**；含工具系统双开关用例 + Insight POST_CHAT 触发测试）。
 
 ## 已实现
 
@@ -62,7 +62,7 @@
 - **Onboarding 5 问（M2 收尾）**：plan §5.2 种子期问题（挂心事/重要日期/称呼/关系人/作息）— 全部可选可跳过，模板表单不入 LLM。
 - **隐私"看见感"面板（M2 收尾）**：`DataTransparencySection`（设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + Bipass 二次确认）。
 - **Health 多源链雏形**：`HealthSnapshotEntity` + `HealthSnapshotDao` + `HealthConnectDataSource` + `SensorManagerHealthSource` + `HealthSyncManager` + `HealthDataSection` + `QueryHealthDataTool`，支持健康数据同步、展示与工具查询。
-- 单元测试覆盖：483 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、**ReactiveCompanion 8（PR A 后从 4 → 8，新增 `runStreaming` 路径 / Json 结构化解析 / image 透传用例）**、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）**、**DreamLoopIntervalTest 6 + DreamLoopSchedulerTest 9** 等）。
+- 单元测试覆盖：561 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、**ReactiveCompanion 8（PR A 后从 4 → 8，新增 `runStreaming` 路径 / Json 结构化解析 / image 透传用例）**、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）**、**DreamLoopIntervalTest 6 + DreamLoopSchedulerTest 9**、**EvidenceResolver 中文 FTS + 兆底**、**ChatViewModel POST_CHAT 触发链路** 等）。
 - Debug APK 构建链路。
 - `docs/plan` 当前保留端云智能体能力整体方案、Vision/tools 协同计划、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）；已完成/阶段性过期方案归档到 `docs/archive/plan`。
 
@@ -83,12 +83,13 @@
 
 ### 近期打磨（2026-06-22）
 
-- **工具系统双开关**（feat `tools-switch`）：`AppPreferences` 加 `mcpEnabled`（MCP 总开关，默认 true）+ `systemToolsEnabled`（系统内置工具开关，默认 true）两个 key。`CompanionToolRegistry.create()` 按两个开关短路——`systemToolsEnabled=false` 时 11 个内置工具全不注册（MCP 也跟着短路，避免出现"只有 MCP 没有记忆"的怪状态）；`mcpEnabled=false` 时只关 MCP，系统工具照常。`mcpEnabled` 与 per-server 的 `McpServerConfig.enabled` 是"总闸 vs 分闸"关系。Settings "MCP" 行由假开关（`enabled=false/locked=true`）改成真 toggle；新增"系统工具"开关行。测试 483 → 497（`CompanionToolRegistryTest` +4 开关组合 / `SettingsUseCaseTest` +2 setter / `ChatViewModelTest` 补 3 个 Flow stub）。
+- **Insight 生成率大幅提升**（`c5c3687`）：新增 POST_CHAT 即时洞察触发器（对话结束 3min 后自动分析，最少 2 条消息）；EvidenceResolver 去掉 ASCII 过滤（解决中文关键词搜索失效）+ snapshot 兆底策略；InsightValidator 门槛降低（confidence 0.4→0.2 / evidence reality 25%→10% / heading similarity 65%→85%）；DreamLoopWorker 传真实 sessionId + confidence boost；InsightPrompts 更激进（2-3 个发现 / 大胆推测 / 空数据才输出空数组）；POST_CHAT 卡片 UI（蓝色徽标 + InsightAnalyzingIndicator）；全链路 info 级日志。测试 497 → 561。
+- **Lint 修复**（`045e2e7`）：`CurrentLocationProvider` 两处 `MissingPermission` 加 `@SuppressLint`（已有 `hasLocationPermission()` 自定义检查，lint 无法识别）。
 - **本地工具开关**（feat `d397db3`）：`local_tools_enabled` DataStore key 控制 LOCAL_QWEN 路径是否注入 `AgentToolRegistry.create()`，走 LocalToolProtocol 软协议（0.8B JSON 质量不稳定 + 多轮推理慢，默认 false）。
 - **安抚文案轮播**（`90151ca` / `d618038`）：首字到达前加随时间升级的安抚文案轮播；本地模型加载态走 carousel 而非静态 pill。
 - **Onboarding 称谓清理**（`b83b0e2`）：Onboarding 称呼默认值清零 + MessageBubble 字体与工具状态显示。
 
-> 备注：测试用例 372（06-15）→ 483（06-17）→ 497（06-22）；native 端需真机 NDK 编译验证。
+> 备注：测试用例 372（06-15）→ 483（06-17）→ 497（06-22）→ 561（06-22 Insight 改进）；native 端需真机 NDK 编译验证。
 
 ## 部分实现
 
@@ -153,11 +154,11 @@
 - 在聊天 UI 中更清楚地展示保存/搜索记忆的过程。
 - 补充记忆排序、prompt 注入数量限制、工具结果展示测试。
 - **【新增，叙事主轴】** 落地 `insights` 表 / Entity / DAO / Repository。
-- **【新增，叙事主轴】** `InsightValidator` 通过单元测试（5+ 边界用例：缺 evidence / 全部 hallucinate / 重复 / 信心度低 / evidence 不存在）。
+- **【新增，叙事主轴】** `InsightValidator` 通过单元测试（5+ 边界用例：缺 evidence / 全部 hallucinate / 重复 / 信心度低 / evidence 不存在）。✅（8 边界用例已落，门槛已降低）
 - **【新增，叙事主轴】** Onboarding 5 问模板上线（最近挂心事 / 未来重要日期 / 称呼 / 关系人 / 作息），写入 Auto Memory `user_patterns.md` + `recurring_topics.md`。
-- **【新增，叙事主轴】** 主页 Insight 卡片 UI 落地（占位 / 无真实数据，验证视觉与交互）。
-- **【新增，叙事主轴】** 用户可一键删除 / 类别静音 / 查看依据（insight 长按弹层）。
-- **【新增，叙事主轴】** 设置页直接展示 `insights` / `mood_snapshots` 当前条数，提供导出 / 删除入口（隐私的"看见感"）。
+- **【新增，叙事主轴】** 主页 Insight 卡片 UI 落地（占位 / 无真实数据，验证视觉与交互）。✅（卡片 + POST_CHAT 徽标 + 分析中指示器已落）
+- **【新增，叙事主轴】** 用户可一键删除 / 类别静音 / 查看依据（insight 长按弹层）。✅
+- **【新增，叙事主轴】** 设置页直接展示 `insights` / `mood_snapshots` 当前条数，提供导出 / 删除入口（隐私的"看见感"）。✅
 
 ### M3：情绪 + Insight Pattern MVP
 
@@ -173,7 +174,7 @@
 - 优先用 Rive 状态机验证 idle、listening、thinking、speaking、happy、sad、tired 等基础状态。✅（逻辑层已覆盖，动画资源待做）
 - App 回到前台时补算时间衰减。
 - 补充持久化、衰减、关系阈值变化测试。✅（`PresenceReactionPolicy` 测试已落地）
-- **【新增，叙事主轴】** `patternDetect` prompt 端到端跑通（Dream Loop → InsightValidator → insights 表）。✅（pipeline 跑通；**PoC 阶段**：本地 Qwen 模型未下载，`LocalQwenEngine.stream()` 58ms 返回空 → `dream_loop_empty_model_output` 后 `Result.retry()`；待用户在 SettingsScreen 触发模型下载后端到端可跑通）
+- **【新增，叙事主轴】** `patternDetect` prompt 端到端跑通（Dream Loop → InsightValidator → insights 表）。✅（pipeline 跑通；**已实机验证**：本地 Qwen 4B 模型生成真实 insight，EvidenceResolver 兆底策略生效，成功保存到 DB）
 - **【新增，叙事主轴】** 用户能在主页看到第一条真实 Pattern insight。✅（3 张 hardcoded seed 卡片真机显示；M3 PoC 修复 `9fa58ab` 后 `Validator` 全部 `insight_save_completed` 通过）
 - **【新增，叙事主轴】** mood trend 按周 / 月可视化上线。✅（`MoodTrendChart` Compose Canvas 4 根周柱状图；W22/W23/W24 真机渲染与 seed mood_snapshots 数据匹配）
 - **【新增，叙事主轴】** Insight 与对话体打通：点"和 Aura 聊聊"→ prefill prompt → 进入对话体上下文。✅（`pendingPrefill` 字段 + `consumePrefillPrompt` + ChatScreen `LaunchedEffect(pendingPrefill)` 消费）
