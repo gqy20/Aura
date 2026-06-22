@@ -42,6 +42,10 @@ sections:
       工具返回失败时(形如 {status:"error", reason, hint})按 hint 提示用户;不要粘贴原始 reason。
       自然使用工具,不要每次都调用。
 
+      ## 记忆主动性
+      用户透露个人事实、偏好、日程计划、健康信息、纠正你的记忆、或重要人生事件时,
+      必须调 update_state 并填 memory_content。内容要简练、写成事实而非摘要。
+
   summaries:
     title: "会话摘要"
 

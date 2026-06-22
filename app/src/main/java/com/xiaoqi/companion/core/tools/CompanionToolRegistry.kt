@@ -12,7 +12,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 interface AgentToolRegistry {
-    fun create(): ToolRegistry
+    fun create(scope: ToolScope = ToolScope.ALL): ToolRegistry
+}
+
+/** 控制 [CompanionToolRegistry.create] 注册哪些类别的工具。 */
+enum class ToolScope {
+    /** 系统内置 + MCP 全部注册(云端路径默认)。 */
+    ALL,
+    /** 仅注册系统内置工具(本地模型路径默认,避免 MCP 网络开销)。 */
+    SYSTEM_ONLY,
+    /** 仅注册 MCP 工具。 */
+    MCP_ONLY,
 }
 
 class CompanionToolRegistry @Inject constructor(
@@ -31,14 +41,12 @@ class CompanionToolRegistry @Inject constructor(
     private val mcpServerListRepository: McpServerListRepository,
     private val appPreferences: AppPreferences,
 ) : AgentToolRegistry {
-    override fun create(): ToolRegistry {
+    override fun create(scope: ToolScope): ToolRegistry {
         val builder = ToolRegistry.builder()
-        val systemToolsEnabled = runCatching {
-            runBlocking { appPreferences.systemToolsEnabled.first() }
-        }.getOrElse {
-            AppLogger.warn(LogTags.Llm, "system_tools_pref_read_failed", "message" to (it.message ?: ""))
-            true
-        }
+        val includeSystem = scope == ToolScope.ALL || scope == ToolScope.SYSTEM_ONLY
+        val includeMcp = scope == ToolScope.ALL || scope == ToolScope.MCP_ONLY
+
+        val systemToolsEnabled = if (includeSystem) readSystemToolsPref() else false
         if (systemToolsEnabled) {
             builder
                 .tool(searchMemoryTool)
@@ -54,10 +62,18 @@ class CompanionToolRegistry @Inject constructor(
                 .tool(updateStateTool)
         }
 
-        if (systemToolsEnabled && isMcpEnabled()) {
+        // MCP 注册独立于 systemToolsEnabled,只受 mcpEnabled + scope 控制。
+        if (includeMcp && isMcpEnabled()) {
             addRemoteMcpTools(builder)
         }
         return builder.build()
+    }
+
+    private fun readSystemToolsPref(): Boolean = runCatching {
+        runBlocking { appPreferences.systemToolsEnabled.first() }
+    }.getOrElse {
+        AppLogger.warn(LogTags.Llm, "system_tools_pref_read_failed", "message" to (it.message ?: ""))
+        true
     }
 
     private fun isMcpEnabled(): Boolean = runCatching {

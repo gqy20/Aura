@@ -589,10 +589,15 @@ private fun LazyListScope.settingsCapabilitiesPage(
             DividerSpacer()
             SettingsToggleRow(
                 title = "系统工具",
-                detail = "记忆/时间/提醒/Health 等内置工具",
+                detail = if (state.toolSettings.localToolsEnabled)
+                    "记忆/时间/提醒/Health 等内置工具"
+                else
+                    "需先开启“本地工具调用”",
                 meta = "",
                 checked = state.toolSettings.systemToolsEnabled,
+                enabled = state.toolSettings.localToolsEnabled,
                 onCheckedChange = actions.onSystemToolsEnabledChanged,
+                modifier = Modifier.padding(start = 20.dp),
             )
             DividerSpacer()
             SettingsToggleRow(
@@ -603,21 +608,31 @@ private fun LazyListScope.settingsCapabilitiesPage(
                 enabled = false,
                 locked = true,
                 onCheckedChange = {},
+                modifier = Modifier.padding(start = 20.dp),
             )
             DividerSpacer()
             SettingsToggleRow(
                 title = "MCP",
-                detail = state.toolSettings.mcpServers.firstOrNull { it.isReady }?.resolvedName
-                    ?: "未配置（缺密钥/地址）",
+                detail = if (!state.toolSettings.localToolsEnabled)
+                    "需先开启“本地工具调用”"
+                else if (state.toolSettings.mcpServers.firstOrNull { it.isReady } == null)
+                    "未配置（缺密钥/地址）"
+                else
+                    state.toolSettings.mcpServers.firstOrNull { it.isReady }?.resolvedName.orEmpty(),
                 meta = "高级",
                 metaIcon = Icons.Outlined.Bolt,
                 checked = state.toolSettings.mcpEnabled && state.toolSettings.mcpServers.any { it.isReady },
-                statusDotColor = if (state.toolSettings.mcpEnabled && state.toolSettings.mcpServers.any { it.enabled && it.isReady }) {
+                enabled = state.toolSettings.localToolsEnabled,
+                statusDotColor = if (state.toolSettings.localToolsEnabled &&
+                    state.toolSettings.mcpEnabled &&
+                    state.toolSettings.mcpServers.any { it.enabled && it.isReady }
+                ) {
                     ChatStatusColors.SuccessDot
                 } else {
                     ChatStatusColors.Unknown
                 },
                 onCheckedChange = actions.onMcpEnabledChanged,
+                modifier = Modifier.padding(start = 20.dp),
             )
         }
     }
@@ -927,9 +942,10 @@ private fun SettingsToggleRow(
     locked: Boolean = false,
     onCheckedChange: (Boolean) -> Unit,
     statusDotColor: Color? = null,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

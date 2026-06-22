@@ -34,6 +34,7 @@ import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
 import com.xiaoqi.companion.core.tools.ToolResultPromptComposer
+import com.xiaoqi.companion.core.tools.ToolScope
 import com.xiaoqi.companion.core.tools.isError
 import com.xiaoqi.companion.core.tools.withErrorResultKind
 import com.xiaoqi.companion.data.db.converter.LlmProvider
@@ -70,7 +71,8 @@ class KoogAgentFactoryImpl @Inject constructor(
             // 且每轮工具调用 = 一次完整 LLM 推理,多轮惩罚严重(最坏 5x)。
             // 默认走纯文本陪伴对话;用户可在 Settings 手动开启工具调用(allowLocalTools=true),
             // 走 LocalToolProtocol 软协议。见 docs/roadmap.md §dual-mind 分工。
-            val effectiveRegistry = if (allowLocalTools) toolRegistry.create() else ToolRegistry.EMPTY
+            // 本地模型只注入系统内置工具,不注入 MCP(避免网络开销和复杂 JSON 调用)。
+            val effectiveRegistry = if (allowLocalTools) toolRegistry.create(ToolScope.SYSTEM_ONLY) else ToolRegistry.EMPTY
             @Suppress("DEPRECATION_RENAMED_TO_REACTIVE_COMPANION")
             return ReactiveCompanion(
                 engine = localQwenEngine,

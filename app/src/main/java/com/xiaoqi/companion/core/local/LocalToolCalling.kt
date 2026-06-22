@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.local
 
+import ai.koog.agents.core.tools.ToolParameterDescriptor
+import ai.koog.agents.core.tools.ToolParameterType
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.tools.annotations.InternalAgentToolsApi
 import ai.koog.serialization.JSONSerializer
@@ -77,6 +79,23 @@ internal object LocalToolProtocol {
                     buildJsonObject {
                         put("name", tool.name)
                         put("description", tool.descriptor.description)
+                        val requiredNames = tool.descriptor.requiredParameters.map { it.name }.toSet()
+                        val allParams = tool.descriptor.requiredParameters + tool.descriptor.optionalParameters
+                        if (allParams.isNotEmpty()) {
+                            put("parameters", buildJsonObject {
+                                allParams.forEach { param ->
+                                    put(param.name, buildJsonObject {
+                                        put("type", param.type.toJsonSchemaType())
+                                        put("description", param.description)
+                                    })
+                                }
+                            })
+                            if (requiredNames.isNotEmpty()) {
+                                put("required", buildJsonArray {
+                                    requiredNames.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) }
+                                })
+                            }
+                        }
                     }
                 )
             }
@@ -89,6 +108,18 @@ internal object LocalToolProtocol {
             Available tools:
             $toolSchema
         """.trimIndent()
+    }
+
+    private fun ToolParameterType.toJsonSchemaType(): String = when (this) {
+        is ToolParameterType.String -> "string"
+        is ToolParameterType.Integer -> "integer"
+        is ToolParameterType.Float -> "number"
+        is ToolParameterType.Boolean -> "boolean"
+        is ToolParameterType.Enum -> "string"
+        is ToolParameterType.List -> "array"
+        is ToolParameterType.Object -> "object"
+        is ToolParameterType.AnyOf -> "string"
+        is ToolParameterType.Null -> "null"
     }
 
     fun buildToolContextBlock(results: List<LocalToolPromptResult>): String =

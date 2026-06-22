@@ -31,11 +31,21 @@ class UpdateStateTool @Inject constructor(
     description = """
         Update companion's emotional state, relationship level, and optionally save a memory — all in one call.
         All fields are optional; only fill what genuinely changed.
-        Call this near the END of your response when you sense:
-        - An emotional shift (fill mood + intensity + reason)
-        - Relationship closeness changing (fill affinity_delta + reason)
-        - Something worth remembering for future conversations (fill memory_content + memory_type)
-        Do NOT call this every turn out of habit — only when there is a real change.
+
+        WHEN to call (any one is enough):
+        - Emotional shift: user's words make you feel noticeably happier/sadder/more worried/etc.
+        - Relationship change: user shares something intimate, or a conflict creates distance.
+        - Memory worth saving — trigger if user mentions ANY of:
+          • Personal facts: name, age, job, location, family/friend names
+          • Preferences or strong opinions: "我喜欢…", "我讨厌…", "我觉得…最好"
+          • Plans or scheduled events: "下周…", "明天要…", "打算…"
+          • Health: illness, medication, exercise habits, sleep issues
+          • Correcting you: "不是那样的", "我其实…", "你记错了"
+          • Significant life events: new job, breakup, achievement, loss
+        If none of the above genuinely occurred, skip this tool entirely.
+
+        Do NOT call every turn out of habit. Memory content should be a concise fact
+        ("用户名叫小明", "用户下周三有面试"), not a conversation summary.
     """.trimIndent(),
 ) {
 

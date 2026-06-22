@@ -118,7 +118,7 @@ class CompanionToolRegistryTest {
         }
         val registry = newRegistry(appPrefs(system = true, mcp = true), repo, client)
 
-        val tools = registry.create()
+        val tools = registry.create(ToolScope.ALL)
 
         // 11 内置 + 1 MCP = 12
         assertEquals(12, tools.tools.size)
@@ -135,7 +135,7 @@ class CompanionToolRegistryTest {
         val client = mockk<RemoteMcpClient>(relaxed = true)
         val registry = newRegistry(appPrefs(system = true, mcp = false), repo, client)
 
-        val tools = registry.create()
+        val tools = registry.create(ToolScope.ALL)
 
         assertEquals(11, tools.tools.size)
         assertTrue(tools.tools.none { it.name.endsWith("__amap_search") })
@@ -143,13 +143,14 @@ class CompanionToolRegistryTest {
 
     @Test
     fun create_systemOff_loadsNoBuiltinAndNoMcpTools() = runTest {
-        // systemToolsEnabled=false 应直接短路,不看 mcpEnabled
+        // systemToolsEnabled=false 时系统工具不注册;MCP 独立判断 mcpEnabled
         val repo = mockk<McpServerListRepository>(relaxed = true)
         val client = mockk<RemoteMcpClient>(relaxed = true)
         val registry = newRegistry(appPrefs(system = false, mcp = true), repo, client)
 
-        val tools = registry.create()
+        val tools = registry.create(ToolScope.ALL)
 
+        // 系统工具关 + 无 ready MCP server(relaxed mock 返回空列表) = 0
         assertEquals(0, tools.tools.size)
     }
 
@@ -159,8 +160,62 @@ class CompanionToolRegistryTest {
         val client = mockk<RemoteMcpClient>(relaxed = true)
         val registry = newRegistry(appPrefs(system = false, mcp = false), repo, client)
 
-        val tools = registry.create()
+        val tools = registry.create(ToolScope.ALL)
 
         assertEquals(0, tools.tools.size)
+    }
+
+    @Test
+    fun create_systemOnly_loadsBuiltinWithoutMcp() = runTest {
+        val repo = mockk<McpServerListRepository> {
+            coEvery { readAll() } returns listOf(readyMcpServer)
+        }
+        val client = mockk<RemoteMcpClient>(relaxed = true)
+        val registry = newRegistry(appPrefs(system = true, mcp = true), repo, client)
+
+        val tools = registry.create(ToolScope.SYSTEM_ONLY)
+
+        assertEquals(11, tools.tools.size)
+        assertTrue(tools.tools.none { it.name.endsWith("__amap_search") })
+    }
+
+    @Test
+    fun create_mcpOnly_loadsOnlyMcpTools() = runTest {
+        val repo = mockk<McpServerListRepository> {
+            coEvery { readAll() } returns listOf(readyMcpServer)
+        }
+        val client = mockk<RemoteMcpClient> {
+            coEvery { listTools(any(), any()) } returns listOf(
+                McpToolSpec("amap_search", "search", buildJsonObject {}),
+            )
+        }
+        val registry = newRegistry(appPrefs(system = true, mcp = true), repo, client)
+
+        val tools = registry.create(ToolScope.MCP_ONLY)
+
+        // MCP_ONLY: 不注册系统工具,只注册 MCP
+        assertEquals(1, tools.tools.size)
+        assertTrue(tools.tools.none { it.name == "search_memory" })
+        assertTrue(tools.tools.any { it.name.endsWith("__amap_search") })
+    }
+
+    @Test
+    fun create_mcpDecoupledFromSystemTools_systemOff_mcpOn_stillLoadsMcp() = runTest {
+        // MCP 注册不应依赖 systemToolsEnabled
+        val repo = mockk<McpServerListRepository> {
+            coEvery { readAll() } returns listOf(readyMcpServer)
+        }
+        val client = mockk<RemoteMcpClient> {
+            coEvery { listTools(any(), any()) } returns listOf(
+                McpToolSpec("amap_search", "search", buildJsonObject {}),
+            )
+        }
+        val registry = newRegistry(appPrefs(system = false, mcp = true), repo, client)
+
+        val tools = registry.create(ToolScope.ALL)
+
+        // systemToolsEnabled=false 但 MCP 独立生效
+        assertEquals(1, tools.tools.size)
+        assertTrue(tools.tools.any { it.name.endsWith("__amap_search") })
     }
 }

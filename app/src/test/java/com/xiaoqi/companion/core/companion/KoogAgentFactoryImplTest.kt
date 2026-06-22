@@ -19,6 +19,7 @@ import com.xiaoqi.companion.core.local.LocalQwenRequest
 import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.core.tools.ToolCallRecorder
+import com.xiaoqi.companion.core.tools.ToolScope
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.ToolCallEntity
@@ -54,7 +55,7 @@ class KoogAgentFactoryImplTest {
             localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
-                override fun create(): ToolRegistry =
+                override fun create(scope: ToolScope): ToolRegistry =
                     ToolRegistry.builder()
                         .tool(noteTool)
                         .build()
@@ -97,7 +98,7 @@ class KoogAgentFactoryImplTest {
             localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
-                override fun create(): ToolRegistry =
+                override fun create(scope: ToolScope): ToolRegistry =
                     ToolRegistry.builder()
                         .tool(noteTool)
                         .build()
@@ -154,7 +155,7 @@ class KoogAgentFactoryImplTest {
             localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
-                override fun create(): ToolRegistry = ToolRegistry.EMPTY
+                override fun create(scope: ToolScope): ToolRegistry = ToolRegistry.EMPTY
             },
         )
 
@@ -175,7 +176,7 @@ class KoogAgentFactoryImplTest {
             localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
-                override fun create(): ToolRegistry =
+                override fun create(scope: ToolScope): ToolRegistry =
                     ToolRegistry.builder()
                         .tool(noteTool)
                         .build()
@@ -206,7 +207,7 @@ class KoogAgentFactoryImplTest {
             localQwenEngine = ErrorLocalQwenEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
-                override fun create(): ToolRegistry =
+                override fun create(scope: ToolScope): ToolRegistry =
                     ToolRegistry.builder()
                         .tool(noteTool)
                         .build()
@@ -235,7 +236,7 @@ class KoogAgentFactoryImplTest {
             localQwenEngine = localEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
-                override fun create(): ToolRegistry = ToolRegistry.EMPTY
+                override fun create(scope: ToolScope): ToolRegistry = ToolRegistry.EMPTY
             },
         )
 
@@ -272,7 +273,7 @@ class KoogAgentFactoryImplTest {
             localQwenEngine = localEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
-                override fun create(): ToolRegistry =
+                override fun create(scope: ToolScope): ToolRegistry =
                     ToolRegistry.builder()
                         .tool(noteTool)
                         .build()
@@ -315,7 +316,7 @@ class KoogAgentFactoryImplTest {
             localQwenEngine = localEngine,
             toolCallRecorder = toolCallRecorder,
             toolRegistry = object : AgentToolRegistry {
-                override fun create(): ToolRegistry =
+                override fun create(scope: ToolScope): ToolRegistry =
                     ToolRegistry.builder()
                         .tool(noteTool)
                         .build()
