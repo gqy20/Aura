@@ -70,9 +70,10 @@ object LogFieldSanitizer {
             is Enum<*> -> value.name
             is Iterable<*> -> value.map { sanitizeValue(it) }.take(MAX_COLLECTION_SIZE)
             is Array<*> -> value.map { sanitizeValue(it) }.take(MAX_COLLECTION_SIZE)
-            is Map<*, *> -> value.entries.take(MAX_COLLECTION_SIZE).associate { (key, itemValue) ->
-                key.toString() to sanitizeValue(itemValue)
-            }
+            // 嵌套 Map 必须对内层 key 重新做敏感判定,否则内层 token/content 等字段会原样泄露
+            is Map<*, *> -> sanitize(
+                value.entries.take(MAX_COLLECTION_SIZE).associate { (k, v) -> k.toString() to v }
+            )
             else -> value.toString().take(MAX_FIELD_LENGTH)
         }
 

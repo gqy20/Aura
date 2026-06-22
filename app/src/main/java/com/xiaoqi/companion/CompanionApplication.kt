@@ -40,7 +40,7 @@ class CompanionApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
-        AppLogger.initialize(BuildConfig.DEBUG)
+        AppLogger.initialize(this, BuildConfig.DEBUG)
         SystemPersona.init(this)
         // debug 构建：从 .env 经 BuildConfig 预填 LLM/MCP 配置到 DataStore，省去每次手填。
         // 异步执行不阻塞启动；release 无 ENV_* 真实值（空占位）且 DEBUG=false，不会执行。

@@ -673,6 +673,9 @@ private fun LazyListScope.settingsSystemPage(
         DataTransparencySection(viewModel = actions.viewModel)
     }
     item {
+        DiagnosticsSection()
+    }
+    item {
         AboutSection()
     }
 }
@@ -1294,6 +1297,74 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
             },
         )
     }
+}
+
+@Composable
+private fun DiagnosticsSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val provider = AppLogger.fileProvider()
+    val latestCrash = remember(provider) { provider?.crashDumps()?.firstOrNull() }
+    val hasCrash = latestCrash != null
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SettingsSectionTitle(
+            title = "诊断日志",
+            subtitle = "仅本地保留,导出需你主动分享",
+        )
+        ChatCardSurface {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "最近的运行日志(已自动脱敏)保存在本机," +
+                        "用于排查问题。点击下方按钮可分享给开发者。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                androidx.compose.material3.OutlinedButton(
+                    onClick = {
+                        val p = provider ?: return@OutlinedButton
+                        shareFile(context, p.logFile, "text/plain")
+                    },
+                    enabled = provider != null,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("导出运行日志")
+                }
+                if (hasCrash) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = {
+                            val p = provider ?: return@OutlinedButton
+                            val crash = latestCrash ?: return@OutlinedButton
+                            shareFile(context, crash, "text/plain")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("导出最近一次崩溃记录")
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun shareFile(
+    context: android.content.Context,
+    file: java.io.File,
+    mimeType: String,
+) {
+    val authority = "${context.packageName}.logfileprovider"
+    val uri = androidx.core.content.FileProvider.getUriForFile(context, authority, file)
+    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = mimeType
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(
+        android.content.Intent.createChooser(intent, "分享诊断日志")
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    )
 }
 
 @Composable
