@@ -2,6 +2,114 @@
 
 项目使用带 `v` 前缀的语义化版本标签，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
+## [0.1.5] - 2026-06-22
+
+距 0.1.4 (2026-06-16) 共 67 个提交。核心主题：Insight 生成率大幅提升 + 多会话支持 + 工具系统双开关 + ToolScope 分层 + 本地模型性能优化 + MCP Auth Token + 网站场景化重构 + MiSans 字体内嵌 + Benchmark 体系。
+
+### 新增
+
+**Insight 生成链路增强**
+- Insight 生成率大幅提升（commit `c5c3687`）：DreamLoopWorker 6h 周期 + ChatViewModel POST_CHAT 3min 冷却即时触发，双路径并行生成。
+- `EvidenceResolver` 后置证据解析（commit `6e2924f`）：本地小模型无法输出有效 evidence_ids 时，通过去 ASCII 过滤 + snapshot 兜底策略后置补全，中文 FTS5 兼容。
+- `InsightValidator` 低门槛调优：MIN_CONFIDENCE=0.2、EVIDENCE_REALITY_THRESHOLD=10%、HEADING_SIMILARITY=85%。
+- POST_CHAT 卡片 UI：蓝色 AutoAwesome 徽标 + InsightAnalyzingIndicator 动画，分析完成后自动展示。
+
+**多会话支持**
+- 新增多会话管理（commit `3264065`），支持动态 sessionId 切换，聊天历史可按会话独立浏览。
+
+**工具系统双开关 + ToolScope 分层**（commit `827a411` / `155a87c`）
+- `mcpEnabled` MCP 总开关 + `systemToolsEnabled` 系统内置工具开关，`CompanionToolRegistry.create()` 按开关短路。
+- `ToolScope` 分层（MCP / LOCAL / SYSTEM）+ 参数 Schema 注入到 prompt，让 LLM 感知工具参数类型。
+- 记忆主动性 L1：Settings 开关控制本地模型是否触发工具调用。
+
+**本地模型性能优化**
+- 应用启动时预加载 MNN 模型（commit `b3c934e`），减少首次聊天等待。
+- Dummy inference warmup（commit `34fbdc8`），预热推理路径。
+- Batch streaming render（commit `34fbdc8`），批量渲染 token 减少 UI 刷新频率。
+- Cap max_new_tokens（commit `3f105fc`），控制本地生成上限。
+- System prompt 拆分利用 MNN prefix cache（commit `e67b387`），提升多轮推理速度。
+- 模型下载器重写（commit `f027fac`）：支持断点续传 + 强制重新下载。
+
+**聊天 UI 陪伴感增强**
+- 首字到达前安抚文案轮播（commit `90151ca` / `d618038`），随时间升级文案，本地模型加载态走 carousel。
+- PerformancePill 性能指示器：assistant 消息下方显示 tok/s + 耗时。
+- 消息字体升级 bodyMedium（commit `f48e005`），流式去掉拼接省略号。
+- 切换历史对话无响应修复（commit `853eae4`）：主动清空 + 放宽 streaming 保护 + isCurrent 短路。
+
+**日志体系完善**（commit `8fade43`）
+- PII 修复 + release 短路 + 本地 ring buffer，诊断日志更安全。
+
+**MCP 改进**
+- Auth Token 输入框（commit `2e3710c`），支持自定义鉴权头。
+- 删除 MCP 编辑页接入地址只读展示块（commit `2a5e734`）。
+- Preserve disabled state（commit `75600e2`），修复禁用状态丢失问题。
+
+**.env 配置注入**（commit `397d5e0` / `1bddd53`）
+- Debug 构建支持从 `.env` 注入 API Key、Base URL 等配置，支持 per-provider API key。
+
+**MiSans 字体内嵌**（commit `565d322`）
+- 内嵌 MiSans 字体替换系统 SansSerif，统一视觉体验。
+
+**Benchmark 体系**
+- 设备自适应 benchmark flow（commit `2af2c57`），后端调优 + 结果文档（commit `e3b88e4`）。
+- 切换到主进程 APK flow（commit `d606bec`），不走 androidTest。
+
+**Prompt 优化**
+- 回复正文去掉结构化标签，情绪改走 update_state（commit `3f3c5f0`）。
+- Persona 去重 + output format 注入 + identity 收紧（commit `e4d2bac`）。
+- 设备定位上下文注入 system prompt（commit `7657ce4`）。
+
+**网站场景化重构**
+- 主页围绕三个真实生活场景重构（commit `406d8f8`）。
+- 6 个场景手机丰富场景化差异内容（commit `538aab5` / `e7da4bf`）。
+- Hero 8 张浮动卡片 + 场景化手机内容（commit `ae1c9b9`）。
+- 子页面动画增强 + Tech 3D Hero（commit `3437dff`）。
+- 设计 token 统一（commit `1a4ea6e` / `a2c6f89`），去掉 Lenis 改原生 CSS snap。
+
+### 变更
+
+- Launcher 月牙图标放大并左偏修正视觉重心（commit `65e125a`）。
+- Onboarding 称呼默认值清零 + MessageBubble 字体与工具状态显示优化（commit `b83b0e2`）。
+- 主动请求定位 + 天气查询体验优化（commit `2e3710c`）。
+- 关系模型实现内联重构（commit `ff7606e`）。
+- 从正则标签迁移到 Agent Tool 主动调用（commit `b1c32d0`）。
+- 统一本地/云端工具结果回灌策略（commit `dcdeabc`）。
+- 测试并行 + Makefile test-fast/test-db + .env UTF-8 修复（commit `b947780`）。
+- CI 工作流精简（commit `5ed24fb`）。
+- MCP 并行构建 + soc model API guard（commit `75600e2` / `f14712f`）。
+- 设置页布局与动效系统重构（commit `0fb0bf7`）。
+- Theme tokens + 删除遗留 TopAppBar adapter（commit `dd3e6a5` / `1596e7d`）。
+
+### 修复
+
+- 切换历史对话无响应（commit `853eae4`）。
+- 本地模型加载态安抚文案 carousel 替代静态 pill（commit `d618038`）。
+- 模型下载 Range 请求 404 时删 partial 从头重试（commit `d9326f6`）。
+- MNN runtime max token 配置不生效（commit `c8294e4`）。
+- Benchmark threadNum + headless app flow（commit `5056e1a`）。
+- Settings 和 detail layouts 稳定性（commit `fd261f1`）。
+- 本地模型加载状态歧义（commit `adcb8ca`）。
+- Lint MissingPermission 手动抑制（commit `045e2e7`）。
+
+### 工具链
+
+- 测试清理：撤回 isReturnDefaultValues + 冗余用例清理（commit `8e43124`）。
+- P1 单 fork Robolectric runtime 全局复用 + P2 抽取共享 Fake 类（commit `6c60a9c`），测试性能提升。
+- 测试基线：561 个单元测试全绿。
+- 创意方案 + 演示视频脚本 + PDF 构建配置（commit `3b07f88`）。
+
+### 文档
+
+- 同步 CLAUDE.md / AGENTS.md 测试相关内容（commit `c19cfc0`）。
+- 全面更新 README / AGENTS / CLAUDE / roadmap（commit `e832c86`）。
+
+### 备注
+
+- v0.1.5 是 Insight 生成率从"偶尔触发"到"几乎每次都有"的关键版本。
+- 67 个提交覆盖 Insight、多会话、工具分层、本地性能、网站重构五大方向。
+
+---
+
 ## [0.1.4] - 2026-06-16
 
 距 0.1.3 (2026-05-25) 共 100 个提交。核心主题：M2 Insight 框架 + M3 Presence 端到端 + M4 Vision→Memory→Dream 闭环 + 本地 LLM 全链路（MNN + ModelScope）+ Health Connect + 项目官网上线 + 品牌体系统一 + UI/UX 全面打磨。
