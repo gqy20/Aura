@@ -198,6 +198,9 @@ Aura 有个叫 **Dream Loop** 的后台机制。你锁屏之后，它用本地�
 
 📱 项目已开源，参加的是「手机上的创意 AI 挑战赛」（TONGYI LAB × Arm）
 
+🔗 官网：https://aura.gqy20.top/
+📦 源码：https://github.com/gqy20/Aura
+
 有问题评论区问，看到就回 👇
 
 ---

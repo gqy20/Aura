@@ -3,6 +3,7 @@ package com.xiaoqi.companion.core.context
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.annotation.SuppressLint
 import android.location.Location
 import android.location.LocationManager
 import android.os.Build
@@ -36,6 +37,7 @@ class AndroidCurrentLocationProvider @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : CurrentLocationProvider {
 
+    @SuppressLint("MissingPermission")
     override fun getLastKnownLocation(): CurrentLocation? {
         if (!hasLocationPermission()) {
             AppLogger.info(LogTags.Tools, "location_read_skipped", "reason" to "permission_missing")
@@ -72,6 +74,7 @@ class AndroidCurrentLocationProvider @Inject constructor(
             }
     }
 
+    @SuppressLint("MissingPermission")
     override suspend fun requestCurrentLocation(timeoutMs: Long): CurrentLocation? {
         // 1. 先用 last known（快，可能够用）
         getLastKnownLocation()?.let { return it }
