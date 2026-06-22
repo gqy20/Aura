@@ -232,6 +232,7 @@ class ChatViewModelTest {
             },
             healthSyncManager = io.mockk.mockk(relaxed = true),
             conversationRepository = conversationRepository,
+            localQwenExecutor = io.mockk.mockk(relaxed = true),
             healthConnectDataSource = io.mockk.mockk(relaxed = true),
             sensorHealthSource = io.mockk.mockk(relaxed = true),
         )
@@ -405,6 +406,7 @@ class ChatViewModelTest {
             },
             healthSyncManager = io.mockk.mockk(relaxed = true),
             conversationRepository = conversationRepository,
+            localQwenExecutor = io.mockk.mockk(relaxed = true),
             healthConnectDataSource = io.mockk.mockk(relaxed = true),
             sensorHealthSource = io.mockk.mockk(relaxed = true),
         )

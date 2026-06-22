@@ -255,6 +255,11 @@ private fun AuraHomeContent(
                         snapshots = uiState.moodTrend,
                     )
                 }
+                if (uiState.isInsightAnalyzing) {
+                    item {
+                        com.xiaoqi.companion.feature.insight.InsightAnalyzingIndicator()
+                    }
+                }
                 if (uiState.insights.isNotEmpty()) {
                     item {
                         com.xiaoqi.companion.feature.insight.InsightCardList(

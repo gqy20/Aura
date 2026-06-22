@@ -3,6 +3,8 @@ package com.xiaoqi.companion.feature.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
+import com.xiaoqi.companion.core.presence.runtime.LocalQwenExecutor
+import com.xiaoqi.companion.core.insight.InsightPrompts
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.llm.ConnectivityResult
@@ -103,6 +105,7 @@ class ChatViewModel @Inject constructor(
     private val dreamRunObserver: DreamRunObserver,
     private val healthSyncManager: HealthSyncManager,
     private val conversationRepository: ConversationRepository,
+    private val localQwenExecutor: LocalQwenExecutor,
     /** 对 Settings 暴露,用于查询 SDK 状态和已授权权限。 */
     val healthConnectDataSource: HealthConnectDataSource,
     /** 对 Settings 暴露,用于显示本机传感器兜底状态。 */
@@ -111,6 +114,11 @@ class ChatViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     private val lastPresenceReactionAtMillis = mutableMapOf<PresenceReaction, Long>()
+    //region 对话后即时洞察:防抖 + 防重入
+    private var lastPostChatInsightAt = 0L
+    private var postChatInsightJob: Job? = null
+    private val POST_CHAT_INSIGHT_COOLDOWN_MS = 3L * 60L * 1000L
+    private val POST_CHAT_INSIGHT_MIN_MESSAGES = 2
 
     /**
      * 当前 Dream Loop 周期档位(供 Settings UI 显示/写入)。
@@ -285,13 +293,71 @@ class ChatViewModel @Inject constructor(
                 messageRepository.getMessagesBySession(sessionId)
             }.collect { messages ->
                 _uiState.update { state ->
-                    // AI 流式回复进行中时,只保护最后一条 streaming 消息不被 DB 旧状态覆盖,
-                    // 但仍允许前面已完成的 messages 更新(避免切换会话时整个列表被阻塞)。
+                    val dbMessages = messages.map { it.toChatMessage() }
                     val streamingTail = state.messages.lastOrNull { it.isStreaming }
                     if (streamingTail != null) {
-                        state.copy(messages = messages.map { it.toChatMessage() } + streamingTail)
+                        // 过滤掉与 streaming tail 内容重复的 DB 消息，
+                        // 避免 saveAssistantMessage 先于 Complete 到达时出现两份相同文本。
+                        // 用 contains 而非 == 兼容 stripStructuredTags：流式内容可能
+                        // 带 [mood:xxx] 前缀标签，DB 版本已剥离，但主体文本一致。
+                        val hasOverlap = dbMessages.any { dbMsg ->
+                            dbMsg.role == "ASSISTANT" &&
+                                dbMsg.content.isNotEmpty() &&
+                                streamingTail.content.contains(dbMsg.content)
+                        }
+                        if (hasOverlap) {
+                            // DB 已包含 streaming 回复，用 DB 版本接管。
+                            // 但 DB 不存 performanceInfo / toolStatus 等内存态字段，
+                            // 需要从 streaming tail 搬运过来，否则 tok/s pill 和工具状态消失。
+                            val enriched = dbMessages.map { dbMsg ->
+                                if (dbMsg.role == "ASSISTANT" &&
+                                    dbMsg.content.isNotEmpty() &&
+                                    streamingTail.content.contains(dbMsg.content)
+                                ) {
+                                    dbMsg.copy(
+                                        performanceInfo = streamingTail.performanceInfo,
+                                        toolStatus = streamingTail.toolStatus,
+                                        toolStatusType = streamingTail.toolStatusType,
+                                    )
+                                } else {
+                                    dbMsg
+                                }
+                            }
+                            state.copy(messages = enriched)
+                        } else {
+                            // DB 尚未包含 streaming 回复（如切换会话），保留 tail
+                            state.copy(messages = dbMessages + streamingTail)
+                        }
                     } else {
-                        state.copy(messages = messages.map { it.toChatMessage() })
+                        // 无 streaming 消息时，从旧 state 搬运 performanceInfo。
+                        val prevAssistantWithPerf = state.messages
+                            .lastOrNull { !it.isStreaming && it.role == "ASSISTANT" && it.performanceInfo != null }
+                        val enriched = if (prevAssistantWithPerf != null) {
+                            dbMessages.map { dbMsg ->
+                                if (dbMsg.role == "ASSISTANT" && dbMsg.performanceInfo == null &&
+                                    dbMsg.content == prevAssistantWithPerf.content
+                                ) {
+                                    dbMsg.copy(performanceInfo = prevAssistantWithPerf.performanceInfo)
+                                } else {
+                                    dbMsg
+                                }
+                            }
+                        } else {
+                            dbMessages
+                        }
+                        // 调试:跟踪 performanceInfo 是否成功搬运
+                        val dbHasPerf = enriched.any { it.performanceInfo != null }
+                        val prevHasPerf = prevAssistantWithPerf != null
+                        if (prevHasPerf && !dbHasPerf) {
+                            AppLogger.warn(
+                                LogTags.Chat,
+                                "perf_info_lost_in_db_collector",
+                                "prevContentLen" to (prevAssistantWithPerf?.content?.length ?: 0),
+                                "dbAssistantCount" to dbMessages.count { it.role == "ASSISTANT" },
+                                "contentMatch" to dbMessages.any { it.role == "ASSISTANT" && it.content == prevAssistantWithPerf?.content },
+                            )
+                        }
+                        state.copy(messages = enriched)
                     }
                 }
             }
@@ -799,7 +865,26 @@ class ChatViewModel @Inject constructor(
                 pendingImage = pendingImage,
                 configStatus = _uiState.value.configStatus,
                 scope = this,
-                update = { reducer -> _uiState.update(reducer) },
+                update = { reducer ->
+                    _uiState.update { state ->
+                        val prev = state
+                        val next = state.reducer()
+                        // 检测 isLoading: true → false(对话结束),触发本地模型即时洞察
+                        if (prev.isLoading && !next.isLoading) {
+                            AppLogger.info(
+                                LogTags.Chat,
+                                "post_chat_trigger_check",
+                                "prevLoading" to prev.isLoading,
+                                "nextLoading" to next.isLoading,
+                                "hasError" to (next.error != null),
+                            )
+                            if (next.error == null) {
+                                triggerPostChatInsight()
+                            }
+                        }
+                        next
+                    }
+                },
             )
         }
     }
@@ -1062,6 +1147,136 @@ class ChatViewModel @Inject constructor(
         presenceReactionJob = viewModelScope.launch {
             kotlinx.coroutines.delay(presenceReactionPolicy.displayDurationMillis(targetReaction))
             _uiState.update { it.copy(presenceReaction = null) }
+        }
+    }
+
+    //endregion
+
+    //region 对话后即时洞察(本地模型核心价值展示)
+
+    /**
+     * 对话结束后触发本地模型即时反思。
+     *
+     * 策略:
+     * - 防抖: 15 分钟内最多跑一次,避免连续对话时频繁分析
+     * - 防重入: 上一次分析还没跑完不重复触发
+     * - 延迟启动: 等待 3 秒再跑,避免与消息保存竞态
+     */
+    private fun triggerPostChatInsight() {
+        val now = System.currentTimeMillis()
+        val elapsed = now - lastPostChatInsightAt
+        AppLogger.info(
+            LogTags.Chat,
+            "post_chat_trigger_entered",
+            "elapsedMs" to elapsed,
+            "cooldownMs" to POST_CHAT_INSIGHT_COOLDOWN_MS,
+            "jobActive" to (postChatInsightJob?.isActive == true),
+        )
+        if (elapsed < POST_CHAT_INSIGHT_COOLDOWN_MS) {
+            AppLogger.info(LogTags.Chat, "post_chat_trigger_cooldown_skip", "remainingMs" to (POST_CHAT_INSIGHT_COOLDOWN_MS - elapsed))
+            return
+        }
+        if (postChatInsightJob?.isActive == true) {
+            AppLogger.info(LogTags.Chat, "post_chat_trigger_job_active_skip")
+            return
+        }
+        lastPostChatInsightAt = now
+        AppLogger.info(LogTags.Chat, "post_chat_trigger_fired")
+        postChatInsightJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(3000L)
+            runPostChatInsight()
+        }
+    }
+
+    /**
+     * 跑本地模型分析最近对话,产出即时洞察。
+     *
+     * 流程:
+     * 1. 取当前会话最近 N 条消息(过滤空消息)
+     * 2. 如果消息数 < 4,跳过(对话太短没有价值)
+     * 3. 拼接成 prompt,调用 LocalQwenExecutor
+     * 4. 解析输出,经 Validator 存入 DB
+     * 5. 首页 Flow 自动感知新 insight 出现
+     */
+    private suspend fun runPostChatInsight() {
+        val startedAt = System.currentTimeMillis()
+        AppLogger.info(LogTags.Chat, "post_chat_insight_started")
+        _uiState.update { it.copy(isInsightAnalyzing = true) }
+        try {
+            val sessionId = appPreferences.currentSessionId.first()
+            val recentMessages = messageRepository.getRecentMessages(sessionId, limit = 12)
+            val meaningful = recentMessages.filter { it.content.isNotBlank() }
+            if (meaningful.size < POST_CHAT_INSIGHT_MIN_MESSAGES) {
+                AppLogger.info(
+                    LogTags.Chat,
+                    "post_chat_insight_skipped_too_short",
+                    "messageCount" to meaningful.size,
+                )
+                return
+            }
+            val conversationText = meaningful.joinToString("\n") { msg ->
+                val role = if (msg.role.name == "USER") "用户" else "Aura"
+                "$role: ${msg.content.take(300)}"
+            }
+            val result = localQwenExecutor.execute(
+                LocalQwenExecutor.Request(
+                    systemPrompt = InsightPrompts.conversationReflection,
+                    userMessage = conversationText,
+                    maxTokens = 300,
+                    temperature = 0.5f,
+                ),
+            )
+            AppLogger.info(
+                LogTags.Chat,
+                "post_chat_insight_raw_output",
+                "textLength" to result.text.length,
+                "latencyMs" to result.latencyMs,
+                "preview" to result.text.take(120),
+            )
+            if (result.errorMessage != null || result.text.isBlank()) {
+                AppLogger.warn(
+                    LogTags.Chat,
+                    "post_chat_insight_failed",
+                    "error" to (result.errorMessage ?: "empty output"),
+                )
+                return
+            }
+            val drafts = localQwenExecutor.parsePatternDetectOutput(result.text)
+            if (drafts.isEmpty()) {
+                AppLogger.info(LogTags.Chat, "post_chat_insight_no_drafts")
+                return
+            }
+            // 重写 triggerType 为 POST_CHAT,让 UI 区分来源
+            val postChatDrafts = drafts.map { draft ->
+                draft.copy(
+                    triggerType = "POST_CHAT",
+                    relevanceWindow = "刚刚",
+                    // 小模型常输出 confidence=0,强制拉高到可用水位
+                    confidence = draft.confidence.coerceAtLeast(0.5f),
+                    // 把当前消息 id 作为 evidence,让 Validator 能通过
+                    evidenceMessageIds = meaningful.takeLast(6).map { it.id },
+                )
+            }
+            var savedCount = 0
+            postChatDrafts.forEach { draft ->
+                val id = insightRepository.saveIfValid(draft)
+                if (id != null) savedCount++
+            }
+            AppLogger.info(
+                LogTags.Chat,
+                "post_chat_insight_completed",
+                "draftsParsed" to drafts.size,
+                "saved" to savedCount,
+                "durationMs" to (System.currentTimeMillis() - startedAt),
+            )
+        } catch (e: Exception) {
+            AppLogger.warn(
+                LogTags.Chat,
+                "post_chat_insight_error",
+                "cause" to (e.message ?: e::class.simpleName.orEmpty()),
+            )
+        } finally {
+            _uiState.update { it.copy(isInsightAnalyzing = false) }
         }
     }
 

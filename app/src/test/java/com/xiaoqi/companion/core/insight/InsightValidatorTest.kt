@@ -75,10 +75,10 @@ class InsightValidatorTest {
 
     @Test
     fun validate_lowConfidence_returnsNull() = runTest {
-        // confidence 0.35 < 0.4 (降低后的门槛)，仍应被拒
+        // confidence 0.15 < 0.2 (降低后的门槛)，仍应被拒
         val draft = emptyEvidenceDraft().copy(
             evidenceMoodSnapshotIds = listOf("mood-1"),
-            confidence = 0.35f,
+            confidence = 0.15f,
         )
         coEvery { moodSnapshotDao.existsById("mood-1") } returns true
 

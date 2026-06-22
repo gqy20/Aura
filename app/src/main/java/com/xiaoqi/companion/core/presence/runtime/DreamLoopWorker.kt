@@ -123,8 +123,27 @@ class DreamLoopWorker @AssistedInject constructor(
             return@withContext Result.success()
         }
 
+        // 小模型常输出 confidence=0,强制拉高到可用水位
+        val boostedDrafts = drafts.map { draft ->
+            if (draft.confidence < 0.5f) draft.copy(confidence = 0.5f) else draft
+        }
+
         // Post-hoc evidence resolution: 从 LLM 文本反查真实 DB ID，解决小模型无法输出有效 evidence_ids 的问题
-        val resolvedDrafts = evidenceResolver.resolve(drafts, snapshot)
+        val currentSessionId = appPreferences.currentSessionId.first()
+        val resolvedDrafts = evidenceResolver.resolve(boostedDrafts, snapshot, currentSessionId)
+
+        resolvedDrafts.forEachIndexed { index, draft ->
+            AppLogger.info(
+                LogTags.Config,
+                "dream_loop_resolved_draft",
+                "index" to index,
+                "headline" to draft.headline.take(40),
+                "msgEvidence" to draft.evidenceMessageIds.size,
+                "memEvidence" to draft.evidenceMemoryIds.size,
+                "moodEvidence" to draft.evidenceMoodSnapshotIds.size,
+                "confidence" to draft.confidence,
+            )
+        }
 
         var savedCount = 0
         resolvedDrafts.forEach { draft ->

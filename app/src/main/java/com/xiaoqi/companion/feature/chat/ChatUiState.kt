@@ -222,6 +222,8 @@ data class ChatUiState(
      */
     val mcpServerTools: Map<String, List<String>> = emptyMap(),
     val insights: List<ChatInsight> = emptyList(),
+    /** 本地模型是否正在分析对话生成洞察(首页显示"正在思考..."指示器) */
+    val isInsightAnalyzing: Boolean = false,
     val moodTrend: List<com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity> = emptyList(),
     val pendingPrefill: String? = null,
 )

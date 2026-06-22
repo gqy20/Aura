@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.insight
 
+import com.xiaoqi.companion.core.logging.AppLogger
+import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.runtime.DreamDataCollector.Snapshot
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MessageSearchDao
@@ -31,7 +33,7 @@ class EvidenceResolver @Inject constructor(
     suspend fun resolve(
         drafts: List<InsightDraft>,
         snapshot: Snapshot,
-        sessionId: String = "default",
+        sessionId: String,
     ): List<InsightDraft> = withContext(Dispatchers.IO) {
         drafts.map { resolveSingle(it, snapshot, sessionId) }
     }
@@ -41,8 +43,6 @@ class EvidenceResolver @Inject constructor(
         snapshot: Snapshot,
         sessionId: String,
     ): InsightDraft {
-        // 如果 LLM 已经给出了看起来像真实 ID 的 evidence（比如从 render() 的 [id:xxx] 复制的），
-        // 先保留它们；resolution 只做补充，不覆盖已有 ID。
         val hasExistingEvidence = draft.evidenceMessageIds.isNotEmpty()
             || draft.evidenceMemoryIds.isNotEmpty()
             || draft.evidenceMoodSnapshotIds.isNotEmpty()
@@ -50,13 +50,41 @@ class EvidenceResolver @Inject constructor(
         if (hasExistingEvidence) return draft
 
         val keywords = extractKeywords(draft.headline, draft.bodyMarkdown)
-        if (keywords.isEmpty()) return draft
+        AppLogger.debug(
+            LogTags.Repo,
+            "evidence_resolver_keywords",
+            "headline" to draft.headline.take(40),
+            "keywordCount" to keywords.size,
+            "keywords" to keywords.take(5).toString(),
+        )
 
-        return draft.copy(
+        val resolved = draft.copy(
             evidenceMessageIds = resolveMessageEvidence(keywords, snapshot, sessionId),
             evidenceMemoryIds = resolveMemoryEvidence(keywords),
             evidenceMoodSnapshotIds = resolveMoodEvidence(keywords, snapshot),
         )
+
+        // 兆底: 如果关键词搜索找不到任何 evidence, 直接用 snapshot 最近消息填充
+        if (resolved.evidenceMessageIds.isEmpty() &&
+            resolved.evidenceMemoryIds.isEmpty() &&
+            resolved.evidenceMoodSnapshotIds.isEmpty()
+        ) {
+            val fallbackIds = snapshot.messages
+                .filter { it.content.isNotBlank() }
+                .takeLast(MAX_EVIDENCE_PER_TYPE)
+                .map { it.id }
+            AppLogger.debug(
+                LogTags.Repo,
+                "evidence_resolver_fallback",
+                "headline" to draft.headline.take(40),
+                "fallbackMsgIds" to fallbackIds.size,
+            )
+            if (fallbackIds.isNotEmpty()) {
+                return draft.copy(evidenceMessageIds = fallbackIds)
+            }
+        }
+
+        return resolved
     }
 
     // ── Message: FTS5 trigram 搜索 ──
@@ -67,19 +95,28 @@ class EvidenceResolver @Inject constructor(
         sessionId: String,
     ): List<String> {
         val ftsQuery = buildFtsQuery(keywords)
-        if (ftsQuery.isBlank()) return emptyList()
+        val ftsResults = if (ftsQuery.isNotBlank()) {
+            runCatching {
+                messageSearchDao.searchRecordsFts(
+                    sessionId = sessionId,
+                    matchQuery = ftsQuery,
+                    role = null,
+                    after = snapshot.rangeStart,
+                    before = snapshot.rangeEnd,
+                    hasImage = null,
+                    limit = MAX_EVIDENCE_PER_TYPE,
+                ).map { it.id }
+            }.getOrDefault(emptyList())
+        } else emptyList()
+        if (ftsResults.isNotEmpty()) return ftsResults
 
-        return runCatching {
-            messageSearchDao.searchRecordsFts(
-                sessionId = sessionId,
-                matchQuery = ftsQuery,
-                role = null,
-                after = snapshot.rangeStart,
-                before = snapshot.rangeEnd,
-                hasImage = null,
-                limit = MAX_EVIDENCE_PER_TYPE,
-            ).map { it.id }
-        }.getOrDefault(emptyList())
+        // FTS 搜不到时,在 snapshot 内存消息中做关键词子串匹配(解决跨会话搜索问题)
+        return snapshot.messages
+            .filter { msg ->
+                keywords.any { kw -> msg.content.contains(kw, ignoreCase = true) }
+            }
+            .take(MAX_EVIDENCE_PER_TYPE)
+            .map { it.id }
     }
 
     // ── Memory: LIKE 子串匹配 ──
@@ -150,7 +187,6 @@ class EvidenceResolver @Inject constructor(
     private fun buildFtsQuery(keywords: List<String>): String =
         keywords
             .take(MAX_FTS_TERMS)
-            .filter { kw -> kw.all { c -> c.isLetterOrDigit() || c == '_' } }
             .map { "\"$it\"" }
             .ifEmpty { return "" }
             .joinToString(" ")

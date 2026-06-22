@@ -30,12 +30,13 @@ class InsightValidator @Inject constructor(
 
     suspend fun validate(draft: InsightDraft): InsightDraft? {
         if (hasNoEvidence(draft)) {
-            AppLogger.debug(
+            AppLogger.info(
                 LogTags.Repo,
                 "insight_rejected",
                 "stage" to "no_evidence",
                 "trigger" to draft.triggerType,
                 "category" to draft.category,
+                "headline" to draft.headline.take(40),
             )
             return null
         }
@@ -44,11 +45,12 @@ class InsightValidator @Inject constructor(
             val realMsg = draft.evidenceMessageIds.count { messageDao.existsById(it) }
             val realMem = draft.evidenceMemoryIds.count { memoryDao.existsById(it) }
             val realMood = draft.evidenceMoodSnapshotIds.count { moodSnapshotDao.existsById(it) }
-            AppLogger.debug(
+            AppLogger.info(
                 LogTags.Repo,
                 "insight_rejected",
                 "stage" to "evidence_reality_check",
                 "trigger" to draft.triggerType,
+                "headline" to draft.headline.take(40),
                 "claimed" to total,
                 "real_msg" to realMsg,
                 "real_mem" to realMem,
@@ -57,21 +59,23 @@ class InsightValidator @Inject constructor(
             return null
         }
         if (draft.confidence < MIN_CONFIDENCE) {
-            AppLogger.debug(
+            AppLogger.info(
                 LogTags.Repo,
                 "insight_rejected",
                 "stage" to "low_confidence",
                 "trigger" to draft.triggerType,
                 "confidence" to draft.confidence,
+                "headline" to draft.headline.take(40),
             )
             return null
         }
         if (isDuplicateHeading(draft)) {
-            AppLogger.debug(
+            AppLogger.info(
                 LogTags.Repo,
                 "insight_rejected",
                 "stage" to "duplicate_heading",
                 "trigger" to draft.triggerType,
+                "headline" to draft.headline.take(40),
             )
             return null
         }
@@ -123,9 +127,9 @@ class InsightValidator @Inject constructor(
     }
 
     private companion object {
-        const val MIN_CONFIDENCE = 0.4f
-        const val EVIDENCE_REALITY_THRESHOLD = 0.25
-        const val HEADING_SIMILARITY_THRESHOLD = 0.65
+        const val MIN_CONFIDENCE = 0.2f
+        const val EVIDENCE_REALITY_THRESHOLD = 0.1
+        const val HEADING_SIMILARITY_THRESHOLD = 0.85
         const val THIRTY_DAYS_MS = 30L * 24L * 60L * 60L * 1000L
     }
 }

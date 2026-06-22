@@ -108,7 +108,7 @@ class EvidenceResolverTest {
             confidence = 0.75f,
         )
 
-        val result = resolver.resolve(listOf(draft), emptySnapshot())
+        val result = resolver.resolve(listOf(draft), emptySnapshot(), "default")
 
         assertEquals(1, result.size)
         assertTrue("应有 message evidence", result[0].evidenceMessageIds.isNotEmpty())
@@ -130,7 +130,7 @@ class EvidenceResolverTest {
             confidence = 0.6f,
         )
 
-        val result = resolver.resolve(listOf(draft), emptySnapshot())
+        val result = resolver.resolve(listOf(draft), emptySnapshot(), "default")
 
         assertEquals(1, result.size)
         assertEquals(emptyList<String>(), result[0].evidenceMessageIds)
@@ -164,7 +164,7 @@ class EvidenceResolverTest {
         )
 
         // 核心验证：resolution 不崩溃，且非 evidence 字段完整保留
-        val result = resolver.resolve(listOf(draft), snapshot)
+        val result = resolver.resolve(listOf(draft), snapshot, "default")
         assertEquals(1, result.size)
         assertEquals("PATTERN_DETECT", result[0].triggerType)
         assertEquals("情绪", result[0].category)
@@ -196,7 +196,7 @@ class EvidenceResolverTest {
             memoryCount = 0,
         )
 
-        val result = resolver.resolve(listOf(draft), snapshot)
+        val result = resolver.resolve(listOf(draft), snapshot, "default")
         assertEquals(1, result.size)
         assertEquals("最近感觉很低落很焦虑紧张", result[0].headline)
     }
@@ -215,7 +215,7 @@ class EvidenceResolverTest {
             evidenceMessageIds = listOf("existing-msg-id"),
         )
 
-        val result = resolver.resolve(listOf(draft), emptySnapshot())
+        val result = resolver.resolve(listOf(draft), emptySnapshot(), "default")
 
         assertEquals(1, result.size)
         assertEquals(listOf("existing-msg-id"), result[0].evidenceMessageIds)
@@ -244,7 +244,7 @@ class EvidenceResolverTest {
             headline = "饮食偏好变化", bodyMarkdown = "频繁提到想吃饭店", relevanceWindow = "近 7 天", confidence = 0.68f,
         )
 
-        val results = resolver.resolve(listOf(draftSleep, draftFood), emptySnapshot())
+        val results = resolver.resolve(listOf(draftSleep, draftFood), emptySnapshot(), "default")
 
         assertEquals(2, results.size)
         assertTrue(results[0].evidenceMessageIds.contains("msg-sleep-1"))
@@ -255,7 +255,7 @@ class EvidenceResolverTest {
 
     @Test
     fun resolve_emptyDraftsList_returnsEmpty() = runTest {
-        val result = resolver.resolve(emptyList(), emptySnapshot())
+        val result = resolver.resolve(emptyList<InsightDraft>(), emptySnapshot(), "default")
         assertEquals(emptyList<InsightDraft>(), result)
     }
 
@@ -270,7 +270,7 @@ class EvidenceResolverTest {
             headline = "任何内容", bodyMarkdown = "任何描述", relevanceWindow = "近 7 天", confidence = 0.5f,
         )
 
-        val result = resolver.resolve(listOf(draft), emptySnapshot())
+        val result = resolver.resolve(listOf(draft), emptySnapshot(), "default")
 
         assertEquals(1, result.size)
         assertEquals(emptyList<String>(), result[0].evidenceMoodSnapshotIds)
@@ -289,7 +289,7 @@ class EvidenceResolverTest {
             confidence = 0.82f,
         )
 
-        val result = resolver.resolve(listOf(original), emptySnapshot())
+        val result = resolver.resolve(listOf(original), emptySnapshot(), "default")
 
         assertEquals(1, result.size)
         assertEquals("ANNIVERSARY", result[0].triggerType)

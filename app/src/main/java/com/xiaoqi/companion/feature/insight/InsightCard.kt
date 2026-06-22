@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.Icon
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.xiaoqi.companion.feature.chat.ChatInsight
 
 /**
@@ -46,9 +48,14 @@ internal fun InsightCard(
     onChat: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val cardColor = if (insight.triggerType == "POST_CHAT") {
+        Color(0xFFF0F4FF)
+    } else {
+        Color(0xFFFFF8EA)
+    }
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFFFF8EA),
+        color = cardColor,
         tonalElevation = 0.dp,
         modifier = modifier
             .fillMaxWidth()
@@ -62,17 +69,32 @@ internal fun InsightCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Lightbulb,
-                    contentDescription = null,
-                    tint = Color(0xFFE5A100),
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    text = "${insight.category} · ${insight.relevanceWindow}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (insight.triggerType == "POST_CHAT") {
+                    Icon(
+                        imageVector = Icons.Filled.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color(0xFF4A6CF7),
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = "刚刚 · 本地模型分析",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF4A6CF7),
+                        fontSize = 11.sp,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Lightbulb,
+                        contentDescription = null,
+                        tint = Color(0xFFE5A100),
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = "${insight.category} · ${insight.relevanceWindow}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Text(
                 text = insight.headline,
