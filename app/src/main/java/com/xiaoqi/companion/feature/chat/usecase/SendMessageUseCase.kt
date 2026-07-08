@@ -297,6 +297,21 @@ class SendMessageUseCase @Inject constructor(
                         pendingStreamingContent.append(event.delta)
                         scheduleStreamingRender()
                     }
+                    is AgentEvent.Progress -> {
+                        updateAssistantToolStatus(
+                            event.message.ifBlank { event.stage },
+                            ToolCallStatus.STARTED,
+                        )
+                    }
+                    is AgentEvent.RemoteStatus -> {
+                        AppLogger.info(
+                            LogTags.Chat,
+                            "remote_agent_status",
+                            "requestHash" to LogFieldSanitizer.hash(requestId),
+                            "runId" to LogFieldSanitizer.hash(event.runId),
+                            "status" to event.status,
+                        )
+                    }
                     is AgentEvent.ToolCallUpdated -> {
                         maybeShowPermissionPrompt(event.call, update)
                         // P0 修复:切到 resolveLabel 动态路径,带 resultJson 的工具可以

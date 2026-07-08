@@ -23,9 +23,11 @@ sealed class UserInput {
 
 sealed class AgentEvent {
     data class Streaming(val delta: String) : AgentEvent()
+    data class Progress(val stage: String, val message: String = "") : AgentEvent()
     data class ToolCallUpdated(val call: AgentToolCall) : AgentEvent()
     data class ToolStarted(val name: String) : AgentEvent()
     data class ToolFinished(val name: String) : AgentEvent()
+    data class RemoteStatus(val runId: String, val status: String) : AgentEvent()
     data class MemorySaved(val count: Int) : AgentEvent()
     data class Complete(val textReply: String = "") : AgentEvent()
     data class Error(val error: AgentError) : AgentEvent()
@@ -52,4 +54,3 @@ sealed class AgentError {
     data class ApiError(val message: String, val code: Int? = null) : AgentError()
     data class ParseError(val reason: String) : AgentError()
 }
-
