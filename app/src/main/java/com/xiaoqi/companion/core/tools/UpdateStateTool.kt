@@ -8,6 +8,7 @@ import com.xiaoqi.companion.core.companion.RelationshipModel
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.db.converter.MemoryType
+import com.xiaoqi.companion.data.repository.MemorySources
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.SaveMemoryRequest
 import kotlinx.coroutines.Dispatchers
@@ -100,7 +101,7 @@ class UpdateStateTool @Inject constructor(
                     content = content,
                     type = type,
                     importance = (args.memory_importance ?: 0.5f).coerceIn(0f, 1f),
-                    source = "tool:update_state",
+                    source = MemorySources.TOOL_UPDATE_STATE,
                 ),
             )
             memorySaved = 1

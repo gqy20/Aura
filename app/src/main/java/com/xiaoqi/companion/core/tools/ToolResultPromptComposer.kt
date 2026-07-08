@@ -15,6 +15,25 @@ object ToolResultPromptComposer {
                 "Do not repeat raw tool JSON in the final reply."
         }
 
+    fun finalWithoutToolsInstruction(hasErrors: Boolean, roundLimitReached: Boolean): String =
+        buildString {
+            append("Answer the user now without calling any more tools. ")
+            if (hasErrors) {
+                append("Some tool calls failed; do not invent missing results. ")
+            }
+            if (roundLimitReached) {
+                append("The tool round limit for this turn has been reached. ")
+            }
+            append("Use only the successful tool results and the conversation context, and explain any limitation naturally.")
+        }
+
+    fun toolLoopFallbackMessage(hasErrors: Boolean, roundLimitReached: Boolean): String =
+        when {
+            hasErrors -> "工具结果没有完整返回，我先基于已经拿到的信息回答；缺失的部分我不会凭空编造。"
+            roundLimitReached -> "我先停在这里，基于已经拿到的信息回答，避免继续重复调用工具。"
+            else -> "我先基于已经拿到的信息回答。"
+        }
+
     fun localToolResultsJson(results: List<LocalToolPromptResult>): String =
         buildJsonObject {
             put(

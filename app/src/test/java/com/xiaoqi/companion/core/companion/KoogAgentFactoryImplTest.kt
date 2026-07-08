@@ -147,6 +147,35 @@ class KoogAgentFactoryImplTest {
     }
 
     @Test
+    fun runEvents_whenToolRoundLimitReached_stopsRepeatedToolLoopWithVisibleReply() = runTest {
+        val executor = RepeatingToolPromptExecutor()
+        val factory = KoogAgentFactoryImpl(
+            executorFactory = object : KoogPromptExecutorFactory {
+                override fun create(config: LlmConfig): PromptExecutor = executor
+            },
+            localQwenEngine = ErrorLocalQwenEngine,
+            toolCallRecorder = toolCallRecorder,
+            toolRegistry = object : AgentToolRegistry {
+                override fun create(scope: ToolScope, policy: ToolPolicy): ToolRegistry =
+                    ToolRegistry.builder()
+                        .tool(noteTool)
+                        .build()
+            },
+        )
+
+        val events = factory.create(testConfig).runEvents(
+            BuiltPrompt(
+                systemPrompt = "You are a companion. Use tools when useful.",
+                userMessage = "Please remember that I like jasmine tea.",
+                toolPolicy = ToolPolicy.chatDefault.copy(maxToolRoundsPerTurn = 1),
+            )
+        ).toList()
+
+        assertEquals(2, executor.toolNamesPerCall.size)
+        assertTrue(events.contains(KoogAgentEvent.TextDelta("我先停在这里，基于已经拿到的信息回答，避免继续重复调用工具。")))
+    }
+
+    @Test
     fun runEvents_whenStreamOnlyCompletes_emitsCompleteTextOnce() = runTest {
         val executor = CompleteOnlyPromptExecutor()
         val factory = KoogAgentFactoryImpl(
@@ -388,6 +417,43 @@ class KoogAgentFactoryImplTest {
                     .asFlow()
             }
         }
+
+        override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
+            ModerationResult(isHarmful = false, categories = emptyMap())
+
+        override fun close() = Unit
+    }
+
+    private class RepeatingToolPromptExecutor : PromptExecutor() {
+        val toolNamesPerCall = mutableListOf<List<String>>()
+
+        override suspend fun execute(
+            prompt: Prompt,
+            model: LLModel,
+            tools: List<ToolDescriptor>,
+        ): List<Message.Response> {
+            toolNamesPerCall += tools.map { it.name }
+            return toolCall(toolNamesPerCall.size)
+        }
+
+        override fun executeStreaming(
+            prompt: Prompt,
+            model: LLModel,
+            tools: List<ToolDescriptor>,
+        ): Flow<StreamFrame> {
+            toolNamesPerCall += tools.map { it.name }
+            return toolCall(toolNamesPerCall.size).toStreamFrames().asFlow()
+        }
+
+        private fun toolCall(index: Int): List<Message.Response> =
+            listOf(
+                Message.Tool.Call(
+                    id = "repeat-$index",
+                    tool = "test_note",
+                    content = """{"content":"loop $index"}""",
+                    metaInfo = ResponseMetaInfo(Clock.System.now()),
+                )
+            )
 
         override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
             ModerationResult(isHarmful = false, categories = emptyMap())

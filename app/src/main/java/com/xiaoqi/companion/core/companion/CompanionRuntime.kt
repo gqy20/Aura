@@ -12,9 +12,12 @@ import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.core.tools.parseOrNull
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
+import com.xiaoqi.companion.data.db.converter.MemoryType
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.MemorySources
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
+import com.xiaoqi.companion.data.repository.SaveMemoryRequest
 import java.net.SocketTimeoutException
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -127,6 +130,7 @@ open class CompanionRuntime @Inject constructor(
             conversationRepository.onMessageSent(sessionId, input.content)
 
             var rawResponse = ""
+            var updateStateSucceeded = false
             val job = launch(Dispatchers.IO) {
                 agent.runEvents(prompt).collect { event ->
                     when (event) {
@@ -140,6 +144,7 @@ open class CompanionRuntime @Inject constructor(
                             if (event.call.name == "update_state" &&
                                 event.call.status == ToolCallStatus.SUCCEEDED
                             ) {
+                                updateStateSucceeded = true
                                 val resultJson = event.call.resultJson
                                 val envelope = parseOrNull(resultJson)
                                 if (envelope is com.xiaoqi.companion.core.tools.ToolEnvelope.Ok) {
@@ -176,6 +181,11 @@ open class CompanionRuntime @Inject constructor(
                 val assistantMessageId = messageRepository.saveAssistantMessage(
                     sessionId = sessionId,
                     content = finalResponse,
+                )
+                runPostTurnFallback(
+                    input = input,
+                    userMessageId = userMessageId,
+                    updateStateSucceeded = updateStateSucceeded,
                 )
                 AppLogger.debug(
                     LogTags.Runtime,
@@ -214,9 +224,65 @@ open class CompanionRuntime @Inject constructor(
         const val DEFAULT_SESSION_ID = "default"
         // [mood:xxx] [intensity:0.5] [affinity:+1] [topics:tag1,tag2]
         val STRUCTURED_TAG_REGEX = Regex("^\\s*(\\[mood:[^\\]]*\\]\\s*|\\[intensity:[^\\]]*\\]\\s*|\\[affinity:[^\\]]*\\]\\s*|\\[topics:[^\\]]*\\]\\s*)+")
+        val POST_TURN_MEMORY_HINTS = listOf(
+            "我叫",
+            "我的名字",
+            "我喜欢",
+            "我不喜欢",
+            "我讨厌",
+            "记住",
+            "帮我记",
+            "明天",
+            "后天",
+            "下周",
+            "下个月",
+            "我的生日",
+            "我住在",
+        )
     }
 
     private fun stripStructuredTags(text: String): String {
         return STRUCTURED_TAG_REGEX.replace(text, "").trimStart()
     }
+
+    private suspend fun runPostTurnFallback(
+        input: UserInput,
+        userMessageId: String,
+        updateStateSucceeded: Boolean,
+    ) {
+        if (updateStateSucceeded) return
+        val content = extractPostTurnMemory(input.content) ?: return
+        runCatching {
+            memoryRepository.saveMemory(
+                SaveMemoryRequest(
+                    content = content,
+                    type = MemoryType.FACT,
+                    importance = 0.45f,
+                    confidence = 0.45f,
+                    source = MemorySources.POST_TURN_FALLBACK,
+                    sourceMessageIds = listOf(userMessageId),
+                )
+            )
+        }.onSuccess {
+            AppLogger.info(
+                LogTags.Runtime,
+                "post_turn_fallback_memory_saved",
+                "memoryId" to it.memory.id,
+            )
+        }.onFailure { error ->
+            AppLogger.warn(
+                LogTags.Runtime,
+                "post_turn_fallback_memory_failed",
+                "message" to (error.message ?: error::class.simpleName.orEmpty()),
+            )
+        }
+    }
+
+    private fun extractPostTurnMemory(text: String): String? {
+        val clean = text.trim().replace(Regex("\\s+"), " ")
+        if (clean.length < 4) return null
+        val hasMemorySignal = POST_TURN_MEMORY_HINTS.any { clean.contains(it) }
+        return if (hasMemorySignal) clean.take(180) else null
+    }
+
 }

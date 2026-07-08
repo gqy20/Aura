@@ -15,12 +15,20 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+object MemorySources {
+    const val TOOL_SAVE_MEMORY = "tool:save_memory"
+    const val TOOL_UPDATE_STATE = "tool:update_state"
+    const val POST_TURN_FALLBACK = "post_turn:fallback"
+    const val ONBOARDING = "onboarding"
+    const val REFLECTION_VISION = "reflection:vision"
+}
+
 data class SaveMemoryRequest(
     val content: String,
     val type: MemoryType,
     val importance: Float = 0.5f,
     val confidence: Float = 0.7f,
-    val source: String = "tool:save_memory",
+    val source: String = MemorySources.TOOL_SAVE_MEMORY,
     val sourceMessageIds: List<String> = emptyList(),
     val sensitivity: String = "normal",
     val expiresAt: Long? = null,
@@ -220,7 +228,7 @@ class MemoryRepository @Inject constructor(
                     type = MemoryType.EPISODE,
                     importance = 0.8f,
                     confidence = 0.9f,
-                    source = "onboarding",
+                    source = MemorySources.ONBOARDING,
                 )
             )
             if (upcomingDates.isNotBlank()) add(
@@ -229,7 +237,7 @@ class MemoryRepository @Inject constructor(
                     type = MemoryType.EPISODE,
                     importance = 0.8f,
                     confidence = 0.9f,
-                    source = "onboarding",
+                    source = MemorySources.ONBOARDING,
                 )
             )
             if (addressStyle.isNotBlank()) add(
@@ -238,7 +246,7 @@ class MemoryRepository @Inject constructor(
                     type = MemoryType.FACT,
                     importance = 0.8f,
                     confidence = 0.9f,
-                    source = "onboarding",
+                    source = MemorySources.ONBOARDING,
                 )
             )
             friends.filter { it.isNotBlank() }.forEach { name ->
@@ -248,7 +256,7 @@ class MemoryRepository @Inject constructor(
                         type = MemoryType.FACT,
                         importance = 0.8f,
                         confidence = 0.9f,
-                        source = "onboarding",
+                        source = MemorySources.ONBOARDING,
                     )
                 )
             }
@@ -258,7 +266,7 @@ class MemoryRepository @Inject constructor(
                     type = MemoryType.FACT,
                     importance = 0.8f,
                     confidence = 0.9f,
-                    source = "onboarding",
+                    source = MemorySources.ONBOARDING,
                 )
             )
         }
@@ -311,7 +319,7 @@ class MemoryRepository @Inject constructor(
             id = java.util.UUID.randomUUID().toString(),
             type = com.xiaoqi.companion.data.db.converter.MemoryType.FACT,
             content = content,
-            source = "reflection:vision",
+            source = MemorySources.REFLECTION_VISION,
             importance = importance.coerceIn(0f, 1f),
             confidence = confidence.coerceIn(0f, 1f),
             sourceMessageIds = sourceIds,

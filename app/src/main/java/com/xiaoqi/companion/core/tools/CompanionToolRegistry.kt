@@ -4,15 +4,19 @@ import ai.koog.agents.core.tools.ToolRegistry
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.mcp.McpRemoteTool
+import com.xiaoqi.companion.core.mcp.McpServerConfig
+import com.xiaoqi.companion.core.mcp.McpToolSpec
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.McpServerListRepository
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 interface AgentToolRegistry {
     fun create(scope: ToolScope = ToolScope.ALL, policy: ToolPolicy = ToolPolicy.chatDefault): ToolRegistry
+    suspend fun warmMcpTools(policy: ToolPolicy = ToolPolicy.readOnly) = Unit
 }
 
 /** 控制 [CompanionToolRegistry.create] 注册哪些类别的工具。 */
@@ -41,6 +45,8 @@ class CompanionToolRegistry @Inject constructor(
     private val mcpServerListRepository: McpServerListRepository,
     private val appPreferences: AppPreferences,
 ) : AgentToolRegistry {
+    private val mcpToolSpecCache = ConcurrentHashMap<String, List<McpToolSpec>>()
+
     override fun create(scope: ToolScope, policy: ToolPolicy): ToolRegistry {
         val builder = ToolRegistry.builder()
         val includeSystem = scope == ToolScope.ALL || scope == ToolScope.SYSTEM_ONLY
@@ -68,6 +74,29 @@ class CompanionToolRegistry @Inject constructor(
         return builder.build()
     }
 
+    override suspend fun warmMcpTools(policy: ToolPolicy) {
+        if (!isMcpEnabledSuspend() || !policy.allowedCategories.contains(ToolCategory.REMOTE_READ)) return
+        readReadyMcpServers().forEach { server ->
+            runCatching { listMcpToolsCached(server) }
+                .onSuccess { specs ->
+                    AppLogger.info(
+                        LogTags.Llm,
+                        "mcp_tools_warmed",
+                        "count" to specs.size,
+                        "serverId" to server.id,
+                    )
+                }
+                .onFailure { error ->
+                    AppLogger.warn(
+                        LogTags.Llm,
+                        "mcp_tools_warm_failed",
+                        "serverId" to server.id,
+                        "message" to (error.message ?: error::class.simpleName.orEmpty()),
+                    )
+                }
+        }
+    }
+
     private fun readSystemToolsPref(): Boolean = runCatching {
         runBlocking { appPreferences.systemToolsEnabled.first() }
     }.getOrElse {
@@ -82,14 +111,20 @@ class CompanionToolRegistry @Inject constructor(
         true
     }
 
+    private suspend fun isMcpEnabledSuspend(): Boolean =
+        runCatching { appPreferences.mcpEnabled.first() }.getOrElse {
+            AppLogger.warn(LogTags.Llm, "mcp_pref_read_failed", "message" to (it.message ?: ""))
+            true
+        }
+
     private fun addRemoteMcpTools(
         builder: ai.koog.agents.core.tools.ToolRegistryBuilder,
         policy: ToolPolicy,
     ) {
         // 多 server 模式:遍历所有 enabled=true 且 isReady=true 的 server,分别调 listTools。
         // 任何单个 server 失败不影响其他 server 的工具注册。
-        val servers = runCatching {
-            runBlocking { mcpServerListRepository.readAll() }
+        val readyServers = runCatching {
+            runBlocking { readReadyMcpServers() }
         }.getOrElse { error ->
             AppLogger.warn(
                 LogTags.Llm,
@@ -98,7 +133,6 @@ class CompanionToolRegistry @Inject constructor(
             )
             return
         }
-        val readyServers = servers.filter { it.enabled && it.isReady }
         if (readyServers.isEmpty()) return
 
         var totalCount = 0
@@ -106,7 +140,7 @@ class CompanionToolRegistry @Inject constructor(
             val url = server.resolvedUrl
             val name = server.resolvedName
             runCatching {
-                runBlocking { remoteMcpClient.listTools(url, server.authHeaders) }
+                runBlocking { listMcpToolsCached(server) }
             }.onSuccess { specs ->
                 specs.forEach { spec ->
                     if (policy.allows(ToolMetadataRegistry.remoteMcp(spec.name))) {
@@ -146,5 +180,15 @@ class CompanionToolRegistry @Inject constructor(
                 "toolCount" to totalCount,
             )
         }
+    }
+
+    private suspend fun readReadyMcpServers(): List<McpServerConfig> =
+        mcpServerListRepository.readAll().filter { it.enabled && it.isReady }
+
+    private suspend fun listMcpToolsCached(server: McpServerConfig): List<McpToolSpec> {
+        val cacheKey = "${server.resolvedUrl}|${server.authHeaders.hashCode()}"
+        mcpToolSpecCache[cacheKey]?.let { return it }
+        return remoteMcpClient.listTools(server.resolvedUrl, server.authHeaders)
+            .also { mcpToolSpecCache[cacheKey] = it }
     }
 }

@@ -19,6 +19,7 @@ import com.xiaoqi.companion.data.repository.McpServerListRepository
 import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
@@ -248,5 +249,24 @@ class CompanionToolRegistryTest {
 
         assertTrue(tools.tools.any { it.name == "search_memory" })
         assertTrue(tools.tools.none { it.name.endsWith("__amap_search") })
+    }
+
+    @Test
+    fun warmMcpTools_preloadsSpecsForNextCreate() = runTest {
+        val repo = mockk<McpServerListRepository> {
+            coEvery { readAll() } returns listOf(readyMcpServer)
+        }
+        val client = mockk<RemoteMcpClient> {
+            coEvery { listTools(any(), any()) } returns listOf(
+                McpToolSpec("amap_search", "search", buildJsonObject {}),
+            )
+        }
+        val registry = newRegistry(appPrefs(system = true, mcp = true), repo, client)
+
+        registry.warmMcpTools()
+        val tools = registry.create(ToolScope.MCP_ONLY)
+
+        assertTrue(tools.tools.any { it.name.endsWith("__amap_search") })
+        coVerify(exactly = 1) { client.listTools(any(), any()) }
     }
 }

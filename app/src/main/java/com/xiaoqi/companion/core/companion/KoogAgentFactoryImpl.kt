@@ -21,6 +21,7 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.AttachmentContent
 import ai.koog.prompt.message.ContentPart
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
 import ai.koog.prompt.streaming.toMessageResponses
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
@@ -48,6 +49,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.serialization.KSerializer
+import kotlin.time.Clock
 
 @Singleton
 class KoogAgentFactoryImpl @Inject constructor(
@@ -166,7 +168,10 @@ private class KoogPromptExecutorWrapper(
                     "hasImage" to prompt.hasImage,
                     "userMessageLength" to prompt.userMessage.length,
                 )
-                createAgent(prompt, observer).run(prompt.userMessage)
+                val result = createAgent(prompt, observer).run(prompt.userMessage)
+                if (!hasStreamingText && result.isNotBlank()) {
+                    observer.onTextComplete(result)
+                }
                 AppLogger.info(
                     LogTags.Llm,
                     "agent_run_completed",
@@ -203,7 +208,7 @@ private class KoogPromptExecutorWrapper(
             )
             .maxIterations(MAX_AGENT_ITERATIONS)
             .id("companion-agent-${config.provider.name.lowercase()}")
-            .graphStrategy(streamingSingleRunStrategy())
+            .graphStrategy(streamingSingleRunStrategy(prompt))
             .install {
                 install(EventHandler.Feature) {
                     onToolCallStarting { context ->
@@ -278,13 +283,17 @@ private class KoogPromptExecutorWrapper(
             }
             .build()
 
-    private fun streamingSingleRunStrategy() = strategy<String, String>("single_run_streaming_tools") {
+    private fun streamingSingleRunStrategy(prompt: BuiltPrompt) = strategy<String, String>("single_run_streaming_tools") {
+        var toolResultRounds = 0
         val nodeCallLLM by nodeLLMRequestStreamingAndSendResults<String>()
         val nodeExecuteTool by nodeExecuteMultipleTools(parallelTools = false)
         val nodeSendToolResult by node<List<ReceivedToolResult>, List<Message.Response>> { results ->
             // 翻 envelope 失败的 resultKind,让 Koog 标准的 Message.Tool.Result.isError 也被点亮
+            toolResultRounds += 1
             val patchedResults = results.withErrorResultKind()
             val hasErrors = results.any { isError(it.content) }
+            val roundLimitReached = toolResultRounds >= prompt.toolPolicy.maxToolRoundsPerTurn
+            val finalWithoutTools = hasErrors || roundLimitReached
             llm.writeSession {
                 appendPrompt {
                     tool {
@@ -297,28 +306,53 @@ private class KoogPromptExecutorWrapper(
                     }
                 }
                 appendPrompt {
-                    user(ToolResultPromptComposer.followupInstruction(hasErrors))
+                    user(
+                        if (finalWithoutTools) {
+                            ToolResultPromptComposer.finalWithoutToolsInstruction(
+                                hasErrors = hasErrors,
+                                roundLimitReached = roundLimitReached,
+                            )
+                        } else {
+                            ToolResultPromptComposer.followupInstruction(hasErrors = false)
+                        }
+                    )
                 }
 
                 AppLogger.info(
                     LogTags.Llm,
                     "tool_result_llm_request_started",
                     "resultCount" to results.size,
+                    "toolResultRounds" to toolResultRounds,
+                    "finalWithoutTools" to finalWithoutTools,
                 )
-                requestLLMStreaming()
+                val responses = requestLLMStreaming()
                     .toList()
                     .toMessageResponses()
-                    .also { responses ->
-                        AppLogger.info(
-                            LogTags.Llm,
-                            "tool_result_llm_request_completed",
-                            "resultCount" to results.size,
-                            "responseCount" to responses.size,
-                            "assistantTextLength" to responses.sumOf { it.content.length },
-                            "toolCallCount" to responses.count { it is Message.Tool.Call },
-                        )
-                        appendPrompt { messages(responses) }
+                    .let { llmResponses ->
+                        if (finalWithoutTools && llmResponses.any { it is Message.Tool.Call }) {
+                            listOf(
+                                Message.Assistant(
+                                    ToolResultPromptComposer.toolLoopFallbackMessage(
+                                        hasErrors = hasErrors,
+                                        roundLimitReached = roundLimitReached,
+                                    ),
+                                    metaInfo = ResponseMetaInfo(Clock.System.now()),
+                                )
+                            )
+                        } else {
+                            llmResponses
+                        }
                     }
+                AppLogger.info(
+                    LogTags.Llm,
+                    "tool_result_llm_request_completed",
+                    "resultCount" to results.size,
+                    "responseCount" to responses.size,
+                    "assistantTextLength" to responses.sumOf { it.content.length },
+                    "toolCallCount" to responses.count { it is Message.Tool.Call },
+                )
+                appendPrompt { messages(responses) }
+                responses
             }
         }
 

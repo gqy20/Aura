@@ -14,6 +14,7 @@ import com.xiaoqi.companion.data.db.converter.MessageRole
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.ConversationRepository
+import com.xiaoqi.companion.data.repository.MemorySources
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.PromptMemoryContext
 import com.xiaoqi.companion.data.repository.MessageRepository
@@ -268,6 +269,28 @@ class CompanionRuntimeTest {
             assertTrue(awaitItem() is AgentEvent.Streaming)
             assertTrue(awaitItem() is AgentEvent.Complete)
             cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun send_whenStateToolDidNotRun_savesLowConfidenceFallbackMemoryForExplicitPreference() = runTest {
+        val factory = FakeKoogAgentFactory()
+        coEvery { messageRepo.sendMessage(any(), any(), any()) } returns "user-message"
+        coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
+
+        makeRuntime(factory).send(UserInput.Text("我喜欢茉莉花茶")).test {
+            assertTrue(awaitItem() is AgentEvent.Streaming)
+            assertTrue(awaitItem() is AgentEvent.Complete)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify {
+            memoryRepository.saveMemory(match {
+                it.content == "我喜欢茉莉花茶" &&
+                    it.source == MemorySources.POST_TURN_FALLBACK &&
+                    it.sourceMessageIds == listOf("user-message") &&
+                    it.confidence == 0.45f
+            })
         }
     }
 
