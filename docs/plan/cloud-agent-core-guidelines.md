@@ -505,3 +505,30 @@ error_type
 - Kimi tool_calls 文档确认：工具调用由应用执行并回传结果，模型可能连续/重复调用工具，应用层必须防循环。
 - MCP 2025-11-25 规范确认：tools 是 model-controlled，但客户端/宿主可自由设计交互、授权、确认和展示模式。
 - Z.AI/智谱文档确认：GLM Anthropic 兼容端点适合作为当前云端主链路，GLM 系列强调 agentic engineering、长程任务和工具协调。
+
+## 13. 2026-07-08 Android 侧落地状态
+
+已完成并提交：
+
+- 配置可信度、Provider 能力、TurnPolicy、ToolPolicy、Registry policy filtering。
+- Koog 工具循环收束、工具失败后最终文本兜底、MCP 工具预热缓存。
+- Post-turn 低置信度记忆兜底、MemorySources 常量化。
+- Vision 最近图像记忆只读注入、发图状态与日志、runtime turnId observability。
+- 工具状态文案补齐、写入/高风险工具确认 policy。
+- AgentEvent 扩展、RemoteAgentEvent DTO 映射、RemoteAgentService HTTP MVP、只读远端工具端点、Browser Worker read/write 边界。
+- 长任务核心模型、Home 长任务入口、云端记忆同步设计文档。
+
+对应提交：
+
+- `c7822be feat(agent): add cloud agent policy foundation`
+- `f8ad761 feat(agent): harden tool loop and memory fallback`
+- `1d96e62 feat(agent): improve vision context observability`
+- `1dea142 feat(agent): add remote agent boundary`
+- `70968c2 feat(agent): add long task surface`
+
+尚未完成：
+
+- 真机 checklist。
+- 真实远端 Agent Server、SSE/WebSocket 流式传输、`RemoteAgentRuntime` 主链路切换。
+- Browser Worker 实际执行器与用户确认 UI。
+- 云端 memory sync 的 Room cursor/tombstone 表、隐私设置和同步服务实现。

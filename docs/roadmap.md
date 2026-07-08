@@ -4,6 +4,15 @@
 >
 > 本文档用于跟踪当前实现进度，并把 `README.md` / `docs/architecture.md` 中的产品愿景拆成可执行里程碑。
 
+> 2026-07-08 云端核心智能体落地更新：
+> 已完成 `docs/plan/cloud-agent-core-guidelines.md` 中 Android 侧 P0-P3 与远端边界 MVP 的 24 项非真机任务，并按 5 项一批提交：
+> `c7822be` 配置可信度 / ProviderCapabilities / TurnPolicy / ToolPolicy / Registry policy；
+> `f8ad761` 工具循环收束 / 工具失败最终回复 / MCP 预热缓存 / post-turn fallback / memory source 规范化；
+> `1d96e62` Vision 只读图像记忆注入 / Vision UX 日志 / turnId observability / 工具文案 / 确认模型；
+> `1dea142` AgentEvent 扩展 / RemoteAgentEvent 映射 / RemoteAgentService MVP / 只读远端工具 / Browser Worker 边界；
+> `70968c2` 长任务模型 / Home 任务入口 / 云端 memory sync 设计。
+> 已跳过真机 checklist；验证命令为多轮定向 `testDebugUnitTest` 与 `make test-fast`。
+
 ## 当前状态
 
 项目当前处于 **文本聊天技术闭环 / Phase 1 agent tools** 阶段，并已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形。
