@@ -218,4 +218,35 @@ class CompanionToolRegistryTest {
         assertEquals(1, tools.tools.size)
         assertTrue(tools.tools.any { it.name.endsWith("__amap_search") })
     }
+
+    @Test
+    fun create_readOnlyPolicy_filtersLocalWriteTools() = runTest {
+        val repo = mockk<McpServerListRepository>(relaxed = true)
+        val client = mockk<RemoteMcpClient>(relaxed = true)
+        val registry = newRegistry(appPrefs(system = true, mcp = false), repo, client)
+
+        val tools = registry.create(ToolScope.ALL, ToolPolicy.readOnly)
+
+        assertTrue(tools.tools.any { it.name == "search_memory" })
+        assertTrue(tools.tools.none { it.name == "update_state" })
+        assertTrue(tools.tools.none { it.name == "create_local_reminder" })
+    }
+
+    @Test
+    fun create_systemOnlyPolicy_filtersMcpTools() = runTest {
+        val repo = mockk<McpServerListRepository> {
+            coEvery { readAll() } returns listOf(readyMcpServer)
+        }
+        val client = mockk<RemoteMcpClient> {
+            coEvery { listTools(any(), any()) } returns listOf(
+                McpToolSpec("amap_search", "search", buildJsonObject {}),
+            )
+        }
+        val registry = newRegistry(appPrefs(system = true, mcp = true), repo, client)
+
+        val tools = registry.create(ToolScope.ALL, ToolPolicy.systemOnly)
+
+        assertTrue(tools.tools.any { it.name == "search_memory" })
+        assertTrue(tools.tools.none { it.name.endsWith("__amap_search") })
+    }
 }

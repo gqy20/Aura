@@ -39,6 +39,7 @@ open class CompanionRuntime @Inject constructor(
     private val locationProvider: CurrentLocationProvider,
     private val appPreferences: AppPreferences,
     private val conversationRepository: com.xiaoqi.companion.data.repository.ConversationRepository,
+    private val agentTurnPolicy: AgentTurnPolicy,
 ) {
     open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
         val startedAt = System.currentTimeMillis()
@@ -62,12 +63,24 @@ open class CompanionRuntime @Inject constructor(
                 }
             } else null
             val config = configRepository.getCurrentLlmConfig().first()
+            val providerCapabilities = ProviderCapabilityRegistry.forProvider(config.provider)
+            val systemToolsEnabled = appPreferences.systemToolsEnabled.first()
+            val mcpEnabled = appPreferences.mcpEnabled.first()
+            val turnDecision = agentTurnPolicy.decide(
+                input = input,
+                config = config,
+                providerCapabilities = providerCapabilities,
+                systemToolsEnabled = systemToolsEnabled,
+                mcpEnabled = mcpEnabled,
+            )
             AppLogger.debug(
                 LogTags.Runtime,
                 "llm_config_loaded",
                 "provider" to config.provider,
                 "model" to config.modelName,
                 "hasApiKey" to config.apiKey.isNotBlank(),
+                "turnMode" to turnDecision.mode,
+                "toolPolicyMaxRisk" to turnDecision.toolPolicy.maxRiskLevel,
             )
             // 本地 LLM 路径走 splitForCache，让 systemPrompt 只含固定部分（人设+工具），
             // 动态上下文由 ReactiveCompanion 拼进 userMessage 前面，让 MNN prefix cache 持久命中。
@@ -81,6 +94,9 @@ open class CompanionRuntime @Inject constructor(
                 summaries = memoryContext.summarySnippets,
                 locationContext = locationContext,
                 splitForCache = splitForCache,
+            ).copy(
+                allowTools = turnDecision.allowTools,
+                toolPolicy = turnDecision.toolPolicy,
             )
             AppLogger.debug(
                 LogTags.Runtime,
@@ -95,6 +111,8 @@ open class CompanionRuntime @Inject constructor(
                 "omittedOlderMessages" to conversationContext.omittedOlderMessageCount,
                 "splitForCache" to splitForCache,
                 "dynamicContextLength" to (prompt.dynamicContext?.length ?: 0),
+                "turnMode" to turnDecision.mode,
+                "toolPolicyCategories" to turnDecision.toolPolicy.allowedCategories.joinToString(","),
             )
             // 本地路径读一次 localToolsEnabled 快照,让用户在 Settings 里切换后下一条消息生效。
             // 云端 provider 此参数被 factory 忽略。

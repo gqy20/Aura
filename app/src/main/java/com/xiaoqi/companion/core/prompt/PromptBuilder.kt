@@ -4,6 +4,7 @@ import com.xiaoqi.companion.core.companion.model.UserInput
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.templates.SystemPersona
+import com.xiaoqi.companion.core.tools.ToolPolicy
 
 data class BuiltPrompt(
     val systemPrompt: String,
@@ -12,6 +13,7 @@ data class BuiltPrompt(
     val imageBase64: String? = null,
     val imageMediaType: String? = null,
     val allowTools: Boolean = true,
+    val toolPolicy: ToolPolicy = ToolPolicy.chatDefault,
     /**
      * 本地 LLM 路径专用：动态后缀（emotion/relationship/memories/summaries/recent/location），
      * 由 ReactiveCompanion 拼到 userMessage 前，保证 systemPrompt 仅含固定部分（人设 + 工具说明），

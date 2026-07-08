@@ -71,6 +71,8 @@ class CompanionRuntimeTest {
         every { locationContextEnabled } returns flowOf(true)
         every { currentSessionId } returns flowOf("default")
         every { localToolsEnabled } returns flowOf(false)
+        every { systemToolsEnabled } returns flowOf(true)
+        every { mcpEnabled } returns flowOf(true)
     }
 
     private val conversationRepository: ConversationRepository = mockk(relaxed = true)
@@ -131,6 +133,7 @@ class CompanionRuntimeTest {
         locationProvider = locationProvider,
         appPreferences = appPreferences,
         conversationRepository = conversationRepository,
+        agentTurnPolicy = AgentTurnPolicy(),
     )
 
     @Test

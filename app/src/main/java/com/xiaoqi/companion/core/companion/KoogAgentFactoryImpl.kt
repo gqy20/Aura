@@ -72,7 +72,11 @@ class KoogAgentFactoryImpl @Inject constructor(
             // 默认走纯文本陪伴对话;用户可在 Settings 手动开启工具调用(allowLocalTools=true),
             // 走 LocalToolProtocol 软协议。见 docs/roadmap.md §dual-mind 分工。
             // 本地模型只注入系统内置工具,不注入 MCP(避免网络开销和复杂 JSON 调用)。
-            val effectiveRegistry = if (allowLocalTools) toolRegistry.create(ToolScope.SYSTEM_ONLY) else ToolRegistry.EMPTY
+            val effectiveRegistry = if (allowLocalTools) {
+                toolRegistry.create(ToolScope.SYSTEM_ONLY, com.xiaoqi.companion.core.tools.ToolPolicy.systemOnly)
+            } else {
+                ToolRegistry.EMPTY
+            }
             @Suppress("DEPRECATION_RENAMED_TO_REACTIVE_COMPANION")
             return ReactiveCompanion(
                 engine = localQwenEngine,
@@ -190,7 +194,13 @@ private class KoogPromptExecutorWrapper(
             .promptExecutor(executor)
             .llmModel(model)
             .prompt(prompt.toKoogAgentPrompt())
-            .toolRegistry(if (prompt.hasImage || !prompt.allowTools) ToolRegistry.EMPTY else toolRegistry.create())
+            .toolRegistry(
+                if (prompt.hasImage || !prompt.allowTools) {
+                    ToolRegistry.EMPTY
+                } else {
+                    toolRegistry.create(policy = prompt.toolPolicy)
+                }
+            )
             .maxIterations(MAX_AGENT_ITERATIONS)
             .id("companion-agent-${config.provider.name.lowercase()}")
             .graphStrategy(streamingSingleRunStrategy())

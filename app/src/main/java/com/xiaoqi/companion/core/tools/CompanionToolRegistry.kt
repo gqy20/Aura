@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 interface AgentToolRegistry {
-    fun create(scope: ToolScope = ToolScope.ALL): ToolRegistry
+    fun create(scope: ToolScope = ToolScope.ALL, policy: ToolPolicy = ToolPolicy.chatDefault): ToolRegistry
 }
 
 /** 控制 [CompanionToolRegistry.create] 注册哪些类别的工具。 */
@@ -41,30 +41,29 @@ class CompanionToolRegistry @Inject constructor(
     private val mcpServerListRepository: McpServerListRepository,
     private val appPreferences: AppPreferences,
 ) : AgentToolRegistry {
-    override fun create(scope: ToolScope): ToolRegistry {
+    override fun create(scope: ToolScope, policy: ToolPolicy): ToolRegistry {
         val builder = ToolRegistry.builder()
         val includeSystem = scope == ToolScope.ALL || scope == ToolScope.SYSTEM_ONLY
         val includeMcp = scope == ToolScope.ALL || scope == ToolScope.MCP_ONLY
 
         val systemToolsEnabled = if (includeSystem) readSystemToolsPref() else false
         if (systemToolsEnabled) {
-            builder
-                .tool(searchMemoryTool)
-                .tool(searchRecordsTool)
-                .tool(searchSummariesTool)
-                .tool(getCurrentTimeTool)
-                .tool(getRecentInteractionContextTool)
-                .tool(getUserContextSettingsTool)
-                .tool(getDeviceStatusTool)
-                .tool(getWeatherTool)
-                .tool(createLocalReminderTool)
-                .tool(queryHealthDataTool)
-                .tool(updateStateTool)
+            if (policy.allows(ToolMetadataRegistry.searchMemory)) builder.tool(searchMemoryTool)
+            if (policy.allows(ToolMetadataRegistry.searchRecords)) builder.tool(searchRecordsTool)
+            if (policy.allows(ToolMetadataRegistry.searchSummaries)) builder.tool(searchSummariesTool)
+            if (policy.allows(ToolMetadataRegistry.getCurrentTime)) builder.tool(getCurrentTimeTool)
+            if (policy.allows(ToolMetadataRegistry.getRecentInteractionContext)) builder.tool(getRecentInteractionContextTool)
+            if (policy.allows(ToolMetadataRegistry.getUserContextSettings)) builder.tool(getUserContextSettingsTool)
+            if (policy.allows(ToolMetadataRegistry.getDeviceStatus)) builder.tool(getDeviceStatusTool)
+            if (policy.allows(ToolMetadataRegistry.getWeather)) builder.tool(getWeatherTool)
+            if (policy.allows(ToolMetadataRegistry.createLocalReminder)) builder.tool(createLocalReminderTool)
+            if (policy.allows(ToolMetadataRegistry.queryHealthData)) builder.tool(queryHealthDataTool)
+            if (policy.allows(ToolMetadataRegistry.updateState)) builder.tool(updateStateTool)
         }
 
         // MCP 注册独立于 systemToolsEnabled,只受 mcpEnabled + scope 控制。
-        if (includeMcp && isMcpEnabled()) {
-            addRemoteMcpTools(builder)
+        if (includeMcp && isMcpEnabled() && policy.allowedCategories.contains(ToolCategory.REMOTE_READ)) {
+            addRemoteMcpTools(builder, policy)
         }
         return builder.build()
     }
@@ -83,7 +82,10 @@ class CompanionToolRegistry @Inject constructor(
         true
     }
 
-    private fun addRemoteMcpTools(builder: ai.koog.agents.core.tools.ToolRegistryBuilder) {
+    private fun addRemoteMcpTools(
+        builder: ai.koog.agents.core.tools.ToolRegistryBuilder,
+        policy: ToolPolicy,
+    ) {
         // 多 server 模式:遍历所有 enabled=true 且 isReady=true 的 server,分别调 listTools。
         // 任何单个 server 失败不影响其他 server 的工具注册。
         val servers = runCatching {
@@ -107,15 +109,17 @@ class CompanionToolRegistry @Inject constructor(
                 runBlocking { remoteMcpClient.listTools(url, server.authHeaders) }
             }.onSuccess { specs ->
                 specs.forEach { spec ->
-                    builder.tool(
-                        McpRemoteTool(
-                            serverUrl = url,
-                            serverName = name,
-                            spec = spec,
-                            client = remoteMcpClient,
-                            headers = server.authHeaders,
+                    if (policy.allows(ToolMetadataRegistry.remoteMcp(spec.name))) {
+                        builder.tool(
+                            McpRemoteTool(
+                                serverUrl = url,
+                                serverName = name,
+                                spec = spec,
+                                client = remoteMcpClient,
+                                headers = server.authHeaders,
+                            )
                         )
-                    )
+                    }
                 }
                 totalCount += specs.size
                 AppLogger.info(

@@ -8,7 +8,7 @@
 
 项目当前处于 **文本聊天技术闭环 / Phase 1 agent tools** 阶段，并已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形。
 
-同时已经开始规划 Phase 2+ 的端云协同智能体能力：Android 端继续承担亲密交互、本地状态和用户授权边界；远程 Agent Server 承担 MCP、浏览器工具、长期任务、云端记忆和 Skills 编排。详细方案见 `docs/plan/agent-capability-server-plan.md`，Vision 与 Agent tools 协同策略见 `docs/plan/vision-tools-plan.md`。产品表现层也开始转向 Presence Layer 思路：借鉴 Looi 一类陪伴设备的状态动画，但目标不是玩具化机器人，而是把 Aura 的情绪、关系、思考、工具调用和主动关怀变成可感知的细腻行为。
+同时已经开始规划 Phase 2+ 的端云协同智能体能力：Android 端继续承担亲密交互、本地状态和用户授权边界；远程 Agent Server 承担 MCP、浏览器工具、长期任务、云端记忆和 Skills 编排。云端核心智能体实现规范见 `docs/plan/cloud-agent-core-guidelines.md`，端云整体方案见 `docs/plan/agent-capability-server-plan.md`，Vision 与 Agent tools 协同策略见 `docs/plan/vision-tools-plan.md`。产品表现层也开始转向 Presence Layer 思路：借鉴 Looi 一类陪伴设备的状态动画，但目标不是玩具化机器人，而是把 Aura 的情绪、关系、思考、工具调用和主动关怀变成可感知的细腻行为。
 
 **2026-06-15 叙事主轴更新**：Aura 的产品定位从"AI 陪伴 App"调整为"**第二大脑 / 数字孪生**"——一个长期认识你的 AI。云端对话体（Responsive Mind）负责"对外办事"，本地陪伴体（Continuous Awareness）负责"对内懂事"。详细方案见 `docs/plan/dual-mind-architecture.md` §1.4 与 `docs/plan/insight-driven-product.md`。M2-M5 的 KPI 已按本叙事调整（见各里程碑详情）。
 
@@ -258,4 +258,5 @@
 8. ~~**dual-mind Phase 1**：拆云端对话体 / 本地觉察面。~~ **已重新评估（2026-06-17）**：经核实，`KoogAgentFactoryImpl` 的 2-way 分支（云端 / 本地）已是合理的 Provider 切换形态；本地的"觉察面"职责由 `core/presence/runtime/` 下的 `DreamLoopWorker` / `LocalQwenExecutor` 等独立组件承担，不在 `KoogAgentWrapper` 主路径里。**不再需要拆 dual-mind Phase 1**，专注把 Pulse Worker（M5）和本地 vision 路径走通即可。AuraMemoryStore 文件系统层属于 M5+ 配套（auto memory PoC 验证后启动）。
 9. ~~**抽象 `AgentRuntime`**：~~ **已重新评估（2026-06-17）**：经讨论，`KoogAgentWrapper` 4 方法契约已能覆盖云端 / 本地两端（PR A 对齐后行为契约一致）。**不引入新接口层**；M7 远端 Agent Server 落地时如需切换入口，可在 `CompanionRuntime` 上做小范围重构，不应预先抽 `AgentRuntime` 接口。
 10. **M6 产品化加固**：扩展 instrumented tests（CameraX / WorkManager 真实场景）+ CI 工作流（GitHub Actions）+ release signing 验证。
-11. **M7 远端 Agent Server**（plan §8 收窄到"信息回写"主轴）：最小 Aura Agent Server 先支持文本输入 / 流式输出 / 只读远程工具；`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 字段，M4 起可对接。
+11. **云端核心智能体规范落地**：按 `docs/plan/cloud-agent-core-guidelines.md` 先做 P0-P3（配置可信度、Tool Policy、Post-turn 兜底、Vision 稳定增强），再启动远端工具 MVP。
+12. **M7 远端 Agent Server**（plan §8 收窄到"信息回写"主轴）：最小 Aura Agent Server 先支持文本输入 / 流式输出 / 只读远程工具；`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 字段，M4 起可对接。

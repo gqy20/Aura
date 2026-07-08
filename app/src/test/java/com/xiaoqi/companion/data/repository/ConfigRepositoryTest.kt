@@ -39,7 +39,7 @@ class ConfigRepositoryTest {
             val config = awaitItem()
             assertEquals(LlmProvider.GLM, config.provider)
             assertEquals("test-key-123", config.apiKey)
-            assertEquals(DefaultLlmValues.GLM_BASE_URL, config.baseUrl)
+            assertEquals("https://example.test/v1", config.baseUrl)
             assertEquals("glm-5v-turbo", config.modelName)
             cancelAndIgnoreRemainingEvents()
         }
@@ -81,9 +81,28 @@ class ConfigRepositoryTest {
         repo.getCurrentLlmConfig().test {
             val config = awaitItem()
             assertEquals(LlmProvider.MODELSCOPE, config.provider)
-            assertEquals(DefaultLlmValues.MODELSCOPE_BASE_URL, config.baseUrl)
+            assertEquals("https://stale.example.com/v1", config.baseUrl)
             assertEquals(DefaultLlmValues.MODELSCOPE_MODEL, config.modelName)
             assertEquals("ms-test-token", config.apiKey)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun getCurrentLlmConfig_usesDefaultBaseUrl_whenStoredBaseUrlBlank() = runTest {
+        val prefs: AppPreferences = mockk {
+            every { apiKey } returns flowOf("key")
+            every { apiKeysJson } returns flowOf("""{"GLM":"key"}""")
+            every { llmProvider } returns flowOf(LlmProvider.GLM)
+            every { modelName } returns flowOf(DefaultLlmValues.GLM_MODEL)
+            every { baseUrl } returns flowOf("")
+        }
+
+        val repo = buildRepo(prefs)
+
+        repo.getCurrentLlmConfig().test {
+            val config = awaitItem()
+            assertEquals(DefaultLlmValues.GLM_BASE_URL, config.baseUrl)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -272,4 +291,3 @@ class ConfigRepositoryTest {
         assertSame(expected, actual)
     }
 }
-

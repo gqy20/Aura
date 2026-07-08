@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.xiaoqi.companion.core.companion.CompanionRuntime
 import com.xiaoqi.companion.core.companion.ConversationContextBuilder
 import com.xiaoqi.companion.core.companion.EmotionStateMachine
+import com.xiaoqi.companion.core.companion.AgentTurnPolicy
 import com.xiaoqi.companion.core.companion.RelationshipModel
 import com.xiaoqi.companion.core.companion.model.AgentError
 import com.xiaoqi.companion.core.companion.model.AgentEvent
@@ -129,6 +130,7 @@ class SendMessageUseCaseTest {
         locationProvider = mockk<CurrentLocationProvider>(relaxed = true),
         appPreferences = mockk<AppPreferences>(relaxed = true),
         conversationRepository = mockk<ConversationRepository>(relaxed = true),
+        agentTurnPolicy = AgentTurnPolicy(),
     ) {
         var rawResponse = "你好呀！"
         var shouldFail = false

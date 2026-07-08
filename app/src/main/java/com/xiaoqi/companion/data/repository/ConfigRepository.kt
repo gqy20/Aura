@@ -119,7 +119,7 @@ class ConfigRepositoryImpl @Inject constructor(
     override val themeMode get() = prefs.themeMode
 
     override fun getCurrentLlmConfig(): Flow<LlmConfig> =
-        combine(prefs.llmProvider, prefs.apiKeysJson, prefs.apiKey, prefs.modelName) { provider, keysJson, legacyKey, model ->
+        combine(prefs.llmProvider, prefs.apiKeysJson, prefs.apiKey, prefs.modelName, prefs.baseUrl) { provider, keysJson, legacyKey, model, storedBaseUrl ->
             val resolvedModel = model.takeIf { it in DefaultLlmValues.modelOptions(provider) }
                 ?: DefaultLlmValues.defaultModel(provider)
             val perProviderKey = runCatching { JSONObject(keysJson) }
@@ -127,7 +127,8 @@ class ConfigRepositoryImpl @Inject constructor(
                 ?.optString(provider.name, "")
                 ?.takeIf { it.isNotBlank() }
             val resolvedKey = perProviderKey ?: legacyKey?.takeIf { it.isNotBlank() }.orEmpty()
-            val resolvedBaseUrl = DefaultLlmValues.defaultBaseUrl(provider)
+            val resolvedBaseUrl = storedBaseUrl.takeIf { it.isNotBlank() }
+                ?: DefaultLlmValues.defaultBaseUrl(provider)
             LlmConfig(
                 provider = provider,
                 baseUrl = resolvedBaseUrl,
