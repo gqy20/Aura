@@ -17,8 +17,10 @@ import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MemorySources
 import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
+import com.xiaoqi.companion.data.repository.PromptMemoryContext
 import com.xiaoqi.companion.data.repository.SaveMemoryRequest
 import java.net.SocketTimeoutException
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -29,6 +31,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.intOrNull
+
+private const val VISION_MEMORY_CONTEXT_LIMIT = 3
 
 open class CompanionRuntime @Inject constructor(
     private val configRepository: ConfigRepository,
@@ -47,10 +51,12 @@ open class CompanionRuntime @Inject constructor(
     open suspend fun send(input: UserInput): Flow<AgentEvent> = callbackFlow {
         val startedAt = System.currentTimeMillis()
         val sessionId = appPreferences.currentSessionId.first()
+        val turnId = UUID.randomUUID().toString()
         try {
             AppLogger.info(
                 LogTags.Runtime,
                 "pipeline_started",
+                "turnId" to turnId,
                 "inputType" to input::class.simpleName,
                 "inputLength" to input.content.length,
                 "hasImage" to (input is UserInput.Vision),
@@ -58,6 +64,7 @@ open class CompanionRuntime @Inject constructor(
             )
 
             val memoryContext = memoryRepository.selectPromptContext(input.content)
+                .withVisionContextIfNeeded(input)
             val conversationContext = conversationContextBuilder.build(sessionId)
             val locationContext = if (appPreferences.locationContextEnabled.first()) {
                 withContext(Dispatchers.IO) { locationProvider.getLastKnownLocation() }?.let { loc ->
@@ -81,6 +88,7 @@ open class CompanionRuntime @Inject constructor(
                 "llm_config_loaded",
                 "provider" to config.provider,
                 "model" to config.modelName,
+                "turnId" to turnId,
                 "hasApiKey" to config.apiKey.isNotBlank(),
                 "turnMode" to turnDecision.mode,
                 "toolPolicyMaxRisk" to turnDecision.toolPolicy.maxRiskLevel,
@@ -105,6 +113,7 @@ open class CompanionRuntime @Inject constructor(
                 LogTags.Runtime,
                 "prompt_built",
                 "systemLength" to prompt.systemPrompt.length,
+                "turnId" to turnId,
                 "userMessageLength" to prompt.userMessage.length,
                 "hasImage" to prompt.hasImage,
                 "memoryCount" to memoryContext.memorySnippets.size,
@@ -166,6 +175,7 @@ open class CompanionRuntime @Inject constructor(
             AppLogger.debug(
                 LogTags.Llm,
                 "response_received",
+                "turnId" to turnId,
                 "responseLength" to rawResponse.length,
             )
 
@@ -173,6 +183,7 @@ open class CompanionRuntime @Inject constructor(
                 AppLogger.warn(
                     LogTags.Runtime,
                     "empty_model_response",
+                    "turnId" to turnId,
                     "durationMs" to (System.currentTimeMillis() - startedAt),
                 )
                 trySend(AgentEvent.Error(AgentError.ParseError("Empty model response")))
@@ -190,6 +201,7 @@ open class CompanionRuntime @Inject constructor(
                 AppLogger.debug(
                     LogTags.Runtime,
                     "response_saved",
+                    "turnId" to turnId,
                     "replyLength" to finalResponse.length,
                     "strippedTags" to (rawResponse.length - finalResponse.length),
                 )
@@ -197,6 +209,7 @@ open class CompanionRuntime @Inject constructor(
                 AppLogger.info(
                     LogTags.Runtime,
                     "pipeline_completed",
+                    "turnId" to turnId,
                     "durationMs" to (System.currentTimeMillis() - startedAt),
                     "replyLength" to finalResponse.length,
                 )
@@ -208,6 +221,7 @@ open class CompanionRuntime @Inject constructor(
                 e,
                 "pipeline_failed",
                 "durationMs" to (System.currentTimeMillis() - startedAt),
+                "turnId" to turnId,
                 "inputType" to input::class.simpleName,
                 "inputLength" to input.content.length,
             )
@@ -243,6 +257,28 @@ open class CompanionRuntime @Inject constructor(
 
     private fun stripStructuredTags(text: String): String {
         return STRUCTURED_TAG_REGEX.replace(text, "").trimStart()
+    }
+
+    private suspend fun PromptMemoryContext.withVisionContextIfNeeded(input: UserInput): PromptMemoryContext {
+        if (input !is UserInput.Vision) return this
+        val imageSnippets = runCatching {
+            memoryRepository.getRecentImages(limit = VISION_MEMORY_CONTEXT_LIMIT)
+                .map { memory -> "Image memory: ${memory.content}" }
+        }.getOrElse { error ->
+            AppLogger.warn(
+                LogTags.Runtime,
+                "vision_memory_context_failed",
+                "message" to (error.message ?: error::class.simpleName.orEmpty()),
+            )
+            emptyList()
+        }
+        if (imageSnippets.isEmpty()) return this
+        AppLogger.debug(
+            LogTags.Runtime,
+            "vision_memory_context_selected",
+            "count" to imageSnippets.size,
+        )
+        return copy(memorySnippets = memorySnippets + imageSnippets)
     }
 
     private suspend fun runPostTurnFallback(

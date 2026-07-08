@@ -33,4 +33,10 @@ class ToolDisplayRegistryTest {
         assertEquals("工具已完成", registry.label("unknown", ToolCallStatus.SUCCEEDED))
         assertEquals("工具失败", registry.label("unknown", ToolCallStatus.FAILED))
     }
+    @Test
+    fun label_coversSummaryHealthAndRemoteTools() {
+        assertEquals("回顾摘要中", registry.label("search_summaries", ToolCallStatus.STARTED))
+        assertEquals("已读取健康数据", registry.label("query_health_data", ToolCallStatus.SUCCEEDED))
+        assertEquals("查询外部服务中", registry.label("mcp__amap__search", ToolCallStatus.STARTED))
+    }
 }

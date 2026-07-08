@@ -72,6 +72,7 @@ class SendMessageUseCase @Inject constructor(
         private const val STREAMING_LEADING_FLUSH_CHARS = 4
         private const val IMAGE_ONLY_PROMPT = "我想给你看这张图片。先说说你看到了什么，再自然地回应我。"
         private const val LOCAL_GENERATION_STATUS = "本地模型加载并生成中"
+        private const val VISION_READING_STATUS = "正在看图"
     }
 
     suspend operator fun invoke(
@@ -229,14 +230,24 @@ class SendMessageUseCase @Inject constructor(
                         isStreaming = true,
                         toolStatus = if (configStatus.provider == LlmProvider.LOCAL_QWEN) {
                             LOCAL_GENERATION_STATUS
+                        } else if (pendingImage != null) {
+                            VISION_READING_STATUS
                         } else {
                             null
                         },
+                        toolStatusType = if (pendingImage != null) ToolCallStatus.STARTED else null,
                     )
                 )
             }
 
             val userInput = if (pendingImage != null) {
+                AppLogger.info(
+                    LogTags.Chat,
+                    "vision_image_prepared",
+                    "requestHash" to LogFieldSanitizer.hash(requestId),
+                    "mediaType" to pendingImage.mediaType,
+                    "base64Length" to pendingImage.imageBase64.length,
+                )
                 // M4:vision memory 持久化（fire-and-forget,不阻塞消息发送)。
                 // 失败仅 log,不影响主流程 — 见 MemoryRepository.saveVisionMemory 注释。
                 scope.launch {
@@ -246,6 +257,12 @@ class SendMessageUseCase @Inject constructor(
                             imageBase64 = pendingImage.imageBase64,
                             imageMediaType = pendingImage.mediaType,
                             sourceMessageId = userMsg.id,
+                        )
+                        AppLogger.info(
+                            LogTags.Chat,
+                            "vision_memory_saved",
+                            "requestHash" to LogFieldSanitizer.hash(requestId),
+                            "mediaType" to pendingImage.mediaType,
                         )
                     } catch (e: Exception) {
                         AppLogger.warn(
@@ -370,6 +387,8 @@ class SendMessageUseCase @Inject constructor(
                                 renderDraft = "",
                                 isRenderDraftCode = false,
                                 toolStatus = if (it.toolStatus == LOCAL_GENERATION_STATUS) {
+                                    null
+                                } else if (it.toolStatus == VISION_READING_STATUS) {
                                     null
                                 } else {
                                     it.toolStatus

@@ -11,6 +11,8 @@ import com.xiaoqi.companion.core.prompt.BuiltPrompt
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.MessageRole
+import com.xiaoqi.companion.data.db.converter.MemoryType
+import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.ConversationRepository
@@ -228,6 +230,42 @@ class CompanionRuntimeTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify { promptBuilder.build(match<UserInput> { it is UserInput.Vision }, any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun send_visionInput_injectsRecentImageMemoriesAsReadOnlyContext() = runTest {
+        coEvery { memoryRepository.getRecentImages(any()) } returns listOf(
+            MemoryEntity(
+                id = "vision-memory-1",
+                type = MemoryType.FACT,
+                content = "[图片] 书桌上有一杯茶",
+                source = "reflection:vision",
+                importance = 0.6f,
+                confidence = 0.8f,
+                timestamp = 1L,
+                updatedAt = 1L,
+                lastAccessed = 1L,
+                imageBase64 = "base64",
+            )
+        )
+        val factory = FakeKoogAgentFactory()
+
+        makeRuntime(factory).send(UserInput.Vision("看这个", "base64img", "image/jpeg")).test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify {
+            promptBuilder.build(
+                match<UserInput> { it is UserInput.Vision },
+                any(),
+                any(),
+                any(),
+                match { it.contains("Image memory: [图片] 书桌上有一杯茶") },
+                any(),
+                any(),
+            )
+        }
     }
 
     @Test
