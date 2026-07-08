@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -56,6 +57,7 @@ import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.presence.PresenceMode
+import com.xiaoqi.companion.core.task.activeSummary
 import com.xiaoqi.companion.feature.chat.HomePresencePalette
 import com.xiaoqi.companion.feature.chat.animated
 import com.xiaoqi.companion.feature.chat.homePalette
@@ -250,6 +252,17 @@ private fun AuraHomeContent(
                     )
                     Spacer(Modifier.height(16.dp))
                 }
+                val taskSummary = uiState.longTasks.activeSummary()
+                if (taskSummary.hasActiveTasks) {
+                    item {
+                        LongTaskEntry(
+                            activeCount = taskSummary.activeCount,
+                            latestTitle = taskSummary.latestTitle,
+                            onClick = onOpenChat,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
+                }
                 item {
                     com.xiaoqi.companion.feature.insight.MoodTrendChartSection(
                         snapshots = uiState.moodTrend,
@@ -293,6 +306,40 @@ private fun AuraHomeContent(
             onShowEvidence = onShowEvidence,
             onChat = { onChatFromAction(insight) },
         )
+    }
+}
+
+@Composable
+private fun LongTaskEntry(
+    activeCount: Int,
+    latestTitle: String?,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.58f),
+        tonalElevation = 0.dp,
+        shadowElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = "任务 · $activeCount 个进行中",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = latestTitle ?: "查看正在处理的任务",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+            )
+        }
     }
 }
 

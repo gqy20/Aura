@@ -6,6 +6,7 @@ import com.xiaoqi.companion.core.mcp.McpServerConfig
 import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceReaction
 import com.xiaoqi.companion.core.presence.PresenceUiState
+import com.xiaoqi.companion.core.task.AgentLongTask
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.DefaultLlmValues
 
@@ -157,6 +158,7 @@ data class ChatUiState(
     val toolCalls: List<ChatToolCall> = emptyList(),
     val memories: List<ChatMemory> = emptyList(),
     val reminders: List<ChatReminder> = emptyList(),
+    val longTasks: List<AgentLongTask> = emptyList(),
     val status: CompanionStatus = CompanionStatus(),
     val presenceReaction: PresenceReaction? = null,
     val presence: PresenceUiState = PresenceUiState(),
