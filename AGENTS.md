@@ -4,11 +4,11 @@
 
 - 项目名称：Aura · 奥拉（Android AI 陪伴应用）
 - 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形
-- 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系/Health/Insight/Reminder）；**工具系统双开关**（`mcpEnabled` MCP 总开关 + `systemToolsEnabled` 系统内置工具开关，`CompanionToolRegistry.create()` 按开关短路，与 per-server `enabled` 是"总闸 vs 分闸"关系）；NavHost 六条路由（Home/Chat/Settings/McpSettings/MemoryRoom/Onboarding）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`OnboardingScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）；`LlmConnectivityChecker`；`DataTransparencySection`；`HealthSyncManager` / `HealthDataSection`；**Insight 双路径**（`DreamLoopWorker` 6h 周期 + `ChatViewModel` POST_CHAT 3min 冷却即时触发）；**EvidenceResolver** 中文 FTS + 兆底策略；**InsightValidator** 低门槛（confidence 0.2 / evidence reality 10%）；POST_CHAT 卡片 UI（蓝色徽标 + 分析中指示器）
+- 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系/Health/Insight/Reminder）；**工具系统双开关**（`mcpEnabled` MCP 总开关 + `systemToolsEnabled` 系统内置工具开关，`CompanionToolRegistry.create()` 按开关短路，与 per-server `enabled` 是"总闸 vs 分闸"关系）；**MCP 渐进加载**（`McpServerRouter` 按请求选择服务器、`McpToolSelector` 在服务器内裁剪工具，tool spec 缓存、失败冷却与选择指标）；**LLM 工具协议兼容**（Anthropic SSE 按 `content_block.index` 并行累积工具调用、扁平 JSON 裸字符串保守修复、HTTP 错误体脱敏摘要与请求结构指纹、Koog `Failure`/`ValidationError` 结果终止错误循环）；NavHost 六条路由（Home/Chat/Settings/McpSettings/MemoryRoom/Onboarding）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`OnboardingScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）；`LlmConnectivityChecker`；`DataTransparencySection`；`HealthSyncManager` / `HealthDataSection`；**Insight 双路径**（`DreamLoopWorker` 6h 周期 + `ChatViewModel` POST_CHAT 3min 冷却即时触发）；**EvidenceResolver** 中文 FTS + 兜底策略；**InsightValidator** 低门槛（confidence 0.2 / evidence reality 10%）；POST_CHAT 卡片 UI（蓝色徽标 + 分析中指示器）
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪与关系的头像/表情层由 Compose Canvas 临时替代；Presence Layer 的 Rive/Lottie 动画资源仍缺；Pulse 的离线衰减/回归反应/主动通知仍缺
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest）、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
-- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-06-22 通过（**561 个测试，0 失败**；含工具系统双开关 4 例组合测试 + InsightValidator 8 边界 + EvidenceResolver + ChatViewModel POST_CHAT 触发等。Robolectric 单 fork 复用后 DAO 总耗 -87%）
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-08-08 通过（**624 个测试，0 失败**；含 MCP 渐进加载、SSE 多工具索引累积、工具参数兼容、Koog 错误结果短路、地图交互与既有 DAO/Insight/ChatViewModel 测试。Robolectric 单 fork 复用）
 
 ## 常用验证命令
 
@@ -42,7 +42,7 @@ make test-one T=CompanionRuntimeTest
 ./gradlew.bat build
 ```
 
-以上 Gradle 命令已在 2026-06-22 验证通过（`testDebugUnitTest` **561 个测试全绿**）。测试性能优化详见 CLAUDE.md "并发配置：单 fork 复用 Robolectric Runtime" 段落。
+以上 Gradle 命令已在 2026-08-08 验证通过（`testDebugUnitTest` **624 个测试全绿**）。测试性能优化详见 CLAUDE.md "并发配置：单 fork 复用 Robolectric Runtime" 段落。
 
 ## MNN Benchmark 流程
 
@@ -104,7 +104,17 @@ make test-one T=CompanionRuntimeTest
 
 ## ADB 日志与本地数据排查
 
-调试手机上“发了消息但 UI/记忆不对”时，优先确认当前前台包、进程、logcat 和 Room 数据库。debug 包名通常是 `com.xiaoqi.companion.debug`，release 包名是 `com.xiaoqi.companion`。
+协议兼容问题先用脚本和 JVM 测试定位，避免每轮都启动模拟器：
+
+```powershell
+.\scripts\llm_tool_protocol_probe.ps1 -Provider GLM -Scenario All
+.\scripts\llm_tool_protocol_probe.ps1 -Provider MODELSCOPE -Scenario All
+.\gradlew.bat testDebugUnitTest --tests "com.xiaoqi.companion.core.llm.AnthropicMessagesLLMClientTest"
+```
+
+脚本负责比较 baseline、单/双工具流和 tool-result follow-up，并输出 SSE 事件类型与 `index`，不输出 API Key。MockWebServer 测试负责固定复现交错工具块、畸形参数、错误体和重试。只有脚本与单测通过后，才安装 APK 做一次真实地图 MCP 端到端验收。
+
+调试手机上“发了消息但 UI/记忆不对”时，再确认当前前台包、进程、logcat 和 Room 数据库。debug 包名通常是 `com.xiaoqi.companion.debug`，release 包名是 `com.xiaoqi.companion`。
 
 ### 1. 确认设备、前台包和进程
 

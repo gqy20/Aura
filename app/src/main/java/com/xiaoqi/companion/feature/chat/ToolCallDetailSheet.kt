@@ -1,6 +1,7 @@
 package com.xiaoqi.companion.feature.chat
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,13 +18,24 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +44,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.tools.parser.ToolResultSummary
+import com.xiaoqi.companion.feature.chat.map.MapRouteDraft
+import com.xiaoqi.companion.feature.chat.map.MapToolInteraction
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -53,6 +67,8 @@ import java.util.Locale
 fun ToolCallDetailSheet(
     toolCall: ChatToolCall,
     onDismiss: () -> Unit,
+    onOpenMap: (MapToolInteraction) -> Unit = {},
+    onRerunRoute: (MapRouteDraft) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -61,12 +77,22 @@ fun ToolCallDetailSheet(
         sheetState = sheetState,
         modifier = modifier,
     ) {
-        ToolCallDetailContent(toolCall = toolCall)
+        ToolCallDetailContent(
+            toolCall = toolCall,
+            onOpenMap = onOpenMap,
+            onRerunRoute = onRerunRoute,
+            onDismiss = onDismiss,
+        )
     }
 }
 
 @Composable
-private fun ToolCallDetailContent(toolCall: ChatToolCall) {
+private fun ToolCallDetailContent(
+    toolCall: ChatToolCall,
+    onOpenMap: (MapToolInteraction) -> Unit,
+    onRerunRoute: (MapRouteDraft) -> Unit,
+    onDismiss: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -75,11 +101,130 @@ private fun ToolCallDetailContent(toolCall: ChatToolCall) {
     ) {
         Header(toolCall)
         Divider()
-        SummaryBody(summary = toolCall.summary, errorMessage = toolCall.errorMessage)
+        toolCall.mapInteraction?.let { interaction ->
+            MapInteractionBody(
+                toolCallId = toolCall.id,
+                interaction = interaction,
+                onOpenMap = onOpenMap,
+                onRerunRoute = { draft ->
+                    onDismiss()
+                    onRerunRoute(draft)
+                },
+            )
+            Divider()
+        }
+        if (toolCall.mapInteraction == null || toolCall.summary !is ToolResultSummary.Unknown) {
+            SummaryBody(summary = toolCall.summary, errorMessage = toolCall.errorMessage)
+        }
         toolCall.durationMs?.let { Footer(durationMs = it) }
         Spacer(modifier = Modifier.height(8.dp))
     }
 }
+
+@Composable
+private fun MapInteractionBody(
+    toolCallId: String,
+    interaction: MapToolInteraction,
+    onOpenMap: (MapToolInteraction) -> Unit,
+    onRerunRoute: (MapRouteDraft) -> Unit,
+) {
+    when (interaction) {
+        is MapToolInteraction.Place -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(interaction.name, style = MaterialTheme.typography.titleSmall)
+                interaction.address.takeIf(String::isNotBlank)?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    text = interaction.coordinate.queryValue,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Button(onClick = { onOpenMap(interaction) }) {
+                    Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text("打开地图")
+                }
+            }
+        }
+        is MapToolInteraction.Route -> {
+            var origin by rememberSaveable(toolCallId) { mutableStateOf(interaction.origin.queryValue) }
+            var destination by rememberSaveable(toolCallId) { mutableStateOf(interaction.destination.queryValue) }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${interaction.travelMode.label}路线", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = routeMetric(interaction),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedTextField(
+                    value = origin,
+                    onValueChange = { origin = it },
+                    label = { Text("起点") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    IconButton(onClick = {
+                        val previousOrigin = origin
+                        origin = destination
+                        destination = previousOrigin
+                    }) {
+                        Icon(Icons.Filled.SwapVert, contentDescription = "交换起终点")
+                    }
+                }
+                OutlinedTextField(
+                    value = destination,
+                    onValueChange = { destination = it },
+                    label = { Text("终点") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FilledTonalButton(onClick = { onOpenMap(interaction) }) {
+                        Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("打开地图")
+                    }
+                    Button(
+                        onClick = {
+                            onRerunRoute(
+                                MapRouteDraft(
+                                    origin = origin,
+                                    destination = destination,
+                                    travelMode = interaction.travelMode,
+                                )
+                            )
+                        },
+                        enabled = origin.isNotBlank() && destination.isNotBlank(),
+                    ) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("重新查询")
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun routeMetric(route: MapToolInteraction.Route): String = buildList {
+    route.distanceMeters?.let { distance ->
+        add(if (distance >= 1000) "%.1f km".format(distance / 1000.0) else "$distance m")
+    }
+    route.durationSeconds?.let { duration -> add("约 ${duration / 60} 分钟") }
+}.joinToString(" · ")
 
 @Composable
 private fun Header(toolCall: ChatToolCall) {

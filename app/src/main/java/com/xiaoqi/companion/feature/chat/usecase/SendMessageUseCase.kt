@@ -31,6 +31,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -309,7 +310,12 @@ class SendMessageUseCase @Inject constructor(
                 UserInput.Text(userPrompt)
             }
 
-            runtime.send(userInput).collect { event ->
+            runtime.send(userInput)
+                .transformWhile { event ->
+                    emit(event)
+                    event !is AgentEvent.Complete && event !is AgentEvent.Error
+                }
+                .collect { event ->
                 when (event) {
                     is AgentEvent.Streaming -> {
                         resetIdleTimer()

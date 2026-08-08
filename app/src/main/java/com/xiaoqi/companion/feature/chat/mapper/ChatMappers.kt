@@ -22,6 +22,7 @@ import com.xiaoqi.companion.feature.chat.ChatInsight
 import com.xiaoqi.companion.feature.chat.ChatToolCall
 import com.xiaoqi.companion.feature.chat.CompanionStatus
 import com.xiaoqi.companion.feature.chat.LocalQwenDownloadUiState
+import com.xiaoqi.companion.feature.chat.map.MapToolInteractionParser
 
 /**
  * Chat 模块所有 Entity / Config / DownloadState → Chat* 模型的映射。
@@ -95,7 +96,13 @@ internal fun ToolCallSnapshot.toChatToolCall(
             ToolCallStatus.FAILED -> "Failed"
         },
         durationMs = durationMs,
+        completedAt = completedAt,
         errorMessage = errorMessage,
+        mapInteraction = MapToolInteractionParser.parse(
+            toolName = toolName,
+            argumentsJson = argumentsJson,
+            resultJson = resultJson,
+        ),
         summary = summary,
     )
 

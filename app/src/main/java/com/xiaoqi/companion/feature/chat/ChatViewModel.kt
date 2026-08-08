@@ -50,6 +50,7 @@ import com.xiaoqi.companion.feature.chat.usecase.SendMessageUseCase
 import com.xiaoqi.companion.feature.chat.usecase.SettingsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -62,6 +63,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -320,6 +322,7 @@ class ChatViewModel @Inject constructor(
                                         performanceInfo = streamingTail.performanceInfo,
                                         toolStatus = streamingTail.toolStatus,
                                         toolStatusType = streamingTail.toolStatusType,
+                                        toolCallIds = streamingTail.toolCallIds,
                                     )
                                 } else {
                                     dbMsg
@@ -332,21 +335,23 @@ class ChatViewModel @Inject constructor(
                         }
                     } else {
                         // 无 streaming 消息时，从旧 state 搬运 performanceInfo。
-                        val prevAssistantWithPerf = state.messages
-                            .lastOrNull { !it.isStreaming && it.role == "ASSISTANT" && it.performanceInfo != null }
-                        val enriched = if (prevAssistantWithPerf != null) {
-                            dbMessages.map { dbMsg ->
-                                if (dbMsg.role == "ASSISTANT" && dbMsg.performanceInfo == null &&
-                                    dbMsg.content == prevAssistantWithPerf.content
-                                ) {
-                                    dbMsg.copy(performanceInfo = prevAssistantWithPerf.performanceInfo)
-                                } else {
-                                    dbMsg
-                                }
-                            }
-                        } else {
-                            dbMessages
+                        val previousAssistants = state.messages.filter { previous ->
+                            !previous.isStreaming && previous.role == "ASSISTANT"
                         }
+                        val enriched = dbMessages.map { dbMsg ->
+                            val previous = previousAssistants.lastOrNull { it.content == dbMsg.content }
+                            if (previous == null || dbMsg.role != "ASSISTANT") {
+                                dbMsg
+                            } else {
+                                dbMsg.copy(
+                                    performanceInfo = previous.performanceInfo,
+                                    toolStatus = previous.toolStatus,
+                                    toolStatusType = previous.toolStatusType,
+                                    toolCallIds = previous.toolCallIds,
+                                )
+                            }
+                        }
+                        val prevAssistantWithPerf = previousAssistants.lastOrNull { it.performanceInfo != null }
                         // 调试:跟踪 performanceInfo 是否成功搬运
                         val dbHasPerf = enriched.any { it.performanceInfo != null }
                         val prevHasPerf = prevAssistantWithPerf != null
@@ -854,7 +859,15 @@ class ChatViewModel @Inject constructor(
     }
 
     fun sendMessage(text: String) {
-        if (sendMessageJob?.isActive == true) return
+        sendMessageJob?.takeIf { it.isActive }?.let { activeJob ->
+            if (_uiState.value.isLoading) {
+                AppLogger.debug(LogTags.Chat, "send_message_ignored_generation_active")
+                return
+            }
+            AppLogger.warn(LogTags.Chat, "send_message_stale_job_recovered")
+            activeJob.cancel()
+            sendMessageJob = null
+        }
         val pendingImage = _uiState.value.pendingImage
         AppLogger.info(
             LogTags.Chat,
@@ -1198,9 +1211,20 @@ class ChatViewModel @Inject constructor(
             AppLogger.info(LogTags.Chat, "post_chat_trigger_job_active_skip")
             return
         }
-        lastPostChatInsightAt = now
-        AppLogger.info(LogTags.Chat, "post_chat_trigger_fired")
         postChatInsightJob = viewModelScope.launch {
+            val installedModel = withContext(Dispatchers.IO) {
+                runCatching { localQwenModelDownloader.findAnyInstalledModel() }.getOrNull()
+            }
+            if (installedModel == null) {
+                AppLogger.info(LogTags.Chat, "post_chat_trigger_skipped_model_missing")
+                return@launch
+            }
+            lastPostChatInsightAt = now
+            AppLogger.info(
+                LogTags.Chat,
+                "post_chat_trigger_fired",
+                "model" to installedModel,
+            )
             kotlinx.coroutines.delay(3000L)
             runPostChatInsight()
         }

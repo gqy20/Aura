@@ -25,6 +25,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 data class McpToolSpec(
@@ -66,6 +67,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     private val sessions = mutableMapOf<String, String>()
     private val protocolVersions = mutableMapOf<String, String>()
     private val toolCache = mutableMapOf<String, List<McpToolSpec>>()
+    private val initializedServers = ConcurrentHashMap.newKeySet<String>()
     private val ids = AtomicLong(1)
 
     override suspend fun listTools(serverUrl: String, headers: Map<String, String>): List<McpToolSpec> =
@@ -206,6 +208,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             // 失败时清掉缓存的 session id,下次重试重做握手
             sessions.remove(serverUrl)
             protocolVersions.remove(serverUrl)
+            initializedServers.remove(serverUrl)
             throw McpUnreachableException(
                 e.message ?: e::class.simpleName.orEmpty(),
                 e,
@@ -214,7 +217,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     }
 
     private fun ensureInitialized(serverUrl: String, headers: Map<String, String>) {
-        if (sessions.containsKey(serverUrl)) return
+        if (initializedServers.contains(serverUrl)) return
 
         val startedAt = System.currentTimeMillis()
         AppLogger.info(LogTags.Tools, "mcp_initialize_started", "serverHost" to serverUrl.hostForLog())
@@ -242,6 +245,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
         response.sessionId?.let { sessions[serverUrl] = it }
         response.json?.throwIfJsonRpcError()
         response.json?.negotiatedProtocolVersion()?.let { protocolVersions[serverUrl] = it }
+        initializedServers.add(serverUrl)
         AppLogger.info(
             LogTags.Tools,
             "mcp_initialize_completed",
@@ -327,6 +331,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                 )
                 sessions.remove(serverUrl)
                 protocolVersions.remove(serverUrl)
+                initializedServers.remove(serverUrl)
                 ensureInitialized(serverUrl, headers)
                 return postJson(
                     serverUrl = serverUrl,

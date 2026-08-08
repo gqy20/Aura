@@ -2,6 +2,7 @@ package com.xiaoqi.companion.core.tools
 
 import ai.koog.agents.core.environment.ReceivedToolResult
 import ai.koog.agents.core.environment.ToolResultKind
+import ai.koog.agents.core.feature.model.AIAgentError
 import ai.koog.serialization.JSONObject
 import io.mockk.mockk
 import kotlinx.serialization.json.JsonObject
@@ -11,6 +12,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KoogResultKindPatcherTest {
+
+    @Test
+    fun isErrorResult_recognizesKoogValidationFailureWithoutEnvelope() {
+        val validation = received(
+            content = "Invalid tool arguments",
+            resultKind = ToolResultKind.ValidationError(
+                AIAgentError("missing required argument", "", null)
+            ),
+        )
+
+        assertTrue(validation.isErrorResult())
+    }
+
+    @Test
+    fun isErrorResult_acceptsSuccessfulPlainMcpPayload() {
+        assertTrue(!received(content = "{\"pois\":[]}").isErrorResult())
+    }
 
     @Test
     fun envelopeError_patchesToFailureWithReasonInMessageAndHintInCause() {
@@ -79,14 +97,18 @@ class KoogResultKindPatcherTest {
         assertTrue("plain 应该是 Success", patched[2].resultKind is ToolResultKind.Success)
     }
 
-    private fun received(content: String, toolName: String): ReceivedToolResult =
+    private fun received(
+        content: String,
+        toolName: String = "test_tool",
+        resultKind: ToolResultKind = ToolResultKind.Success,
+    ): ReceivedToolResult =
         ReceivedToolResult(
             id = "call-1",
             tool = toolName,
             toolArgs = mockk<JSONObject>(relaxed = true),
             toolDescription = null,
             content = content,
-            resultKind = ToolResultKind.Success,
+            resultKind = resultKind,
             result = null,
         )
 }

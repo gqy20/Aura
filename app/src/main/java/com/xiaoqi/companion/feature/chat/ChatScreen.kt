@@ -61,6 +61,8 @@ import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.CompanionTheme
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.feature.chat.map.MapIntentLauncher
+import com.xiaoqi.companion.feature.chat.map.MapRoutePromptBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -127,6 +129,8 @@ fun ChatScreen(
         onAttachImage = { viewModel.attachImage(it.toString()) },
         onRemoveImage = { viewModel.removePendingImage() },
         onPresenceTapped = { viewModel.onPresenceTapped() },
+        onOpenMap = { interaction -> MapIntentLauncher.open(context, interaction) },
+        onRerunRoute = { draft -> viewModel.sendMessage(MapRoutePromptBuilder.build(draft)) },
         onNewConversation = { viewModel.startNewConversation() },
         onSwitchConversation = { viewModel.switchConversation(it) },
         onDeleteConversation = { viewModel.deleteConversation(it) },
@@ -151,6 +155,8 @@ fun ChatScreenContent(
     onAttachImage: (Uri) -> Unit,
     onRemoveImage: () -> Unit,
     onPresenceTapped: () -> Unit,
+    onOpenMap: (com.xiaoqi.companion.feature.chat.map.MapToolInteraction) -> Unit = {},
+    onRerunRoute: (com.xiaoqi.companion.feature.chat.map.MapRouteDraft) -> Unit = {},
     onNewConversation: () -> Unit = {},
     onSwitchConversation: (String) -> Unit = {},
     onDeleteConversation: (String) -> Unit = {},
@@ -334,18 +340,33 @@ fun ChatScreenContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(reversedMessages, key = { it.id }) { message ->
-                        val onToolClick = remember(message.id, uiState.toolCalls) {
-                            findToolCallForMessage(message, uiState.toolCalls)?.let { toolCall ->
+                        val messageToolCall = remember(message.id, uiState.toolCalls) {
+                            findToolCallForMessage(message, uiState.toolCalls)
+                        }
+                        val onToolClick = remember(messageToolCall) {
+                            messageToolCall?.let { toolCall ->
                                 { selectedToolCall = toolCall }
                             }
                         }
-                        MessageBubble(
-                            message = message,
+                        Column(
                             modifier = Modifier.animateItem(
                                 fadeInSpec = androidx.compose.animation.core.tween(durationMillis = 250),
                             ),
-                            onToolStatusClick = onToolClick,
-                        )
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            MessageBubble(
+                                message = message,
+                                onToolStatusClick = onToolClick,
+                            )
+                            messageToolCall?.mapInteraction?.let { interaction ->
+                                MapResultCard(
+                                    interaction = interaction,
+                                    onOpenMap = { onOpenMap(interaction) },
+                                    onAdjustRoute = { selectedToolCall = messageToolCall },
+                                    modifier = Modifier.padding(start = 4.dp).fillMaxWidth(),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -363,6 +384,8 @@ fun ChatScreenContent(
                 ToolCallDetailSheet(
                     toolCall = toolCall,
                     onDismiss = { selectedToolCall = null },
+                    onOpenMap = onOpenMap,
+                    onRerunRoute = onRerunRoute,
                 )
             }
 
@@ -607,8 +630,18 @@ internal fun findToolCallForMessage(
     message: ChatMessage,
     toolCalls: List<ChatToolCall>,
 ): ChatToolCall? {
-    if (message.toolStatus == null || message.toolCallIds.isEmpty()) return null
-    return toolCalls.firstOrNull { it.id in message.toolCallIds }
+    if (message.role != "ASSISTANT") return null
+    toolCalls.firstOrNull { it.id in message.toolCallIds }?.let { return it }
+    return toolCalls
+        .asSequence()
+        .filter { it.mapInteraction != null }
+        .filter { call ->
+            val completedAt = call.completedAt ?: return@filter false
+            completedAt <= message.timestamp && message.timestamp - completedAt <= MAP_TOOL_HISTORY_WINDOW_MS
+        }
+        .maxByOrNull { it.completedAt ?: Long.MIN_VALUE }
 }
+
+private const val MAP_TOOL_HISTORY_WINDOW_MS = 2 * 60 * 1000L
 
 //endregion

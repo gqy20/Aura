@@ -98,17 +98,6 @@ fun AuraHomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenMemoryRoom = onOpenMemoryRoom,
         onOpenMcpSettings = onOpenMcpSettings,
-        onInsightClick = { insight ->
-            AppLogger.debug(
-                LogTags.Chat,
-                "insight_tapped",
-                "insightId" to insight.id,
-                "category" to insight.category,
-            )
-            showEvidence = false
-            actionInsight = insight
-            viewModel.openInsight(insight.id)
-        },
         onInsightLongPress = { insight ->
             AppLogger.debug(
                 LogTags.Chat,
@@ -195,7 +184,6 @@ private fun AuraHomeContent(
     onOpenSettings: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
     onOpenMcpSettings: () -> Unit,
-    onInsightClick: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
     onInsightLongPress: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
     onInsightDismiss: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
     onInsightChat: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
@@ -279,7 +267,6 @@ private fun AuraHomeContent(
                     item {
                         com.xiaoqi.companion.feature.insight.InsightCardList(
                             insights = uiState.insights,
-                            onInsightClick = onInsightClick,
                             onInsightLongPress = onInsightLongPress,
                             onInsightDismiss = onInsightDismiss,
                             onInsightChat = onInsightChat,

@@ -19,11 +19,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,8 +33,7 @@ import com.xiaoqi.companion.feature.chat.ChatInsight
 /**
  * 单条 Insight 卡片(plan §4.2 样式)。
  *
- * 布局:类别图标 + "近 7 天" pill → headline (titleMedium) → body (≤ 3 行) →
- * 底部 "和 Aura 聊聊" TextButton + ⨯ IconButton。
+ * 布局:headline + ⨯ IconButton → 类别图标 + 时间范围 → body (≤ 3 行)。
  *
  * 长按卡片 → 触发 [onLongPress] 弹层(类别静音 / 知道了 / 查看依据)。
  */
@@ -45,7 +44,6 @@ internal fun InsightCard(
     onClick: () -> Unit,
     onLongPress: () -> Unit,
     onDismiss: () -> Unit,
-    onChat: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cardColor = if (insight.triggerType == "POST_CHAT") {
@@ -59,12 +57,43 @@ internal fun InsightCard(
         tonalElevation = 0.dp,
         modifier = modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
+            .combinedClickable(
+                role = Role.Button,
+                onClickLabel = "和 Aura 聊聊",
+                onClick = onClick,
+                onLongClick = onLongPress,
+            ),
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = insight.headline,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "知道了",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -96,14 +125,6 @@ internal fun InsightCard(
                     )
                 }
             }
-            Text(
-                text = insight.headline,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
             if (insight.bodyMarkdown.isNotBlank()) {
                 Text(
                     text = insight.bodyMarkdown,
@@ -112,26 +133,6 @@ internal fun InsightCard(
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(onClick = onChat) {
-                    Text("和 Aura 聊聊")
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "知道了",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
             }
         }
     }

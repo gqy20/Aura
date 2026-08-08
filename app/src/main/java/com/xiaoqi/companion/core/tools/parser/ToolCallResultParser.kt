@@ -5,8 +5,7 @@ import com.xiaoqi.companion.core.tools.isError
 import com.xiaoqi.companion.core.tools.parseErrorHint
 import com.xiaoqi.companion.core.tools.parseErrorReason
 import com.xiaoqi.companion.core.tools.parseOrNull
-import com.xiaoqi.companion.core.logging.AppLogger
-import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.core.tools.normalizeToolResultJson
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
@@ -32,24 +31,25 @@ class ToolCallResultParser @Inject constructor() {
 
     fun parse(toolName: String, resultJson: String?): ToolResultSummary {
         if (resultJson.isNullOrBlank()) return ToolResultSummary.Unknown(raw = "")
+        val normalized = normalizeToolResultJson(resultJson)
 
-        if (isError(resultJson)) {
+        if (isError(normalized)) {
             return ToolResultSummary.Failed(
                 title = toolTitle(toolName),
-                reason = parseErrorReason(resultJson) ?: "tool_error",
-                hint = parseErrorHint(resultJson),
+                reason = parseErrorReason(normalized) ?: "tool_error",
+                hint = parseErrorHint(normalized),
             )
         }
 
-        val env = parseOrNull(resultJson)
+        val env = parseOrNull(normalized)
         if (env is ToolEnvelope.Ok) {
             return parseEnvelopeOk(toolName, env.data)
         }
 
         // Legacy 裸 JSON:search_records 的 {count, results}、create_local_reminder
         // (CreateLocalReminderTool.kt:122 不走 envelope,直接 buildJsonObject) 等旧结构。
-        return parseLegacy(toolName, resultJson)
-            ?: ToolResultSummary.Unknown(raw = resultJson)
+        return parseLegacy(toolName, normalized)
+            ?: ToolResultSummary.Unknown(raw = normalized)
     }
 
     private fun parseEnvelopeOk(toolName: String, data: JsonObject): ToolResultSummary {
@@ -212,17 +212,7 @@ class ToolCallResultParser @Inject constructor() {
             } else {
                 null
             }
-        }
-            .onFailure {
-                AppLogger.debug(
-                    LogTags.Parser,
-                    "tool_legacy_parse_failed",
-                    "tool" to toolName,
-                    "rawLength" to raw.length,
-                    "error" to (it.message ?: it::class.simpleName.orEmpty()),
-                )
-            }
-            .getOrNull()
+        }.getOrNull()
     }
 
     private fun toolTitle(toolName: String): String = when (toolName) {

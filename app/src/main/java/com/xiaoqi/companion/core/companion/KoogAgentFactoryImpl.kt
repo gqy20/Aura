@@ -37,6 +37,8 @@ import com.xiaoqi.companion.core.tools.ToolCallRecorder
 import com.xiaoqi.companion.core.tools.ToolResultPromptComposer
 import com.xiaoqi.companion.core.tools.ToolScope
 import com.xiaoqi.companion.core.tools.isError
+import com.xiaoqi.companion.core.tools.isErrorResult
+import com.xiaoqi.companion.core.tools.normalizeToolResultJson
 import com.xiaoqi.companion.core.tools.withErrorResultKind
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.LlmConfig
@@ -203,7 +205,10 @@ private class KoogPromptExecutorWrapper(
                 if (prompt.hasImage || !prompt.allowTools) {
                     ToolRegistry.EMPTY
                 } else {
-                    toolRegistry.create(policy = prompt.toolPolicy)
+                    toolRegistry.createForQuery(
+                        query = prompt.userMessage,
+                        policy = prompt.toolPolicy,
+                    )
                 }
             )
             .maxIterations(MAX_AGENT_ITERATIONS)
@@ -232,7 +237,7 @@ private class KoogPromptExecutorWrapper(
                     onToolCallCompleted { context ->
                         val callId = context.toolCallId?.ifBlank { context.eventId } ?: context.eventId
                         val argumentsJson = context.toolArgs.toString()
-                        val resultJson = context.toolResult.toString()
+                        val resultJson = normalizeToolResultJson(context.toolResult.toString())
                         toolCallRecorder.succeed(callId = callId, resultJson = resultJson)
                         observer?.onToolUpdated(
                             AgentToolCall(
@@ -291,9 +296,19 @@ private class KoogPromptExecutorWrapper(
             // 翻 envelope 失败的 resultKind,让 Koog 标准的 Message.Tool.Result.isError 也被点亮
             toolResultRounds += 1
             val patchedResults = results.withErrorResultKind()
-            val hasErrors = results.any { isError(it.content) }
+            val hasErrors = results.any { it.isErrorResult() }
             val roundLimitReached = toolResultRounds >= prompt.toolPolicy.maxToolRoundsPerTurn
             val finalWithoutTools = hasErrors || roundLimitReached
+            results.forEach { result ->
+                AppLogger.info(
+                    LogTags.Llm,
+                    "tool_execution_result_received",
+                    "toolName" to result.tool,
+                    "resultKind" to result.resultKind::class.simpleName.orEmpty(),
+                    "contentLength" to result.content.length,
+                    "contentClass" to result.content.diagnosticContentClass(),
+                )
+            }
             llm.writeSession {
                 appendPrompt {
                     tool {
@@ -372,6 +387,15 @@ private class KoogPromptExecutorWrapper(
         const val MAX_AGENT_ITERATIONS = 12
         const val DEFAULT_SESSION_ID = "default"
     }
+}
+
+private fun String.diagnosticContentClass(): String = when {
+    isBlank() -> "blank"
+    contains("not found", ignoreCase = true) -> "tool_not_found"
+    contains("validation", ignoreCase = true) -> "validation_error"
+    contains("required", ignoreCase = true) -> "missing_required_argument"
+    contains("error", ignoreCase = true) -> "error_payload"
+    else -> "payload"
 }
 
 private interface KoogAgentObserver {

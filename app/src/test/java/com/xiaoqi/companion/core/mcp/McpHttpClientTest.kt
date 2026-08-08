@@ -19,6 +19,7 @@ class McpHttpClientTest {
     private val sessionHeaders = CopyOnWriteArrayList<String?>()
     private val protocolHeaders = CopyOnWriteArrayList<String?>()
     private var rejectFirstToolsCallWithInvalidSession = false
+    private var issueSessionHeader = true
     private var toolsListCalls = 0
 
     @Before
@@ -32,7 +33,7 @@ class McpHttpClientTest {
 
             when {
                 body.contains("\"method\":\"initialize\"") -> {
-                    exchange.responseHeaders.add("Mcp-Session-Id", "session-1")
+                    if (issueSessionHeader) exchange.responseHeaders.add("Mcp-Session-Id", "session-1")
                     exchange.respondJson(
                         """{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26","capabilities":{},"serverInfo":{"name":"test","version":"1"}}}"""
                     )
@@ -113,6 +114,23 @@ class McpHttpClientTest {
         assertEquals(1, tools.size)
         assertEquals(2, toolsListCalls)
         assertTrue(requests.count { it.contains("\"method\":\"initialize\"") } >= 2)
+    }
+
+    @Test
+    fun sessionlessServer_isInitializedOnlyOnceAcrossListAndCall() = runTest {
+        issueSessionHeader = false
+        val client: RemoteMcpClient = McpHttpClient()
+
+        client.listTools(serverUrl)
+        client.callTool(
+            serverUrl = serverUrl,
+            toolName = "echo",
+            arguments = kotlinx.serialization.json.buildJsonObject {
+                put("text", kotlinx.serialization.json.JsonPrimitive("hello"))
+            },
+        )
+
+        assertEquals(1, requests.count { it.contains("\"method\":\"initialize\"") })
     }
 
     private fun HttpExchange.respondJson(response: String, statusCode: Int = 200) {

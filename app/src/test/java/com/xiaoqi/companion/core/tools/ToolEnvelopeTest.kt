@@ -75,6 +75,15 @@ class ToolEnvelopeTest {
         assertNull(parseOrNull("""{"status":"weird","reason":"x"}"""))
     }
 
+    @Test
+    fun parseOrNull_acceptsDoubleEncodedEnvelopeAndIgnoresLegacyJson() {
+        val encoded = encode(ToolEnvelope.Ok(data = buildJsonObject { put("k", JsonPrimitive("v")) }))
+        val doubleEncoded = JsonPrimitive(encoded).toString()
+
+        assertTrue(parseOrNull(doubleEncoded) is ToolEnvelope.Ok)
+        assertNull(parseOrNull("""{"epochMillis":123,"timezone":"Asia/Shanghai"}"""))
+    }
+
     // --- isError quick check ---
 
     @Test

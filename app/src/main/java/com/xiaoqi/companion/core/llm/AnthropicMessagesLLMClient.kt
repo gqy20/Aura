@@ -64,7 +64,23 @@ data class LlmRetryPolicy(
 private class LlmHttpException(
     val statusCode: Int,
     val retryAfterMs: Long?,
-) : IOException("HTTP $statusCode")
+    val errorBodyPreview: String?,
+) : IOException(buildString {
+    append("HTTP $statusCode")
+    if (!errorBodyPreview.isNullOrBlank()) append(": $errorBodyPreview")
+})
+
+private data class PendingToolCall(
+    val id: String?,
+    val name: String,
+    val input: StringBuilder = StringBuilder(),
+)
+
+private data class NormalizedToolInput(
+    val content: String,
+    val repaired: Boolean,
+    val valid: Boolean,
+)
 
 class AnthropicMessagesLLMClient(
     private val apiKey: String,
@@ -136,10 +152,31 @@ class AnthropicMessagesLLMClient(
         val startedAt = System.currentTimeMillis()
         var fullText = ""
         var finishReason: String? = null
-        var currentToolId: String? = null
-        var currentToolName: String? = null
-        var currentToolInput = StringBuilder()
+        val pendingTools = mutableMapOf<Int, PendingToolCall>()
         var hasEmittedFrame = false
+
+        fun completeTool(index: Int) {
+            val tool = pendingTools.remove(index) ?: return
+            val normalized = normalizeToolInput(tool.input.toString())
+            hasEmittedFrame = true
+            trySend(
+                StreamFrame.ToolCallComplete(
+                    id = tool.id,
+                    name = tool.name,
+                    content = normalized.content,
+                    index = index,
+                )
+            )
+            AppLogger.info(
+                LogTags.Llm,
+                "stream_tool_completed",
+                "tool" to tool.name,
+                "index" to index,
+                "inputLength" to tool.input.length,
+                "inputRepaired" to normalized.repaired,
+                "inputValid" to normalized.valid,
+            )
+        }
 
         val job = launch(Dispatchers.IO) {
             try {
@@ -155,13 +192,19 @@ class AnthropicMessagesLLMClient(
                     canRetry = { !hasEmittedFrame },
                 ) {
                     finishReason = null
-                    currentToolId = null
-                    currentToolName = null
-                    currentToolInput = StringBuilder()
+                    pendingTools.clear()
                     val request = buildRequest(prompt, model, stream = true, tools = tools)
                     httpClient.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) {
-                            throw response.toHttpException()
+                            val errorBody = response.body?.string().orEmpty()
+                            AppLogger.warn(
+                                LogTags.Llm,
+                                "stream_http_error",
+                                "statusCode" to response.code,
+                                "model" to model.id,
+                                "errorBodyPreview" to sanitizeErrorBody(errorBody),
+                            )
+                            throw response.toHttpException(errorBody)
                         }
 
                         val source = response.body?.source()
@@ -175,59 +218,43 @@ class AnthropicMessagesLLMClient(
 
                             val parsed = parseSseData(data)
                             if (parsed.isToolUseBlock && parsed.toolName != null) {
-                                currentToolId = parsed.toolId
-                                currentToolName = parsed.toolName
-                                currentToolInput = StringBuilder()
-                                AppLogger.debug(LogTags.Llm, "stream_tool_start", "tool" to parsed.toolName)
+                                val index = parsed.index ?: nextSyntheticToolIndex(pendingTools)
+                                pendingTools[index] = PendingToolCall(parsed.toolId, parsed.toolName)
+                                AppLogger.debug(
+                                    LogTags.Llm,
+                                    "stream_tool_start",
+                                    "tool" to parsed.toolName,
+                                    "index" to index,
+                                    "indexMissing" to (parsed.index == null),
+                                )
                             }
                             if (parsed.toolInput != null) {
-                                currentToolInput.append(parsed.toolInput)
+                                val pending = parsed.index?.let(pendingTools::get)
+                                    ?: pendingTools.values.singleOrNull()
+                                if (pending != null) {
+                                    pending.input.append(parsed.toolInput)
+                                } else {
+                                    AppLogger.warn(
+                                        LogTags.Llm,
+                                        "stream_tool_delta_orphaned",
+                                        "index" to parsed.index,
+                                        "deltaLength" to parsed.toolInput.length,
+                                        "pendingCount" to pendingTools.size,
+                                    )
+                                }
                             }
                             if (parsed.deltaText != null) {
                                 fullText += parsed.deltaText
                                 hasEmittedFrame = true
                                 trySend(StreamFrame.TextDelta(parsed.deltaText, null))
                             }
-                            if (parsed.isContentBlockStop && currentToolName != null) {
-                                hasEmittedFrame = true
-                                trySend(
-                                    StreamFrame.ToolCallComplete(
-                                        id = currentToolId,
-                                        name = currentToolName.orEmpty(),
-                                        content = currentToolInput.toString(),
-                                        index = null,
-                                    )
-                                )
-                                AppLogger.info(
-                                    LogTags.Llm,
-                                    "stream_tool_completed",
-                                    "tool" to currentToolName,
-                                    "inputLength" to currentToolInput.length,
-                                )
-                                currentToolId = null
-                                currentToolName = null
+                            if (parsed.isContentBlockStop) {
+                                val stoppedIndex = parsed.index
+                                    ?: pendingTools.keys.singleOrNull { it < 0 }
+                                stoppedIndex?.let(::completeTool)
                             }
                             if (parsed.finishReason != null) {
                                 finishReason = parsed.finishReason
-                                if (currentToolName != null) {
-                                    hasEmittedFrame = true
-                                    trySend(
-                                        StreamFrame.ToolCallComplete(
-                                            id = currentToolId,
-                                            name = currentToolName.orEmpty(),
-                                            content = currentToolInput.toString(),
-                                            index = null,
-                                        )
-                                    )
-                                    AppLogger.info(
-                                        LogTags.Llm,
-                                        "stream_tool_completed",
-                                        "tool" to currentToolName,
-                                        "inputLength" to currentToolInput.length,
-                                    )
-                                    currentToolId = null
-                                    currentToolName = null
-                                }
                             }
                         }
                     }
@@ -237,13 +264,16 @@ class AnthropicMessagesLLMClient(
                     trySend(StreamFrame.TextComplete(fullText, null))
                 }
 
-                if (finishReason == "tool_use" && currentToolName != null) {
-                    AppLogger.info(
+                if (pendingTools.isNotEmpty()) {
+                    val incompleteTools = pendingTools.values.joinToString(",") { it.name }
+                    AppLogger.warn(
                         LogTags.Llm,
-                        "stream_tool_use_final",
-                        "tool" to currentToolName,
-                        "input" to currentToolInput.toString(),
+                        "stream_tool_incomplete",
+                        "indexes" to pendingTools.keys.sorted().joinToString(","),
+                        "tools" to incompleteTools,
                     )
+                    pendingTools.clear()
+                    throw IOException("Streaming response ended with incomplete tool calls: $incompleteTools")
                 }
                 AppLogger.info(
                     LogTags.Llm,
@@ -301,7 +331,7 @@ class AnthropicMessagesLLMClient(
                             "durationMs" to (System.currentTimeMillis() - startedAt),
                             "errorBodyLength" to body.length,
                         )
-                        throw response.toHttpException()
+                        throw response.toHttpException(body)
                     }
                     json.parseToJsonElement(body).jsonObject
                 }
@@ -362,13 +392,14 @@ class AnthropicMessagesLLMClient(
         else -> false
     }
 
-    private fun Response.toHttpException(): LlmHttpException =
+    private fun Response.toHttpException(errorBody: String): LlmHttpException =
         LlmHttpException(
             statusCode = code,
             retryAfterMs = header("Retry-After")
                 ?.trim()
                 ?.toLongOrNull()
                 ?.times(1_000),
+            errorBodyPreview = sanitizeErrorBody(errorBody),
         )
 
     private fun buildRequest(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): Request {
@@ -382,6 +413,8 @@ class AnthropicMessagesLLMClient(
             "stream" to stream,
             "systemMessageCount" to prompt.messages.filterIsInstance<Message.System>().size,
             "messageCount" to prompt.messages.count { it !is Message.System },
+            "messageShape" to body.messageShape(),
+            "toolCount" to tools.size,
             "hasApiKey" to apiKey.isNotBlank(),
         )
         return Request.Builder()
@@ -481,7 +514,7 @@ class AnthropicMessagesLLMClient(
     }
 
     private fun String.toToolInput(): JsonObject =
-        runCatching { json.parseToJsonElement(this).jsonObject }
+        runCatching { json.parseToJsonElement(normalizeToolInput(this).content).jsonObject }
             .getOrElse {
                 buildJsonObject { put("_raw", this@toToolInput) }
             }
@@ -584,6 +617,7 @@ class AnthropicMessagesLLMClient(
             .getOrNull()
             ?: return ParsedSse()
         val type = event["type"]?.jsonPrimitive?.contentOrNull
+        val index = event["index"]?.jsonPrimitive?.intOrNull
         if (type == "message_delta") {
             return ParsedSse(
                 finishReason = event["delta"]?.jsonObject
@@ -594,6 +628,7 @@ class AnthropicMessagesLLMClient(
             val block = event["content_block"]?.jsonObject ?: return ParsedSse()
             if (block["type"]?.jsonPrimitive?.contentOrNull == "tool_use") {
                 return ParsedSse(
+                    index = index,
                     isToolUseBlock = true,
                     toolId = block["id"]?.jsonPrimitive?.contentOrNull,
                     toolName = block["name"]?.jsonPrimitive?.contentOrNull,
@@ -602,15 +637,15 @@ class AnthropicMessagesLLMClient(
             return ParsedSse()
         }
         if (type == "content_block_stop") {
-            return ParsedSse(isContentBlockStop = true)
+            return ParsedSse(index = index, isContentBlockStop = true)
         }
         if (type != "content_block_delta") return ParsedSse()
 
         val delta = event["delta"]?.jsonObject ?: return ParsedSse()
         val deltaType = delta["type"]?.jsonPrimitive?.contentOrNull
         return when (deltaType) {
-            "text_delta" -> ParsedSse(deltaText = delta["text"]?.jsonPrimitive?.contentOrNull)
-            "input_json_delta" -> ParsedSse(toolInput = delta["partial_json"]?.jsonPrimitive?.contentOrNull)
+            "text_delta" -> ParsedSse(index = index, deltaText = delta["text"]?.jsonPrimitive?.contentOrNull)
+            "input_json_delta" -> ParsedSse(index = index, toolInput = delta["partial_json"]?.jsonPrimitive?.contentOrNull)
             else -> ParsedSse()
         }
     }
@@ -623,6 +658,7 @@ class AnthropicMessagesLLMClient(
         )
 
     private data class ParsedSse(
+        val index: Int? = null,
         val deltaText: String? = null,
         val finishReason: String? = null,
         val toolId: String? = null,
@@ -641,6 +677,78 @@ class AnthropicMessagesLLMClient(
                 .build()
     }
 }
+
+private fun nextSyntheticToolIndex(pending: Map<Int, PendingToolCall>): Int =
+    generateSequence(-1) { it - 1 }.first { it !in pending }
+
+private fun normalizeToolInput(raw: String): NormalizedToolInput {
+    if (runCatching { Json.parseToJsonElement(raw).jsonObject }.isSuccess) {
+        return NormalizedToolInput(raw, repaired = false, valid = true)
+    }
+    val repaired = repairFlatJsonValues(raw)
+    val valid = repaired != null && runCatching { Json.parseToJsonElement(repaired).jsonObject }.isSuccess
+    return if (valid) {
+        NormalizedToolInput(repaired.orEmpty(), repaired = true, valid = true)
+    } else {
+        NormalizedToolInput(raw, repaired = false, valid = false)
+    }
+}
+
+private fun repairFlatJsonValues(raw: String): String? {
+    val trimmed = raw.trim()
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null
+    var inString = false
+    var escaped = false
+    for (index in 1 until trimmed.lastIndex) {
+        val char = trimmed[index]
+        if (escaped) {
+            escaped = false
+        } else if (char == '\\' && inString) {
+            escaped = true
+        } else if (char == '"') {
+            inString = !inString
+        } else if (!inString && (char == '{' || char == '[')) {
+            return null
+        }
+    }
+
+    val valuePattern = Regex("""(:\s*)([^,}\s][^,}]*)\s*(?=,|})""")
+    var changed = false
+    val candidate = valuePattern.replace(trimmed) { match ->
+        val prefix = match.groupValues[1]
+        val token = match.groupValues[2].trim()
+        val isAlreadyJson = token.startsWith('"') ||
+            token == "true" || token == "false" || token == "null" || token.toDoubleOrNull() != null
+        if (isAlreadyJson) {
+            match.value
+        } else {
+            changed = true
+            prefix + JsonPrimitive(token).toString()
+        }
+    }
+    return candidate.takeIf { changed }
+}
+
+private fun sanitizeErrorBody(body: String): String? = body
+    .replace(Regex("""(?i)(bearer\s+|api[_-]?key[\"']?\s*[:=]\s*[\"']?)[^\s\"',}]+"""), "$1[REDACTED]")
+    .replace(Regex("\\s+"), " ")
+    .trim()
+    .take(400)
+    .ifBlank { null }
+
+private fun JsonObject.messageShape(): String = this["messages"]
+    ?.jsonArray
+    ?.joinToString(">") { message ->
+        val obj = message.jsonObject
+        val role = obj["role"]?.jsonPrimitive?.contentOrNull ?: "?"
+        val types = obj["content"]?.jsonArray
+            ?.mapNotNull { it.jsonObject["type"]?.jsonPrimitive?.contentOrNull }
+            ?.distinct()
+            ?.joinToString("+")
+            .orEmpty()
+        "$role:${types.ifEmpty { "unknown" }}"
+    }
+    .orEmpty()
 
 class AnthropicMessagesLLMClientFactory @Inject constructor() {
     fun create(apiKey: String, baseUrl: String): AnthropicMessagesLLMClient =

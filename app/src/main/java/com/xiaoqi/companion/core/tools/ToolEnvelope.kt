@@ -1,7 +1,5 @@
 package com.xiaoqi.companion.core.tools
 
-import com.xiaoqi.companion.core.logging.AppLogger
-import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.db.converter.MemoryType
 import com.xiaoqi.companion.data.db.converter.SummaryType
 import kotlinx.serialization.Serializable
@@ -144,30 +142,18 @@ fun encode(envelope: ToolEnvelope): String = when (envelope) {
  */
 fun parseOrNull(raw: String?): ToolEnvelope? {
     if (raw.isNullOrBlank()) return null
-    return runCatching {
-        // 先尝试 Ok 形态(默认 status="ok",所以原 data 字段必填)
-        runCatching { envelopeJson.decodeFromString(OkEnvelope.serializer(), raw) }
-            .onFailure {
-                AppLogger.debug(
-                    LogTags.Parser,
-                    "envelope_ok_parse_failed",
-                    "rawLength" to raw.length,
-                )
-            }
+    val normalized = normalizeToolResultJson(raw)
+    val obj = runCatching { envelopeJson.parseToJsonElement(normalized) }.getOrNull() as? JsonObject
+        ?: return null
+    return when ((obj["status"] as? JsonPrimitive)?.content) {
+        "ok" -> runCatching { envelopeJson.decodeFromString(OkEnvelope.serializer(), normalized) }
             .getOrNull()
             ?.let { ToolEnvelope.Ok(data = it.data) }
-        // 再尝试 Error 形态
-            ?: runCatching { envelopeJson.decodeFromString(ErrorEnvelope.serializer(), raw) }
-                .onFailure {
-                    AppLogger.debug(
-                        LogTags.Parser,
-                        "envelope_error_parse_failed",
-                        "rawLength" to raw.length,
-                    )
-                }
-                .getOrNull()
-                ?.let { ToolEnvelope.Error(reason = it.reason, hint = it.hint, details = it.details) }
-    }.getOrNull()
+        "error" -> runCatching { envelopeJson.decodeFromString(ErrorEnvelope.serializer(), normalized) }
+            .getOrNull()
+            ?.let { ToolEnvelope.Error(reason = it.reason, hint = it.hint, details = it.details) }
+        else -> null
+    }
 }
 
 /**
@@ -176,7 +162,8 @@ fun parseOrNull(raw: String?): ToolEnvelope? {
  */
 fun isError(raw: String?): Boolean {
     if (raw.isNullOrBlank()) return false
-    val obj = runCatching { envelopeJson.parseToJsonElement(raw) }.getOrNull() as? JsonObject ?: return false
+    val obj = runCatching { envelopeJson.parseToJsonElement(normalizeToolResultJson(raw)) }.getOrNull() as? JsonObject
+        ?: return false
     val status = obj["status"] as? JsonPrimitive ?: return false
     return status.content == "error"
 }

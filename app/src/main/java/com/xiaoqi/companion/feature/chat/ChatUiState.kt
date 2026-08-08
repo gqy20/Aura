@@ -41,7 +41,9 @@ data class ChatToolCall(
     val label: String,
     val status: String,
     val durationMs: Long? = null,
+    val completedAt: Long? = null,
     val errorMessage: String? = null,
+    val mapInteraction: com.xiaoqi.companion.feature.chat.map.MapToolInteraction? = null,
     /**
      * 工具结果的结构化摘要,供 detail panel 渲染。
      * - STARTED 时为 null(还没结果)

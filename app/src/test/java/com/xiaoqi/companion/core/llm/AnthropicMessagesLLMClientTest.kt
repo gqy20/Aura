@@ -20,6 +20,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -103,13 +104,19 @@ class AnthropicMessagesLLMClientTest {
 
     @Test
     fun execute_doesNotRetryNonTransientHttpFailure() = runTest {
-        server.enqueue(MockResponse().setResponseCode(400).setBody("bad request"))
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(400)
+                .setBody("""{"error":"bad request shape","api_key":"secret-value"}""")
+        )
 
         val failure = runCatching {
             client().execute(simplePrompt(), model, emptyList())
         }.exceptionOrNull()
 
         assertTrue(failure?.message?.contains("HTTP 400") == true)
+        assertTrue(failure?.message?.contains("bad request shape") == true)
+        assertFalse(failure?.message?.contains("secret-value") == true)
         assertEquals(1, server.requestCount)
     }
 
@@ -138,6 +145,73 @@ class AnthropicMessagesLLMClientTest {
         assertEquals(2, server.requestCount)
     }
 
+    @Test
+    fun executeStreaming_accumulatesInterleavedToolsByContentBlockIndex() = runTest {
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"map-1","name":"maps_around_search"}}""",
+                """{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"query\":"}}""",
+                """{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"memory-1","name":"search_records"}}""",
+                """{"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"query\":睡眠,"}}""",
+                """{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"咖啡\"}"}}""",
+                """{"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"\"limit\":10}"}}""",
+                """{"type":"content_block_stop","index":2}""",
+                """{"type":"content_block_stop","index":1}""",
+                """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val frames = client().executeStreaming(simplePrompt(), model, emptyList()).toList()
+        val calls = frames.filterIsInstance<StreamFrame.ToolCallComplete>()
+
+        assertEquals(listOf("search_records", "maps_around_search"), calls.map { it.name })
+        assertEquals(listOf(2, 1), calls.map { it.index })
+        assertEquals("睡眠", json.parseToJsonElement(calls[0].content).jsonObject.getValue("query").jsonPrimitive.content)
+        assertEquals(10, json.parseToJsonElement(calls[0].content).jsonObject.getValue("limit").jsonPrimitive.content.toInt())
+        assertEquals("咖啡", json.parseToJsonElement(calls[1].content).jsonObject.getValue("query").jsonPrimitive.content)
+    }
+
+    @Test
+    fun executeStreaming_doesNotCompleteToolWhenAnotherContentBlockStops() = runTest {
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"map-1","name":"maps_around_search"}}""",
+                """{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"query\":\"咖啡\"}"}}""",
+                """{"type":"content_block_stop","index":0}""",
+                """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val failure = runCatching {
+            client().executeStreaming(simplePrompt(), model, emptyList()).toList()
+        }.exceptionOrNull()
+
+        assertTrue(failure?.message?.contains("incomplete tool calls") == true)
+    }
+
+    @Test
+    fun executeStreaming_supportsSingleToolProviderWithoutIndexes() = runTest {
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","content_block":{"type":"tool_use","id":"map-1","name":"maps_around_search"}}""",
+                """{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{\"query\":\"咖啡\"}"}}""",
+                """{"type":"content_block_stop"}""",
+                """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val calls = client().executeStreaming(simplePrompt(), model, emptyList())
+            .toList()
+            .filterIsInstance<StreamFrame.ToolCallComplete>()
+
+        assertEquals(1, calls.size)
+        assertEquals("maps_around_search", calls.single().name)
+        assertEquals(-1, calls.single().index)
+    }
+
     private fun client() = AnthropicMessagesLLMClient(
         apiKey = "test-key",
         baseUrl = server.url("/").toString().trimEnd('/'),
@@ -160,6 +234,11 @@ class AnthropicMessagesLLMClientTest {
         .setBody(
             """{"type":"message","role":"assistant","content":[{"type":"text","text":"$text"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}"""
         )
+
+    private fun sseResponse(vararg events: String) = MockResponse()
+        .setResponseCode(200)
+        .setHeader("Content-Type", "text/event-stream")
+        .setBody(events.joinToString("\n\n", postfix = "\n\n") { "data: $it" })
 
     private val serverClient = okhttp3.OkHttpClient.Builder().build()
 

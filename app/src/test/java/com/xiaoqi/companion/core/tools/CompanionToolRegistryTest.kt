@@ -269,4 +269,34 @@ class CompanionToolRegistryTest {
         assertTrue(tools.tools.any { it.name.endsWith("__amap_search") })
         coVerify(exactly = 1) { client.listTools(any(), any()) }
     }
+
+    @Test
+    fun createForQuery_registersOnlyRelevantMcpToolsAndReusesCatalogCache() = runTest {
+        val repo = mockk<McpServerListRepository> {
+            coEvery { readAll() } returns listOf(readyMcpServer)
+        }
+        val specs = listOf(
+            "maps_geo" to "Convert an address to coordinates",
+            "maps_weather" to "Query weather",
+            "maps_text_search" to "Search POIs",
+            "maps_around_search" to "Search nearby POIs",
+            "maps_direction_walking" to "Plan a walking route",
+            "maps_direction_driving" to "Plan a driving route",
+            "maps_direction_transit_integrated" to "Plan a transit route",
+        ).map { (name, description) -> McpToolSpec(name, description, buildJsonObject {}) }
+        val client = mockk<RemoteMcpClient> {
+            coEvery { listTools(any(), any()) } returns specs
+        }
+        val registry = newRegistry(appPrefs(system = false, mcp = true), repo, client)
+
+        val first = registry.createForQuery("查西湖附近的咖啡店和步行路线", ToolScope.MCP_ONLY)
+        val second = registry.createForQuery("查西湖附近的咖啡店和步行路线", ToolScope.MCP_ONLY)
+
+        assertTrue(first.tools.size <= 5)
+        assertTrue(first.tools.any { it.name.endsWith("__maps_around_search") })
+        assertTrue(first.tools.any { it.name.endsWith("__maps_direction_walking") })
+        assertTrue(first.tools.none { it.name.endsWith("__maps_weather") })
+        assertEquals(first.tools.map { it.name }, second.tools.map { it.name })
+        coVerify(exactly = 1) { client.listTools(any(), any()) }
+    }
 }

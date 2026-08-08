@@ -38,7 +38,6 @@ import com.xiaoqi.companion.feature.chat.ChatInsight
 internal fun InsightCardList(
     insights: List<ChatInsight>,
     limit: Int = 3,
-    onInsightClick: (ChatInsight) -> Unit,
     onInsightLongPress: (ChatInsight) -> Unit,
     onInsightDismiss: (ChatInsight) -> Unit,
     onInsightChat: (ChatInsight) -> Unit,
@@ -62,10 +61,9 @@ internal fun InsightCardList(
         visible.forEach { insight ->
             InsightCard(
                 insight = insight,
-                onClick = { onInsightClick(insight) },
+                onClick = { onInsightChat(insight) },
                 onLongPress = { onInsightLongPress(insight) },
                 onDismiss = { onInsightDismiss(insight) },
-                onChat = { onInsightChat(insight) },
             )
         }
     }

@@ -32,3 +32,6 @@ fun List<ReceivedToolResult>.withErrorResultKind(): List<ReceivedToolResult> = m
         )
     )
 }
+
+fun ReceivedToolResult.isErrorResult(): Boolean =
+    resultKind !is ToolResultKind.Success || isError(content)
