@@ -31,6 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,6 +61,9 @@ internal fun CompanionHeader(
     reminders: List<ChatReminder>,
     toolSettings: ChatToolCapabilitySettings,
     mcpServerTools: Map<String, List<String>>,
+    isLoading: Boolean = false,
+    latestActivity: String? = null,
+    hasError: Boolean = false,
     onOpenMemoryRoom: () -> Unit,
     onOpenReminders: () -> Unit,
     onOpenConversations: () -> Unit,
@@ -68,11 +73,15 @@ internal fun CompanionHeader(
 ) {
     val scheduledReminderCount = reminders.count { it.status == "SCHEDULED" }
     val mcpState = resolveHeaderMcpState(toolSettings, mcpServerTools)
-    val statusText = if (!configStatus.isReady) {
-        "待配置"
-    } else {
-        presence.label.removePrefix("Aura ").ifBlank { "在这里" }
-    }
+    val statusText = resolveCompanionHeaderStatus(
+        isConfigReady = configStatus.isReady,
+        isLoading = isLoading,
+        latestActivity = latestActivity,
+        hasError = hasError,
+        presenceMode = presence.mode,
+        presenceLabel = presence.label,
+    )
+    val statusHasError = !configStatus.isReady || hasError || presence.mode == PresenceMode.ERROR
 
     Column(
         modifier = Modifier
@@ -105,6 +114,7 @@ internal fun CompanionHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Row(
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -113,7 +123,7 @@ internal fun CompanionHeader(
                             .size(7.dp)
                             .clip(CircleShape)
                             .background(
-                                if (presence.mode == PresenceMode.ERROR || !configStatus.isReady) {
+                                if (statusHasError) {
                                     MaterialTheme.colorScheme.error
                                 } else {
                                     ChatStatusColors.SuccessDot
@@ -164,6 +174,21 @@ internal fun CompanionHeader(
             ConfigStatusCard(status = configStatus, onOpenSettings = onOpenSettings)
         }
     }
+}
+
+internal fun resolveCompanionHeaderStatus(
+    isConfigReady: Boolean,
+    isLoading: Boolean,
+    latestActivity: String?,
+    hasError: Boolean,
+    presenceMode: PresenceMode,
+    presenceLabel: String,
+): String = when {
+    !isConfigReady -> "待配置"
+    isLoading -> latestActivity?.takeIf { it.isNotBlank() } ?: "思考中"
+    hasError -> "连接异常"
+    presenceMode == PresenceMode.ERROR -> "暂时离线"
+    else -> presenceLabel.removePrefix("Aura ").ifBlank { "在这里" }
 }
 
 internal enum class HeaderCapabilityTone { NEUTRAL, ACTIVE, SUCCESS, WARNING }

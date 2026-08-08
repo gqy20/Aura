@@ -697,6 +697,8 @@ private fun normalizeToolInput(raw: String): NormalizedToolInput {
 private fun repairFlatJsonValues(raw: String): String? {
     val trimmed = raw.trim()
     if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null
+    val fields = mutableListOf<String>()
+    var fieldStart = 1
     var inString = false
     var escaped = false
     for (index in 1 until trimmed.lastIndex) {
@@ -709,24 +711,53 @@ private fun repairFlatJsonValues(raw: String): String? {
             inString = !inString
         } else if (!inString && (char == '{' || char == '[')) {
             return null
+        } else if (!inString && char == ',') {
+            fields += trimmed.substring(fieldStart, index)
+            fieldStart = index + 1
         }
     }
+    if (inString) return null
+    fields += trimmed.substring(fieldStart, trimmed.lastIndex)
 
-    val valuePattern = Regex("""(:\s*)([^,}\s][^,}]*)\s*(?=,|})""")
     var changed = false
-    val candidate = valuePattern.replace(trimmed) { match ->
-        val prefix = match.groupValues[1]
-        val token = match.groupValues[2].trim()
+    val repairedFields = fields.map { field ->
+        val colon = field.indexOfUnquotedColon() ?: return null
+        val valueStart = field.indexOfFirst { index, char -> index > colon && !char.isWhitespace() }
+        if (valueStart == -1) return null
+        val prefix = field.substring(0, valueStart)
+        val token = field.substring(valueStart).trimEnd()
         val isAlreadyJson = token.startsWith('"') ||
             token == "true" || token == "false" || token == "null" || token.toDoubleOrNull() != null
         if (isAlreadyJson) {
-            match.value
+            field
         } else {
             changed = true
             prefix + JsonPrimitive(token).toString()
         }
     }
-    return candidate.takeIf { changed }
+    return repairedFields.joinToString(prefix = "{", postfix = "}").takeIf { changed }
+}
+
+private fun String.indexOfUnquotedColon(): Int? {
+    var inString = false
+    var escaped = false
+    forEachIndexed { index, char ->
+        if (escaped) {
+            escaped = false
+        } else if (char == '\\' && inString) {
+            escaped = true
+        } else if (char == '"') {
+            inString = !inString
+        } else if (!inString && char == ':') {
+            return index
+        }
+    }
+    return null
+}
+
+private inline fun String.indexOfFirst(predicate: (Int, Char) -> Boolean): Int {
+    forEachIndexed { index, char -> if (predicate(index, char)) return index }
+    return -1
 }
 
 private fun sanitizeErrorBody(body: String): String? = body

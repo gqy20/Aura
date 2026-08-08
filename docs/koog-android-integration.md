@@ -141,13 +141,13 @@ MultiLLMPromptExecutor(AnthropicMessagesLLMClient(apiKey, baseUrl))
 - ✅ 视觉输入经 `LLMCapability.Vision.Image` + `ContentPart.Image(AttachmentContent.Binary.Base64)` 完整跑通
 - ✅ LLM 连通性检查（`LlmConnectivityChecker`）能在设置页 "Test connection" 按钮里区分 200 / 401 / 网络失败
 - ✅ 本地模型分流（`LlmProvider.LOCAL_QWEN` 走 `ReactiveCompanion`，不进 Koog）
-- ✅ `./gradlew.bat testDebugUnitTest` 于 2026-06-15 通过（**372 测试 / 0 失败**；含 11 个 M4 vision memory 用例）
+- ✅ `./gradlew.bat testDebugUnitTest` 于 2026-08-09 通过（**634 测试 / 0 失败**）
+- ✅ Android 17 模拟器已验证 GLM streaming、记忆 tool、Reminder、地图 MCP 与 Photo Picker Vision 端到端链路
 
 ### 2.4 仍待补
 
 - ⏳ 进程死亡后的输入框草稿（`SavedStateHandle` 接入）
-- ⏳ EmotionMachine / RelationshipModel 序列化到 DataStore（进程死亡后情感/关系状态归零）
-- ⏳ GLM / Kimi 在生产端的流式端到端手动验证（连通性检查 OK，但完整 streaming 链路在真机还需补一次手动跑）
+- ⏳ Kimi 流式 + tool 端到端手动验证（GLM 已完成模拟器验收）
 
 ---
 
@@ -317,8 +317,9 @@ private fun addRemoteMcpTools(builder: ToolRegistryBuilder) {
 - **位置**: `CompanionToolRegistry.addRemoteMcpTools`
 - **原因**: `ToolRegistry.create()` 是 `fun create(): ToolRegistry`（非 suspend），而 `mcpServerListRepository.readAll()` 是 suspend + Room
 - **安全条件**: 在 `koogAgentFactory.create(config)` 时同步执行，调用方在 `CompanionRuntime.send()` 内位于 `Dispatchers.IO` 上下文，**不**在主线程
-- **已知风险**: MCP server 慢 / 不可达会阻塞 ToolRegistry 构造（agent 创建路径），影响首条消息延迟
-- **后续方案**: 缓存 + 异步预热 + 单独 ToolRegistryManager
+- **当前缓解**: `McpServerRouter` 只选择本轮相关 server，`McpToolSelector` 裁剪工具，tool spec 缓存复用，失败 server 进入冷却
+- **剩余风险**: 首次命中且未缓存的慢 server 仍会阻塞当前 turn
+- **后续方案**: 可取消的异步 ToolRegistryManager
 
 ### 4.5 正确的 Dispatcher 使用模式
 
@@ -429,7 +430,7 @@ Android 系统可能在后台杀死应用进程。重启时：
 | P2 | MainActivity 直接 LLM 调用反模式 | 绕过架构 | 已改为 `ChatViewModel` 驱动 | 已修复 |
 | P3 | 历史上的 KoogAgentFactoryImpl stub | 所有 AI 回复为空 | 已替换为真实 `AIAgent.builder()` + 自定义 strategy | 已修复 |
 | P4 | 进程死亡时输入框草稿丢失 | 旋转屏幕 / 进程死亡后输入框为空 | `SavedStateHandle` 接入 | 低优先级 |
-| P5 | MCP server 慢 / 不可达 → ToolRegistry 构造阻塞 | 首条消息延迟 1-5s | 缓存 + 异步预热 | 中优先级 |
+| P5 | 首次命中的 MCP server 慢 / 不可达 | 当前 turn 延迟 | 已有意图路由、工具裁剪、缓存与失败冷却；后续异步加载 | 已缓解 |
 | KG-750 | `runBlocking` + `ExecutorService` 死锁 | ANR | 全项目禁用 `runBlocking`（§4.4 例外已标注） | 已规避 |
 
 ### 6.2 Anthropic 兼容端点的注意事项
@@ -445,7 +446,7 @@ Android 系统可能在后台杀死应用进程。重启时：
 | 图片输入 (base64) | ✅ | ✅ | ✅ |
 
 **建议**: 如果未来需要 `tool_use` 功能，需验证目标端点是否支持。
-当前纯聊天 + tool 场景需在真机端到端验证。
+GLM 的纯聊天 + tool 场景已在 Android 17 模拟器端到端验证；Kimi 仍待同等验收。
 
 ### 6.3 `execute() vs executeStreaming()` 的 API 验证
 
@@ -483,13 +484,14 @@ public abstract kotlinx.coroutines.flow.Flow<ai.koog.prompt.streaming.StreamFram
 - [x] `runStructured` 用于 memory reflection
 - [x] LLM 连通性检查区分 200/401/网络失败
 - [x] 本地模型（`LlmProvider.LOCAL_QWEN`）走 `ReactiveCompanion` 不进 Koog
-- [x] `./gradlew.bat testDebugUnitTest` 于 2026-06-15 通过（**372 测试 / 0 失败**；含 11 个 M4 vision memory 用例）
+- [x] `./gradlew.bat testDebugUnitTest` 于 2026-08-09 通过（**634 测试 / 0 失败**）
+- [x] Android 17 模拟器验证 GLM 流式、tool、MCP、Reminder 与 Vision 链路
 
 ### 7.3 后续待补
 
 - [ ] 进程死亡后的输入框草稿（`SavedStateHandle`）
-- [ ] 真机/模拟器手动验证 GLM/Kimi 端到端回复（含流式 + tool 链路）
-- [ ] MCP server 列表异步预热
+- [ ] 手动验证 Kimi 端到端回复（含流式 + tool 链路）
+- [ ] 把首次 MCP tool spec 加载改为可取消异步流程
 - [ ] 切换到 Agent Core 最新 API（跟踪 Koog 上游 release notes）
 
 ---

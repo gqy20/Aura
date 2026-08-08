@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,12 +26,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +55,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -63,9 +75,6 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.feature.chat.map.MapIntentLauncher
 import com.xiaoqi.companion.feature.chat.map.MapRoutePromptBuilder
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -105,6 +114,9 @@ fun ChatScreen(
         currentSessionId = currentSessionId,
         onSendMessage = { viewModel.sendMessage(uiState.inputText) },
         onStopGenerating = { viewModel.stopGenerating() },
+        onRetryMessage = { viewModel.retryMessage(it) },
+        onEditMessage = { viewModel.editMessage(it) },
+        onRetryLastMessage = { viewModel.retryLastMessage() },
         onInputTextChanged = { viewModel.updateInputText(it) },
         onClearError = { viewModel.clearError() },
         onOpenMemoryRoom = onOpenMemoryRoom,
@@ -144,6 +156,9 @@ fun ChatScreenContent(
     currentSessionId: String = "default",
     onSendMessage: () -> Unit,
     onStopGenerating: () -> Unit,
+    onRetryMessage: (String) -> Unit = {},
+    onEditMessage: (String) -> Unit = {},
+    onRetryLastMessage: () -> Unit = {},
     onInputTextChanged: (String) -> Unit,
     onClearError: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
@@ -162,7 +177,6 @@ fun ChatScreenContent(
     onDeleteConversation: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
-    val snackbarHostState = remember { SnackbarHostState() }
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
@@ -173,18 +187,27 @@ fun ChatScreenContent(
     var selectedToolCall by remember { mutableStateOf<ChatToolCall?>(null) }
     val messages = uiState.messages
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
+    val latestMessage = messages.lastOrNull()
+    val latestUserMessageId = messages.lastOrNull { it.role == "USER" }?.id
     var hasCompletedInitialScroll by remember { mutableStateOf(false) }
     val reversedMessages = remember(messages) { messages.asReversed() }
 
-    // 跟随策略:用户上滑 → 解锁跟随;松手 2s 后自动恢复;流式期间仅在 pinned 时 scrollToItem(0)。
+    // 跟随只由用户所在位置决定；用户上滑后，必须主动回到底部才恢复。
     var isUserPinnedToBottom by rememberSaveable { mutableStateOf(true) }
-    var followRecoveryJob by remember { mutableStateOf<Job?>(null) }
-    val followRecoveryScope = rememberCoroutineScope()
+    var hasUnseenMessages by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(reversedMessages.size) {
         if (reversedMessages.isNotEmpty() && !hasCompletedInitialScroll) {
             listState.scrollToItem(0)
             hasCompletedInitialScroll = true
+        }
+    }
+
+    LaunchedEffect(latestUserMessageId) {
+        if (latestUserMessageId != null && hasCompletedInitialScroll) {
+            listState.scrollToItem(0)
+            isUserPinnedToBottom = true
+            hasUnseenMessages = false
         }
     }
 
@@ -195,55 +218,20 @@ fun ChatScreenContent(
             .distinctUntilChanged()
             .collect { (idx, offset) ->
                 val nowPinned = idx == 0 && offset < 32
-                if (!nowPinned) {
-                    isUserPinnedToBottom = false
-                    followRecoveryJob?.cancel()
-                } else if (!isUserPinnedToBottom) {
-                    isUserPinnedToBottom = true
-                    followRecoveryJob?.cancel()
+                isUserPinnedToBottom = nowPinned
+                if (nowPinned) {
+                    hasUnseenMessages = false
                 }
             }
     }
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }
-            .collect { isScrolling ->
-                if (isScrolling) {
-                    isUserPinnedToBottom = false
-                    followRecoveryJob?.cancel()
-                }
-            }
-    }
-
-    LaunchedEffect(isUserPinnedToBottom) {
-        if (!isUserPinnedToBottom) {
-            followRecoveryJob?.cancel()
-            followRecoveryJob = followRecoveryScope.launch {
-                delay(2000L)
-                isUserPinnedToBottom = true
-            }
+    LaunchedEffect(latestMessage?.id, lastContentLength, latestMessage?.isStreaming) {
+        if (!hasCompletedInitialScroll || latestMessage == null) return@LaunchedEffect
+        if (isUserPinnedToBottom) {
+            listState.scrollToItem(0)
         } else {
-            followRecoveryJob?.cancel()
+            hasUnseenMessages = true
         }
-    }
-
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            Triple(
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-                messages.lastOrNull()?.content?.length ?: 0,
-            )
-        }
-            .distinctUntilChanged()
-            .collectLatest { (_, _, lastLen) ->
-                if (!hasCompletedInitialScroll) return@collectLatest
-                if (!isUserPinnedToBottom) return@collectLatest
-                val isStreaming = messages.lastOrNull()?.isStreaming == true
-                if (isStreaming && lastLen > 0) {
-                    listState.scrollToItem(0)
-                }
-            }
     }
 
     // IME 弹起/收起动画结束后,确保 index 0(最新消息)滚入视口。
@@ -252,6 +240,7 @@ fun ChatScreenContent(
     val listStateHolder = rememberUpdatedState(listState)
     val reversedMessagesHolder = rememberUpdatedState(reversedMessages)
     val hasInitialScrollHolder = rememberUpdatedState(hasCompletedInitialScroll)
+    val isPinnedHolder = rememberUpdatedState(isUserPinnedToBottom)
     DisposableEffect(view) {
         val callback = object : WindowInsetsAnimationCompat.Callback(
             WindowInsetsAnimationCompat.Callback.DISPATCH_MODE_STOP,
@@ -266,7 +255,7 @@ fun ChatScreenContent(
                     animation.typeMask and WindowInsetsCompat.Type.ime() != 0
                 if (!isImeAnimation) return
                 val current = reversedMessagesHolder.value
-                if (hasInitialScrollHolder.value && current.isNotEmpty()) {
+                if (hasInitialScrollHolder.value && isPinnedHolder.value && current.isNotEmpty()) {
                     coroutineScope.launch {
                         listStateHolder.value.scrollToItem(0)
                     }
@@ -282,7 +271,6 @@ fun ChatScreenContent(
     Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(
             modifier = Modifier
@@ -312,6 +300,9 @@ fun ChatScreenContent(
                 reminders = uiState.reminders,
                 toolSettings = uiState.toolCapabilitySettings,
                 mcpServerTools = uiState.mcpServerTools,
+                isLoading = uiState.isLoading,
+                latestActivity = latestMessage?.takeIf { it.isStreaming }?.toolStatus,
+                hasError = uiState.error != null,
                 onOpenMemoryRoom = onOpenMemoryRoom,
                 onOpenReminders = { isRemindersOpen = true },
                 onOpenConversations = { isConversationsOpen = true },
@@ -332,39 +323,99 @@ fun ChatScreenContent(
                     )
                 }
             } else {
-                LazyColumn(
-                    state = listState,
-                    reverseLayout = true,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                 ) {
-                    items(reversedMessages, key = { it.id }) { message ->
-                        val messageToolCall = remember(message.id, uiState.toolCalls) {
-                            findToolCallForMessage(message, uiState.toolCalls)
-                        }
-                        val onToolClick = remember(messageToolCall) {
-                            messageToolCall?.let { toolCall ->
-                                { selectedToolCall = toolCall }
+                    LazyColumn(
+                        state = listState,
+                        reverseLayout = true,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            top = 8.dp,
+                            end = 16.dp,
+                            bottom = if (isUserPinnedToBottom) 8.dp else 64.dp,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(reversedMessages, key = { it.id }) { message ->
+                            val messageToolCall = remember(message.id, uiState.toolCalls) {
+                                findToolCallForMessage(message, uiState.toolCalls)
+                            }
+                            val onToolClick = remember(messageToolCall) {
+                                messageToolCall?.let { toolCall ->
+                                    { selectedToolCall = toolCall }
+                                }
+                            }
+                            Column(
+                                modifier = Modifier.animateItem(
+                                    fadeInSpec = androidx.compose.animation.core.tween(durationMillis = 250),
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                MessageBubble(
+                                    message = message,
+                                    onToolStatusClick = onToolClick,
+                                    onRetry = if (message.role == "ASSISTANT") {
+                                        { onRetryMessage(message.id) }
+                                    } else {
+                                        null
+                                    },
+                                    onEdit = if (message.role == "USER") {
+                                        { onEditMessage(message.id) }
+                                    } else {
+                                        null
+                                    },
+                                    onRegenerate = if (message.role == "ASSISTANT") {
+                                        { onRetryMessage(message.id) }
+                                    } else {
+                                        null
+                                    },
+                                )
+                                messageToolCall?.mapInteraction?.let { interaction ->
+                                    MapResultCard(
+                                        interaction = interaction,
+                                        onOpenMap = { onOpenMap(interaction) },
+                                        onAdjustRoute = { selectedToolCall = messageToolCall },
+                                        modifier = Modifier.padding(start = 4.dp).fillMaxWidth(),
+                                    )
+                                }
                             }
                         }
-                        Column(
-                            modifier = Modifier.animateItem(
-                                fadeInSpec = androidx.compose.animation.core.tween(durationMillis = 250),
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                    }
+                    if (!isUserPinnedToBottom) {
+                        SmallFloatingActionButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    listState.scrollToItem(0)
+                                    isUserPinnedToBottom = true
+                                    hasUnseenMessages = false
+                                }
+                            },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 12.dp)
+                                .semantics {
+                                    contentDescription = if (hasUnseenMessages) {
+                                        "有新回复，回到最新消息"
+                                    } else {
+                                        "回到最新消息"
+                                    }
+                                },
                         ) {
-                            MessageBubble(
-                                message = message,
-                                onToolStatusClick = onToolClick,
-                            )
-                            messageToolCall?.mapInteraction?.let { interaction ->
-                                MapResultCard(
-                                    interaction = interaction,
-                                    onOpenMap = { onOpenMap(interaction) },
-                                    onAdjustRoute = { selectedToolCall = messageToolCall },
-                                    modifier = Modifier.padding(start = 4.dp).fillMaxWidth(),
-                                )
+                            Box(contentAlignment = Alignment.TopEnd) {
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+                                if (hasUnseenMessages) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .background(MaterialTheme.colorScheme.error, CircleShape),
+                                    )
+                                }
                             }
                         }
                     }
@@ -386,6 +437,16 @@ fun ChatScreenContent(
                     onDismiss = { selectedToolCall = null },
                     onOpenMap = onOpenMap,
                     onRerunRoute = onRerunRoute,
+                )
+            }
+
+            uiState.error?.let { error ->
+                ChatErrorCard(
+                    message = error,
+                    canRetry = messages.any { it.role == "USER" } && !uiState.isLoading,
+                    onRetry = onRetryLastMessage,
+                    onDismiss = onClearError,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
 
@@ -412,13 +473,6 @@ fun ChatScreenContent(
         }
     }
 
-    uiState.error?.let { error ->
-        LaunchedEffect(error) {
-            snackbarHostState.showSnackbar(error)
-            onClearError()
-        }
-    }
-
     if (isRemindersOpen) {
         RemindersDialog(
             reminders = uiState.reminders,
@@ -439,6 +493,57 @@ fun ChatScreenContent(
             onSwitchConversation = onSwitchConversation,
             onDeleteConversation = onDeleteConversation,
         )
+    }
+}
+
+@Composable
+internal fun ChatErrorCard(
+    message: String,
+    canRetry: Boolean,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            if (canRetry) {
+                TextButton(onClick = onRetry) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                    )
+                    Text("重试")
+                }
+            }
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.semantics { contentDescription = "关闭错误提示" },
+            ) {
+                Icon(Icons.Default.Close, contentDescription = null)
+            }
+        }
     }
 }
 

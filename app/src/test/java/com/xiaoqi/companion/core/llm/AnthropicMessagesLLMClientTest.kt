@@ -212,6 +212,28 @@ class AnthropicMessagesLLMClientTest {
         assertEquals(-1, calls.single().index)
     }
 
+    @Test
+    fun executeStreaming_repairsBareStringValuesWithoutRegexLookahead() = runTest {
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"state-1","name":"update_state"}}""",
+                """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"mood\":calm,\"reason\":needs rest}"}}""",
+                """{"type":"content_block_stop","index":0}""",
+                """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val call = client().executeStreaming(simplePrompt(), model, emptyList())
+            .toList()
+            .filterIsInstance<StreamFrame.ToolCallComplete>()
+            .single()
+        val input = json.parseToJsonElement(call.content).jsonObject
+
+        assertEquals("calm", input.getValue("mood").jsonPrimitive.content)
+        assertEquals("needs rest", input.getValue("reason").jsonPrimitive.content)
+    }
+
     private fun client() = AnthropicMessagesLLMClient(
         apiKey = "test-key",
         baseUrl = server.url("/").toString().trimEnd('/'),

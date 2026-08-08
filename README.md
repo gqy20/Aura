@@ -72,18 +72,19 @@ Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
 
 ## 当前状态
 
-**最新版本：v0.1.4** · 561 个单元测试通过 · 0 失败 · CI: ✅ passing
+**最新版本：v0.1.4** · 634 个单元测试通过 · 0 失败 · CI: ✅ passing
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
 | 文本聊天闭环 | ✅ 完整 | Compose UI + ChatViewModel + CompanionRuntime + Koog Agent |
-| 流式输出 | ✅ 完整 | Anthropic Messages 兼容 SSE，聊天气泡逐字渲染 |
+| 流式输出 | ✅ 完整 | Anthropic Messages 兼容 SSE、批量增量渲染、停止/重试、离底新消息提示 |
 | 长期记忆 | ✅ 完整 | MemoryRepository 统一保存 / 搜索 / prompt selection / 访问时间 |
 | 情绪 / 关系 | ✅ 完整 | 状态机 + 关系模型已接入 Agent 主循环 |
 | 图片理解 | ✅ MVP | Photo Picker 选图，CameraX 拍摄 UI 未做 |
 | 设置 / 可观测性 | ✅ 完整 | Provider、API Key、连通性检查、数据导出 |
 | Insight / Onboarding / Presence | ✅ 完整 | Dream Loop 周期 + POST_CHAT 即时洞察、Mood Trend、引导流程、Presence 反应策略 |
 | Reminder | ✅ 完整 | AlarmManager + Worker + 通知 |
+| 对话操作 | ✅ 完整 | 新建/切换对话、消息复制、编辑后重发、重新生成、代码块复制 |
 | Health Connect | ✅ 完整 | HealthDataSection + HealthSyncManager |
 | 本地 LLM (Qwen MNN) | ✅ MVP | MNN 推理 + 模型下载器，UI 走 `Local Qwen` Provider |
 | 语音 I/O (STT/TTS) | ❌ 未做 | 规划中 |
@@ -144,7 +145,7 @@ make run    # 构建 + 安装 + 启动
 
 ```bash
 ./gradlew assembleDebug              # 构建 Debug APK
-./gradlew testDebugUnitTest          # 跑 561 个单元测试
+./gradlew testDebugUnitTest          # 跑 634 个单元测试
 ./gradlew connectedDebugAndroidTest  # 仪器测试（需连真机）
 make run                              # 构建 + 安装 + 启动
 make logcat                           # 查看应用日志

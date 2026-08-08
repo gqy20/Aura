@@ -1,6 +1,6 @@
 # Aura Roadmap
 
-> 最后核对：2026-06-22
+> 最后核对：2026-08-09
 >
 > 本文档用于跟踪当前实现进度，并把 `README.md` / `docs/architecture.md` 中的产品愿景拆成可执行里程碑。
 
@@ -30,7 +30,7 @@
 ./gradlew.bat assembleDebug
 ```
 
-以上命令均已在 2026-06-22 验证通过（`testDebugUnitTest` **561 个测试全绿**；含工具系统双开关用例 + Insight POST_CHAT 触发测试）。
+以上命令均已在 2026-08-09 验证通过（`testDebugUnitTest` **634 个测试全绿**；含聊天恢复交互、MCP 渐进路由、Android 工具参数兼容与既有 DAO/Insight/ChatViewModel 测试）。
 
 ## 已实现
 
@@ -38,6 +38,7 @@
 - Compose 聊天页，链路为 `MainActivity` -> `ChatScreen` -> `ChatViewModel`。
 - `CompanionRuntime` 主流程：Prompt 构建、记忆注入、Koog 执行、输出解析、情绪更新、关系更新。
 - Koog `AIAgent` 真实集成，支持流式文本事件。
+- 对话体验闭环：停止生成、失败重试、重新生成、编辑后重发、消息/代码复制、离底后新消息提示与回到底部入口。
 - Anthropic Messages 兼容 LLM client，支持 SSE streaming、tool schema 序列化、底层图片 content 组装。
 - 本地 Qwen / MNN 链路：`core/local/*`（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader` / `LocalQwenModelCatalog` / `LocalQwenModelLocator`），含 ModelScope 下载与 MNN 推理桥。
 - **`ReactiveCompanion`（dual-mind Phase 0 命名清理 + PR A 对齐）**：原 `LocalQwenAgentWrapper` 重命名；2026-06-17 PR A 后 `runStreaming`/`runEvents`/`runStructured`/`allowTools` 行为契约与云端 `KoogPromptExecutorWrapper` 对齐（不再硬抛 `UnsupportedOperationException`，`runStructured` 走 `Json.decodeFromString` 兜底 `examples[0]`）。
@@ -71,7 +72,7 @@
 - **Onboarding 5 问（M2 收尾）**：plan §5.2 种子期问题（挂心事/重要日期/称呼/关系人/作息）— 全部可选可跳过，模板表单不入 LLM。
 - **隐私"看见感"面板（M2 收尾）**：`DataTransparencySection`（设置页条数 + 导出 JSON via 系统 SAF + 3 个清空按钮 + Bipass 二次确认）。
 - **Health 多源链雏形**：`HealthSnapshotEntity` + `HealthSnapshotDao` + `HealthConnectDataSource` + `SensorManagerHealthSource` + `HealthSyncManager` + `HealthDataSection` + `QueryHealthDataTool`，支持健康数据同步、展示与工具查询。
-- 单元测试覆盖：561 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator 8 边界、LocalQwenExecutor 6 边界、**DreamDataCollector 10（含 6 个 M4 vision memory）**、AutoMemoryStore 4、**ReactiveCompanion 8（PR A 后从 4 → 8，新增 `runStreaming` 路径 / Json 结构化解析 / image 透传用例）**、**MemoryRepositoryTest 18（含 3 个 saveVisionMemory）**、**SendMessageUseCaseTest（含 2 个 vision memory 自动落库）**、**DreamLoopIntervalTest 6 + DreamLoopSchedulerTest 9**、**EvidenceResolver 中文 FTS + 兆底**、**ChatViewModel POST_CHAT 触发链路** 等）。
+- 单元测试覆盖：634 单测全绿（core runtime、prompt、parser、tools、DAO、repository、DataStore、ChatViewModel、消息 UI、Presence 反应策略、InsightValidator、LocalQwenExecutor、DreamDataCollector、MemoryRepository、SendMessageUseCase、MCP 路由/工具适配、Android 裸字符串参数修复与 POST_CHAT 触发链路等）。
 - Debug APK 构建链路。
 - `docs/plan` 当前保留端云智能体能力整体方案、Vision/tools 协同计划、双轨智能体架构（dual-mind）、Insight 驱动产品方案（第二大脑叙事）；已完成/阶段性过期方案归档到 `docs/archive/plan`。
 
@@ -99,6 +100,15 @@
 - **Onboarding 称谓清理**（`b83b0e2`）：Onboarding 称呼默认值清零 + MessageBubble 字体与工具状态显示。
 
 > 备注：测试用例 372（06-15）→ 483（06-17）→ 497（06-22）→ 561（06-22 Insight 改进）；native 端需真机 NDK 编译验证。
+
+### 近期打磨（2026-08-09）
+
+- **对话恢复体验**：流式阶段支持停止生成；中断/失败消息保留部分内容并提供重试/重新生成；用户消息支持编辑后重发；消息与代码块提供复制入口。
+- **滚动与状态反馈**：用户离开底部后不再被流式内容强制拉回，出现“回到最新消息”入口与新消息提示；顶部状态展示思考、工具活动与错误状态；错误从短暂 Snackbar 改为可关闭、可重试的持久卡片。
+- **工具协议 Android 兼容**：扁平 JSON 裸字符串修复从正则改为保守逐字符解析，规避 Android ICU `PatternSyntaxException`；MCP 边界再次规范化 Koog lenient primitive，避免中文参数形成非法 JSON。
+- **MCP 渐进路由**：补齐 `map tool` / `map search` 显式意图，按请求只加载相关 server 和少量工具。
+- **模拟器端到端验收**：GLM 流式回复、记忆写入/召回、提醒权限失败/成功调度/通知触发、高德 `maps_geo`、停止生成、新对话与 Photo Picker Vision 均已跑通。
+- **验证**：`assembleDebug` 与 `testDebugUnitTest` 通过，634 测试、0 失败。
 
 ## 部分实现
 

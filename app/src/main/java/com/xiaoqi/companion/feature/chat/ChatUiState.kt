@@ -32,7 +32,13 @@ data class ChatMessage(
      * 只在消息完成后填充,流式中为 null。
      */
     val performanceInfo: PerformanceInfo? = null,
+    val completionState: ChatMessageCompletionState? = null,
 )
+
+enum class ChatMessageCompletionState {
+    STOPPED,
+    FAILED,
+}
 
 data class ChatToolCall(
     val id: String,

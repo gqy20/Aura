@@ -42,6 +42,13 @@ class McpServerRouterTest {
         assertEquals(listOf("amap"), selected.map { it.id })
     }
 
+    @Test
+    fun explicitMapToolQuerySelectsMapServer() {
+        val selected = McpServerRouter.select("Use the map tool to find coffee near West Lake", servers)
+
+        assertEquals(listOf("amap"), selected.map { it.id })
+    }
+
     private fun custom(id: String, name: String, url: String) = McpServerConfig(
         id = id,
         displayName = name,

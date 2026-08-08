@@ -10,7 +10,7 @@ internal object McpServerRouter {
         }
 
         val needsMap = normalized.containsAny(
-            "maps_", "amap", "高德", "地图", "导航", "路线", "坐标", "地理编码",
+            "maps_", "map tool", "map search", "amap", "高德", "地图", "导航", "路线", "坐标", "地理编码",
             "geocode", "direction", "route", "walk", "walking", "driving", "transit", "navigation",
             "nearby", "around search", "poi",
             "附近", "周边",

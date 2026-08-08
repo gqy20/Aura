@@ -30,6 +30,7 @@ import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.feature.chat.ChatConfigStatus
 import com.xiaoqi.companion.feature.chat.ChatImageAttachment
 import com.xiaoqi.companion.feature.chat.ChatMessage
+import com.xiaoqi.companion.feature.chat.ChatMessageCompletionState
 import com.xiaoqi.companion.feature.chat.ChatPermissionType
 import com.xiaoqi.companion.feature.chat.ChatUiState
 import com.xiaoqi.companion.feature.chat.PreparedChatImage
@@ -374,6 +375,7 @@ class SendMessageUseCaseTest {
         advanceUntilIdle()
 
         assertNotNull(state.value.error)
+        assertEquals("服务暂时没有响应，请重试。", state.value.error)
         assertFalse(state.value.isLoading)
     }
 
@@ -387,7 +389,7 @@ class SendMessageUseCaseTest {
         val assistant = state.value.messages.first { it.role == "ASSISTANT" }
         assertEquals("partial reply", assistant.content)
         assertFalse(assistant.isStreaming)
-        assertEquals("回复未完整完成", assistant.toolStatus)
+        assertEquals(ChatMessageCompletionState.FAILED, assistant.completionState)
         assertNotNull(state.value.error)
         assertFalse(state.value.isLoading)
     }
@@ -560,7 +562,7 @@ class SendMessageUseCaseTest {
 
         val assistant = state.value.messages.last { it.role == "ASSISTANT" }
         assertEquals("hello", assistant.content)
-        assertEquals("已停止生成", assistant.toolStatus)
+        assertEquals(ChatMessageCompletionState.STOPPED, assistant.completionState)
         assertFalse(assistant.isStreaming)
         assertFalse(state.value.isLoading)
         assertNull(state.value.error)

@@ -20,6 +20,7 @@ import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.feature.chat.ChatConfigStatus
 import com.xiaoqi.companion.feature.chat.ChatImageAttachment
 import com.xiaoqi.companion.feature.chat.ChatMessage
+import com.xiaoqi.companion.feature.chat.ChatMessageCompletionState
 import com.xiaoqi.companion.feature.chat.PerformanceInfo
 import com.xiaoqi.companion.feature.chat.ChatPermissionPrompt
 import com.xiaoqi.companion.feature.chat.ChatPermissionType
@@ -199,8 +200,7 @@ class SendMessageUseCase @Inject constructor(
                                 renderBlocks = emptyList(),
                                 renderDraft = "",
                                 isRenderDraftCode = false,
-                                toolStatus = "回复未完整完成",
-                                toolStatusType = ToolCallStatus.FAILED,
+                                completionState = ChatMessageCompletionState.FAILED,
                             )
                         } else {
                             msg
@@ -230,8 +230,7 @@ class SendMessageUseCase @Inject constructor(
                         renderBlocks = emptyList(),
                         renderDraft = "",
                         isRenderDraftCode = false,
-                        toolStatus = "已停止生成",
-                        toolStatusType = null,
+                        completionState = ChatMessageCompletionState.STOPPED,
                     )
                 }
                 copy(
@@ -331,7 +330,7 @@ class SendMessageUseCase @Inject constructor(
                     }
                     is AgentEvent.Progress -> {
                         updateAssistantToolStatus(
-                            event.message.ifBlank { event.stage },
+                            formatProgress(event.message.ifBlank { event.stage }),
                             ToolCallStatus.STARTED,
                         )
                     }
@@ -441,6 +440,7 @@ class SendMessageUseCase @Inject constructor(
                                     it.toolStatus
                                 },
                                 performanceInfo = perfInfo,
+                                completionState = null,
                             )
                         }
                         update {
@@ -528,31 +528,21 @@ class SendMessageUseCase @Inject constructor(
         when (error) {
             is AgentError.NetworkTimeout -> "网络超时，请检查连接。"
             is AgentError.RateLimited -> "请求过于频繁，稍后再试。"
-            is AgentError.ApiError -> error.message
-            is AgentError.ParseError -> error.reason
+            is AgentError.ApiError -> "服务暂时没有响应，请重试。"
+            is AgentError.ParseError -> "回复解析失败，请重试。"
         }
 
-    /**
-     * 把单个 tool call 的失败原因翻译成用户可读字符串。
-     *
-     * 输入可来自两个字段:
-     * - `call.resultJson`: envelope error 文本(优先,理由更具体)
-     * - `call.errorMessage`: 早期异常的纯字符串兜底
-     *
-     * 输出策略:
-     * - 有 envelope reason → 返回 "工具失败 · <reason>"(不暴露 hint,因为 hint 是给 LLM 的)
-     * - 有 errorMessage → 返回 "工具失败 · <errorMessage>"
-     * - 都无 → 返回 "工具失败"
-     */
-    private fun formatToolError(call: AgentToolCall): String {
-        val resultJson = call.resultJson
-        if (!resultJson.isNullOrBlank() && com.xiaoqi.companion.core.tools.isError(resultJson)) {
-            val reason = com.xiaoqi.companion.core.tools.parseErrorReason(resultJson)
-            if (!reason.isNullOrBlank()) return "工具失败 · $reason"
+    private fun formatProgress(raw: String): String {
+        val value = raw.trim()
+        if (value.isBlank()) return "正在处理…"
+        if (value.length > 48 || value.any { it == '{' || it == '}' || it == '[' || it == ']' }) {
+            return "正在处理…"
         }
-        val msg = call.errorMessage?.takeIf { it.isNotBlank() }
-        return if (msg != null) "工具失败 · $msg" else "工具失败"
+        return value
     }
+
+    // 原始异常与 JSON 保留在工具详情中，对话流只展示可行动的用户文案。
+    private fun formatToolError(call: AgentToolCall): String = "工具未完成 · 点击查看详情"
 
     private fun persistStatus(status: CompanionStatus, scope: CoroutineScope) {
         scope.launch {

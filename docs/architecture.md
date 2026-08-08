@@ -404,7 +404,8 @@ ksp("androidx.hilt:hilt-compiler:<version>")
 - HTTP 连接管理（OkHttp 4.12.0，60s callTimeout）
 - 请求序列化（Anthropic Messages 格式，含 system / messages / tools / image base64）
 - 响应反序列化（SSE stream 解析，区分 `text_delta` / `input_json_delta` / `content_block_stop` / `message_delta`）
-- 错误处理与重试（**当前未启用重试**，只把错误转成 `AgentError.NetworkTimeout` / `ApiError`）
+- 错误处理与重试（瞬态 HTTP 失败仅在尚未发出任何 frame 时重试；UI 支持失败重试、重新生成与停止生成）
+- Tool 参数兼容（SSE 按 `content_block.index` 累积并行调用；扁平裸字符串保守修复；MCP 边界规范化 lenient primitive）
 - 超时控制（callTimeout 60s + LlmConnectivityChecker connect 5s / read 8s）
 
 App 业务层通过 `ConfigRepository`（DataStore）管理 `baseUrl / apiKey / modelName`：
@@ -687,7 +688,7 @@ override fun create(config: LlmConfig): KoogAgentWrapper {
 | `GetWeatherTool` | context | 外部 weather provider |
 | `CreateLocalReminderTool` | action | 写本地 Reminder + AlarmManager |
 
-**Tool 双源注册**：`CompanionToolRegistry.create()` 合并内置 9 个 + 远程 MCP tool，任何一个 MCP server 失败不影响其他 server。
+**Tool 双源注册**：`CompanionToolRegistry.create()` 合并内置 9 个 + 远程 MCP tool；`McpServerRouter` 按本轮意图选择 server，`McpToolSelector` 在 server 内裁剪工具，配合 spec 缓存与失败冷却。任何一个 MCP server 失败不影响其他 server。
 
 **Tool 状态 → Presence**：`ChatViewModel` 第 7 个 collector 订阅 `ToolCallRepository.observeBySession`，每次 tool 状态变化（STARTED/SUCCEEDED/FAILED）→ `presenceController.reactionFor(PresenceEvent.ToolChanged(...))` → Presence Reaction 节流展示。
 
@@ -701,7 +702,7 @@ override fun create(config: LlmConfig): KoogAgentWrapper {
 | Streaming SSE → Koog StreamFrame | **项目内兼容层** | 走 `executeStreaming` 的 `Flow<StreamFrame>` |
 | 对话历史 / Token 压缩 | Koog prompt 上下文 | **未启用压缩**；靠 `ConversationContextBuilder` 控制近 50 条 |
 | 结构化 Tool Use | Koog `ToolRegistry` + `EventHandler.Feature` | 9 内置 + 远程 MCP（`McpRemoteTool`） |
-| 错误重试 / 容错 | **当前以错误事件 + UI 提示为主** | 规划中；`AgentError` 已分 4 类（NetworkTimeout/RateLimited/ApiError/ParseError） |
+| 错误重试 / 容错 | 项目内 LLM client + 对话恢复 UI | 瞬态 HTTP 前置重试、错误分类、部分回复保留、持久错误卡、重试/重新生成/停止 |
 | JSON 解析 | `kotlinx.serialization` 1.7.3 | `ReflectionResponse` 等 `@Serializable` 数据类 |
 | 数据库 ORM | Room 2.8.4 | `MessageDao` / `ToolCallDao` / `AgentStateDao` 等 |
 | 后台调度 | WorkManager 2.10.0 + hilt-work 1.3.0 | `DreamLoopWorker` (PeriodicWorkRequest **7 档可配置 + 立即触发**) + `ReminderNotificationWorker` (OneTimeWorkRequest) |
@@ -1181,7 +1182,7 @@ com.xiaoqi.companion
 | **LLM 客户端** | **通过项目内兼容层集中封装，业务层无需直接处理 HTTP/SSE** |
 | Streaming / 历史压缩 | Streaming 已接入；历史压缩当前配置为 NoCompression |
 | Tool Use / 结构化输出 | Koog tools + 项目内 Anthropic Messages 兼容层 |
-| 错误重试 / 容错 | 当前基础错误处理，重试策略待补 |
+| 错误重试 / 容错 | 前置瞬态重试 + 错误分类 + 部分回复保留 + 用户主动重试/停止；跨进程请求恢复仍待补 |
 | 数据库 | Room 替代手写 SQLite |
 | 后台任务 | WorkManager 替代 Service+AlarmManager |
 | DI | Hilt 替代手动工厂 |

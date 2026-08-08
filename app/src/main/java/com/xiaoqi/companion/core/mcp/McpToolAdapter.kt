@@ -6,7 +6,9 @@ import ai.koog.agents.core.tools.ToolParameterDescriptor
 import ai.koog.agents.core.tools.ToolParameterType
 import ai.koog.serialization.typeToken
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -30,9 +32,19 @@ class McpRemoteTool(
         client.callTool(
             serverUrl = remoteServerUrl,
             toolName = remoteName,
-            arguments = args,
+            arguments = args.quoteInvalidBareLiterals().jsonObject,
             headers = headers,
         )
+}
+
+private fun JsonElement.quoteInvalidBareLiterals(): JsonElement = when (this) {
+    is JsonObject -> JsonObject(mapValues { (_, value) -> value.quoteInvalidBareLiterals() })
+    is JsonArray -> JsonArray(map(JsonElement::quoteInvalidBareLiterals))
+    is JsonPrimitive -> {
+        val isValidLiteral = isString || content == "true" || content == "false" ||
+            content == "null" || content.toDoubleOrNull() != null
+        if (isValidLiteral) this else JsonPrimitive(content)
+    }
 }
 
 fun McpToolSpec.toKoogToolName(serverName: String, serverUrl: String): String {

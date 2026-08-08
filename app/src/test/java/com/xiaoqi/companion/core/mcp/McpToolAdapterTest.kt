@@ -1,8 +1,10 @@
 package com.xiaoqi.companion.core.mcp
 
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -47,6 +49,30 @@ class McpToolAdapterTest {
         assertEquals("web_search", client.calledToolName)
         assertEquals("android", client.arguments["query"]?.let { (it as JsonPrimitive).content })
         assertEquals(listOf("query"), tool.descriptor.requiredParameters.map { it.name })
+    }
+
+    @Test
+    fun remoteTool_quotesLenientBareStringValuesBeforeSending() = runTest {
+        val client = RecordingMcpClient()
+        val tool = McpRemoteTool(
+            serverUrl = "https://mcp.example.com/mcp",
+            serverName = "map",
+            spec = McpToolSpec(
+                name = "maps_geo",
+                description = "Geocode an address",
+                inputSchema = buildJsonObject { put("type", "object") },
+            ),
+            client = client,
+        )
+        val lenientArgs = Json { isLenient = true }
+            .parseToJsonElement("""{"address":西湖,"city":杭州}""")
+            .jsonObject
+
+        tool.execute(lenientArgs)
+
+        assertEquals("西湖", client.arguments.getValue("address").let { (it as JsonPrimitive).content })
+        assertEquals("杭州", client.arguments.getValue("city").let { (it as JsonPrimitive).content })
+        assertEquals("""{"address":"西湖","city":"杭州"}""", client.arguments.toString())
     }
 
     private class RecordingMcpClient : RemoteMcpClient {

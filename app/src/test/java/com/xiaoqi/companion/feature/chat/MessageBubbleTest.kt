@@ -6,9 +6,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -64,7 +66,7 @@ class MessageBubbleTest {
     }
 
     @Test
-    fun streamingMessage_withoutContent_butWithToolStatus_showsSpinner() {
+    fun streamingMessage_withoutContent_butWithToolStatus_showsActualStatus() {
         composeTestRule.setContent {
             MessageBubble(
                 message = ChatMessage(
@@ -73,14 +75,13 @@ class MessageBubbleTest {
                     content = "",
                     isStreaming = true,
                     toolStatus = "查找记忆",
-                    // 真实工具调用一定带 type，这时才回退老 spinner，避免 chip 与安抚文案打架
                     toolStatusType = ToolCallStatus.STARTED,
                 )
             )
         }
 
-        // 真实工具调用（type!=null）时不应叠安抚文案，回退到老 spinner
-        composeTestRule.onNodeWithContentDescription("Aura 正在回复").assertIsDisplayed()
+        composeTestRule.onNodeWithText("查找记忆").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText(ThinkingHints.hintFor(0L, 0)).assertCountEquals(0)
     }
 
     @Test
@@ -123,6 +124,65 @@ class MessageBubbleTest {
     }
 
     @Test
+    fun stoppedAssistant_showsStoppedStateAndRegenerateAction() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "Partial reply",
+                    completionState = ChatMessageCompletionState.STOPPED,
+                ),
+                onRetry = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("已停止生成").assertIsDisplayed()
+        composeTestRule.onNodeWithText("重新生成").assertIsDisplayed()
+    }
+
+    @Test
+    fun completedMessage_showsDiscoverableActions() {
+        composeTestRule.setContent {
+            MessageBubble(message = ChatMessage(id = "1", role = "ASSISTANT", content = "Done"))
+        }
+
+        composeTestRule.onNodeWithContentDescription("消息操作").assertIsDisplayed()
+    }
+
+    @Test
+    fun userMessage_actionMenuOffersEditAndCopy() {
+        var editRequested = false
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(id = "1", role = "USER", content = "Revise me"),
+                onEdit = { editRequested = true },
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("消息操作").performClick()
+        composeTestRule.onNodeWithText("复制").assertIsDisplayed()
+        composeTestRule.onNodeWithText("编辑后重发").performClick()
+        composeTestRule.runOnIdle { assertTrue(editRequested) }
+    }
+
+    @Test
+    fun errorCard_keepsFailureVisibleAndOffersRetry() {
+        composeTestRule.setContent {
+            ChatErrorCard(
+                message = "网络超时，请检查连接。",
+                canRetry = true,
+                onRetry = {},
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("网络超时，请检查连接。").assertIsDisplayed()
+        composeTestRule.onNodeWithText("重试").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("关闭错误提示").assertIsDisplayed()
+    }
+
+    @Test
     fun assistantMessage_rendersMarkdownInlineContent() {
         composeTestRule.setContent {
             MessageBubble(
@@ -152,5 +212,6 @@ class MessageBubbleTest {
 
         composeTestRule.onNodeWithText("Try this:").assertIsDisplayed()
         composeTestRule.onNodeWithText("val aura = true").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("复制代码").assertIsDisplayed()
     }
 }

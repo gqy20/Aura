@@ -78,4 +78,10 @@ class ThinkingHintsTest {
         val hint = ThinkingHints.hintFor(elapsedMs = 1_000L, indexInStage = -1)
         assertTrue(hint.isNotBlank())
     }
+
+    @Test
+    fun hints_doNotPromiseUnknownCompletionTime() {
+        val hints = (0..8).map { ThinkingHints.hintFor(elapsedMs = 30_000L, indexInStage = it) }
+        assertTrue(hints.none { it.contains("快了") })
+    }
 }

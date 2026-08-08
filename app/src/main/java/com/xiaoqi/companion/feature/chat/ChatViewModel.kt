@@ -323,6 +323,7 @@ class ChatViewModel @Inject constructor(
                                         toolStatus = streamingTail.toolStatus,
                                         toolStatusType = streamingTail.toolStatusType,
                                         toolCallIds = streamingTail.toolCallIds,
+                                        completionState = streamingTail.completionState,
                                     )
                                 } else {
                                     dbMsg
@@ -348,6 +349,7 @@ class ChatViewModel @Inject constructor(
                                     toolStatus = previous.toolStatus,
                                     toolStatusType = previous.toolStatusType,
                                     toolCallIds = previous.toolCallIds,
+                                    completionState = previous.completionState,
                                 )
                             }
                         }
@@ -918,6 +920,72 @@ class ChatViewModel @Inject constructor(
         generationCancelledByUser = true
         AppLogger.info(LogTags.Chat, "generation_stop_requested")
         job.cancel()
+    }
+
+    fun retryMessage(messageId: String) {
+        if (_uiState.value.isLoading || _uiState.value.isPreparingImage) return
+        val messages = _uiState.value.messages
+        val targetIndex = messages.indexOfFirst { it.id == messageId }
+        if (targetIndex < 0) return
+        val userMessage = if (messages[targetIndex].role == "USER") {
+            messages[targetIndex]
+        } else {
+            messages.subList(0, targetIndex).lastOrNull { it.role == "USER" }
+        } ?: return
+        resendUserMessage(userMessage)
+    }
+
+    fun retryLastMessage() {
+        if (_uiState.value.isLoading || _uiState.value.isPreparingImage) return
+        _uiState.value.messages.lastOrNull { it.role == "USER" }?.let(::resendUserMessage)
+    }
+
+    fun editMessage(messageId: String) {
+        if (_uiState.value.isLoading) return
+        val message = _uiState.value.messages.firstOrNull {
+            it.id == messageId && it.role == "USER"
+        } ?: return
+        _uiState.update { it.copy(inputText = message.content, error = null) }
+        message.imageUri?.let(::attachImage)
+    }
+
+    private fun resendUserMessage(message: ChatMessage) {
+        _uiState.update { it.copy(error = null) }
+        val imageUri = message.imageUri
+        if (imageUri == null) {
+            sendMessage(message.content)
+            return
+        }
+        _uiState.update { it.copy(isPreparingImage = true) }
+        viewModelScope.launch {
+            try {
+                val prepared = imageProcessor.prepare(imageUri)
+                _uiState.update {
+                    it.copy(
+                        pendingImage = ChatImageAttachment(
+                            uriString = prepared.uriString,
+                            imageBase64 = prepared.imageBase64,
+                            mediaType = prepared.mediaType,
+                        ),
+                        isPreparingImage = false,
+                    )
+                }
+                sendMessage(message.content)
+            } catch (e: Exception) {
+                AppLogger.warn(
+                    LogTags.Chat,
+                    "retry_image_prepare_failed",
+                    "message" to (e.message ?: e::class.simpleName.orEmpty()),
+                )
+                _uiState.update {
+                    it.copy(
+                        pendingImage = null,
+                        isPreparingImage = false,
+                        error = "原图片无法重新读取，请重新选择图片。",
+                    )
+                }
+            }
+        }
     }
 
     fun prepareSettings() {

@@ -453,16 +453,19 @@ addRemoteMcpTools(builder)   // ← 远程 MCP
 return builder.build()
 ```
 
-`addRemoteMcpTools` 遍历所有 `enabled=true && isReady=true` 的 MCP server，**对每个 server 单独**调 `listTools`：
+`addRemoteMcpTools` 先由 `McpServerRouter` 根据本轮输入选择相关 server，再由 `McpToolSelector` 在 server 内裁剪工具：
 
 - 任何单个 server 失败 → 仅 log warn，不影响其他 server
+- 未命中 MCP 意图 → 本轮不请求远程 `listTools`
+- tool spec 按 server 配置缓存，失败 server 进入 5 分钟冷却
+- 命中的 server 默认只注册少量高相关工具，减少 prompt schema 与首条消息延迟
 - 用 `runBlocking` 包 `mcpServerListRepository.readAll()` — 这是 **Hilt entry point**，必须能同步返回 ToolRegistry
 
-**已知妥协**：`ToolRegistry.create()` 用 `runBlocking` 读 MCP server 列表。在 `koogAgentFactory.create(config)` 时同步调用 — 整个 agent 构建路径会**潜在阻塞**直到 MCP listTools 返回。这是当前实现的 trade-off：
+**已知妥协**：`ToolRegistry.create()` 仍用 `runBlocking` 读取本地 server 配置，并对本轮命中的未缓存 server 同步执行 `listTools`：
 
-- ✅ 优点：ToolRegistry 一次构建、agent 生命周期内不变；MCP server 列表改变需要重启 agent。
-- ⚠️ 风险：MCP server 慢 / 不可达 → 整个聊天页首条消息会卡 1-5 秒。
-- 📋 后续：缓存 + 异步预热 + 单独的 MCP Tool Registry manager。
+- ✅ 已缓解：无关对话不碰远端，已缓存 server 不重复探测，失败不会每轮重试。
+- ⚠️ 剩余风险：首次命中一个慢 server 时，当前 turn 仍会等待它的 `listTools`。
+- 📋 后续：把首次加载移到可取消的异步 Tool Registry manager。
 
 ### 6.3 Tool 调用持久化
 
@@ -625,10 +628,18 @@ is AgentEvent.Error -> {
 ```
 
 `finishWithError` 行为：
-- 如果 assistant 已经有部分内容（`assistantContent.isNotBlank()`）→ 保留消息，把 `isStreaming = false`，`toolStatus = "回复未完整完成"`
+- 如果 assistant 已经有部分内容（`assistantContent.isNotBlank()`）→ 保留消息，把 `isStreaming = false`，标记 `completionState = FAILED` 并展示“重试”
 - 如果 assistant 完全空 → 移除占位消息
+- 底部展示持久错误卡片，可重试或关闭；原始异常只保留在日志/工具详情，不直接暴露到对话正文
 
 → 用户能"看到部分回复 + 知道中断了"，而不是"消息消失"。
+
+### 8.5 跟随、停止与消息操作
+
+- 用户停在底部时，流式增量继续跟随最新消息。
+- 用户主动上滑后不再自动抢回位置；有新内容时显示“回到最新消息”按钮与提示点。
+- `stopGenerating()` 取消当前 job；已有内容保留并标记 `STOPPED`，可直接重新生成。
+- 已完成消息支持复制；用户消息可编辑后重发；assistant 消息可重新生成；代码块有独立复制按钮。
 
 ---
 
@@ -638,7 +649,8 @@ is AgentEvent.Error -> {
 
 | 触发 | 路径 |
 |------|------|
-| 用户按返回 / 离开聊天页 | `NavHost` 弹出 `ChatScreen` → `collectAsStateWithLifecycle` 停止 → `ViewModel.onCleared()` → `viewModelScope.cancel()` → `runtime.send` 的 `callbackFlow` 取消 → Koog `agent.run` 抛 `CancellationException` → HTTP 连接关闭 |
+| 用户点击停止生成 | `ChatViewModel.stopGenerating()` → 当前 `sendMessageJob.cancel()` → `pipeline_cancelled` → 保留部分回复并标记 `STOPPED` |
+| 用户按返回 / 离开聊天页 | `NavHost` 弹出 `ChatScreen` → `collectAsStateWithLifecycle` 停止；ViewModel 被清理时 `viewModelScope.cancel()` → runtime/HTTP 取消 |
 | 用户切到其他 app（onStop） | `collectAsStateWithLifecycle` 暂停收集（**不**取消协程）；回到前台时继续 |
 | 进程死亡 | 同 §9.3 |
 
@@ -653,10 +665,10 @@ val error = when (e) {
 
 | 错误 | 来源 | UI 表现 |
 |------|------|---------|
-| `NetworkTimeout` | OkHttp 60s call timeout | "Network timed out. Check your connection." |
-| `ApiError(msg)` | HTTP 非 2xx / 解析失败 | msg（原始） |
-| `RateLimited` | 预留，目前未触发 | "Too many requests. Try again later." |
-| `ParseError` | `outputParser` 解析空 / raw 为空 | "Empty model response" / "Empty assistant reply" |
+| `NetworkTimeout` | OkHttp 60s call timeout | “网络超时，请检查连接。” + 重试 |
+| `ApiError(msg)` | HTTP 非 2xx | “服务暂时没有响应，请重试。”；原始错误留在日志 |
+| `RateLimited` | 限流 | “请求过于频繁，稍后再试。” |
+| `ParseError` | 输出解析失败 | “回复解析失败，请重试。” |
 
 ### 9.3 进程死亡
 
@@ -730,4 +742,3 @@ val error = when (e) {
 | 流式 UX 集成（90ms / 30s / Markdown chunker） | — | ✅ |
 | UI / StateFlow / Compose | — | ✅（在 architecture.md） |
 | 数据层（Room / DataStore） | — | ✅（在 architecture.md） |
-
