@@ -73,6 +73,10 @@ class KoogAgentFactoryImplTest {
         assertEquals("remembered", response)
         assertTrue(executor.toolNamesPerCall.first().contains("test_note"))
         assertEquals(2, executor.toolNamesPerCall.size)
+        assertEquals(
+            1,
+            executor.prompts.last().messages.filterIsInstance<Message.Tool.Result>().size,
+        )
         coVerify {
             toolCallDao.insert(match<ToolCallEntity> {
                 it.id == "call-1" &&
@@ -375,12 +379,14 @@ class KoogAgentFactoryImplTest {
 
     private class ToolCallingPromptExecutor : PromptExecutor() {
         val toolNamesPerCall = mutableListOf<List<String>>()
+        val prompts = mutableListOf<Prompt>()
 
         override suspend fun execute(
             prompt: Prompt,
             model: LLModel,
             tools: List<ToolDescriptor>,
         ): List<Message.Response> {
+            prompts += prompt
             toolNamesPerCall += tools.map { it.name }
             return if (toolNamesPerCall.size == 1) {
                 listOf(
@@ -401,6 +407,7 @@ class KoogAgentFactoryImplTest {
             model: LLModel,
             tools: List<ToolDescriptor>,
         ): Flow<StreamFrame> {
+            prompts += prompt
             toolNamesPerCall += tools.map { it.name }
             return if (toolNamesPerCall.size == 1) {
                 listOf(

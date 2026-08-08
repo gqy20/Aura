@@ -334,6 +334,7 @@ dependencies {
     testImplementation("org.json:json:20240303")
     testImplementation(libs.turbine)
     testImplementation(libs.mockk)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.room.testing)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.robolectric)

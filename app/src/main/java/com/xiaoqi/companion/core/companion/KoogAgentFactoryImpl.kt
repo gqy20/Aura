@@ -301,11 +301,6 @@ private class KoogPromptExecutorWrapper(
                     }
                 }
                 appendPrompt {
-                    tool {
-                        results.forEach { result(it) }
-                    }
-                }
-                appendPrompt {
                     user(
                         if (finalWithoutTools) {
                             ToolResultPromptComposer.finalWithoutToolsInstruction(

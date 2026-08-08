@@ -13,10 +13,14 @@ import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import java.io.IOException
 import javax.inject.Inject
+import kotlin.random.Random
 import kotlin.time.Clock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
@@ -37,6 +41,7 @@ import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
@@ -44,11 +49,29 @@ import java.util.concurrent.TimeUnit
 private const val DEFAULT_MAX_TOKENS = 4096
 private const val ANTHROPIC_VERSION = "2023-06-01"
 
+data class LlmRetryPolicy(
+    val maxAttempts: Int = 3,
+    val initialDelayMs: Long = 300,
+    val maxDelayMs: Long = 2_000,
+) {
+    init {
+        require(maxAttempts >= 1)
+        require(initialDelayMs >= 0)
+        require(maxDelayMs >= initialDelayMs)
+    }
+}
+
+private class LlmHttpException(
+    val statusCode: Int,
+    val retryAfterMs: Long?,
+) : IOException("HTTP $statusCode")
+
 class AnthropicMessagesLLMClient(
     private val apiKey: String,
     private val baseUrl: String,
     private val httpClient: OkHttpClient = defaultHttpClient(),
     private val clock: Clock = Clock.System,
+    private val retryPolicy: LlmRetryPolicy = LlmRetryPolicy(),
 ) : LLMClient() {
 
     override val clientName: String = "anthropic-messages"
@@ -111,14 +134,14 @@ class AnthropicMessagesLLMClient(
         tools: List<ToolDescriptor>,
     ): Flow<StreamFrame> = callbackFlow {
         val startedAt = System.currentTimeMillis()
-        val request = buildRequest(prompt, model, stream = true, tools = tools)
         var fullText = ""
         var finishReason: String? = null
         var currentToolId: String? = null
         var currentToolName: String? = null
         var currentToolInput = StringBuilder()
+        var hasEmittedFrame = false
 
-        launch(Dispatchers.IO) {
+        val job = launch(Dispatchers.IO) {
             try {
                 AppLogger.info(
                     LogTags.Llm,
@@ -126,72 +149,47 @@ class AnthropicMessagesLLMClient(
                     "model" to model.id,
                     "toolCount" to tools.size,
                 )
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        AppLogger.warn(
-                            LogTags.Llm,
-                            "stream_request_http_error",
-                            "statusCode" to response.code,
-                            "model" to model.id,
-                            "durationMs" to (System.currentTimeMillis() - startedAt),
-                        )
-                        response.body?.close()
-                        close(RuntimeException("HTTP ${response.code}"))
-                        return@launch
-                    }
+                withTransientRetry(
+                    modelId = model.id,
+                    operation = "stream",
+                    canRetry = { !hasEmittedFrame },
+                ) {
+                    finishReason = null
+                    currentToolId = null
+                    currentToolName = null
+                    currentToolInput = StringBuilder()
+                    val request = buildRequest(prompt, model, stream = true, tools = tools)
+                    httpClient.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) {
+                            throw response.toHttpException()
+                        }
 
-                    val source = response.body?.source() ?: run {
-                        AppLogger.warn(
-                            LogTags.Llm,
-                            "stream_response_body_missing",
-                            "model" to model.id,
-                            "durationMs" to (System.currentTimeMillis() - startedAt),
-                        )
-                        close()
-                        return@launch
-                    }
-                    while (!source.exhausted()) {
-                        val line = source.readUtf8Line() ?: continue
-                        if (!line.startsWith("data: ")) continue
+                        val source = response.body?.source()
+                            ?: throw IOException("Streaming response body is missing")
+                        while (!source.exhausted()) {
+                            val line = source.readUtf8Line() ?: continue
+                            if (!line.startsWith("data: ")) continue
 
-                        val data = line.removePrefix("data: ").trim()
-                        if (data == "[DONE]") break
+                            val data = line.removePrefix("data: ").trim()
+                            if (data == "[DONE]") break
 
-                        val parsed = parseSseData(data)
-                        if (parsed.isToolUseBlock && parsed.toolName != null) {
-                            currentToolId = parsed.toolId
-                            currentToolName = parsed.toolName
-                            currentToolInput = StringBuilder()
-                            AppLogger.debug(LogTags.Llm, "stream_tool_start", "tool" to parsed.toolName)
-                        }
-                        if (parsed.toolInput != null) {
-                            currentToolInput.append(parsed.toolInput)
-                        }
-                        if (parsed.deltaText != null) {
-                            fullText += parsed.deltaText
-                            trySend(StreamFrame.TextDelta(parsed.deltaText, null))
-                        }
-                        if (parsed.isContentBlockStop && currentToolName != null) {
-                            trySend(
-                                StreamFrame.ToolCallComplete(
-                                    id = currentToolId,
-                                    name = currentToolName.orEmpty(),
-                                    content = currentToolInput.toString(),
-                                    index = null,
-                                )
-                            )
-                            AppLogger.info(
-                                LogTags.Llm,
-                                "stream_tool_completed",
-                                "tool" to currentToolName,
-                                "inputLength" to currentToolInput.length,
-                            )
-                            currentToolId = null
-                            currentToolName = null
-                        }
-                        if (parsed.finishReason != null) {
-                            finishReason = parsed.finishReason
-                            if (currentToolName != null) {
+                            val parsed = parseSseData(data)
+                            if (parsed.isToolUseBlock && parsed.toolName != null) {
+                                currentToolId = parsed.toolId
+                                currentToolName = parsed.toolName
+                                currentToolInput = StringBuilder()
+                                AppLogger.debug(LogTags.Llm, "stream_tool_start", "tool" to parsed.toolName)
+                            }
+                            if (parsed.toolInput != null) {
+                                currentToolInput.append(parsed.toolInput)
+                            }
+                            if (parsed.deltaText != null) {
+                                fullText += parsed.deltaText
+                                hasEmittedFrame = true
+                                trySend(StreamFrame.TextDelta(parsed.deltaText, null))
+                            }
+                            if (parsed.isContentBlockStop && currentToolName != null) {
+                                hasEmittedFrame = true
                                 trySend(
                                     StreamFrame.ToolCallComplete(
                                         id = currentToolId,
@@ -208,6 +206,28 @@ class AnthropicMessagesLLMClient(
                                 )
                                 currentToolId = null
                                 currentToolName = null
+                            }
+                            if (parsed.finishReason != null) {
+                                finishReason = parsed.finishReason
+                                if (currentToolName != null) {
+                                    hasEmittedFrame = true
+                                    trySend(
+                                        StreamFrame.ToolCallComplete(
+                                            id = currentToolId,
+                                            name = currentToolName.orEmpty(),
+                                            content = currentToolInput.toString(),
+                                            index = null,
+                                        )
+                                    )
+                                    AppLogger.info(
+                                        LogTags.Llm,
+                                        "stream_tool_completed",
+                                        "tool" to currentToolName,
+                                        "inputLength" to currentToolInput.length,
+                                    )
+                                    currentToolId = null
+                                    currentToolName = null
+                                }
                             }
                         }
                     }
@@ -249,7 +269,7 @@ class AnthropicMessagesLLMClient(
             }
         }
 
-        awaitClose { }
+        awaitClose { job.cancel() }
     }
 
     override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult =
@@ -264,24 +284,92 @@ class AnthropicMessagesLLMClient(
     private suspend fun executeRequest(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): JsonObject =
         withContext(Dispatchers.IO) {
             val startedAt = System.currentTimeMillis()
-            val request = buildRequest(prompt, model, stream, tools)
-            httpClient.newCall(request).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                if (!response.isSuccessful) {
-                    AppLogger.warn(
-                        LogTags.Llm,
-                        "request_http_error",
-                        "statusCode" to response.code,
-                        "model" to model.id,
-                        "stream" to stream,
-                        "durationMs" to (System.currentTimeMillis() - startedAt),
-                        "errorBodyLength" to body.length,
-                    )
-                    throw RuntimeException("HTTP ${response.code}")
+            withTransientRetry(
+                modelId = model.id,
+                operation = if (stream) "stream" else "request",
+            ) {
+                val request = buildRequest(prompt, model, stream, tools)
+                httpClient.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) {
+                        AppLogger.warn(
+                            LogTags.Llm,
+                            "request_http_error",
+                            "statusCode" to response.code,
+                            "model" to model.id,
+                            "stream" to stream,
+                            "durationMs" to (System.currentTimeMillis() - startedAt),
+                            "errorBodyLength" to body.length,
+                        )
+                        throw response.toHttpException()
+                    }
+                    json.parseToJsonElement(body).jsonObject
                 }
-                json.parseToJsonElement(body).jsonObject
             }
         }
+
+    private suspend fun <T> withTransientRetry(
+        modelId: String,
+        operation: String,
+        canRetry: () -> Boolean = { true },
+        block: suspend () -> T,
+    ): T {
+        var attempt = 1
+        while (true) {
+            try {
+                return block()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                val shouldRetry = attempt < retryPolicy.maxAttempts &&
+                    canRetry() &&
+                    error.isTransientLlmFailure()
+                if (!shouldRetry) throw error
+
+                val delayMs = retryDelayMs(attempt, error)
+                AppLogger.warn(
+                    LogTags.Llm,
+                    "llm_request_retry_scheduled",
+                    "model" to modelId,
+                    "operation" to operation,
+                    "attempt" to attempt,
+                    "nextAttempt" to (attempt + 1),
+                    "delayMs" to delayMs,
+                    "statusCode" to (error as? LlmHttpException)?.statusCode,
+                    "cause" to error::class.simpleName,
+                )
+                delay(delayMs)
+                attempt += 1
+            }
+        }
+    }
+
+    private fun retryDelayMs(attempt: Int, error: Exception): Long {
+        val serverDelay = (error as? LlmHttpException)?.retryAfterMs
+        if (serverDelay != null) return serverDelay.coerceAtMost(retryPolicy.maxDelayMs)
+        var delayMs = retryPolicy.initialDelayMs
+        repeat((attempt - 1).coerceAtLeast(0)) {
+            delayMs = (delayMs * 2).coerceAtMost(retryPolicy.maxDelayMs)
+        }
+        if (delayMs == 0L) return 0L
+        val jitter = (delayMs / 5).coerceAtLeast(1)
+        return (delayMs + Random.nextLong(-jitter, jitter + 1))
+            .coerceIn(0, retryPolicy.maxDelayMs)
+    }
+
+    private fun Exception.isTransientLlmFailure(): Boolean = when (this) {
+        is LlmHttpException -> statusCode == 408 || statusCode == 429 || statusCode in 500..599
+        is IOException -> true
+        else -> false
+    }
+
+    private fun Response.toHttpException(): LlmHttpException =
+        LlmHttpException(
+            statusCode = code,
+            retryAfterMs = header("Retry-After")
+                ?.trim()
+                ?.toLongOrNull()
+                ?.times(1_000),
+        )
 
     private fun buildRequest(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): Request {
         require(baseUrl.isNotBlank()) { "LLM_BASE_URL is not configured" }
@@ -363,14 +451,40 @@ class AnthropicMessagesLLMClient(
         }
     }
 
-    private fun Message.toAnthropicMessage(): JsonObject =
-        buildJsonObject {
-            put("role", when (this@toAnthropicMessage) {
-                is Message.Assistant -> "assistant"
-                else -> "user"
+    private fun Message.toAnthropicMessage(): JsonObject = when (this) {
+        is Message.Tool.Call -> buildJsonObject {
+            put("role", "assistant")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "tool_use")
+                    put("id", id)
+                    put("name", tool)
+                    put("input", content.toToolInput())
+                })
             })
+        }
+        is Message.Tool.Result -> buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "tool_result")
+                    put("tool_use_id", id)
+                    put("content", content)
+                    put("is_error", isError)
+                })
+            })
+        }
+        else -> buildJsonObject {
+            put("role", if (this@toAnthropicMessage is Message.Response) "assistant" else "user")
             put("content", parts.toAnthropicContent())
         }
+    }
+
+    private fun String.toToolInput(): JsonObject =
+        runCatching { json.parseToJsonElement(this).jsonObject }
+            .getOrElse {
+                buildJsonObject { put("_raw", this@toToolInput) }
+            }
 
     private fun List<ContentPart>.toAnthropicContent(): JsonArray =
         buildJsonArray {
