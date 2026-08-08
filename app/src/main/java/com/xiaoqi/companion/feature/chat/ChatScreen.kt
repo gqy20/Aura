@@ -102,6 +102,7 @@ fun ChatScreen(
         conversations = conversations,
         currentSessionId = currentSessionId,
         onSendMessage = { viewModel.sendMessage(uiState.inputText) },
+        onStopGenerating = { viewModel.stopGenerating() },
         onInputTextChanged = { viewModel.updateInputText(it) },
         onClearError = { viewModel.clearError() },
         onOpenMemoryRoom = onOpenMemoryRoom,
@@ -138,6 +139,7 @@ fun ChatScreenContent(
     conversations: List<com.xiaoqi.companion.data.repository.ConversationItem> = emptyList(),
     currentSessionId: String = "default",
     onSendMessage: () -> Unit,
+    onStopGenerating: () -> Unit,
     onInputTextChanged: (String) -> Unit,
     onClearError: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
@@ -302,7 +304,8 @@ fun ChatScreenContent(
                 configStatus = uiState.configStatus,
                 memories = uiState.memories,
                 reminders = uiState.reminders,
-                mcpLabel = uiState.toolCapabilitySettings.mcpDisplayLabel(),
+                toolSettings = uiState.toolCapabilitySettings,
+                mcpServerTools = uiState.mcpServerTools,
                 onOpenMemoryRoom = onOpenMemoryRoom,
                 onOpenReminders = { isRemindersOpen = true },
                 onOpenConversations = { isConversationsOpen = true },
@@ -332,10 +335,8 @@ fun ChatScreenContent(
                 ) {
                     items(reversedMessages, key = { it.id }) { message ->
                         val onToolClick = remember(message.id, uiState.toolCalls) {
-                            if (message.toolStatus == null || uiState.toolCalls.isEmpty()) {
-                                null
-                            } else {
-                                { selectedToolCall = uiState.toolCalls.first() }
+                            findToolCallForMessage(message, uiState.toolCalls)?.let { toolCall ->
+                                { selectedToolCall = toolCall }
                             }
                         }
                         MessageBubble(
@@ -369,6 +370,7 @@ fun ChatScreenContent(
                 inputText = uiState.inputText,
                 onInputTextChanged = onInputTextChanged,
                 onSendMessage = onSendMessage,
+                onStopGenerating = onStopGenerating,
                 pendingImage = uiState.pendingImage,
                 isPreparingImage = uiState.isPreparingImage,
                 onPickImage = {
@@ -377,9 +379,7 @@ fun ChatScreenContent(
                     )
                 },
                 onRemoveImage = onRemoveImage,
-                isLoading = uiState.isLoading && uiState.messages.none {
-                    it.role == "ASSISTANT" && it.isStreaming && it.content.isNotBlank()
-                },
+                isLoading = uiState.isLoading,
                 isConfigReady = uiState.configStatus.isReady,
                 modifier = Modifier
                     .imePadding()
@@ -553,6 +553,7 @@ private fun ChatPreviewContent(state: ChatUiState) {
         ChatScreenContent(
             uiState = state,
             onSendMessage = {},
+            onStopGenerating = {},
             onInputTextChanged = {},
             onClearError = {},
             onOpenMemoryRoom = {},
@@ -601,5 +602,13 @@ private fun previewChatState(
         presence = presence,
         isLoading = isLoading,
     )
+
+internal fun findToolCallForMessage(
+    message: ChatMessage,
+    toolCalls: List<ChatToolCall>,
+): ChatToolCall? {
+    if (message.toolStatus == null || message.toolCallIds.isEmpty()) return null
+    return toolCalls.firstOrNull { it.id in message.toolCallIds }
+}
 
 //endregion

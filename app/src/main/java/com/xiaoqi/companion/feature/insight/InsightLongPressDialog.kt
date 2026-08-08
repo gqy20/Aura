@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.feature.insight
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,12 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,9 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xiaoqi.companion.data.repository.InsightEvidenceView
+import com.xiaoqi.companion.feature.chat.AuraDialogHeader
+import com.xiaoqi.companion.feature.chat.AuraDialogPanel
 import com.xiaoqi.companion.feature.chat.ChatInsight
 
 /**
@@ -50,75 +50,60 @@ internal fun InsightLongPressDialog(
     onChat: () -> Unit,
     showEvidence: Boolean,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+    AuraDialogPanel(
+        onDismiss = onDismiss,
+        fillHeight = 0.72f,
+    ) {
+        AuraDialogHeader(
+            title = insight.headline,
+            titleMaxLines = 2,
+            onDismiss = onDismiss,
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "${insight.category} · ${insight.relevanceWindow}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (insight.bodyMarkdown.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = insight.headline,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "关闭",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "${insight.category} · ${insight.relevanceWindow}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (insight.bodyMarkdown.isNotBlank()) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = insight.bodyMarkdown,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                if (showEvidence && !evidence.isEmpty) {
-                    Spacer(Modifier.height(8.dp))
-                    EvidenceSection(evidence = evidence)
-                }
-            }
-        },
-        confirmButton = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                InsightActionRow(
-                    icon = Icons.Filled.ChatBubbleOutline,
-                    label = "和 Aura 聊聊",
-                    onClick = onChat,
-                )
-                InsightActionRow(
-                    icon = Icons.Filled.VolumeOff,
-                    label = "本周不聊 ${insight.category}",
-                    onClick = { onMute(7) },
-                )
-                InsightActionRow(
-                    icon = Icons.Filled.Visibility,
-                    label = if (showEvidence) "隐藏原因" else "查看原因",
-                    onClick = onShowEvidence,
+                    text = insight.bodyMarkdown,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
-        },
-    )
+            if (showEvidence && !evidence.isEmpty) {
+                Spacer(Modifier.height(8.dp))
+                EvidenceSection(evidence = evidence)
+            }
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            InsightActionRow(
+                icon = Icons.Filled.ChatBubbleOutline,
+                label = "和 Aura 聊聊",
+                onClick = onChat,
+            )
+            InsightActionRow(
+                icon = Icons.Filled.VolumeOff,
+                label = "本周不聊 ${insight.category}",
+                onClick = { onMute(7) },
+            )
+            InsightActionRow(
+                icon = Icons.Filled.Visibility,
+                label = if (showEvidence) "隐藏原因" else "查看原因",
+                onClick = onShowEvidence,
+            )
+        }
+    }
 }
 
 @Composable
@@ -127,16 +112,24 @@ private fun InsightActionRow(
     label: String,
     onClick: () -> Unit,
 ) {
-    TextButton(onClick = onClick) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier
-                .height(18.dp)
-                .width(18.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(label)
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier
+                    .height(18.dp)
+                    .width(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(label)
+        }
     }
 }
 

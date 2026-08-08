@@ -22,12 +22,12 @@ import com.xiaoqi.companion.data.repository.SaveMemoryRequest
 import java.net.SocketTimeoutException
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.intOrNull
@@ -140,7 +140,7 @@ open class CompanionRuntime @Inject constructor(
 
             var rawResponse = ""
             var updateStateSucceeded = false
-            val job = launch(Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 agent.runEvents(prompt).collect { event ->
                     when (event) {
                         is KoogAgentEvent.TextDelta -> {
@@ -170,7 +170,6 @@ open class CompanionRuntime @Inject constructor(
                     }
                 }
             }
-            job.join()
 
             AppLogger.debug(
                 LogTags.Llm,
@@ -215,6 +214,14 @@ open class CompanionRuntime @Inject constructor(
                 )
                 trySend(AgentEvent.Complete(finalResponse))
             }
+        } catch (cancelled: CancellationException) {
+            AppLogger.info(
+                LogTags.Runtime,
+                "pipeline_cancelled",
+                "durationMs" to (System.currentTimeMillis() - startedAt),
+                "turnId" to turnId,
+            )
+            throw cancelled
         } catch (e: Exception) {
             AppLogger.error(
                 LogTags.Runtime,

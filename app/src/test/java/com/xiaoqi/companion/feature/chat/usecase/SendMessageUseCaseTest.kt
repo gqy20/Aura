@@ -39,16 +39,19 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -542,6 +545,25 @@ class SendMessageUseCaseTest {
 
         val assistant = state.value.messages.lastOrNull { it.role == "ASSISTANT" }
         assertEquals("abc", assistant?.content)
+    }
+
+    @Test
+    fun sendMessage_whenCancelled_preservesPartialReplyWithoutError() = runTest {
+        fakeRuntime.emitStreaming = true
+        fakeRuntime.completeDelayMs = 60_000L
+
+        val sendJob = launch {
+            sendMessageUseCase("hello", null, readyConfig(), this, update)
+        }
+        runCurrent()
+        sendJob.cancelAndJoin()
+
+        val assistant = state.value.messages.last { it.role == "ASSISTANT" }
+        assertEquals("hello", assistant.content)
+        assertEquals("已停止生成", assistant.toolStatus)
+        assertFalse(assistant.isStreaming)
+        assertFalse(state.value.isLoading)
+        assertNull(state.value.error)
     }
 
 }

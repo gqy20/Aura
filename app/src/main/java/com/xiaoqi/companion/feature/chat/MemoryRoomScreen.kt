@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -188,6 +187,10 @@ private fun MemoryRoomScreenContent(
                         onDeleteMemory(memory.id)
                         pendingDelete = null
                     },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
                 ) {
                     Text("删除")
                 }
@@ -372,7 +375,7 @@ private fun MemoryRoomItemCard(
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(48.dp)
                         .semantics { contentDescription = "删除记忆" },
                 ) {
                     Icon(
@@ -463,51 +466,41 @@ private fun MemoryDetailDialog(
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+    AuraDialogPanel(onDismiss = onDismiss) {
+        AuraDialogHeader(
+            title = memory.type.memoryTypeLabel(),
+            onDismiss = onDismiss,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            CapabilityMetaPill(text = memory.source.memorySourceLabel())
+            CapabilityMetaPill(text = memory.importance.memoryImportanceLabel())
+        }
+        Text(
+            text = memory.content,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (memory.timestamp > 0L) {
+            Text(
+                text = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(memory.timestamp)),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            TextButton(
+                onClick = onDelete,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
             ) {
-                Text(memory.type.memoryTypeLabel())
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "关闭")
-                }
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    CapabilityMetaPill(text = memory.source.memorySourceLabel())
-                    CapabilityMetaPill(text = memory.importance.memoryImportanceLabel())
-                }
-                Text(
-                    text = memory.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (memory.timestamp > 0L) {
-                    Text(
-                        text = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(memory.timestamp)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDelete) {
                 Text("删除")
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        },
-    )
+        }
+    }
 }
 
 private fun String.memoryTypeLabel(): String =

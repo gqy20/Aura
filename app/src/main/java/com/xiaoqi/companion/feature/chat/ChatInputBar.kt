@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -74,6 +75,7 @@ internal fun InputBar(
     inputText: String,
     onInputTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
+    onStopGenerating: () -> Unit,
     pendingImage: ChatImageAttachment?,
     isPreparingImage: Boolean,
     onPickImage: () -> Unit,
@@ -160,11 +162,27 @@ internal fun InputBar(
                         cursorColor = primary,
                     ),
                 )
-                if (isLoading || isPreparingImage) {
+                if (isPreparingImage) {
                     AuraLoadingIndicator(
                         modifier = Modifier.size(24.dp).padding(4.dp),
                         color = primary,
                     )
+                } else if (isLoading) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = CircleShape,
+                    ) {
+                        IconButton(
+                            onClick = onStopGenerating,
+                            modifier = Modifier.semantics { contentDescription = "停止生成" },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = null,
+                                tint = primary,
+                            )
+                        }
+                    }
                 } else {
                     Surface(
                         color = if (canSend) SendButtonReadyColor else InputBarContainerColor,

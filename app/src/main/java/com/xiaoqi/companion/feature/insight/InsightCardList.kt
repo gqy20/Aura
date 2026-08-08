@@ -111,7 +111,7 @@ internal fun InsightAnalyzingIndicator(
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                text = "本地模型正在思考...",
+                text = "Aura 正在整理刚才的对话…",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = Color(0xFF4A6CF7).copy(alpha = alpha),

@@ -8,11 +8,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -28,11 +28,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.xiaoqi.companion.ui.theme.ChatColors
@@ -63,7 +63,7 @@ internal fun RemindersDialog(
     ) {
         AuraDialogHeader(
             title = "提醒",
-            subtitle = "$scheduledReminderCount 个待生效",
+            titleMeta = scheduledReminderCount.toString(),
             onDismiss = onDismiss,
         )
 
@@ -238,8 +238,11 @@ internal fun AuraDialogPanel(
 @Composable
 internal fun AuraDialogHeader(
     title: String,
+    titleMeta: String? = null,
+    titleMaxLines: Int = 1,
     subtitle: String? = null,
     onDismiss: () -> Unit,
+    primaryAction: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -247,15 +250,36 @@ internal fun AuraDialogHeader(
         verticalAlignment = Alignment.Top,
     ) {
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp),
+            verticalArrangement = if (subtitle == null) {
+                Arrangement.Center
+            } else {
+                Arrangement.spacedBy(3.dp)
+            },
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = titleMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                titleMeta?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    )
+                }
+            }
             subtitle?.let {
                 Text(
                     text = it,
@@ -264,21 +288,22 @@ internal fun AuraDialogHeader(
                 )
             }
         }
-        Surface(
-            shape = CircleShape,
-            color = Color(0xFFF1EADB),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            primaryAction?.invoke()
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
-                    .size(38.dp)
-                    .semantics { contentDescription = "关闭" },
+                    .size(48.dp)
+                    .semantics { contentDescription = "关闭弹窗" },
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }

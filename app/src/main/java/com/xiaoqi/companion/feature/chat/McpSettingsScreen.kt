@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -187,7 +188,9 @@ private fun McpListScreen(
                 ) {
                     FilledTonalButton(
                         onClick = onAdd,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp),
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
@@ -197,6 +200,9 @@ private fun McpListScreen(
                         OutlinedButton(
                             onClick = onTestConnection,
                             enabled = !isCheckingConnectivity,
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp),
                         ) {
                             Text("测试连接")
                         }

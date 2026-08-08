@@ -117,6 +117,8 @@ class ChatViewModel @Inject constructor(
     //region 对话后即时洞察:防抖 + 防重入
     private var lastPostChatInsightAt = 0L
     private var postChatInsightJob: Job? = null
+    private var sendMessageJob: Job? = null
+    private var generationCancelledByUser = false
     private val POST_CHAT_INSIGHT_COOLDOWN_MS = 3L * 60L * 1000L
     private val POST_CHAT_INSIGHT_MIN_MESSAGES = 2
 
@@ -852,6 +854,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun sendMessage(text: String) {
+        if (sendMessageJob?.isActive == true) return
         val pendingImage = _uiState.value.pendingImage
         AppLogger.info(
             LogTags.Chat,
@@ -859,7 +862,8 @@ class ChatViewModel @Inject constructor(
             "textLength" to text.length,
             "hasImage" to (pendingImage != null),
         )
-        viewModelScope.launch {
+        generationCancelledByUser = false
+        val job = viewModelScope.launch {
             sendMessageUseCase(
                 text = text,
                 pendingImage = pendingImage,
@@ -870,7 +874,7 @@ class ChatViewModel @Inject constructor(
                         val prev = state
                         val next = state.reducer()
                         // 检测 isLoading: true → false(对话结束),触发本地模型即时洞察
-                        if (prev.isLoading && !next.isLoading) {
+                        if (prev.isLoading && !next.isLoading && !generationCancelledByUser) {
                             AppLogger.info(
                                 LogTags.Chat,
                                 "post_chat_trigger_check",
@@ -887,6 +891,20 @@ class ChatViewModel @Inject constructor(
                 },
             )
         }
+        sendMessageJob = job
+        job.invokeOnCompletion {
+            if (sendMessageJob === job) {
+                sendMessageJob = null
+                generationCancelledByUser = false
+            }
+        }
+    }
+
+    fun stopGenerating() {
+        val job = sendMessageJob?.takeIf { it.isActive } ?: return
+        generationCancelledByUser = true
+        AppLogger.info(LogTags.Chat, "generation_stop_requested")
+        job.cancel()
     }
 
     fun prepareSettings() {

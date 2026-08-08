@@ -77,7 +77,7 @@ internal fun InsightCard(
                         modifier = Modifier.size(14.dp),
                     )
                     Text(
-                        text = "刚刚 · 本地模型分析",
+                        text = "刚刚注意到",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF4A6CF7),
                         fontSize = 11.sp,

@@ -27,6 +27,7 @@ import com.xiaoqi.companion.feature.chat.ChatUiState
 import com.xiaoqi.companion.feature.chat.CompanionStatus
 import com.xiaoqi.companion.feature.chat.StreamingMarkdownChunker
 import com.xiaoqi.companion.feature.chat.mapper.after
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -211,6 +212,31 @@ class SendMessageUseCase @Inject constructor(
                     messages = updatedMessages,
                     isLoading = false,
                     error = message,
+                )
+            }
+        }
+
+        fun finishCancelled() {
+            idleTimeoutJob?.cancel()
+            streamingRenderJob?.cancel()
+            flushStreamingContent()
+            update {
+                val updatedMessages = messages.mapNotNull { message ->
+                    if (message.id != assistantId) return@mapNotNull message
+                    if (message.content.isBlank()) return@mapNotNull null
+                    message.copy(
+                        isStreaming = false,
+                        renderBlocks = emptyList(),
+                        renderDraft = "",
+                        isRenderDraftCode = false,
+                        toolStatus = "已停止生成",
+                        toolStatusType = null,
+                    )
+                }
+                copy(
+                    messages = updatedMessages,
+                    isLoading = false,
+                    error = null,
                 )
             }
         }
@@ -439,6 +465,14 @@ class SendMessageUseCase @Inject constructor(
             if (timedOut) {
                 finishWithError("回复超时，请重试。")
             }
+        } catch (cancelled: CancellationException) {
+            AppLogger.info(
+                LogTags.Chat,
+                "message_send_cancelled",
+                "requestHash" to LogFieldSanitizer.hash(requestId),
+            )
+            finishCancelled()
+            throw cancelled
         } catch (e: Exception) {
             AppLogger.error(
                 LogTags.Chat,

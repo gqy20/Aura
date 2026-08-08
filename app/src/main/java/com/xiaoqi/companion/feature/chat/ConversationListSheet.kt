@@ -25,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -51,39 +50,24 @@ internal fun ConversationListSheet(
     ) {
         AuraDialogHeader(
             title = "对话",
-            subtitle = "${conversations.size} 个对话",
+            titleMeta = conversations.size.toString(),
             onDismiss = onDismiss,
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            Surface(
-                onClick = onNewConversation,
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            primaryAction = {
+                IconButton(
+                    onClick = onNewConversation,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .semantics { contentDescription = "新建对话" },
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = "新对话",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp),
                     )
                 }
-            }
-        }
+            },
+        )
 
         if (conversations.isEmpty()) {
             Box(
@@ -92,7 +76,7 @@ internal fun ConversationListSheet(
             ) {
                 AuraEmptyState(
                     title = "暂无对话",
-                    message = "点击「新对话」开始聊天",
+                    message = "点击右上角的＋开始聊天",
                 )
             }
         } else {
@@ -198,7 +182,7 @@ private fun ConversationItemCard(
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(48.dp)
                         .semantics { contentDescription = "删除对话" },
                 ) {
                     Icon(
