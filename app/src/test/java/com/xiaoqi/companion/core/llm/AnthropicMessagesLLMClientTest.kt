@@ -230,6 +230,8 @@ class AnthropicMessagesLLMClientTest {
             .single()
         val input = json.parseToJsonElement(call.content).jsonObject
 
+        assertTrue(call.content.contains("\"mood\":\"calm\""))
+        assertTrue(call.content.contains("\"reason\":\"needs rest\""))
         assertEquals("calm", input.getValue("mood").jsonPrimitive.content)
         assertEquals("needs rest", input.getValue("reason").jsonPrimitive.content)
     }

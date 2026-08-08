@@ -173,6 +173,11 @@ class AnthropicMessagesLLMClient(
                 "tool" to tool.name,
                 "index" to index,
                 "inputLength" to tool.input.length,
+                "inputNormalization" to when {
+                    normalized.repaired -> "repaired"
+                    normalized.valid -> "valid"
+                    else -> "invalid"
+                },
                 "inputRepaired" to normalized.repaired,
                 "inputValid" to normalized.valid,
             )
@@ -682,16 +687,12 @@ private fun nextSyntheticToolIndex(pending: Map<Int, PendingToolCall>): Int =
     generateSequence(-1) { it - 1 }.first { it !in pending }
 
 private fun normalizeToolInput(raw: String): NormalizedToolInput {
-    if (runCatching { Json.parseToJsonElement(raw).jsonObject }.isSuccess) {
-        return NormalizedToolInput(raw, repaired = false, valid = true)
-    }
     val repaired = repairFlatJsonValues(raw)
-    val valid = repaired != null && runCatching { Json.parseToJsonElement(repaired).jsonObject }.isSuccess
-    return if (valid) {
-        NormalizedToolInput(repaired.orEmpty(), repaired = true, valid = true)
-    } else {
-        NormalizedToolInput(raw, repaired = false, valid = false)
+    if (repaired != null && runCatching { Json.parseToJsonElement(repaired).jsonObject }.isSuccess) {
+        return NormalizedToolInput(repaired, repaired = true, valid = true)
     }
+    val valid = runCatching { Json.parseToJsonElement(raw).jsonObject }.isSuccess
+    return NormalizedToolInput(raw, repaired = false, valid = valid)
 }
 
 private fun repairFlatJsonValues(raw: String): String? {
