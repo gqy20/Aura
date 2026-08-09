@@ -21,6 +21,9 @@ class McpHttpClientTest {
     private var rejectFirstToolsCallWithInvalidSession = false
     private var issueSessionHeader = true
     private var toolsListCalls = 0
+    private var toolCallResponseStatus = 200
+    private var toolCallIsError = false
+    private var retryAfterSeconds: Long? = null
 
     @Before
     fun setUp() {
@@ -56,8 +59,17 @@ class McpHttpClientTest {
                         )
                     }
                 }
-                body.contains("\"method\":\"tools/call\"") ->
-                    exchange.respondJson("""{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"remote: hello"}]}}""")
+                body.contains("\"method\":\"tools/call\"") -> {
+                    retryAfterSeconds?.let { exchange.responseHeaders.add("Retry-After", it.toString()) }
+                    exchange.respondJson(
+                        if (toolCallIsError) {
+                            """{"jsonrpc":"2.0","id":3,"result":{"isError":true,"content":[{"type":"text","text":"invalid arguments"}]}}"""
+                        } else {
+                            """{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"remote: hello"}]}}"""
+                        },
+                        statusCode = toolCallResponseStatus,
+                    )
+                }
                 else ->
                     exchange.respondJson("""{"jsonrpc":"2.0","error":{"code":-32601,"message":"unknown method"}}""")
             }
@@ -102,6 +114,33 @@ class McpHttpClientTest {
         assertEquals("remote: hello", result)
         assertTrue(requests.any { it.contains("\"method\":\"tools/call\"") })
         assertTrue(requests.any { it.contains("\"name\":\"echo\"") })
+    }
+
+    @Test
+    fun callTool_exposesHttpFailureClassificationAndRetryAfter() = runTest {
+        toolCallResponseStatus = 429
+        retryAfterSeconds = 3
+        val client: RemoteMcpClient = McpHttpClient()
+
+        val error = runCatching {
+            client.callTool(serverUrl, "echo", kotlinx.serialization.json.buildJsonObject {})
+        }.exceptionOrNull()
+
+        assertTrue(error is McpHttpException)
+        assertEquals(429, (error as McpHttpException).statusCode)
+        assertEquals(3_000L, error.retryAfterMs)
+    }
+
+    @Test
+    fun callTool_treatsProtocolErrorResultAsFailure() = runTest {
+        toolCallIsError = true
+        val client: RemoteMcpClient = McpHttpClient()
+
+        val error = runCatching {
+            client.callTool(serverUrl, "echo", kotlinx.serialization.json.buildJsonObject {})
+        }.exceptionOrNull()
+
+        assertTrue(error is McpToolResultException)
     }
 
     @Test

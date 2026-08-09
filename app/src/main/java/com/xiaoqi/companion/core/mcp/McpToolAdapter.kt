@@ -28,13 +28,20 @@ class McpRemoteTool(
     private val remoteName = spec.name
     private val remoteServerUrl = serverUrl
 
-    override suspend fun execute(args: JsonObject): String =
-        client.callTool(
+    override suspend fun execute(args: JsonObject): String {
+        val normalizedArgs = args.quoteInvalidBareLiterals().jsonObject
+        return withMcpToolRetry(
             serverUrl = remoteServerUrl,
             toolName = remoteName,
-            arguments = args.quoteInvalidBareLiterals().jsonObject,
-            headers = headers,
-        )
+        ) {
+            client.callTool(
+                serverUrl = remoteServerUrl,
+                toolName = remoteName,
+                arguments = normalizedArgs,
+                headers = headers,
+            )
+        }
+    }
 }
 
 private fun JsonElement.quoteInvalidBareLiterals(): JsonElement = when (this) {

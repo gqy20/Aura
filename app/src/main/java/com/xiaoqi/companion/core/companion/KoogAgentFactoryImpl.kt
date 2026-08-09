@@ -28,6 +28,7 @@ import ai.koog.prompt.streaming.toMessageResponses
 import com.xiaoqi.companion.core.llm.KoogPromptExecutorFactory
 import com.xiaoqi.companion.core.local.LocalQwenEngine
 import com.xiaoqi.companion.core.local.ReactiveCompanion
+import com.xiaoqi.companion.core.mcp.McpRetryProgressContext
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.companion.model.AgentToolCall
@@ -53,6 +54,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.serialization.KSerializer
 import kotlin.time.Clock
@@ -213,7 +215,16 @@ private class KoogPromptExecutorWrapper(
                     "hasImage" to prompt.hasImage,
                     "userMessageLength" to prompt.userMessage.length,
                 )
-                val result = createAgent(prompt, observer, taskExecution).run(prompt.userMessage)
+                val result = withContext(
+                    McpRetryProgressContext { progress ->
+                        observer.onProgress(
+                            TOOL_RETRY_STAGE,
+                            "工具响应较慢，正在重试 ${progress.nextAttempt}/${progress.maxAttempts}",
+                        )
+                    }
+                ) {
+                    createAgent(prompt, observer, taskExecution).run(prompt.userMessage)
+                }
                 val safeResult = if (taskExecution != null && !taskExecution.isComplete) {
                     taskExecution.incompleteFallback()
                 } else {
@@ -570,6 +581,7 @@ private class KoogPromptExecutorWrapper(
         const val MAX_COMPLETION_GATE_RETRIES = 2
         const val DEFAULT_SESSION_ID = "default"
         const val COMPOUND_TASK_STAGE = "compound_task"
+        const val TOOL_RETRY_STAGE = "tool_retry"
         const val STREAM_PROTOCOL_GUARD_LENGTH = 24
     }
 }

@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -27,6 +28,7 @@ import okhttp3.Response
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import java.io.IOException
 
 data class McpToolSpec(
     val name: String,
@@ -56,6 +58,19 @@ interface RemoteMcpClient {
 }
 
 class McpUnreachableException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+class McpHttpException(
+    val statusCode: Int,
+    val retryAfterMs: Long? = null,
+    bodyPreview: String? = null,
+) : IOException(buildString {
+    append("MCP HTTP $statusCode")
+    if (!bodyPreview.isNullOrBlank()) append(": ${bodyPreview.take(300)}")
+})
+
+class McpRpcException(val code: Int?, message: String) : RuntimeException("MCP error: $message")
+
+class McpToolResultException(message: String) : RuntimeException("MCP tool failed: $message")
 
 @Singleton
 class McpHttpClient @Inject constructor() : RemoteMcpClient {
@@ -360,7 +375,14 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
                     "bodyLength" to rawBody.length,
                     "durationMs" to (System.currentTimeMillis() - startedAt),
                 )
-                throw RuntimeException("MCP HTTP ${response.code}: ${rawBody.take(300)}")
+                throw McpHttpException(
+                    statusCode = response.code,
+                    retryAfterMs = response.header("Retry-After")
+                        ?.trim()
+                        ?.toLongOrNull()
+                        ?.times(1_000),
+                    bodyPreview = rawBody,
+                )
             }
             return McpHttpResponse(
                 json = parseHttpBody(rawBody, response, expectedResponseId),
@@ -434,7 +456,8 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     private fun JsonObject.throwIfJsonRpcError() {
         val error = this["error"] as? JsonObject ?: return
         val message = error["message"]?.jsonPrimitive?.contentOrNull ?: error.toString()
-        throw RuntimeException("MCP error: $message")
+        val code = error["code"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+        throw McpRpcException(code, message)
     }
 
     private fun JsonObject.negotiatedProtocolVersion(): String? =
@@ -470,6 +493,9 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
             }
             ?.joinToString("\n")
             ?.takeIf { it.isNotBlank() }
+        if (this["isError"]?.jsonPrimitive?.booleanOrNull == true) {
+            throw McpToolResultException(text ?: "Remote tool returned an error result")
+        }
         if (text != null) return text
 
         val structured = this["structuredContent"]?.takeUnless { it is JsonNull }
@@ -488,7 +514,7 @@ class McpHttpClient @Inject constructor() : RemoteMcpClient {
     }
 }
 
-private fun String.hostForLog(): String =
+internal fun String.hostForLog(): String =
     substringAfter("://", this)
         .substringBefore("/")
         .substringBefore(":")
