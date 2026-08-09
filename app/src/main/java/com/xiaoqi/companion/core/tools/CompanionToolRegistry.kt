@@ -22,6 +22,7 @@ interface AgentToolRegistry {
         query: String,
         scope: ToolScope = ToolScope.ALL,
         policy: ToolPolicy = ToolPolicy.chatDefault,
+        requiredToolNames: Set<String> = emptySet(),
     ): ToolRegistry = create(scope, policy)
     suspend fun warmMcpTools(policy: ToolPolicy = ToolPolicy.readOnly) = Unit
 }
@@ -59,11 +60,26 @@ class CompanionToolRegistry @Inject constructor(
         return createInternal(scope = scope, policy = policy, queryHint = null)
     }
 
-    override fun createForQuery(query: String, scope: ToolScope, policy: ToolPolicy): ToolRegistry {
-        return createInternal(scope = scope, policy = policy, queryHint = query)
+    override fun createForQuery(
+        query: String,
+        scope: ToolScope,
+        policy: ToolPolicy,
+        requiredToolNames: Set<String>,
+    ): ToolRegistry {
+        return createInternal(
+            scope = scope,
+            policy = policy,
+            queryHint = query,
+            requiredToolNames = requiredToolNames,
+        )
     }
 
-    private fun createInternal(scope: ToolScope, policy: ToolPolicy, queryHint: String?): ToolRegistry {
+    private fun createInternal(
+        scope: ToolScope,
+        policy: ToolPolicy,
+        queryHint: String?,
+        requiredToolNames: Set<String> = emptySet(),
+    ): ToolRegistry {
         val builder = ToolRegistry.builder()
         val includeSystem = scope == ToolScope.ALL || scope == ToolScope.SYSTEM_ONLY
         val includeMcp = scope == ToolScope.ALL || scope == ToolScope.MCP_ONLY
@@ -85,7 +101,7 @@ class CompanionToolRegistry @Inject constructor(
 
         // MCP 注册独立于 systemToolsEnabled,只受 mcpEnabled + scope 控制。
         if (includeMcp && isMcpEnabled() && policy.allowedCategories.contains(ToolCategory.REMOTE_READ)) {
-            addRemoteMcpTools(builder, policy, queryHint)
+            addRemoteMcpTools(builder, policy, queryHint, requiredToolNames)
         }
         return builder.build()
     }
@@ -137,6 +153,7 @@ class CompanionToolRegistry @Inject constructor(
         builder: ai.koog.agents.core.tools.ToolRegistryBuilder,
         policy: ToolPolicy,
         queryHint: String?,
+        requiredToolNames: Set<String>,
     ) {
         // 多 server 模式:遍历所有 enabled=true 且 isReady=true 的 server,分别调 listTools。
         // 任何单个 server 失败不影响其他 server 的工具注册。
@@ -187,7 +204,9 @@ class CompanionToolRegistry @Inject constructor(
             }.onSuccess { specs ->
                 mcpFailureCooldowns.remove(cacheKey)
                 val selectionStartedAt = System.nanoTime()
-                val selectedSpecs = queryHint?.let { McpToolSelector.select(it, specs) } ?: specs
+                val selectedSpecs = queryHint?.let {
+                    McpToolSelector.select(it, specs, requiredToolNames = requiredToolNames)
+                } ?: specs
                 var registeredCount = 0
                 selectedSpecs.forEach { spec ->
                     if (policy.allows(ToolMetadataRegistry.remoteMcp(spec.name))) {

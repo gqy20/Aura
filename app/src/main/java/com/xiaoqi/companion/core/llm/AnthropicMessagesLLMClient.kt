@@ -154,11 +154,15 @@ class AnthropicMessagesLLMClient(
         var finishReason: String? = null
         val pendingTools = mutableMapOf<Int, PendingToolCall>()
         var hasEmittedFrame = false
+        var completedToolCount = 0
+        val completedToolNames = mutableSetOf<String>()
 
         fun completeTool(index: Int) {
             val tool = pendingTools.remove(index) ?: return
             val normalized = normalizeToolInput(tool.input.toString())
             hasEmittedFrame = true
+            completedToolCount += 1
+            completedToolNames += tool.name
             trySend(
                 StreamFrame.ToolCallComplete(
                     id = tool.id,
@@ -198,6 +202,8 @@ class AnthropicMessagesLLMClient(
                 ) {
                     finishReason = null
                     pendingTools.clear()
+                    completedToolCount = 0
+                    completedToolNames.clear()
                     val request = buildRequest(prompt, model, stream = true, tools = tools)
                     httpClient.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) {
@@ -267,6 +273,21 @@ class AnthropicMessagesLLMClient(
 
                 if (fullText.isNotEmpty()) {
                     trySend(StreamFrame.TextComplete(fullText, null))
+                }
+
+                if (pendingTools.isNotEmpty()) {
+                    val supersededTools = pendingTools.filterValues { it.name in completedToolNames }
+                    if (supersededTools.isNotEmpty()) {
+                        AppLogger.warn(
+                            LogTags.Llm,
+                            "stream_superseded_tools_discarded",
+                            "indexes" to supersededTools.keys.sorted().joinToString(","),
+                            "tools" to supersededTools.values.joinToString(",") { it.name },
+                            "inputLengths" to supersededTools.values.joinToString(",") { it.input.length.toString() },
+                            "completedToolCount" to completedToolCount,
+                        )
+                        supersededTools.keys.forEach(pendingTools::remove)
+                    }
                 }
 
                 if (pendingTools.isNotEmpty()) {
@@ -712,7 +733,7 @@ private fun repairFlatJsonValues(raw: String): String? {
             inString = !inString
         } else if (!inString && (char == '{' || char == '[')) {
             return null
-        } else if (!inString && char == ',') {
+        } else if (!inString && char == ',' && trimmed.startsJsonFieldAt(index + 1, trimmed.lastIndex)) {
             fields += trimmed.substring(fieldStart, index)
             fieldStart = index + 1
         }
@@ -737,6 +758,28 @@ private fun repairFlatJsonValues(raw: String): String? {
         }
     }
     return repairedFields.joinToString(prefix = "{", postfix = "}").takeIf { changed }
+}
+
+private fun String.startsJsonFieldAt(start: Int, endExclusive: Int): Boolean {
+    var index = start
+    while (index < endExclusive && this[index].isWhitespace()) index += 1
+    if (index >= endExclusive || this[index] != '"') return false
+    index += 1
+    var escaped = false
+    while (index < endExclusive) {
+        val char = this[index]
+        if (escaped) {
+            escaped = false
+        } else if (char == '\\') {
+            escaped = true
+        } else if (char == '"') {
+            index += 1
+            while (index < endExclusive && this[index].isWhitespace()) index += 1
+            return index < endExclusive && this[index] == ':'
+        }
+        index += 1
+    }
+    return false
 }
 
 private fun String.indexOfUnquotedColon(): Int? {

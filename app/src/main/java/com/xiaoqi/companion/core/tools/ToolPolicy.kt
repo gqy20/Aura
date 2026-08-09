@@ -35,7 +35,7 @@ data class ToolPolicy(
             metadata.riskLevel != ToolRiskLevel.BLOCKED
 
     companion object {
-        const val DEFAULT_MAX_TOOL_ROUNDS_PER_TURN = 3
+        const val DEFAULT_MAX_TOOL_ROUNDS_PER_TURN = 4
         const val DEFAULT_MAX_TOOL_CALLS_PER_TURN = 6
 
         val none = ToolPolicy(
@@ -79,6 +79,26 @@ private val ToolRiskLevel.weight: Int
     }
 
 object ToolMetadataRegistry {
+    private val remoteWriteVerbs = setOf(
+        "bind",
+        "book",
+        "buy",
+        "cancel",
+        "checkout",
+        "confirm",
+        "create",
+        "delete",
+        "pay",
+        "purchase",
+        "refund",
+        "remove",
+        "reserve",
+        "send",
+        "submit",
+        "unbind",
+        "update",
+    )
+
     val searchMemory = ToolMetadata("search_memory", ToolCategory.READ_CONTEXT, ToolRiskLevel.LOW)
     val searchRecords = ToolMetadata("search_records", ToolCategory.READ_CONTEXT, ToolRiskLevel.LOW)
     val searchSummaries = ToolMetadata("search_summaries", ToolCategory.READ_CONTEXT, ToolRiskLevel.LOW)
@@ -91,6 +111,13 @@ object ToolMetadataRegistry {
     val updateState = ToolMetadata("update_state", ToolCategory.LOCAL_WRITE, ToolRiskLevel.MEDIUM)
     val createLocalReminder = ToolMetadata("create_local_reminder", ToolCategory.LOCAL_WRITE, ToolRiskLevel.MEDIUM)
 
-    fun remoteMcp(name: String): ToolMetadata =
-        ToolMetadata(name, ToolCategory.REMOTE_READ, ToolRiskLevel.LOW)
+    fun remoteMcp(name: String): ToolMetadata {
+        val nameTokens = name.lowercase().split(Regex("[^a-z0-9]+"))
+        val isWrite = nameTokens.any(remoteWriteVerbs::contains)
+        return if (isWrite) {
+            ToolMetadata(name, ToolCategory.REMOTE_WRITE, ToolRiskLevel.HIGH)
+        } else {
+            ToolMetadata(name, ToolCategory.REMOTE_READ, ToolRiskLevel.LOW)
+        }
+    }
 }

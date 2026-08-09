@@ -100,6 +100,7 @@ fun McpSettingsScreen(
         McpSettingsMode.LIST -> McpListScreen(
             servers = uiState.toolCapabilitySettings.mcpServers,
             serverTools = uiState.mcpServerTools,
+            serverErrors = uiState.mcpServerErrors,
             isCheckingConnectivity = uiState.isCheckingConnectivity,
             connectivityResult = uiState.mcpConnectivityResult,
             snackbarHostState = snackbarHostState,
@@ -131,6 +132,7 @@ private enum class McpSettingsMode { LIST, EDITOR }
 private fun McpListScreen(
     servers: List<McpServerConfig>,
     serverTools: Map<String, List<String>>,
+    serverErrors: Map<String, String>,
     isCheckingConnectivity: Boolean,
     connectivityResult: ConnectivityResult?,
     snackbarHostState: SnackbarHostState,
@@ -176,6 +178,7 @@ private fun McpListScreen(
                 McpServerCard(
                     server = server,
                     discoveredTools = serverTools[server.id],
+                    connectionError = serverErrors[server.id],
                     onClick = { onEdit(server.id) },
                     onToggleEnabled = { onToggleEnabled(server.id) },
                 )
@@ -251,6 +254,7 @@ private fun McpListScreen(
 private fun McpServerCard(
     server: McpServerConfig,
     discoveredTools: List<String>?,
+    connectionError: String?,
     onClick: () -> Unit,
     onToggleEnabled: () -> Unit,
 ) {
@@ -281,10 +285,14 @@ private fun McpServerCard(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    McpStatusDot(server = server, discoveredTools = discoveredTools)
+                    McpStatusDot(
+                        server = server,
+                        discoveredTools = discoveredTools,
+                        connectionError = connectionError,
+                    )
                 }
                 Text(
-                    text = mcpStatusLabel(server = server, discoveredTools = discoveredTools),
+                    text = connectionError ?: mcpStatusLabel(server = server, discoveredTools = discoveredTools),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -322,11 +330,18 @@ private fun mcpStatusLabel(server: McpServerConfig, discoveredTools: List<String
     }
 
 @Composable
-private fun McpStatusDot(server: McpServerConfig, discoveredTools: List<String>?) {
-    val color = when (mcpStatusOf(server, discoveredTools)) {
+private fun McpStatusDot(
+    server: McpServerConfig,
+    discoveredTools: List<String>?,
+    connectionError: String?,
+) {
+    val color = when {
+        connectionError != null -> MaterialTheme.colorScheme.error
+        else -> when (mcpStatusOf(server, discoveredTools)) {
         McpStatus.READY -> ChatStatusColors.SuccessDot
         McpStatus.DISABLED -> ChatStatusColors.Unknown
         McpStatus.NOT_READY, McpStatus.NOT_TESTED, McpStatus.EMPTY -> ChatStatusColors.Warning
+        }
     }
     androidx.compose.foundation.Canvas(modifier = Modifier.size(8.dp)) {
         drawCircle(color = color)

@@ -231,6 +231,8 @@ data class ChatUiState(
      * 整个 key 不在 map 里表示"还没探过"。
      */
     val mcpServerTools: Map<String, List<String>> = emptyMap(),
+    /** 上次连接检查中每个 server 的可读失败原因；成功后会移除对应项。 */
+    val mcpServerErrors: Map<String, String> = emptyMap(),
     val insights: List<ChatInsight> = emptyList(),
     /** 本地模型是否正在分析对话生成洞察(首页显示"正在思考..."指示器) */
     val isInsightAnalyzing: Boolean = false,

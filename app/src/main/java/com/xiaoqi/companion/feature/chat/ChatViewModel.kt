@@ -52,6 +52,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +65,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -770,6 +773,7 @@ class ChatViewModel @Inject constructor(
                 it.copy(
                     isCheckingConnectivity = true,
                     mcpConnectivityResult = null,
+                    mcpServerErrors = emptyMap(),
                 )
             }
             // 探测每个 ready server,缓存 tool 列表(含失败空 list)给 McpListScreen 展示。
@@ -786,29 +790,50 @@ class ChatViewModel @Inject constructor(
                 }
                 return@launch
             }
-            // 逐个 probe，每个测完立即刷新 mcpServerTools[id]，UI 实时"测一个亮一个"，
-            // 而不是 associate 一把全测完才一次性更新。
-            val perServer = linkedMapOf<String, List<String>>()
-            targets.forEach { server ->
-                val tools = runCatching {
-                    remoteMcpClient.probe(server.resolvedUrl, server.authHeaders).map { spec -> spec.name }
-                }.getOrDefault(emptyList())
-                perServer[server.id] = tools
-                _uiState.update { it.copy(mcpServerTools = it.mcpServerTools + (server.id to tools)) }
+            val startedAt = System.currentTimeMillis()
+            val outcomes = supervisorScope {
+                targets.map { server ->
+                    async {
+                        val probeResult = runCatching {
+                            remoteMcpClient.probe(server.resolvedUrl, server.authHeaders)
+                                .map { spec -> spec.name }
+                        }
+                        val tools = probeResult.getOrDefault(emptyList())
+                        val error = probeResult.exceptionOrNull()?.toMcpFailureLabel()
+                        _uiState.update { state ->
+                            state.copy(
+                                mcpServerTools = state.mcpServerTools + (server.id to tools),
+                                mcpServerErrors = if (error == null) {
+                                    state.mcpServerErrors - server.id
+                                } else {
+                                    state.mcpServerErrors + (server.id to error)
+                                },
+                            )
+                        }
+                        McpProbeOutcome(tools, error)
+                    }
+                }.awaitAll()
             }
-            val okCount = perServer.values.count { it.isNotEmpty() }
-            val firstOk = targets.firstOrNull { perServer[it.id]?.isNotEmpty() == true }
-            val result: ConnectivityResult = if (firstOk != null) {
+            val okCount = outcomes.count { it.tools.isNotEmpty() }
+            val durationMs = System.currentTimeMillis() - startedAt
+            val result: ConnectivityResult = if (okCount > 0) {
                 ConnectivityResult.Success(
-                    latencyMs = 0L,
-                    modelName = firstOk.resolvedName,
+                    latencyMs = durationMs,
+                    modelName = "$okCount/${targets.size} 可用",
                 )
             } else {
-                val firstFail = targets.first()
                 ConnectivityResult.Unreachable(
-                    "全部不可达 (例: ${firstFail.resolvedUrl})",
+                    outcomes.firstNotNullOfOrNull { it.error } ?: "全部不可达",
                 )
             }
+            AppLogger.info(
+                LogTags.Config,
+                "ui_mcp_connectivity_check_completed",
+                "targetCount" to targets.size,
+                "okCount" to okCount,
+                "durationMs" to durationMs,
+                "parallel" to true,
+            )
             _uiState.update {
                 it.copy(
                     mcpConnectivityResult = result,
@@ -817,6 +842,27 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
+
+    private fun Throwable.toMcpFailureLabel(): String {
+        val raw = message.orEmpty()
+        return when {
+            raw.contains("401") || raw.contains("token", ignoreCase = true) || raw.contains("令牌") ->
+                "令牌无效或已过期"
+            raw.contains("403") || raw.contains("forbidden", ignoreCase = true) ->
+                "没有访问权限"
+            raw.contains("412") || raw.contains("CAExited", ignoreCase = true) ||
+                raw.contains("instance exited", ignoreCase = true) -> "远程服务启动失败"
+            raw.contains("timeout", ignoreCase = true) || raw.contains("timed out", ignoreCase = true) ||
+                raw.contains("超时") -> "连接超时"
+            raw.isBlank() -> "连接失败"
+            else -> raw.replace(Regex("https?://\\S+"), "远程服务").take(80)
+        }
+    }
+
+    private data class McpProbeOutcome(
+        val tools: List<String>,
+        val error: String?,
+    )
 
     //endregion
 

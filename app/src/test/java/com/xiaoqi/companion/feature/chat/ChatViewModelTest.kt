@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloadState
 import com.xiaoqi.companion.core.local.LocalQwenModelDownloader
+import com.xiaoqi.companion.core.llm.ConnectivityResult
 import com.xiaoqi.companion.core.presence.PresenceController
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceReaction
@@ -19,12 +20,15 @@ import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
+import com.xiaoqi.companion.core.mcp.McpServerConfig
+import com.xiaoqi.companion.core.mcp.McpToolSpec
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.ConversationRepository
 import com.xiaoqi.companion.data.repository.InsightRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
 import com.xiaoqi.companion.data.repository.LlmConfigStatus
 import com.xiaoqi.companion.data.repository.MemoryRepository
+import com.xiaoqi.companion.data.repository.McpServerListRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
@@ -38,6 +42,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -47,6 +52,9 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -77,6 +85,7 @@ class ChatViewModelTest {
     private lateinit var appPreferences: AppPreferences
     private lateinit var conversationRepository: ConversationRepository
     private lateinit var remoteMcpClient: RemoteMcpClient
+    private lateinit var mcpServerListRepository: McpServerListRepository
     private lateinit var dreamLoopScheduler: DreamLoopScheduler
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -192,6 +201,7 @@ class ChatViewModelTest {
         }
         messageDao = mockk<MessageDao>(relaxed = true)
         remoteMcpClient = mockk(relaxed = true)
+        mcpServerListRepository = mockk(relaxed = true)
         agentStateDao = mockk(relaxed = true) {
             every { observeByCompanionId("default") } returns flowOf(null)
         }
@@ -221,7 +231,7 @@ class ChatViewModelTest {
             toolDisplayRegistry = ToolDisplayRegistry(com.xiaoqi.companion.core.tools.parser.ToolCallResultParser()),
             toolCallResultParser = com.xiaoqi.companion.core.tools.parser.ToolCallResultParser(),
             remoteMcpClient = remoteMcpClient,
-            mcpServerListRepository = io.mockk.mockk(relaxed = true),
+            mcpServerListRepository = mcpServerListRepository,
             dreamLoopScheduler = dreamLoopScheduler,
             dreamRunObserver = io.mockk.mockk(relaxed = true) {
                 every { state } returns kotlinx.coroutines.flow.MutableStateFlow(
@@ -253,6 +263,48 @@ class ChatViewModelTest {
             assertNull(state.error)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun checkMcpConnectivity_probesIndependentServersConcurrently() = runTest {
+        val servers = listOf(
+            McpServerConfig(
+                id = "server-a",
+                providerId = "custom",
+                customUrl = "https://a.example/mcp",
+            ),
+            McpServerConfig(
+                id = "server-b",
+                providerId = "custom",
+                customUrl = "https://b.example/mcp",
+            ),
+        )
+        coEvery { mcpServerListRepository.readAll() } returns servers
+        val bothStarted = CompletableDeferred<Unit>()
+        var activeProbes = 0
+        var maxActiveProbes = 0
+        coEvery { remoteMcpClient.probe(any(), any()) } coAnswers {
+            activeProbes += 1
+            maxActiveProbes = maxOf(maxActiveProbes, activeProbes)
+            if (activeProbes == servers.size) bothStarted.complete(Unit)
+            withTimeout(1_000) { bothStarted.await() }
+            activeProbes -= 1
+            listOf(
+                McpToolSpec(
+                    name = "search",
+                    description = "Search",
+                    inputSchema = buildJsonObject { put("type", "object") },
+                )
+            )
+        }
+
+        viewModel.checkMcpConnectivity()
+        advanceUntilIdle()
+
+        assertEquals(2, maxActiveProbes)
+        assertEquals(setOf("server-a", "server-b"), viewModel.uiState.value.mcpServerTools.keys)
+        assertEquals("2/2 可用", (viewModel.uiState.value.mcpConnectivityResult as ConnectivityResult.Success).modelName)
+        assertFalse(viewModel.uiState.value.isCheckingConnectivity)
     }
 
     @Test

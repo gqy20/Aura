@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -198,6 +199,27 @@ class CompanionToolRegistryTest {
         assertEquals(1, tools.tools.size)
         assertTrue(tools.tools.none { it.name == "search_memory" })
         assertTrue(tools.tools.any { it.name.endsWith("__amap_search") })
+    }
+
+    @Test
+    fun create_chatDefault_filtersRemoteWriteTools() = runTest {
+        val repo = mockk<McpServerListRepository> {
+            coEvery { readAll() } returns listOf(readyMcpServer)
+        }
+        val client = mockk<RemoteMcpClient> {
+            coEvery { listTools(any(), any()) } returns listOf(
+                McpToolSpec("query-nearby-stores", "Find nearby stores", buildJsonObject {}),
+                McpToolSpec("create-order", "Create an order", buildJsonObject {}),
+                McpToolSpec("auto-bind-coupons", "Bind coupons", buildJsonObject {}),
+            )
+        }
+        val registry = newRegistry(appPrefs(system = true, mcp = true), repo, client)
+
+        val tools = registry.create(ToolScope.MCP_ONLY)
+
+        assertTrue(tools.tools.any { it.name.endsWith("__query-nearby-stores") })
+        assertFalse(tools.tools.any { it.name.endsWith("__create-order") })
+        assertFalse(tools.tools.any { it.name.endsWith("__auto-bind-coupons") })
     }
 
     @Test

@@ -18,6 +18,9 @@ internal object McpServerRouter {
         val needsRail = normalized.containsAny("12306", "火车", "高铁", "车次", "余票", "railway", "train ticket")
         val needsWeb = normalized.containsAny("bing", "必应", "web search", "网页搜索", "搜索网页", "新闻", "latest news")
         val needsMeal = normalized.containsAny("今天吃什么", "吃什么", "随机菜", "推荐吃")
+        val needsMealEnglish = normalized.containsAny(
+            "what to eat", "meal recommendation", "recommend food", "recipe", "howtocook",
+        )
         val needsMcDonalds = normalized.containsAny("麦当劳", "mcdonald")
         val needsLuckin = normalized.containsAny("瑞幸", "luckin")
 
@@ -26,7 +29,7 @@ internal object McpServerRouter {
             (needsMap && identity.containsAny("amap", "高德", "map")) ||
                 (needsRail && identity.containsAny("12306", "铁路")) ||
                 (needsWeb && identity.containsAny("bing", "必应")) ||
-                (needsMeal && identity.contains("吃什么")) ||
+                ((needsMeal || needsMealEnglish) && identity.containsAny("吃什么", "food", "meal", "howtocook")) ||
                 (needsMcDonalds && identity.containsAny("麦当劳", "mcdonald")) ||
                 (needsLuckin && identity.containsAny("瑞幸", "luckin"))
         }

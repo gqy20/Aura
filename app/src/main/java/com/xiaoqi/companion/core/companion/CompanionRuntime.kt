@@ -10,6 +10,7 @@ import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.prompt.PromptBuilder
 import com.xiaoqi.companion.core.tools.parseOrNull
+import com.xiaoqi.companion.core.tools.withoutToolProtocolArtifacts
 import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.db.converter.MemoryType
@@ -263,7 +264,9 @@ open class CompanionRuntime @Inject constructor(
     }
 
     private fun stripStructuredTags(text: String): String {
-        return STRUCTURED_TAG_REGEX.replace(text, "").trimStart()
+        return STRUCTURED_TAG_REGEX.replace(text, "")
+            .withoutToolProtocolArtifacts()
+            .trimStart()
     }
 
     private suspend fun PromptMemoryContext.withVisionContextIfNeeded(input: UserInput): PromptMemoryContext {

@@ -14,7 +14,8 @@ class McpServerRouterTest {
     private val rail = custom("rail", "12306", "https://example.com/rail")
     private val bing = custom("bing", "必应搜索", "https://example.com/bing")
     private val luckin = custom("luckin", "瑞幸", "https://example.com/luckin")
-    private val servers = listOf(amap, rail, bing, luckin)
+    private val meals = custom("meals", "今天吃什么", "https://example.com/meal-service")
+    private val servers = listOf(amap, rail, bing, luckin, meals)
 
     @Test
     fun mapQuerySelectsOnlyMapServer() {
@@ -47,6 +48,13 @@ class McpServerRouterTest {
         val selected = McpServerRouter.select("Use the map tool to find coffee near West Lake", servers)
 
         assertEquals(listOf("amap"), selected.map { it.id })
+    }
+
+    @Test
+    fun naturalEnglishMealQuerySelectsMealServer() {
+        val selected = McpServerRouter.select("Recommend a quick meal recipe for tonight", servers)
+
+        assertEquals(listOf("meals"), selected.map { it.id })
     }
 
     private fun custom(id: String, name: String, url: String) = McpServerConfig(

@@ -18,6 +18,7 @@ class ToolResultPromptComposerTest {
         val text = ToolResultPromptComposer.followupInstruction(hasErrors = false)
 
         assertTrue(text.contains("answer the user naturally", ignoreCase = true))
+        assertTrue(text.contains("every explicit part", ignoreCase = true))
         assertTrue(text.contains("Do not repeat raw tool JSON", ignoreCase = true))
     }
 }

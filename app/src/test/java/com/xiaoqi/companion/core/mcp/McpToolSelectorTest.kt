@@ -37,6 +37,20 @@ class McpToolSelectorTest {
     }
 
     @Test
+    fun compoundTask_preservesRequiredToolsAcrossEnglishRanking() {
+        val required = setOf("maps_geo", "maps_around_search", "maps_direction_walking")
+
+        val names = McpToolSelector.select(
+            query = "Use amap find coffee near West Lake then give a walking route from the station",
+            tools = tools,
+            requiredToolNames = required,
+        ).map { it.name }
+
+        assertTrue(required.all(names::contains))
+        assertTrue(names.size <= McpToolSelector.DEFAULT_LIMIT)
+    }
+
+    @Test
     fun specificIntent_prioritizesMatchingTool() {
         assertEquals("maps_weather", McpToolSelector.select("杭州今天会下雨吗，查一下天气", tools).first().name)
         assertEquals("maps_regeocode", McpToolSelector.select("120.1,30.2 这个坐标在哪", tools).first().name)

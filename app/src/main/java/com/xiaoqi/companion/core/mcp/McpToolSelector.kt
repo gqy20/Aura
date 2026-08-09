@@ -8,6 +8,7 @@ internal object McpToolSelector {
         query: String,
         tools: List<McpToolSpec>,
         limit: Int = DEFAULT_LIMIT,
+        requiredToolNames: Set<String> = emptySet(),
     ): List<McpToolSpec> {
         if (tools.size <= limit || query.isBlank()) return tools
         val normalizedQuery = query.lowercase()
@@ -36,12 +37,19 @@ internal object McpToolSelector {
             RankedTool(tool, lexicalScore + intentScore - modeMismatchPenalty(normalizedQuery, haystack), index)
         }
 
-        val matched = ranked.filter { it.score > 0 }
-        if (matched.isEmpty()) return tools
-        return matched
+        val required = tools.filter { tool ->
+            requiredToolNames.any { requiredName ->
+                tool.name.contains(requiredName, ignoreCase = true)
+            }
+        }
+        val requiredNames = required.mapTo(mutableSetOf()) { it.name }
+        val matched = ranked.filter { it.score > 0 && it.tool.name !in requiredNames }
+        if (matched.isEmpty()) return required.ifEmpty { tools }
+        val effectiveLimit = limit.coerceAtLeast(required.size).coerceAtLeast(1)
+        return (required + matched
             .sortedWith(compareByDescending<RankedTool> { it.score }.thenBy { it.index })
-            .take(limit.coerceAtLeast(1))
-            .map { it.tool }
+            .map { it.tool })
+            .take(effectiveLimit)
     }
 
     private fun String.searchTerms(): Set<String> {

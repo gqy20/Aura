@@ -11,7 +11,8 @@ object ToolResultPromptComposer {
             "One or more tool calls failed. Do not invent missing results. Explain the limitation naturally, " +
                 "use any successful tool results that are available, and suggest a practical next step when helpful."
         } else {
-            "Use the tool results above to answer the user naturally. If you still need tools, call them. " +
+            "Use the tool results above to answer the user naturally. Check every explicit part of the original " +
+                "request; if any part is still unresolved and a relevant tool is available, call it before answering. " +
                 "Do not repeat raw tool JSON in the final reply."
         }
 

@@ -192,6 +192,51 @@ class AnthropicMessagesLLMClientTest {
     }
 
     @Test
+    fun executeStreaming_discardsIncompleteToolWhenSameNamedToolCompletes() = runTest {
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"abandoned-1","name":"maps_geo"}}""",
+                """{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"address\":"}}""",
+                """{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"geo-2","name":"maps_geo"}}""",
+                """{"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"address\":\"West Lake Hangzhou\"}"}}""",
+                """{"type":"content_block_stop","index":2}""",
+                """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val frames = client().executeStreaming(simplePrompt(), model, emptyList()).toList()
+        val calls = frames.filterIsInstance<StreamFrame.ToolCallComplete>()
+
+        assertEquals(1, calls.size)
+        assertEquals("geo-2", calls.single().id)
+        assertEquals("West Lake Hangzhou", json.parseToJsonElement(calls.single().content)
+            .jsonObject.getValue("address").jsonPrimitive.content)
+        assertTrue(frames.any { it is StreamFrame.End })
+    }
+
+    @Test
+    fun executeStreaming_keepsFailingForIncompleteDifferentNamedTool() = runTest {
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"route-1","name":"maps_direction_walking"}}""",
+                """{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"origin\":"}}""",
+                """{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"geo-2","name":"maps_geo"}}""",
+                """{"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"address\":\"West Lake Hangzhou\"}"}}""",
+                """{"type":"content_block_stop","index":2}""",
+                """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val failure = runCatching {
+            client().executeStreaming(simplePrompt(), model, emptyList()).toList()
+        }.exceptionOrNull()
+
+        assertTrue(failure?.message?.contains("maps_direction_walking") == true)
+    }
+
+    @Test
     fun executeStreaming_supportsSingleToolProviderWithoutIndexes() = runTest {
         server.enqueue(
             sseResponse(
@@ -234,6 +279,28 @@ class AnthropicMessagesLLMClientTest {
         assertTrue(call.content.contains("\"reason\":\"needs rest\""))
         assertEquals("calm", input.getValue("mood").jsonPrimitive.content)
         assertEquals("needs rest", input.getValue("reason").jsonPrimitive.content)
+    }
+
+    @Test
+    fun executeStreaming_repairsBareCoordinatePairsContainingCommas() = runTest {
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"route-1","name":"maps_direction_walking"}}""",
+                """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"origin\":120.212600,30.290851,\"destination\":120.130396,30.259242}"}}""",
+                """{"type":"content_block_stop","index":0}""",
+                """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val call = client().executeStreaming(simplePrompt(), model, emptyList())
+            .toList()
+            .filterIsInstance<StreamFrame.ToolCallComplete>()
+            .single()
+        val input = json.parseToJsonElement(call.content).jsonObject
+
+        assertEquals("120.212600,30.290851", input.getValue("origin").jsonPrimitive.content)
+        assertEquals("120.130396,30.259242", input.getValue("destination").jsonPrimitive.content)
     }
 
     private fun client() = AnthropicMessagesLLMClient(
