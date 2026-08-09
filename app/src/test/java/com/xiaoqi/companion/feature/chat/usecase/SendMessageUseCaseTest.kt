@@ -143,6 +143,7 @@ class SendMessageUseCaseTest {
         var memorySavedCount = 0
         var emitStreaming = false
         var streamingDeltas: List<String> = emptyList()
+        var progressEvents: List<AgentEvent.Progress> = emptyList()
         var failAfterStreaming = false
         var completeDelayMs = 0L
         var sendCalled = false
@@ -159,6 +160,7 @@ class SendMessageUseCaseTest {
                     emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
                 }
                 toolEvents.forEach { call -> emit(AgentEvent.ToolCallUpdated(call)) }
+                progressEvents.forEach { progress -> emit(progress) }
                 if (memorySavedCount > 0) {
                     emit(AgentEvent.MemorySaved(memorySavedCount))
                 }
@@ -517,6 +519,23 @@ class SendMessageUseCaseTest {
 
         // 3 个小 delta 在 batch 之后会按到达顺序 flush,最终内容等于完整字符串
         assertEquals("abc", state.value.messages.last { it.role == "ASSISTANT" }.content)
+    }
+
+    @Test
+    fun sendMessage_firstTextDeltaReplacesProgressStatus() = runTest {
+        fakeRuntime.progressEvents = listOf(
+            AgentEvent.Progress("compound_task", "信息已齐，正在整理回答")
+        )
+        fakeRuntime.streamingDeltas = listOf("最终回答")
+        fakeRuntime.rawResponse = "最终回答"
+
+        sendMessageUseCase("hello", null, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        val assistant = state.value.messages.last { it.role == "ASSISTANT" }
+        assertEquals("最终回答", assistant.content)
+        assertNull(assistant.toolStatus)
+        assertNull(assistant.toolStatusType)
     }
 
     @Test

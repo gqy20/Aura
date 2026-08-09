@@ -153,6 +153,8 @@ private class KoogPromptExecutorWrapper(
 
     override fun runEvents(prompt: BuiltPrompt): Flow<KoogAgentEvent> = callbackFlow {
         var hasStreamingText = false
+        val streamingText = StringBuilder()
+        var emittedTextLength = 0
         val taskExecution = CompositeTaskPlanner.create(prompt.userMessage)
         if (taskExecution != null) {
             AppLogger.info(
@@ -162,22 +164,43 @@ private class KoogPromptExecutorWrapper(
                 "stepCount" to taskExecution.totalStepCount,
             )
         }
+        fun emitSanitizedStreamingText(flush: Boolean) {
+            val sanitized = streamingText.toString().withoutToolProtocolArtifacts()
+            val targetLength = if (flush) {
+                sanitized.length
+            } else {
+                (sanitized.length - STREAM_PROTOCOL_GUARD_LENGTH).coerceAtLeast(0)
+            }
+            if (targetLength <= emittedTextLength) return
+            trySend(KoogAgentEvent.TextDelta(sanitized.substring(emittedTextLength, targetLength)))
+            emittedTextLength = targetLength
+            hasStreamingText = true
+        }
+
         val observer = object : KoogAgentObserver {
             override fun onToolUpdated(call: AgentToolCall) {
                 trySend(KoogAgentEvent.ToolCallUpdated(call))
             }
 
             override fun onTextDelta(text: String) {
-                hasStreamingText = true
-                trySend(KoogAgentEvent.TextDelta(text))
+                streamingText.append(text)
+                emitSanitizedStreamingText(flush = false)
             }
 
             override fun onTextComplete(text: String) {
-                if (!hasStreamingText && text.isNotBlank()) {
-                    hasStreamingText = true
-                    trySend(KoogAgentEvent.TextDelta(text))
+                if (streamingText.isEmpty() && text.isNotBlank()) {
+                    streamingText.append(text)
                 }
+                emitSanitizedStreamingText(flush = true)
             }
+
+            override fun onProgress(stage: String, message: String) {
+                trySend(KoogAgentEvent.Progress(stage, message))
+            }
+        }
+
+        taskExecution?.let {
+            observer.onProgress(COMPOUND_TASK_STAGE, it.progressMessage())
         }
 
         val job = launch {
@@ -196,7 +219,7 @@ private class KoogPromptExecutorWrapper(
                 } else {
                     result.withoutToolProtocolArtifacts()
                 }
-                if (!hasStreamingText && safeResult.isNotBlank()) {
+                if (safeResult.isNotBlank()) {
                     observer.onTextComplete(safeResult)
                 }
                 AppLogger.info(
@@ -270,7 +293,7 @@ private class KoogPromptExecutorWrapper(
                 }
             )
             .id("companion-agent-${config.provider.name.lowercase()}")
-            .graphStrategy(streamingSingleRunStrategy(prompt, taskExecution))
+            .graphStrategy(streamingSingleRunStrategy(prompt, taskExecution, observer))
             .install {
                 install(EventHandler.Feature) {
                     onToolCallStarting { context ->
@@ -336,10 +359,10 @@ private class KoogPromptExecutorWrapper(
                     }
                     onLLMStreamingFrameReceived { context ->
                         when (val frame = context.streamFrame) {
-                            is StreamFrame.TextDelta -> if (taskExecution == null) {
+                            is StreamFrame.TextDelta -> if (taskExecution == null || taskExecution.isComplete) {
                                 observer?.onTextDelta(frame.text)
                             }
-                            is StreamFrame.TextComplete -> if (taskExecution == null) {
+                            is StreamFrame.TextComplete -> if (taskExecution == null || taskExecution.isComplete) {
                                 observer?.onTextComplete(frame.text)
                             }
                             else -> Unit
@@ -353,6 +376,7 @@ private class KoogPromptExecutorWrapper(
     private fun streamingSingleRunStrategy(
         prompt: BuiltPrompt,
         taskExecution: CompositeTaskExecution?,
+        observer: KoogAgentObserver?,
     ) = strategy<String, String>("single_run_streaming_tools") {
         var toolResultRounds = 0
         var completionGateRetries = 0
@@ -360,6 +384,24 @@ private class KoogPromptExecutorWrapper(
             prompt.toolPolicy.maxToolRoundsPerTurn,
             taskExecution?.minimumToolRounds ?: 0,
         )
+        val nodePrepareInitialRequest by node<String, String> { input ->
+            if (taskExecution != null && !taskExecution.isComplete) {
+                llm.writeSession {
+                    val nextStepTools = toolRegistry.tools
+                        .map { it.descriptor }
+                        .filter { taskExecution.acceptsNextTool(it.name) }
+                    if (nextStepTools.isNotEmpty()) {
+                        tools = nextStepTools
+                        if (nextStepTools.size == 1) {
+                            setToolChoiceNamed(nextStepTools.single().name)
+                        } else {
+                            setToolChoiceRequired()
+                        }
+                    }
+                }
+            }
+            input
+        }
         val nodeCallLLM by nodeLLMRequestStreamingAndSendResults<String>()
         val nodeExecuteTool by nodeExecuteMultipleTools(parallelTools = taskExecution != null)
         val nodeSendToolResult by node<List<ReceivedToolResult>, List<Message.Response>> { results ->
@@ -369,6 +411,7 @@ private class KoogPromptExecutorWrapper(
             val hasErrors = results.any { it.isErrorResult() }
             taskExecution?.record(results)
             if (taskExecution != null) {
+                observer?.onProgress(COMPOUND_TASK_STAGE, taskExecution.progressMessage())
                 AppLogger.info(
                     LogTags.Llm,
                     "compound_task_progress",
@@ -503,7 +546,8 @@ private class KoogPromptExecutorWrapper(
             }
         }
 
-        edge(nodeStart forwardTo nodeCallLLM)
+        edge(nodeStart forwardTo nodePrepareInitialRequest)
+        edge(nodePrepareInitialRequest forwardTo nodeCallLLM)
         edge(nodeCallLLM forwardTo nodeExecuteTool onMultipleToolCalls { true })
         edge(
             nodeCallLLM forwardTo nodeFinish
@@ -525,6 +569,8 @@ private class KoogPromptExecutorWrapper(
         const val MAX_COMPOUND_AGENT_ITERATIONS = 20
         const val MAX_COMPLETION_GATE_RETRIES = 2
         const val DEFAULT_SESSION_ID = "default"
+        const val COMPOUND_TASK_STAGE = "compound_task"
+        const val STREAM_PROTOCOL_GUARD_LENGTH = 24
     }
 }
 
@@ -541,6 +587,7 @@ private interface KoogAgentObserver {
     fun onToolUpdated(call: AgentToolCall)
     fun onTextDelta(text: String)
     fun onTextComplete(text: String)
+    fun onProgress(stage: String, message: String)
 }
 
 private fun BuiltPrompt.toKoogAgentPrompt() = prompt("companion-chat") {

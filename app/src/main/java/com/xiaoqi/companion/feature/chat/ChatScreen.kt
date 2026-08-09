@@ -4,6 +4,11 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -52,7 +57,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -66,6 +75,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.core.presence.PresenceAnimationState
 import com.xiaoqi.companion.core.presence.PresenceMode
 import com.xiaoqi.companion.core.presence.PresenceUiState
@@ -186,13 +196,12 @@ fun ChatScreenContent(
     var isConversationsOpen by remember { mutableStateOf(false) }
     var selectedToolCall by remember { mutableStateOf<ChatToolCall?>(null) }
     val messages = uiState.messages
-    val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
     val latestMessage = messages.lastOrNull()
     val latestUserMessageId = messages.lastOrNull { it.role == "USER" }?.id
     var hasCompletedInitialScroll by remember { mutableStateOf(false) }
     val reversedMessages = remember(messages) { messages.asReversed() }
 
-    // 跟随只由用户所在位置决定；用户上滑后，必须主动回到底部才恢复。
+    // 只有真实拖动才暂停跟随；卡片变高、流式重排和 IME 动画不能夺走滚动控制权。
     var isUserPinnedToBottom by rememberSaveable { mutableStateOf(true) }
     var hasUnseenMessages by rememberSaveable { mutableStateOf(false) }
 
@@ -211,21 +220,36 @@ fun ChatScreenContent(
         }
     }
 
+    val userScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y != 0f) {
+                    isUserPinnedToBottom = false
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
     LaunchedEffect(listState) {
         snapshotFlow {
-            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+            Triple(
+                listState.isScrollInProgress,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+            )
         }
             .distinctUntilChanged()
-            .collect { (idx, offset) ->
+            .collect { (isScrolling, idx, offset) ->
                 val nowPinned = idx == 0 && offset < 32
-                isUserPinnedToBottom = nowPinned
-                if (nowPinned) {
+                if (!isUserPinnedToBottom && !isScrolling && nowPinned) {
+                    isUserPinnedToBottom = true
                     hasUnseenMessages = false
                 }
             }
     }
 
-    LaunchedEffect(latestMessage?.id, lastContentLength, latestMessage?.isStreaming) {
+    LaunchedEffect(latestMessage?.id) {
         if (!hasCompletedInitialScroll || latestMessage == null) return@LaunchedEffect
         if (isUserPinnedToBottom) {
             listState.scrollToItem(0)
@@ -331,7 +355,9 @@ fun ChatScreenContent(
                     LazyColumn(
                         state = listState,
                         reverseLayout = true,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(userScrollConnection),
                         contentPadding = PaddingValues(
                             start = 16.dp,
                             top = 8.dp,
@@ -343,6 +369,14 @@ fun ChatScreenContent(
                         items(reversedMessages, key = { it.id }) { message ->
                             val messageToolCall = remember(message.id, uiState.toolCalls) {
                                 findToolCallForMessage(message, uiState.toolCalls)
+                            }
+                            val messageMapToolCall = remember(
+                                message.id,
+                                message.isStreaming,
+                                message.toolCallIds,
+                                uiState.mapToolCalls,
+                            ) {
+                                findMapToolCallForMessage(message, uiState.mapToolCalls)
                             }
                             val onToolClick = remember(messageToolCall) {
                                 messageToolCall?.let { toolCall ->
@@ -374,13 +408,23 @@ fun ChatScreenContent(
                                         null
                                     },
                                 )
-                                messageToolCall?.mapInteraction?.let { interaction ->
-                                    MapResultCard(
-                                        interaction = interaction,
-                                        onOpenMap = { onOpenMap(interaction) },
-                                        onAdjustRoute = { selectedToolCall = messageToolCall },
-                                        modifier = Modifier.padding(start = 4.dp).fillMaxWidth(),
-                                    )
+                                val mapInteraction = messageMapToolCall?.mapInteraction
+                                AnimatedVisibility(
+                                    visible = !message.isStreaming && mapInteraction != null,
+                                    enter = fadeIn(tween(180)) + expandVertically(
+                                        animationSpec = tween(220),
+                                        expandFrom = Alignment.Top,
+                                    ),
+                                    exit = ExitTransition.None,
+                                ) {
+                                    mapInteraction?.let { interaction ->
+                                        MapResultCard(
+                                            interaction = interaction,
+                                            onOpenMap = { onOpenMap(interaction) },
+                                            onAdjustRoute = { selectedToolCall = messageMapToolCall },
+                                            modifier = Modifier.padding(start = 4.dp).fillMaxWidth(),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -738,6 +782,30 @@ internal fun findToolCallForMessage(
     if (message.role != "ASSISTANT") return null
     toolCalls.firstOrNull { it.id in message.toolCallIds }?.let { return it }
     return toolCalls
+        .asSequence()
+        .filter { it.mapInteraction != null }
+        .filter { call ->
+            val completedAt = call.completedAt ?: return@filter false
+            completedAt <= message.timestamp && message.timestamp - completedAt <= MAP_TOOL_HISTORY_WINDOW_MS
+        }
+        .maxByOrNull { it.completedAt ?: Long.MIN_VALUE }
+}
+
+internal fun findMapToolCallForMessage(
+    message: ChatMessage,
+    mapToolCalls: List<ChatToolCall>,
+): ChatToolCall? {
+    if (message.role != "ASSISTANT") return null
+
+    val ownedMapCall = mapToolCalls
+        .asSequence()
+        .filter { it.id in message.toolCallIds }
+        .filter { it.mapInteraction != null && it.toolStatus == ToolCallStatus.SUCCEEDED }
+        .maxByOrNull { it.completedAt ?: Long.MIN_VALUE }
+    if (ownedMapCall != null) return ownedMapCall
+
+    if (message.isStreaming || message.toolCallIds.isNotEmpty()) return null
+    return mapToolCalls
         .asSequence()
         .filter { it.mapInteraction != null }
         .filter { call ->

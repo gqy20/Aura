@@ -148,6 +148,9 @@ open class CompanionRuntime @Inject constructor(
                             rawResponse += event.text
                             trySend(AgentEvent.Streaming(event.text))
                         }
+                        is KoogAgentEvent.Progress -> {
+                            trySend(AgentEvent.Progress(event.stage, event.message))
+                        }
                         is KoogAgentEvent.ToolCallUpdated -> {
                             trySend(AgentEvent.ToolCallUpdated(event.call))
                             // update_state 完成时，如果有记忆保存，触发 MemorySaved 事件

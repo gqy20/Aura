@@ -33,6 +33,7 @@ import com.xiaoqi.companion.data.repository.MemoryRepository
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ToolCallRepository
+import com.xiaoqi.companion.data.repository.ToolCallSnapshot
 import com.xiaoqi.companion.data.source.HealthConnectDataSource
 import com.xiaoqi.companion.data.source.HealthSyncManager
 import com.xiaoqi.companion.data.source.SensorManagerHealthSource
@@ -397,20 +398,30 @@ class ChatViewModel @Inject constructor(
             }.collect { calls ->
                 var shouldClearReaction = false
                 _uiState.update { state ->
-                    val visibleCalls = calls.take(RECENT_TOOL_CALL_LIMIT)
-                        .map { snap ->
-                            val summary = toolCallResultParser.parse(
-                                toolName = snap.toolName,
-                                resultJson = snap.resultJson,
-                            )
-                            val label = toolDisplayRegistry.resolveLabel(
-                                toolName = snap.toolName,
-                                status = snap.status,
-                                resultJson = snap.resultJson,
-                                errorMessage = snap.errorMessage,
-                            )
-                            snap.toChatToolCall(displayLabel = label, summary = summary)
+                    fun ToolCallSnapshot.toUiCall(): ChatToolCall {
+                        val summary = toolCallResultParser.parse(
+                            toolName = toolName,
+                            resultJson = resultJson,
+                        )
+                        val label = toolDisplayRegistry.resolveLabel(
+                            toolName = toolName,
+                            status = status,
+                            resultJson = resultJson,
+                            errorMessage = errorMessage,
+                        )
+                        return toChatToolCall(displayLabel = label, summary = summary)
+                    }
+
+                    val visibleCalls = calls.take(RECENT_TOOL_CALL_LIMIT).map { it.toUiCall() }
+                    val mapCalls = calls.asSequence()
+                        .filter { snap ->
+                            val name = snap.toolName.lowercase()
+                            "maps_" in name || "amap" in name
                         }
+                        .map { it.toUiCall() }
+                        .filter { it.mapInteraction != null }
+                        .take(RECENT_MAP_TOOL_CALL_LIMIT)
+                        .toList()
                     val previousLatest = state.toolCalls.firstOrNull()
                     val nextLatest = visibleCalls.firstOrNull()
                     val reaction = nextLatest
@@ -429,6 +440,7 @@ class ChatViewModel @Inject constructor(
                     shouldClearReaction = acceptedReaction != null
                     state.copy(
                         toolCalls = visibleCalls,
+                        mapToolCalls = mapCalls,
                         presenceReaction = acceptedReaction ?: state.presenceReaction,
                     )
                 }
@@ -872,7 +884,9 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val conversation = conversationRepository.createNew()
             appPreferences.setCurrentSessionId(conversation.id)
-            _uiState.update { it.copy(messages = emptyList(), toolCalls = emptyList()) }
+            _uiState.update {
+                it.copy(messages = emptyList(), toolCalls = emptyList(), mapToolCalls = emptyList())
+            }
         }
     }
 
@@ -884,6 +898,7 @@ class ChatViewModel @Inject constructor(
                 it.copy(
                     messages = emptyList(),
                     toolCalls = emptyList(),
+                    mapToolCalls = emptyList(),
                     isLoading = false,
                 )
             }
@@ -1441,6 +1456,7 @@ class ChatViewModel @Inject constructor(
     companion object {
         private const val DEFAULT_COMPANION_ID = "default"
         private const val RECENT_TOOL_CALL_LIMIT = 3
+        private const val RECENT_MAP_TOOL_CALL_LIMIT = 64
         private const val INSIGHT_CARD_LIMIT = 3
         private const val MUTE_DAY_MS = 24L * 60L * 60L * 1000L
     }

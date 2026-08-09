@@ -5,5 +5,10 @@ private val TOOL_PROTOCOL_BLOCK = Regex(
     options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
 )
 
+private val BARE_TOOL_PROTOCOL_SUFFIX = Regex(
+    pattern = """(?:\{\s*)?"?(?:tool)?_name"\s*:\s*"[^"]+"\s*,\s*"tool_args"\s*:\s*\{.*$""",
+    options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+
 internal fun String.withoutToolProtocolArtifacts(): String =
-    TOOL_PROTOCOL_BLOCK.replace(this, "").trimEnd()
+    BARE_TOOL_PROTOCOL_SUFFIX.replace(TOOL_PROTOCOL_BLOCK.replace(this, ""), "").trimEnd()

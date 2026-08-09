@@ -85,6 +85,7 @@ class CompanionRuntimeTest {
         var responseText = "你好呀！"
         var shouldFail = false
         var emitToolEvents = false
+        var emitProgress = false
         var emitTextEvents = true
         var runCallCount = 0
         var runEventsCallCount = 0
@@ -115,6 +116,9 @@ class CompanionRuntimeTest {
                     if (emitToolEvents) {
                         emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("update_state", ToolCallStatus.STARTED)))
                         emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("update_state", ToolCallStatus.SUCCEEDED)))
+                    }
+                    if (emitProgress) {
+                        emit(KoogAgentEvent.Progress("compound_task", "正在完成第 2/3 步"))
                     }
                     if (emitTextEvents) {
                         emit(KoogAgentEvent.TextDelta(responseText))
@@ -147,6 +151,20 @@ class CompanionRuntimeTest {
             val event = awaitItem()
             assertTrue(event is AgentEvent.Complete)
             assertEquals("你好呀！", (event as AgentEvent.Complete).textReply)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun send_forwardsCompoundTaskProgress() = runTest {
+        val factory = FakeKoogAgentFactory().apply { emitProgress = true }
+
+        makeRuntime(factory).send(UserInput.Text("hello")).test {
+            val progress = awaitItem() as AgentEvent.Progress
+            assertEquals("compound_task", progress.stage)
+            assertEquals("正在完成第 2/3 步", progress.message)
+            assertTrue(awaitItem() is AgentEvent.Streaming)
+            assertTrue(awaitItem() is AgentEvent.Complete)
             cancelAndIgnoreRemainingEvents()
         }
     }

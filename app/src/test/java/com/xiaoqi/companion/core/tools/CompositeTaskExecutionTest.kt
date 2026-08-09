@@ -6,6 +6,7 @@ import ai.koog.agents.core.feature.model.AIAgentError
 import ai.koog.serialization.JSONObject
 import io.mockk.mockk
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,6 +48,19 @@ class CompositeTaskExecutionTest {
 
         assertTrue(execution.requiredToolNameHints.contains("maps_search_detail"))
         assertTrue(execution.minimumToolRounds >= 5)
+    }
+
+    @Test
+    fun progressMessage_advancesThenSwitchesToFinalSynthesis() {
+        val execution = CompositeTaskPlanner.create(
+            "Use Bing web search for latest Android news"
+        )!!
+
+        assertEquals("正在完成第 1/2 步", execution.progressMessage())
+        execution.record(listOf(success("bing_search")))
+        assertEquals("正在完成第 2/2 步", execution.progressMessage())
+        execution.record(listOf(success("crawl_webpage")))
+        assertEquals("信息已齐，正在整理回答", execution.progressMessage())
     }
 
     @Test

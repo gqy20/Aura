@@ -411,6 +411,27 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun init_retainsMapCallsOutsideRecentToolWindow() = runTest {
+        toolCallRepository.calls.value = listOf(
+            toolCallSnapshot("1", "search_memory", ToolCallStatus.SUCCEEDED),
+            toolCallSnapshot("2", "update_mood", ToolCallStatus.SUCCEEDED),
+            toolCallSnapshot("3", "update_relationship", ToolCallStatus.SUCCEEDED),
+            toolCallSnapshot(
+                id = "map-4",
+                toolName = "maps_geo",
+                status = ToolCallStatus.SUCCEEDED,
+                completedAt = 1_100L,
+                argumentsJson = """{"address":"West Lake"}""",
+                resultJson = """{"results":[{"location":"120.13,30.25","city":"Hangzhou"}]}""",
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(3, viewModel.uiState.value.toolCalls.size)
+        assertEquals(listOf("map-4"), viewModel.uiState.value.mapToolCalls.map { it.id })
+    }
+
+    @Test
     fun restoredImageMessage_usesDataUriForDisplay() = runTest {
         val imageMessageRepo: MessageRepository = mockk(relaxed = true) {
             every { getMessagesBySession("default") } returns flowOf(
@@ -475,12 +496,13 @@ class ChatViewModelTest {
         completedAt: Long? = null,
         errorMessage: String? = null,
         resultJson: String? = null,
+        argumentsJson: String = "{}",
     ) = ToolCallSnapshot(
         id = id,
         sessionId = "default",
         toolName = toolName,
         status = status,
-        argumentsJson = "{}",
+        argumentsJson = argumentsJson,
         resultJson = resultJson,
         errorMessage = errorMessage,
         startedAt = 1_000L,

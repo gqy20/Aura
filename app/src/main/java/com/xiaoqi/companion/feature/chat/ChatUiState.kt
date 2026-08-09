@@ -164,6 +164,8 @@ data class ChatPermissionPrompt(
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val toolCalls: List<ChatToolCall> = emptyList(),
+    /** 独立保留地图产物，避免复合任务把历史卡片挤出最近工具窗口。 */
+    val mapToolCalls: List<ChatToolCall> = emptyList(),
     val memories: List<ChatMemory> = emptyList(),
     val reminders: List<ChatReminder> = emptyList(),
     val longTasks: List<AgentLongTask> = emptyList(),

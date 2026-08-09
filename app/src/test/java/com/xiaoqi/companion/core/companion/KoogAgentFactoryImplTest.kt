@@ -209,8 +209,19 @@ class KoogAgentFactoryImplTest {
             )
         ).toList()
 
-        assertTrue(events.contains(KoogAgentEvent.TextDelta("grounded final answer")))
+        val finalDeltas = events.filterIsInstance<KoogAgentEvent.TextDelta>()
+        assertEquals("grounded final answer with enough content", finalDeltas.joinToString("") { it.text })
+        assertTrue(finalDeltas.size >= 2)
         assertTrue(events.none { it == KoogAgentEvent.TextDelta("premature answer") })
+        assertEquals(
+            listOf(
+                "正在完成第 1/3 步",
+                "正在完成第 2/3 步",
+                "正在完成第 3/3 步",
+                "信息已齐，正在整理回答",
+            ),
+            events.filterIsInstance<KoogAgentEvent.Progress>().map { it.message }.distinct(),
+        )
         assertEquals(5, executor.requestCount)
         assertTrue(policies.single().allowedCategories.contains(ToolCategory.REMOTE_READ))
         assertTrue(!policies.single().allowedCategories.contains(ToolCategory.LOCAL_WRITE))
@@ -518,7 +529,16 @@ class KoogAgentFactoryImplTest {
             prompt: Prompt,
             model: LLModel,
             tools: List<ToolDescriptor>,
-        ): Flow<StreamFrame> = nextResponse().toStreamFrames().asFlow()
+        ): Flow<StreamFrame> {
+            val responses = nextResponse()
+            if (requestCount < 5) return responses.toStreamFrames().asFlow()
+            return listOf(
+                StreamFrame.TextDelta("grounded final answer ", null),
+                StreamFrame.TextDelta("with enough content", null),
+                StreamFrame.TextComplete("grounded final answer with enough content", null),
+                StreamFrame.End(null, ResponseMetaInfo(Clock.System.now())),
+            ).asFlow()
+        }
 
         private fun nextResponse(): List<Message.Response> {
             requestCount += 1

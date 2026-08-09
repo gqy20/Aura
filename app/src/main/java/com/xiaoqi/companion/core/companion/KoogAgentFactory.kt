@@ -30,6 +30,7 @@ interface KoogAgentFactory {
 
 sealed class KoogAgentEvent {
     data class TextDelta(val text: String) : KoogAgentEvent()
+    data class Progress(val stage: String, val message: String) : KoogAgentEvent()
     data class ToolCallUpdated(val call: AgentToolCall) : KoogAgentEvent()
     data class ToolStarted(val name: String) : KoogAgentEvent()
     data class ToolFinished(val name: String) : KoogAgentEvent()

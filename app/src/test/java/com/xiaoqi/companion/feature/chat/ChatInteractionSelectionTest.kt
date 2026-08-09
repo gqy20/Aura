@@ -53,7 +53,39 @@ class ChatInteractionSelectionTest {
             timestamp = completedAt + 10_000L,
         )
 
-        assertEquals(mapCall, findToolCallForMessage(message, listOf(mapCall)))
+        assertEquals(mapCall, findMapToolCallForMessage(message, listOf(mapCall)))
+    }
+
+    @Test
+    fun findMapToolCallForMessage_streamingMessageDoesNotBorrowPreviousTurnMap() {
+        val previousMap = mapToolCall(id = "previous-map", completedAt = 900_000L)
+        val message = ChatMessage(
+            id = "assistant-streaming",
+            role = "ASSISTANT",
+            content = "",
+            timestamp = 1_000_000L,
+            isStreaming = true,
+        )
+
+        assertNull(findMapToolCallForMessage(message, listOf(previousMap)))
+    }
+
+    @Test
+    fun findMapToolCallForMessage_keepsLatestOwnedMapAcrossNonMapCalls() {
+        val firstMap = mapToolCall(id = "geo", completedAt = 1_000L)
+        val routeMap = mapToolCall(id = "route", completedAt = 3_000L)
+        val nonMap = toolCall(id = "poi-detail").copy(completedAt = 2_000L)
+        val message = ChatMessage(
+            id = "assistant-map",
+            role = "ASSISTANT",
+            content = "done",
+            toolCallIds = listOf(firstMap.id, nonMap.id, routeMap.id),
+        )
+
+        assertEquals(
+            routeMap,
+            findMapToolCallForMessage(message, listOf(nonMap, firstMap, routeMap)),
+        )
     }
 
     private fun toolCall(id: String) = ChatToolCall(
@@ -62,5 +94,15 @@ class ChatInteractionSelectionTest {
         toolStatus = ToolCallStatus.SUCCEEDED,
         label = "搜索记忆",
         status = "已完成",
+    )
+
+    private fun mapToolCall(id: String, completedAt: Long) = toolCall(id).copy(
+        toolName = "maps_geo",
+        completedAt = completedAt,
+        mapInteraction = MapToolInteraction.Place(
+            name = "West Lake",
+            address = "Hangzhou",
+            coordinate = MapCoordinate(120.13, 30.25),
+        ),
     )
 }

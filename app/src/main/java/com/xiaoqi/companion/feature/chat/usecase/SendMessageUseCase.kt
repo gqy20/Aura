@@ -133,6 +133,7 @@ class SendMessageUseCase @Inject constructor(
         // UseCase 不直接持有 MutableStateFlow,通过 updateAssistantToolStatus
         // 闭包写入来同步。
         var lastAssistantToolStatus: String? = null
+        var isProgressStatus = false
 
         fun resetIdleTimer() {
             timedOut = false
@@ -241,8 +242,13 @@ class SendMessageUseCase @Inject constructor(
             }
         }
 
-        fun updateAssistantToolStatus(status: String, type: ToolCallStatus? = null) {
+        fun updateAssistantToolStatus(
+            status: String,
+            type: ToolCallStatus? = null,
+            progress: Boolean = false,
+        ) {
             lastAssistantToolStatus = status
+            isProgressStatus = progress
             updateAssistantMessage(assistantId, update) { it.copy(toolStatus = status, toolStatusType = type) }
         }
 
@@ -318,6 +324,13 @@ class SendMessageUseCase @Inject constructor(
                 when (event) {
                     is AgentEvent.Streaming -> {
                         resetIdleTimer()
+                        if (isProgressStatus) {
+                            isProgressStatus = false
+                            lastAssistantToolStatus = null
+                            updateAssistantMessage(assistantId, update) {
+                                it.copy(toolStatus = null, toolStatusType = null)
+                            }
+                        }
                         AppLogger.info(
                             LogTags.Chat,
                             "streaming_delta",
@@ -332,6 +345,7 @@ class SendMessageUseCase @Inject constructor(
                         updateAssistantToolStatus(
                             formatProgress(event.message.ifBlank { event.stage }),
                             ToolCallStatus.STARTED,
+                            progress = true,
                         )
                     }
                     is AgentEvent.RemoteStatus -> {

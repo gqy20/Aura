@@ -34,6 +34,12 @@ internal class CompositeTaskExecution(
     val minimumToolRounds: Int
         get() = steps.sumOf { it.requiredEvidenceCount }
 
+    fun progressMessage(): String = if (isComplete) {
+        "信息已齐，正在整理回答"
+    } else {
+        "正在完成第 ${completedStepCount + 1}/$totalStepCount 步"
+    }
+
     fun acceptsNextTool(toolName: String): Boolean {
         if (isComplete) return false
         return steps[nextStepIndex].acceptedToolNames.any { accepted ->
