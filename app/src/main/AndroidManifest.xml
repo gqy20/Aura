@@ -60,17 +60,6 @@
             android:name=".core.reminder.ReminderAlarmReceiver"
             android:exported="false" />
 
-        <!-- 诊断日志导出:把 app 私有目录下的 diagnostics 文件分享给用户选择的应用 -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.logfileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/log_file_paths" />
-        </provider>
-
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

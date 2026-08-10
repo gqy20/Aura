@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<paths>
-    <!-- diagnostics 目录:app.log + crashes/*。导出诊断日志时分享这些文件 -->
-    <files-path
-        name="diagnostics"
-        path="diagnostics/" />
-</paths>

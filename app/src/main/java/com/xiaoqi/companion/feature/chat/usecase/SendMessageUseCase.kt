@@ -122,7 +122,7 @@ class SendMessageUseCase @Inject constructor(
 
         val assistantId = UUID.randomUUID().toString()
         var assistantContent = ""
-        val streamingChunker = StreamingMarkdownChunker()
+        var streamingChunker = StreamingMarkdownChunker()
         val pendingStreamingContent = StringBuilder()
         var streamingRenderJob: Job? = null
         var idleTimeoutJob: Job? = null
@@ -341,6 +341,21 @@ class SendMessageUseCase @Inject constructor(
                         pendingStreamingContent.append(event.delta)
                         scheduleStreamingRender()
                     }
+                    AgentEvent.StreamingReset -> {
+                        streamingRenderJob?.cancel()
+                        streamingRenderJob = null
+                        pendingStreamingContent.clear()
+                        assistantContent = ""
+                        streamingChunker = StreamingMarkdownChunker()
+                        updateAssistantMessage(assistantId, update) {
+                            it.copy(
+                                content = "",
+                                renderBlocks = emptyList(),
+                                renderDraft = "",
+                                isRenderDraftCode = false,
+                            )
+                        }
+                    }
                     is AgentEvent.Progress -> {
                         updateAssistantToolStatus(
                             formatProgress(event.message.ifBlank { event.stage }),
@@ -439,23 +454,47 @@ class SendMessageUseCase @Inject constructor(
                             "estimatedTokens" to estimatedTokens,
                             "tokensPerSecond" to perfInfo.tokensPerSecond,
                         )
-                        updateAssistantMessage(assistantId, update) {
-                            it.copy(
+                        update {
+                            val persistedId = event.persistedMessageId
+                            val transientMessage = messages.firstOrNull { it.id == assistantId }
+                            val persistedMessage = persistedId?.let { id ->
+                                messages.firstOrNull { it.id == id }
+                            }
+                            val source = transientMessage ?: persistedMessage ?: ChatMessage(
+                                id = assistantId,
+                                role = "ASSISTANT",
+                                content = "",
+                            )
+                            val completedMessage = source.copy(
+                                id = persistedId ?: assistantId,
                                 content = finalReply,
                                 isStreaming = false,
                                 renderBlocks = emptyList(),
                                 renderDraft = "",
                                 isRenderDraftCode = false,
-                                toolStatus = if (it.toolStatus == LOCAL_GENERATION_STATUS) {
+                                toolStatus = if (source.toolStatus == LOCAL_GENERATION_STATUS) {
                                     null
-                                } else if (it.toolStatus == VISION_READING_STATUS) {
+                                } else if (source.toolStatus == VISION_READING_STATUS) {
                                     null
                                 } else {
-                                    it.toolStatus
+                                    source.toolStatus
                                 },
                                 performanceInfo = perfInfo,
                                 completionState = null,
                             )
+                            val completedIds = buildSet {
+                                add(assistantId)
+                                persistedId?.let(::add)
+                            }
+                            val firstCompletedIndex = messages.indexOfFirst { it.id in completedIds }
+                            val remaining = messages.filterNot { it.id in completedIds }.toMutableList()
+                            val insertionIndex = if (firstCompletedIndex < 0) {
+                                remaining.size
+                            } else {
+                                messages.take(firstCompletedIndex).count { it.id !in completedIds }
+                            }
+                            remaining.add(insertionIndex.coerceAtMost(remaining.size), completedMessage)
+                            copy(messages = remaining)
                         }
                         update {
                             val nextStatus = status.after(

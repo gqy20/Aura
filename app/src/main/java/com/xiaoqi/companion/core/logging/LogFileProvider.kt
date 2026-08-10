@@ -15,7 +15,7 @@ import java.util.Locale
  * - 所有日志正文已由 [LogFieldSanitizer] 脱敏,文件内容不含原始 PII。
  *
  * 文件位于 app 私有目录(`filesDir/diagnostics/`),外部无法直接读取;
- * 用户通过 Settings 的"导出诊断日志"经 FileProvider + share 主动授权分享。
+ * Debug 用户通过 Settings 的诊断包入口主动授权分享;release 不声明分享用 FileProvider。
  */
 class LogFileProvider(
     context: Context,

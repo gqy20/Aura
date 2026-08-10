@@ -304,40 +304,12 @@ class ChatViewModel @Inject constructor(
                     val dbMessages = messages.map { it.toChatMessage() }
                     val streamingTail = state.messages.lastOrNull { it.isStreaming }
                     if (streamingTail != null) {
-                        // 过滤掉与 streaming tail 内容重复的 DB 消息，
-                        // 避免 saveAssistantMessage 先于 Complete 到达时出现两份相同文本。
-                        // 用 contains 而非 == 兼容 stripStructuredTags：流式内容可能
-                        // 带 [mood:xxx] 前缀标签，DB 版本已剥离，但主体文本一致。
-                        val hasOverlap = dbMessages.any { dbMsg ->
-                            dbMsg.role == "ASSISTANT" &&
-                                dbMsg.content.isNotEmpty() &&
-                                streamingTail.content.contains(dbMsg.content)
-                        }
-                        if (hasOverlap) {
-                            // DB 已包含 streaming 回复，用 DB 版本接管。
-                            // 但 DB 不存 performanceInfo / toolStatus 等内存态字段，
-                            // 需要从 streaming tail 搬运过来，否则 tok/s pill 和工具状态消失。
-                            val enriched = dbMessages.map { dbMsg ->
-                                if (dbMsg.role == "ASSISTANT" &&
-                                    dbMsg.content.isNotEmpty() &&
-                                    streamingTail.content.contains(dbMsg.content)
-                                ) {
-                                    dbMsg.copy(
-                                        performanceInfo = streamingTail.performanceInfo,
-                                        toolStatus = streamingTail.toolStatus,
-                                        toolStatusType = streamingTail.toolStatusType,
-                                        toolCallIds = streamingTail.toolCallIds,
-                                        completionState = streamingTail.completionState,
-                                    )
-                                } else {
-                                    dbMsg
-                                }
-                            }
-                            state.copy(messages = enriched)
-                        } else {
-                            // DB 尚未包含 streaming 回复（如切换会话），保留 tail
-                            state.copy(messages = dbMessages + streamingTail)
-                        }
+                        state.copy(
+                            messages = mergePersistedMessagesDuringStreaming(
+                                dbMessages = dbMessages,
+                                streamingTail = streamingTail,
+                            )
+                        )
                     } else {
                         // 无 streaming 消息时，从旧 state 搬运 performanceInfo。
                         val previousAssistants = state.messages.filter { previous ->

@@ -45,7 +45,7 @@ object AppLogger {
         }
     }
 
-    /** 暴露给 Settings 的"导出诊断日志"使用;测试或无文件模式返回 null。 */
+    /** 暴露给 Debug Settings 的诊断包导出使用;测试或无文件模式返回 null。 */
     fun fileProvider(): LogFileProvider? = fileProvider
 
     /** 短路阈值,用于测试验证 release 模式确实抬高到 WARN。 */

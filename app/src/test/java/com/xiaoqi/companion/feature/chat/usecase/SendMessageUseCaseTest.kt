@@ -146,6 +146,9 @@ class SendMessageUseCaseTest {
         var progressEvents: List<AgentEvent.Progress> = emptyList()
         var failAfterStreaming = false
         var completeDelayMs = 0L
+        var persistedMessageId: String? = null
+        var beforeComplete: (() -> Unit)? = null
+        var scriptedEvents: List<AgentEvent> = emptyList()
         var sendCalled = false
         var lastInput: UserInput? = null
 
@@ -155,23 +158,28 @@ class SendMessageUseCaseTest {
             if (shouldFail) {
                 emit(AgentEvent.Error(AgentError.ApiError("API error")))
             } else {
-                if (emitToolEvents) {
-                    emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)))
-                    emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
+                if (scriptedEvents.isNotEmpty()) {
+                    scriptedEvents.forEach { emit(it) }
+                } else {
+                    if (emitToolEvents) {
+                        emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.STARTED)))
+                        emit(AgentEvent.ToolCallUpdated(AgentToolCall("save_memory", ToolCallStatus.SUCCEEDED)))
+                    }
+                    toolEvents.forEach { call -> emit(AgentEvent.ToolCallUpdated(call)) }
+                    progressEvents.forEach { progress -> emit(progress) }
+                    if (memorySavedCount > 0) {
+                        emit(AgentEvent.MemorySaved(memorySavedCount))
+                    }
+                    if (emitStreaming) emit(AgentEvent.Streaming("hello"))
+                    streamingDeltas.forEach { delta -> emit(AgentEvent.Streaming(delta)) }
                 }
-                toolEvents.forEach { call -> emit(AgentEvent.ToolCallUpdated(call)) }
-                progressEvents.forEach { progress -> emit(progress) }
-                if (memorySavedCount > 0) {
-                    emit(AgentEvent.MemorySaved(memorySavedCount))
-                }
-                if (emitStreaming) emit(AgentEvent.Streaming("hello"))
-                streamingDeltas.forEach { delta -> emit(AgentEvent.Streaming(delta)) }
                 if (failAfterStreaming) {
                     emit(AgentEvent.Error(AgentError.ApiError("stream interrupted")))
                     return@flow
                 }
                 if (completeDelayMs > 0L) delay(completeDelayMs)
-                emit(AgentEvent.Complete(rawResponse))
+                beforeComplete?.invoke()
+                emit(AgentEvent.Complete(rawResponse, persistedMessageId))
             }
         }
     }
@@ -536,6 +544,55 @@ class SendMessageUseCaseTest {
         assertEquals("最终回答", assistant.content)
         assertNull(assistant.toolStatus)
         assertNull(assistant.toolStatusType)
+    }
+
+    @Test
+    fun sendMessage_streamReset_discardsTextEmittedBeforeToolCall() = runTest {
+        fakeRuntime.rawResponse = "查到一家距离很近的咖啡店。"
+        fakeRuntime.scriptedEvents = listOf(
+            AgentEvent.Streaming("我先帮你查一下。"),
+            AgentEvent.StreamingReset,
+            AgentEvent.ToolCallUpdated(
+                AgentToolCall("maps_around_search", ToolCallStatus.STARTED)
+            ),
+            AgentEvent.Streaming("查到一家距离很近的咖啡店。"),
+        )
+
+        sendMessageUseCase("附近的咖啡店", null, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        val assistant = state.value.messages.single { it.role == "ASSISTANT" }
+        assertEquals("查到一家距离很近的咖啡店。", assistant.content)
+        assertFalse(assistant.content.contains("我先帮你查一下"))
+    }
+
+    @Test
+    fun sendMessage_complete_reconcilesPersistedAndStreamingCopiesById() = runTest {
+        val persistedId = "persisted-assistant"
+        val finalReply = "这是最终回答。"
+        fakeRuntime.rawResponse = finalReply
+        fakeRuntime.streamingDeltas = listOf("这是最终")
+        fakeRuntime.persistedMessageId = persistedId
+        fakeRuntime.beforeComplete = {
+            state.update { current ->
+                current.copy(
+                    messages = current.messages + ChatMessage(
+                        id = persistedId,
+                        role = "ASSISTANT",
+                        content = finalReply,
+                    )
+                )
+            }
+        }
+
+        sendMessageUseCase("hello", null, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        val assistants = state.value.messages.filter { it.role == "ASSISTANT" }
+        assertEquals(1, assistants.size)
+        assertEquals(persistedId, assistants.single().id)
+        assertEquals(finalReply, assistants.single().content)
+        assertFalse(assistants.single().isStreaming)
     }
 
     @Test

@@ -141,6 +141,17 @@ open class CompanionRuntime @Inject constructor(
 
             var rawResponse = ""
             var updateStateSucceeded = false
+            fun resetStreamingForToolCall() {
+                if (rawResponse.isBlank()) return
+                AppLogger.debug(
+                    LogTags.Runtime,
+                    "streaming_text_reset_for_tool",
+                    "discardedLength" to rawResponse.length,
+                    "turnId" to turnId,
+                )
+                rawResponse = ""
+                trySend(AgentEvent.StreamingReset)
+            }
             withContext(Dispatchers.IO) {
                 agent.runEvents(prompt).collect { event ->
                     when (event) {
@@ -152,6 +163,9 @@ open class CompanionRuntime @Inject constructor(
                             trySend(AgentEvent.Progress(event.stage, event.message))
                         }
                         is KoogAgentEvent.ToolCallUpdated -> {
+                            if (event.call.status == ToolCallStatus.STARTED) {
+                                resetStreamingForToolCall()
+                            }
                             trySend(AgentEvent.ToolCallUpdated(event.call))
                             // update_state 完成时，如果有记忆保存，触发 MemorySaved 事件
                             if (event.call.name == "update_state" &&
@@ -169,7 +183,10 @@ open class CompanionRuntime @Inject constructor(
                                 }
                             }
                         }
-                        is KoogAgentEvent.ToolStarted -> trySend(AgentEvent.ToolStarted(event.name))
+                        is KoogAgentEvent.ToolStarted -> {
+                            resetStreamingForToolCall()
+                            trySend(AgentEvent.ToolStarted(event.name))
+                        }
                         is KoogAgentEvent.ToolFinished -> trySend(AgentEvent.ToolFinished(event.name))
                     }
                 }
@@ -216,7 +233,12 @@ open class CompanionRuntime @Inject constructor(
                     "durationMs" to (System.currentTimeMillis() - startedAt),
                     "replyLength" to finalResponse.length,
                 )
-                trySend(AgentEvent.Complete(finalResponse))
+                trySend(
+                    AgentEvent.Complete(
+                        textReply = finalResponse,
+                        persistedMessageId = assistantMessageId,
+                    )
+                )
             }
         } catch (cancelled: CancellationException) {
             AppLogger.info(

@@ -87,6 +87,7 @@ class CompanionRuntimeTest {
         var emitToolEvents = false
         var emitProgress = false
         var emitTextEvents = true
+        var scriptedEvents: List<KoogAgentEvent> = emptyList()
         var runCallCount = 0
         var runEventsCallCount = 0
 
@@ -113,6 +114,10 @@ class CompanionRuntimeTest {
                 override fun runEvents(prompt: BuiltPrompt) = flow {
                     runEventsCallCount++
                     if (shouldFail) throw RuntimeException("API error")
+                    if (scriptedEvents.isNotEmpty()) {
+                        scriptedEvents.forEach { emit(it) }
+                        return@flow
+                    }
                     if (emitToolEvents) {
                         emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("update_state", ToolCallStatus.STARTED)))
                         emit(KoogAgentEvent.ToolCallUpdated(AgentToolCall("update_state", ToolCallStatus.SUCCEEDED)))
@@ -208,11 +213,46 @@ class CompanionRuntimeTest {
 
         makeRuntime(factory).send(UserInput.Text("hello")).test {
             assertTrue(awaitItem() is AgentEvent.Streaming)
-            assertTrue(awaitItem() is AgentEvent.Complete)
+            val complete = awaitItem() as AgentEvent.Complete
+            assertEquals("assistant-message", complete.persistedMessageId)
             cancelAndIgnoreRemainingEvents()
         }
 
         coVerify { messageRepo.saveAssistantMessage("default", factory.responseText) }
+    }
+
+    @Test
+    fun send_toolCallAfterPreamble_resetsStreamAndPersistsOnlyFinalRound() = runTest {
+        val factory = FakeKoogAgentFactory().apply {
+            scriptedEvents = listOf(
+                KoogAgentEvent.TextDelta("我先帮你查一下。"),
+                KoogAgentEvent.ToolCallUpdated(
+                    AgentToolCall("maps_around_search", ToolCallStatus.STARTED)
+                ),
+                KoogAgentEvent.ToolCallUpdated(
+                    AgentToolCall("maps_around_search", ToolCallStatus.SUCCEEDED)
+                ),
+                KoogAgentEvent.TextDelta("查到一家距离很近的咖啡店。"),
+            )
+        }
+        coEvery { messageRepo.sendMessage(any(), any(), any()) } returns "user-message"
+        coEvery { messageRepo.saveAssistantMessage(any(), any()) } returns "assistant-message"
+
+        makeRuntime(factory).send(UserInput.Text("附近的咖啡店")).test {
+            assertEquals(AgentEvent.Streaming("我先帮你查一下。"), awaitItem())
+            assertEquals(AgentEvent.StreamingReset, awaitItem())
+            assertTrue(awaitItem() is AgentEvent.ToolCallUpdated)
+            assertTrue(awaitItem() is AgentEvent.ToolCallUpdated)
+            assertEquals(AgentEvent.Streaming("查到一家距离很近的咖啡店。"), awaitItem())
+            val complete = awaitItem() as AgentEvent.Complete
+            assertEquals("查到一家距离很近的咖啡店。", complete.textReply)
+            assertEquals("assistant-message", complete.persistedMessageId)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify {
+            messageRepo.saveAssistantMessage("default", "查到一家距离很近的咖啡店。")
+        }
     }
 
     @Test
