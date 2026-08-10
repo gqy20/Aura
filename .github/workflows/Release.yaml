@@ -30,6 +30,33 @@ jobs:
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x gradlew
 
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release metadata
+        run: |
+          version="${{ steps.version.outputs.VERSION }}"
+          brand_version="$(sed -n 's/^BRAND_VERSION_NAME=//p' brand.properties | tr -d '\r')"
+          brand_code="$(sed -n 's/^BRAND_VERSION_CODE=//p' brand.properties | tr -d '\r')"
+
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Release tag must use stable semantic version format, for example v0.1.6"
+            exit 1
+          fi
+          if [ "$version" != "$brand_version" ]; then
+            echo "::error::Tag version $version does not match BRAND_VERSION_NAME=$brand_version"
+            exit 1
+          fi
+          if ! printf '%s' "$brand_code" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "::error::BRAND_VERSION_CODE must be a positive integer"
+            exit 1
+          fi
+          if ! grep -Fq "## [$version]" CHANGLOG.md; then
+            echo "::error::CHANGLOG.md is missing a section for $version"
+            exit 1
+          fi
+
       - name: Validate release signing secrets
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -58,12 +85,31 @@ jobs:
           keyPassword=${{ secrets.KEY_PASSWORD }}
           EOF
 
-      - name: Build release APK
-        run: ./gradlew :app:assembleRelease
+      - name: Test, lint and build release APK
+        run: ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Verify release artifact
+        run: |
+          version="${{ steps.version.outputs.VERSION }}"
+          brand_code="$(sed -n 's/^BRAND_VERSION_CODE=//p' brand.properties | tr -d '\r')"
+          apk="app/build/outputs/apk/release/app-release.apk"
+          metadata="app/build/outputs/apk/release/output-metadata.json"
+
+          test -s "$apk"
+          grep -Fq "\"versionCode\": $brand_code" "$metadata"
+          grep -Fq "\"versionName\": \"$version\"" "$metadata"
+
+          apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [ -z "$apksigner" ]; then
+            echo "::error::apksigner was not found in ANDROID_SDK_ROOT"
+            exit 1
+          fi
+          certificate="$($apksigner verify --print-certs "$apk")"
+          printf '%s\n' "$certificate"
+          if printf '%s' "$certificate" | grep -Fqi 'CN=Android Debug'; then
+            echo "::error::Release APK is signed with an Android Debug certificate"
+            exit 1
+          fi
 
       - name: Prepare release artifacts
         run: |

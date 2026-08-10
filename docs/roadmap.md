@@ -30,7 +30,7 @@
 ./gradlew.bat assembleDebug
 ```
 
-以上命令均已在 2026-08-09 验证通过（`testDebugUnitTest` **634 个测试全绿**；含聊天恢复交互、MCP 渐进路由、Android 工具参数兼容与既有 DAO/Insight/ChatViewModel 测试）。
+以上命令均已在 2026-08-10 验证通过（`testDebugUnitTest` **672 个测试全绿**；含聊天恢复交互、复合 MCP 任务、工具安全重试、Android 工具参数兼容与既有 DAO/Insight/ChatViewModel 测试）。
 
 ## 已实现
 
@@ -244,8 +244,8 @@
 
 - 扩展隐私控制、数据删除、数据导出。（基础面板已完成，细粒度策略待补）
 - 扩展聊天、设置、记忆、权限等 instrumented tests。
-- 添加或验证 CI 工作流。
-- 验证 release signing 和 shrinker 行为。
+- 持续完善 CI 工作流。（已加入发布元数据、签名密钥、单测、lint 与 release 构建门禁）
+- 验证 release signing 和 shrinker 行为。（本地 shrinker 构建已通过；正式签名仍需由 GitHub Secrets 在 tag 工作流中验收）
 - 在隐私预期清晰后再接入崩溃分析。
 
 ### M7：端云 Agent 能力
@@ -276,6 +276,6 @@
 7. **M5 Pulse + Weekly Insight**：离线衰减 / 回归反应 Worker、AnniversaryScanner 周期任务、Weekly Insight 自动汇总 + 通知、InsightLog 用户反馈回路（👍/👎/文字 → 训练样本）。本地 vision 已就绪后 Pulse Worker 可复用 vision 元数据驱动"记得你拍过的照片"型通知。
 8. ~~**dual-mind Phase 1**：拆云端对话体 / 本地觉察面。~~ **已重新评估（2026-06-17）**：经核实，`KoogAgentFactoryImpl` 的 2-way 分支（云端 / 本地）已是合理的 Provider 切换形态；本地的"觉察面"职责由 `core/presence/runtime/` 下的 `DreamLoopWorker` / `LocalQwenExecutor` 等独立组件承担，不在 `KoogAgentWrapper` 主路径里。**不再需要拆 dual-mind Phase 1**，专注把 Pulse Worker（M5）和本地 vision 路径走通即可。AuraMemoryStore 文件系统层属于 M5+ 配套（auto memory PoC 验证后启动）。
 9. ~~**抽象 `AgentRuntime`**：~~ **已重新评估（2026-06-17）**：经讨论，`KoogAgentWrapper` 4 方法契约已能覆盖云端 / 本地两端（PR A 对齐后行为契约一致）。**不引入新接口层**；M7 远端 Agent Server 落地时如需切换入口，可在 `CompanionRuntime` 上做小范围重构，不应预先抽 `AgentRuntime` 接口。
-10. **M6 产品化加固**：扩展 instrumented tests（CameraX / WorkManager 真实场景）+ CI 工作流（GitHub Actions）+ release signing 验证。
+10. **M6 产品化加固**：扩展 instrumented tests（CameraX / WorkManager 真实场景）；GitHub Release 已具备版本一致性、签名密钥、单测、lint 与构建门禁，正式签名待 tag 发布验收。
 11. **云端核心智能体规范落地**：按 `docs/plan/cloud-agent-core-guidelines.md` 先做 P0-P3（配置可信度、Tool Policy、Post-turn 兜底、Vision 稳定增强），再启动远端工具 MVP。
 12. **M7 远端 Agent Server**（plan §8 收窄到"信息回写"主轴）：最小 Aura Agent Server 先支持文本输入 / 流式输出 / 只读远程工具；`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 字段，M4 起可对接。

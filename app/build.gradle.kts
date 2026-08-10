@@ -31,8 +31,8 @@ fun brand(key: String, default: String): String =
 val brandName: String = brand("NAME", "Aura")
 val brandDisplayName: String = brand("DISPLAY_NAME", brandName)
 val brandPackage: String = brand("PACKAGE", "com.xiaoqi.companion")
-val brandVersionName: String = brand("VERSION_NAME", "0.1.3")
-val brandVersionCode: String = brand("VERSION_CODE", "4")
+val brandVersionName: String = brand("VERSION_NAME", "0.1.6")
+val brandVersionCode: String = brand("VERSION_CODE", "7")
 
 // ---------------------------------------------------------------------------
 // Local dev/.env config — debug-only BuildConfig injection.

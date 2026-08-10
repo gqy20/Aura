@@ -72,7 +72,7 @@ Aura 是 Android 上的 AI 陪伴 App，主线跑通三件事：
 
 ## 当前状态
 
-**最新版本：v0.1.4** · 634 个单元测试通过 · 0 失败 · CI: ✅ passing
+**最新版本：v0.1.6** · 672 个单元测试通过 · 0 失败 · CI: ✅ passing
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
@@ -145,7 +145,7 @@ make run    # 构建 + 安装 + 启动
 
 ```bash
 ./gradlew assembleDebug              # 构建 Debug APK
-./gradlew testDebugUnitTest          # 跑 634 个单元测试
+./gradlew testDebugUnitTest          # 跑 672 个单元测试
 ./gradlew connectedDebugAndroidTest  # 仪器测试（需连真机）
 make run                              # 构建 + 安装 + 启动
 make logcat                           # 查看应用日志
