@@ -173,7 +173,9 @@ class AnthropicMessagesLLMClientTest {
     }
 
     @Test
-    fun executeStreaming_doesNotCompleteToolWhenAnotherContentBlockStops() = runTest {
+    fun executeStreaming_salvagesPendingToolWithoutOwnBlockStopAtStreamEnd() = runTest {
+        // GLM 偶发漏发工具块的 content_block_stop(真机踩过 maps_text_search)。
+        // 流干净结束时补齐完成,不再让整轮回复失败;index 0 的 stop 不能提前完成 index 1。
         server.enqueue(
             sseResponse(
                 """{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"map-1","name":"maps_around_search"}}""",
@@ -184,11 +186,52 @@ class AnthropicMessagesLLMClientTest {
             )
         )
 
-        val failure = runCatching {
-            client().executeStreaming(simplePrompt(), model, emptyList()).toList()
-        }.exceptionOrNull()
+        val frames = client().executeStreaming(simplePrompt(), model, emptyList()).toList()
+        val calls = frames.filterIsInstance<StreamFrame.ToolCallComplete>()
 
-        assertTrue(failure?.message?.contains("incomplete tool calls") == true)
+        assertEquals(1, calls.size)
+        assertEquals("maps_around_search", calls.single().name)
+        assertEquals(1, calls.single().index)
+        assertEquals("咖啡", json.parseToJsonElement(calls.single().content).jsonObject.getValue("query").jsonPrimitive.content)
+        assertTrue(frames.any { it is StreamFrame.End })
+    }
+
+    @Test
+    fun executeStreaming_salvagesPendingToolWithBlankInputAsEmptyObject() = runTest {
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-1","name":"get_current_time"}}""",
+                """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val frames = client().executeStreaming(simplePrompt(), model, emptyList()).toList()
+        val calls = frames.filterIsInstance<StreamFrame.ToolCallComplete>()
+
+        assertEquals(1, calls.size)
+        assertEquals("{}", calls.single().content)
+        assertTrue(frames.any { it is StreamFrame.End })
+    }
+
+    @Test
+    fun executeStreaming_salvagesTruncatedToolInputForValidationFallback() = runTest {
+        // 参数被截断无法解析时仍补齐发出,让 Koog 工具校验兜底(与 stop 到达但参数畸形同路)
+        server.enqueue(
+            sseResponse(
+                """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-1","name":"maps_text_search"}}""",
+                """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"query\":\"麦"}}""",
+                """{"type":"message_stop"}""",
+            )
+        )
+
+        val frames = client().executeStreaming(simplePrompt(), model, emptyList()).toList()
+        val calls = frames.filterIsInstance<StreamFrame.ToolCallComplete>()
+
+        assertEquals(1, calls.size)
+        assertEquals("""{"query":"麦""", calls.single().content)
+        val end = frames.filterIsInstance<StreamFrame.End>().single()
+        assertEquals("tool_use", end.finishReason)
     }
 
     @Test
@@ -216,7 +259,9 @@ class AnthropicMessagesLLMClientTest {
     }
 
     @Test
-    fun executeStreaming_keepsFailingForIncompleteDifferentNamedTool() = runTest {
+    fun executeStreaming_salvagesAbandonedDifferentNamedToolAtStreamEnd() = runTest {
+        // 双工具流中被遗弃的不同名工具:不再让整轮失败,补齐发出截断参数,
+        // 由 Koog 工具校验兜底;正常完成的工具不受影响。
         server.enqueue(
             sseResponse(
                 """{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"route-1","name":"maps_direction_walking"}}""",
@@ -229,11 +274,16 @@ class AnthropicMessagesLLMClientTest {
             )
         )
 
-        val failure = runCatching {
-            client().executeStreaming(simplePrompt(), model, emptyList()).toList()
-        }.exceptionOrNull()
+        val frames = client().executeStreaming(simplePrompt(), model, emptyList()).toList()
+        val calls = frames.filterIsInstance<StreamFrame.ToolCallComplete>()
 
-        assertTrue(failure?.message?.contains("maps_direction_walking") == true)
+        assertEquals(2, calls.size)
+        val completed = calls.first { it.id == "geo-2" }
+        assertEquals("West Lake Hangzhou", json.parseToJsonElement(completed.content)
+            .jsonObject.getValue("address").jsonPrimitive.content)
+        val salvaged = calls.first { it.id == "route-1" }
+        assertEquals("""{"origin":""", salvaged.content)
+        assertTrue(frames.any { it is StreamFrame.End })
     }
 
     @Test

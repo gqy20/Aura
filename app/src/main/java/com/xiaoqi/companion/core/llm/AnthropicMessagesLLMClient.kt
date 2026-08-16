@@ -156,10 +156,12 @@ class AnthropicMessagesLLMClient(
         var hasEmittedFrame = false
         var completedToolCount = 0
         val completedToolNames = mutableSetOf<String>()
+        var sawStreamTerminator = false
 
         fun completeTool(index: Int) {
             val tool = pendingTools.remove(index) ?: return
-            val normalized = normalizeToolInput(tool.input.toString())
+            // 空参数按 "{}" 规范:工具参数默认是 JSON object,空串会让 Koog 校验直接失败
+            val normalized = normalizeToolInput(tool.input.toString().ifBlank { "{}" })
             hasEmittedFrame = true
             completedToolCount += 1
             completedToolNames += tool.name
@@ -178,6 +180,7 @@ class AnthropicMessagesLLMClient(
                 "index" to index,
                 "inputLength" to tool.input.length,
                 "inputNormalization" to when {
+                    tool.input.isEmpty() -> "empty"
                     normalized.repaired -> "repaired"
                     normalized.valid -> "valid"
                     else -> "invalid"
@@ -225,9 +228,15 @@ class AnthropicMessagesLLMClient(
                             if (!line.startsWith("data: ")) continue
 
                             val data = line.removePrefix("data: ").trim()
-                            if (data == "[DONE]") break
+                            if (data == "[DONE]") {
+                                sawStreamTerminator = true
+                                break
+                            }
 
                             val parsed = parseSseData(data)
+                            if (parsed.isMessageStop) {
+                                sawStreamTerminator = true
+                            }
                             if (parsed.isToolUseBlock && parsed.toolName != null) {
                                 val index = parsed.index ?: nextSyntheticToolIndex(pendingTools)
                                 pendingTools[index] = PendingToolCall(parsed.toolId, parsed.toolName)
@@ -271,10 +280,6 @@ class AnthropicMessagesLLMClient(
                     }
                 }
 
-                if (fullText.isNotEmpty()) {
-                    trySend(StreamFrame.TextComplete(fullText, null))
-                }
-
                 if (pendingTools.isNotEmpty()) {
                     val supersededTools = pendingTools.filterValues { it.name in completedToolNames }
                     if (supersededTools.isNotEmpty()) {
@@ -290,16 +295,28 @@ class AnthropicMessagesLLMClient(
                     }
                 }
 
+                // GLM 偶发在工具块 content_block_stop 之前结束 SSE(真机端到端踩过:
+                // "Streaming response ended with incomplete tool calls: maps_text_search")。
+                // 流干净结束时,累积到的参数就是服务端的完整输出 —— 补齐完成,
+                // 与"stop 到达但参数畸形"同路,交给 Koog 工具校验兜底,
+                // 不再因缺 stop 事件让整轮回复失败。
                 if (pendingTools.isNotEmpty()) {
-                    val incompleteTools = pendingTools.values.joinToString(",") { it.name }
-                    AppLogger.warn(
-                        LogTags.Llm,
-                        "stream_tool_incomplete",
-                        "indexes" to pendingTools.keys.sorted().joinToString(","),
-                        "tools" to incompleteTools,
-                    )
-                    pendingTools.clear()
-                    throw IOException("Streaming response ended with incomplete tool calls: $incompleteTools")
+                    if (finishReason == null) finishReason = "tool_use"
+                    pendingTools.keys.sorted().forEach { index ->
+                        val tool = pendingTools[index] ?: return@forEach
+                        AppLogger.warn(
+                            LogTags.Llm,
+                            "stream_tool_salvaged_at_stream_end",
+                            "tool" to tool.name,
+                            "index" to index,
+                            "sawTerminator" to sawStreamTerminator,
+                        )
+                        completeTool(index)
+                    }
+                }
+
+                if (fullText.isNotEmpty()) {
+                    trySend(StreamFrame.TextComplete(fullText, null))
                 }
                 AppLogger.info(
                     LogTags.Llm,
@@ -665,6 +682,9 @@ class AnthropicMessagesLLMClient(
         if (type == "content_block_stop") {
             return ParsedSse(index = index, isContentBlockStop = true)
         }
+        if (type == "message_stop") {
+            return ParsedSse(isMessageStop = true)
+        }
         if (type != "content_block_delta") return ParsedSse()
 
         val delta = event["delta"]?.jsonObject ?: return ParsedSse()
@@ -692,6 +712,7 @@ class AnthropicMessagesLLMClient(
         val toolInput: String? = null,
         val isToolUseBlock: Boolean = false,
         val isContentBlockStop: Boolean = false,
+        val isMessageStop: Boolean = false,
     )
 
     private companion object {
