@@ -66,8 +66,13 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
+import com.xiaoqi.companion.core.presence.PresenceMode
+import com.xiaoqi.companion.core.presence.PresenceUiState
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -125,78 +130,103 @@ fun MessageBubble(
                     )
                 }
             } else {
-                MessageBubbleContent(
-                    message = message,
-                    isUser = false,
-                    contentColor = contentColor,
-                    modifier = Modifier
-                        .widthIn(max = 344.dp)
-                        .combinedClickable(
-                            onClick = {},
-                            onLongClick = { if (canShowActions) menuExpanded = true },
-                        )
-                        .padding(top = 1.dp, bottom = 8.dp),
-                    onToolStatusClick = onToolStatusClick,
-                    onToolStepClick = onToolStepClick,
-                    onRetry = onRetry,
-                )
+                // AI 消息的身份锚点:mini 头像常驻,流式时用 SPEAKING 帧("正在说话"),
+                // 让"谁在回"在消息流里可见,不只依赖顶栏
+                Row(verticalAlignment = Alignment.Top) {
+                    AuraPetAvatar(
+                        presence = remember(message.isStreaming) {
+                            PresenceUiState(
+                                mode = if (message.isStreaming) PresenceMode.SPEAKING else PresenceMode.IDLE,
+                            )
+                        },
+                        size = 28.dp,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    MessageBubbleContent(
+                        message = message,
+                        isUser = false,
+                        contentColor = contentColor,
+                        modifier = Modifier
+                            .widthIn(max = 316.dp)
+                            .combinedClickable(
+                                onClick = {},
+                                onLongClick = { if (canShowActions) menuExpanded = true },
+                            )
+                            .padding(top = 1.dp, bottom = 8.dp),
+                        onToolStatusClick = onToolStatusClick,
+                        onToolStepClick = onToolStepClick,
+                        onRetry = onRetry,
+                    )
+                }
             }
         }
         if (canShowActions) {
-            Box {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .width(36.dp)
-                        .height(22.dp)
-                        .clip(CircleShape)
-                        .clickable { menuExpanded = true }
-                        .semantics { contentDescription = "消息操作" },
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreHoriz,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f),
-                        modifier = Modifier.size(17.dp),
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("复制") },
-                        leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            copyMessage()
-                        },
-                    )
-                    if (isUser && onEdit != null) {
-                        DropdownMenuItem(
-                            text = { Text("编辑后重发") },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onEdit()
-                            },
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .width(36.dp)
+                            .height(22.dp)
+                            .clip(CircleShape)
+                            .clickable { menuExpanded = true }
+                            .semantics { contentDescription = "消息操作" },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreHoriz,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f),
+                            modifier = Modifier.size(17.dp),
                         )
                     }
-                    if (!isUser && onRegenerate != null) {
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
                         DropdownMenuItem(
-                            text = { Text("重新生成") },
-                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                            text = { Text("复制") },
+                            leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
                             onClick = {
                                 menuExpanded = false
-                                onRegenerate()
+                                copyMessage()
                             },
                         )
+                        if (isUser && onEdit != null) {
+                            DropdownMenuItem(
+                                text = { Text("编辑后重发") },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onEdit()
+                                },
+                            )
+                        }
+                        if (!isUser && onRegenerate != null) {
+                            DropdownMenuItem(
+                                text = { Text("重新生成") },
+                                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onRegenerate()
+                                },
+                            )
+                        }
                     }
                 }
+                Spacer(modifier = Modifier.size(4.dp))
+                Text(
+                    text = remember(message.id, message.timestamp) { formatChatTimestamp(message.timestamp) },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                )
             }
         }
     }
 }
+
+internal fun formatChatTimestamp(timestampMs: Long): String =
+    SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestampMs))
 
 @Composable
 private fun MessageBubbleContent(

@@ -27,12 +27,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -44,6 +48,7 @@ fun MarkdownMessageText(
 ) {
     val displayText = remember(text) { text.sanitizeDisplayMarkdown() }
     val blocks = remember(displayText) { parseMarkdownBlocks(displayText) }
+    val linkColor = MaterialTheme.colorScheme.primary
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -53,13 +58,17 @@ fun MarkdownMessageText(
                 is MarkdownBlock.Code -> MarkdownCodeBlock(text = block.text)
                 MarkdownBlock.Divider -> MarkdownDivider()
                 is MarkdownBlock.Heading -> Text(
-                    text = remember(block.text) { parseInlineMarkdown(block.text.removeControlFragments()) },
+                    text = remember(block.text, linkColor) {
+                        parseInlineMarkdown(block.text.removeControlFragments(), linkColor)
+                    },
                     color = color,
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 is MarkdownBlock.Text -> Text(
-                    text = remember(block.text) { parseInlineMarkdown(block.text.removeControlFragments()) },
+                    text = remember(block.text, linkColor) {
+                        parseInlineMarkdown(block.text.removeControlFragments(), linkColor)
+                    },
                     color = color,
                     style = style,
                 )
@@ -237,11 +246,36 @@ private fun String.displayMarkdownLine(): String? {
     }
 }
 
-private fun parseInlineMarkdown(raw: String): AnnotatedString =
+private fun parseInlineMarkdown(raw: String, linkColor: Color): AnnotatedString =
     buildAnnotatedString {
         var index = 0
         while (index < raw.length) {
             when {
+                // [label](http…) → 可点击链接;url 非空白且 http 开头才匹配,
+                // 避免 `](async:n)` 之类协议残渣被当成链接
+                raw[index] == '[' -> {
+                    val closeBracket = raw.indexOf("](", startIndex = index + 1)
+                    val closeParen = if (closeBracket > index) raw.indexOf(')', startIndex = closeBracket + 2) else -1
+                    val label = if (closeParen > closeBracket) raw.substring(index + 1, closeBracket) else ""
+                    val url = if (closeParen > closeBracket) raw.substring(closeBracket + 2, closeParen) else ""
+                    if (closeParen > closeBracket && label.isNotBlank() && url.startsWith("http")) {
+                        withLink(
+                            LinkAnnotation.Url(
+                                url = url,
+                                styles = TextLinkStyles(
+                                    style = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
+                                ),
+                            )
+                        ) {
+                            append(label)
+                        }
+                        index = closeParen + 1
+                    } else {
+                        append(raw[index])
+                        index++
+                    }
+                }
+
                 raw.startsWith("**", index) -> {
                     val end = raw.indexOf("**", startIndex = index + 2)
                     if (end > index) {

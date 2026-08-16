@@ -293,4 +293,51 @@ class MessageBubbleTest {
         composeTestRule.onNodeWithText("搜索记忆").assertIsDisplayed()
         composeTestRule.onAllNodesWithText(ThinkingHints.hintFor(0L, 0)).assertCountEquals(0)
     }
+
+    @Test
+    fun assistantMessage_rendersMarkdownLinkWithoutRawSyntax() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "看这个 [Aura 文档](https://example.com/docs) 很不错",
+                )
+            )
+        }
+
+        composeTestRule.onNodeWithText("看这个 Aura 文档 很不错").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("看这个 [Aura 文档](https://example.com/docs) 很不错")
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun completedMessage_showsTimestampNextToActions() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "Done",
+                    timestamp = 0L,
+                )
+            )
+        }
+
+        // epoch 0 在本地时区的 HH:mm 无法静态断言,断言与 formatChatTimestamp 输出一致
+        composeTestRule.onNodeWithText(formatChatTimestamp(0L)).assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyChatState_showsCompanionSuggestionChips() {
+        composeTestRule.setContent {
+            EmptyChatState(
+                presence = com.xiaoqi.companion.core.presence.PresenceUiState(),
+                presenceAnimation = ChatUiState().presenceAnimation,
+            )
+        }
+
+        composeTestRule.onNodeWithText("今天有点累，想随便聊聊").assertIsDisplayed()
+        composeTestRule.onNodeWithText("帮我记住一件小事").assertIsDisplayed()
+    }
 }

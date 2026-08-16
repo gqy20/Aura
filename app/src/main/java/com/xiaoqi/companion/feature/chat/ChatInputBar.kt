@@ -4,6 +4,16 @@ import android.content.Context
 import android.provider.Settings
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -103,11 +112,17 @@ internal fun InputBar(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            pendingImage?.let {
-                PendingImagePreview(
-                    imageUri = it.uriString,
-                    onRemoveImage = onRemoveImage,
-                )
+            AnimatedVisibility(
+                visible = pendingImage != null,
+                enter = fadeIn(tween(180)) + expandVertically(tween(220)),
+                exit = fadeOut(tween(150)) + shrinkVertically(tween(180)),
+            ) {
+                pendingImage?.let {
+                    PendingImagePreview(
+                        imageUri = it.uriString,
+                        onRemoveImage = onRemoveImage,
+                    )
+                }
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -142,14 +157,10 @@ internal fun InputBar(
                         )
                     },
                     maxLines = 3,
+                    // 回车换行、按钮发送:多行输入场景回车即发送会丢内容
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Send,
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            if (canSend) onSendMessage()
-                        },
+                        imeAction = ImeAction.Default,
                     ),
                     textStyle = MaterialTheme.typography.bodyMedium,
                     shape = RoundedCornerShape(22.dp),
@@ -162,45 +173,14 @@ internal fun InputBar(
                         cursorColor = primary,
                     ),
                 )
-                if (isPreparingImage) {
-                    AuraLoadingIndicator(
-                        modifier = Modifier.size(24.dp).padding(4.dp),
-                        color = primary,
-                    )
-                } else if (isLoading) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = CircleShape,
-                    ) {
-                        IconButton(
-                            onClick = onStopGenerating,
-                            modifier = Modifier.semantics { contentDescription = "停止生成" },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Stop,
-                                contentDescription = null,
-                                tint = primary,
-                            )
-                        }
-                    }
-                } else {
-                    Surface(
-                        color = if (canSend) SendButtonReadyColor else InputBarContainerColor,
-                        shape = CircleShape,
-                    ) {
-                        IconButton(
-                            onClick = onSendMessage,
-                            enabled = canSend,
-                            modifier = Modifier.semantics { contentDescription = "发送" },
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = null,
-                                tint = if (canSend) primary else primary.copy(alpha = 0.32f),
-                            )
-                        }
-                    }
-                }
+                InputBarActionButton(
+                    isPreparingImage = isPreparingImage,
+                    isLoading = isLoading,
+                    canSend = canSend,
+                    primary = primary,
+                    onSendMessage = onSendMessage,
+                    onStopGenerating = onStopGenerating,
+                )
             }
             ImeRecoveryHint(
                 visible = imeStuck,
@@ -232,6 +212,76 @@ internal fun InputBar(
         }
     }
 }
+
+/** 输入栏右侧三态按钮:图片处理中/停止/发送,切换时缩放+淡入淡出 morph。 */
+@Composable
+private fun InputBarActionButton(
+    isPreparingImage: Boolean,
+    isLoading: Boolean,
+    canSend: Boolean,
+    primary: Color,
+    onSendMessage: () -> Unit,
+    onStopGenerating: () -> Unit,
+) {
+    val state = when {
+        isPreparingImage -> InputBarAction.Preparing
+        isLoading -> InputBarAction.Stop
+        else -> InputBarAction.Send
+    }
+    AnimatedContent(
+        targetState = state,
+        transitionSpec = {
+            (scaleIn(tween(180)) + fadeIn(tween(180))) togetherWith
+                (scaleOut(tween(140)) + fadeOut(tween(140)))
+        },
+        label = "inputBarAction",
+    ) { target ->
+        when (target) {
+            InputBarAction.Preparing -> Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(48.dp),
+            ) {
+                AuraLoadingIndicator(
+                    modifier = Modifier.size(24.dp).padding(4.dp),
+                    color = primary,
+                )
+            }
+            InputBarAction.Stop -> Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = CircleShape,
+            ) {
+                IconButton(
+                    onClick = onStopGenerating,
+                    modifier = Modifier.semantics { contentDescription = "停止生成" },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = null,
+                        tint = primary,
+                    )
+                }
+            }
+            InputBarAction.Send -> Surface(
+                color = if (canSend) SendButtonReadyColor else InputBarContainerColor,
+                shape = CircleShape,
+            ) {
+                IconButton(
+                    onClick = onSendMessage,
+                    enabled = canSend,
+                    modifier = Modifier.semantics { contentDescription = "发送" },
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = null,
+                        tint = if (canSend) primary else primary.copy(alpha = 0.32f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class InputBarAction { Preparing, Stop, Send }
 
 @Composable
 private fun ImeRecoveryHint(

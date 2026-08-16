@@ -390,6 +390,28 @@ class SendMessageUseCaseTest {
     }
 
     @Test
+    fun sendMessage_onError_restoresInputWhenNothingWasProduced() = runTest {
+        // 一无所获的失败回填输入,长文本不再因一次网络失败整段丢失
+        fakeRuntime.shouldFail = true
+        sendMessageUseCase("很长的一段心里话", null, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        assertEquals("很长的一段心里话", state.value.inputText)
+    }
+
+    @Test
+    fun sendMessage_onError_keepsInputEmptyWhenPartialReplyExists() = runTest {
+        // 有部分回复时输入不回填,避免与保留的半截回复重复
+        fakeRuntime.streamingDeltas = listOf("partial")
+        fakeRuntime.failAfterStreaming = true
+        sendMessageUseCase("hello", null, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        assertEquals("", state.value.inputText)
+        assertEquals("partial", state.value.messages.first { it.role == "ASSISTANT" }.content)
+    }
+
+    @Test
     fun sendMessage_errorAfterStreaming_keepsPartialAssistantMessage() = runTest {
         fakeRuntime.streamingDeltas = listOf("partial reply")
         fakeRuntime.failAfterStreaming = true

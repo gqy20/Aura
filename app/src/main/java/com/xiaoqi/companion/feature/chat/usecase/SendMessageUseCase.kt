@@ -232,10 +232,17 @@ class SendMessageUseCase @Inject constructor(
                 } else {
                     messages.filter { it.id != assistantId }
                 }
+                // 一无所获的失败把输入回填(仅当用户还没开始打下一条),
+                // 避免长文本打错一次网络就整段丢失。参数 pendingImage 遮蔽 state 字段,读现值用 this.
+                val restoreInput = !hasPartialAssistantReply &&
+                    inputText.isBlank() &&
+                    this.pendingImage == null
                 copy(
                     messages = updatedMessages,
                     isLoading = false,
                     error = message,
+                    inputText = if (restoreInput) trimmed else inputText,
+                    pendingImage = if (restoreInput) pendingImage else this.pendingImage,
                 )
             }
         }
