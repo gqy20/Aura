@@ -116,6 +116,30 @@ abstract class MessageSearchDao {
         limit: Int,
     ): List<MessageSearchHit>
 
+    /** 跨会话全文搜索,供聊天页消息搜索入口使用(结果带 session_id 供跳转定位)。 */
+    @Query(
+        """
+        SELECT
+            m.id AS id,
+            m.session_id AS sessionId,
+            m.role AS role,
+            m.content AS content,
+            m.imageBase64 AS imageBase64,
+            m.timestamp AS timestamp,
+            bm25(message_search_docs_fts) AS ftsRank
+        FROM message_search_docs_fts
+        JOIN message_search_docs d ON d.search_id = message_search_docs_fts.rowid
+        JOIN messages m ON m.id = d.message_id
+        WHERE message_search_docs_fts MATCH :matchQuery
+        ORDER BY m.timestamp DESC, ftsRank ASC
+        LIMIT :limit
+        """
+    )
+    abstract suspend fun searchAllSessionsFts(
+        matchQuery: String,
+        limit: Int,
+    ): List<MessageSearchHit>
+
     @Query(
         """
         DELETE FROM message_search_docs_fts

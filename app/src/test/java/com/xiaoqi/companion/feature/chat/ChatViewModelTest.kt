@@ -81,6 +81,8 @@ class ChatViewModelTest {
     private lateinit var insightRepository: InsightRepository
     private lateinit var moodSnapshotDao: MoodSnapshotDao
     private lateinit var messageDao: MessageDao
+    private val messageSearchDao: com.xiaoqi.companion.data.db.dao.MessageSearchDao =
+        io.mockk.mockk(relaxed = true)
     private lateinit var agentStateDao: AgentStateDao
     private lateinit var appPreferences: AppPreferences
     private lateinit var conversationRepository: ConversationRepository
@@ -222,7 +224,7 @@ class ChatViewModelTest {
             insightRepository = insightRepository,
             moodSnapshotDao = moodSnapshotDao,
             messageDao = mockk(relaxed = true),
-            messageSearchDao = mockk(relaxed = true),
+            messageSearchDao = messageSearchDao,
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,
@@ -461,7 +463,7 @@ class ChatViewModelTest {
             insightRepository = insightRepository,
             moodSnapshotDao = moodSnapshotDao,
             messageDao = mockk(relaxed = true),
-            messageSearchDao = mockk(relaxed = true),
+            messageSearchDao = messageSearchDao,
             agentStateDao = agentStateDao,
             presenceController = presenceController,
             presenceReactionPolicy = presenceReactionPolicy,
@@ -489,6 +491,68 @@ class ChatViewModelTest {
 
         val message = imageViewModel.uiState.value.messages.single()
         assertEquals("data:image/jpeg;base64,stored-base64", message.imageUri)
+    }
+
+    @Test
+    fun messageSearch_mapsFtsHitsWithSessionTitleFallback() = runTest {
+        coEvery {
+            messageSearchDao.searchAllSessionsFts("\"麦当劳\"", any())
+        } returns listOf(
+            com.xiaoqi.companion.data.db.dao.MessageSearchHit(
+                id = "m-1",
+                sessionId = "default",
+                role = MessageRole.USER,
+                content = "附近的麦当劳\n在哪里",
+                imageBase64 = null,
+                timestamp = 1_000L,
+                ftsRank = -1.5,
+            )
+        )
+
+        viewModel.updateMessageSearchQuery("麦当劳")
+        advanceTimeBy(250L)
+        advanceUntilIdle()
+
+        val results = viewModel.uiState.value.messageSearchResults
+        assertEquals(1, results.size)
+        // 多行压平截断;conversations 为空时标题回退"对话"
+        assertEquals("附近的麦当劳 在哪里", results.single().preview)
+        assertEquals("对话", results.single().sessionTitle)
+        assertEquals("USER", results.single().role)
+    }
+
+    @Test
+    fun messageSearch_shortQueryClearsResultsWithoutDaoCall() = runTest {
+        viewModel.updateMessageSearchQuery("麦当劳")
+        advanceTimeBy(250L)
+        advanceUntilIdle()
+        coVerify(exactly = 1) { messageSearchDao.searchAllSessionsFts(any(), any()) }
+
+        viewModel.updateMessageSearchQuery("麦")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.messageSearchResults.isEmpty())
+        coVerify(exactly = 1) { messageSearchDao.searchAllSessionsFts(any(), any()) }
+    }
+
+    @Test
+    fun jumpToMessage_switchesSessionAndSetsThenConsumesScrollTarget() = runTest {
+        viewModel.jumpToMessage(
+            ChatMessageSearchHit(
+                messageId = "m-1",
+                sessionId = "session-2",
+                sessionTitle = "美食日记",
+                role = "USER",
+                preview = "附近的麦当劳",
+                timestamp = 1_000L,
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals("m-1", viewModel.uiState.value.pendingScrollTargetId)
+        coVerify { appPreferences.setCurrentSessionId("session-2") }
+
+        viewModel.consumeScrollTarget()
+        assertNull(viewModel.uiState.value.pendingScrollTargetId)
     }
 
     private fun toolCallSnapshot(

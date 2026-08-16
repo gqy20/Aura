@@ -137,6 +137,16 @@ data class ChatInsight(
         com.xiaoqi.companion.data.repository.InsightEvidenceView(),
 )
 
+/** 跨会话消息搜索结果条目,点击跳转到对应会话并定位消息。 */
+data class ChatMessageSearchHit(
+    val messageId: String,
+    val sessionId: String,
+    val sessionTitle: String,
+    val role: String,
+    val preview: String,
+    val timestamp: Long,
+)
+
 data class ChatConfigStatus(
     val label: String = "正在检测模型",
     val isReady: Boolean = false,
@@ -270,6 +280,11 @@ data class ChatUiState(
     val isInsightAnalyzing: Boolean = false,
     val moodTrend: List<com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity> = emptyList(),
     val pendingPrefill: String? = null,
+    /** 对话列表 Sheet 的消息搜索框文本;≥3 字符触发 FTS 查询(trigram 下限)。 */
+    val messageSearchQuery: String = "",
+    val messageSearchResults: List<ChatMessageSearchHit> = emptyList(),
+    /** 搜索结果跳转目标消息 id;ChatScreen 滚动定位后调用 consumeScrollTarget 清除。 */
+    val pendingScrollTargetId: String? = null,
 )
 
 /**

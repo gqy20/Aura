@@ -865,6 +865,63 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private var messageSearchJob: Job? = null
+
+    /** 对话列表 Sheet 的跨会话消息搜索;FTS 查询词按空白拆分加引号(与 EvidenceResolver 同约定)。
+     *  trigram tokenizer 要求 ≥3 字符才可能命中,不足 3 直接清空结果不打 DAO。 */
+    fun updateMessageSearchQuery(query: String) {
+        _uiState.update {
+            it.copy(
+                messageSearchQuery = query,
+                messageSearchResults = if (query.trim().length < 3) emptyList() else it.messageSearchResults,
+            )
+        }
+        messageSearchJob?.cancel()
+        if (query.trim().length < 3) return
+        messageSearchJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(200)
+            val ftsQuery = query.trim()
+                .split(Regex("\\s+"))
+                .filter { it.isNotBlank() }
+                .joinToString(" ") { "\"$it\"" }
+            val hits = runCatching {
+                messageSearchDao.searchAllSessionsFts(ftsQuery, MESSAGE_SEARCH_LIMIT)
+            }.getOrDefault(emptyList())
+            val titleBySession = conversations.value.associate { it.id to it.title }
+            _uiState.update { state ->
+                if (state.messageSearchQuery != query) {
+                    state
+                } else {
+                    state.copy(
+                        messageSearchResults = hits.map { hit ->
+                            ChatMessageSearchHit(
+                                messageId = hit.id,
+                                sessionId = hit.sessionId,
+                                sessionTitle = titleBySession[hit.sessionId] ?: "对话",
+                                role = hit.role.name,
+                                preview = hit.content.replace('\n', ' ').take(64),
+                                timestamp = hit.timestamp,
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    fun jumpToMessage(hit: ChatMessageSearchHit) {
+        viewModelScope.launch {
+            if (hit.sessionId != currentSessionId.value) {
+                switchConversation(hit.sessionId)
+            }
+            _uiState.update { it.copy(pendingScrollTargetId = hit.messageId) }
+        }
+    }
+
+    fun consumeScrollTarget() {
+        _uiState.update { it.copy(pendingScrollTargetId = null) }
+    }
+
     fun deleteConversation(sessionId: String) {
         viewModelScope.launch {
             conversationRepository.delete(sessionId)
@@ -1416,6 +1473,7 @@ class ChatViewModel @Inject constructor(
         private const val DEFAULT_COMPANION_ID = "default"
         // 8 条窗口覆盖复合工具时间线的 detail 反查(3 条在多工具轮次里不够)
         private const val RECENT_TOOL_CALL_LIMIT = 8
+        private const val MESSAGE_SEARCH_LIMIT = 30
         private const val RECENT_MAP_TOOL_CALL_LIMIT = 64
         private const val INSIGHT_CARD_LIMIT = 3
         private const val MUTE_DAY_MS = 24L * 60L * 60L * 1000L

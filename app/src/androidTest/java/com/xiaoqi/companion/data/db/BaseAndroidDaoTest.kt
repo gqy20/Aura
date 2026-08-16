@@ -3,6 +3,7 @@ package com.xiaoqi.companion.data.db
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
@@ -16,11 +17,12 @@ import org.junit.runner.RunWith
  *
  * **必须用 [androidx.sqlite.driver.bundled.BundledSQLiteDriver]** 替换默认 framework SQLite，
  * 否则 `message_search_docs_fts`（FTS5 虚拟表 + `tokenize='trigram'`）建不出来。
- * BundledSQLiteDriver 走 Android 系统自带的 libsqliteX.so（SQLite ≥ 3.24），原生气 FTS5 支持。
  *
- * schema 改写 [SupportSQLiteDatabase] 形态 → 必须再回调一次
- * [CompanionDatabase.createMessageSearchTables]，因为 Room `@Database` 注解只声明 `messages`
- * 等主表，FTS5 影子表是 `MIGRATION_9_10` / `createMessageSearchTables` 手工建的。
+ * schema 改写 → 必须再回调一次 [CompanionDatabase.createMessageSearchTables]，
+ * 因为 Room `@Database` 注解只声明 `messages` 等主表，FTS5 影子表是
+ * `MIGRATION_9_10` / `createMessageSearchTables` 手工建的。
+ * 注意两个 onCreate 变体都要注册:`setDriver(BundledSQLiteDriver)` 只触发
+ * `SQLiteConnection` 变体,老 `SupportSQLiteDatabase` 变体不触发(与 DataModule 同构)。
  *
  * @see MessageSearchDaoFts5Test 真 FTS5 行为验证
  */
@@ -37,8 +39,12 @@ abstract class BaseAndroidDaoTest {
             .setDriver(BundledSQLiteDriver())
             .allowMainThreadQueries()
             .addCallback(object : RoomDatabase.Callback() {
-                override fun onCreate(db: SupportSQLiteDatabase) {
+                override fun onCreate(connection: SQLiteConnection) {
                     // 复用生产暴露的建表工具,让 tests 跟 prod schema 完全一致
+                    CompanionDatabase.createMessageSearchTables(connection)
+                }
+
+                override fun onCreate(db: SupportSQLiteDatabase) {
                     CompanionDatabase.createMessageSearchTables(db)
                 }
             })

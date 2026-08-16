@@ -22,6 +22,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,6 +65,8 @@ internal fun CompanionHeader(
     isLoading: Boolean = false,
     latestActivity: String? = null,
     hasError: Boolean = false,
+    /** 关系阶段徽标(陌生/初识/熟悉/亲密);"陌生"阶段不显示。 */
+    relationshipLabel: String? = null,
     onOpenMemoryRoom: () -> Unit,
     onOpenReminders: () -> Unit,
     onOpenConversations: () -> Unit,
@@ -137,6 +140,19 @@ internal fun CompanionHeader(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (!relationshipLabel.isNullOrBlank() && relationshipLabel != "陌生") {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                        ) {
+                            Text(
+                                text = relationshipLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
                 }
             }
             HeaderCapabilityAction(

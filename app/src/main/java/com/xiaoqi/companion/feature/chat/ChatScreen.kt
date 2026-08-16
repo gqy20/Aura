@@ -160,6 +160,9 @@ fun ChatScreen(
         onNewConversation = { viewModel.startNewConversation() },
         onSwitchConversation = { viewModel.switchConversation(it) },
         onDeleteConversation = { viewModel.deleteConversation(it) },
+        onMessageSearchQueryChange = { viewModel.updateMessageSearchQuery(it) },
+        onJumpToMessage = { viewModel.jumpToMessage(it) },
+        onConsumeScrollTarget = { viewModel.consumeScrollTarget() },
     )
 }
 
@@ -189,6 +192,9 @@ fun ChatScreenContent(
     onNewConversation: () -> Unit = {},
     onSwitchConversation: (String) -> Unit = {},
     onDeleteConversation: (String) -> Unit = {},
+    onMessageSearchQueryChange: (String) -> Unit = {},
+    onJumpToMessage: (ChatMessageSearchHit) -> Unit = {},
+    onConsumeScrollTarget: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val imagePicker = rememberLauncherForActivityResult(
@@ -274,6 +280,19 @@ fun ChatScreenContent(
         }
     }
 
+    // 消息搜索跳转:目标不在当前列表时保持 pending,等会话消息加载完(size 变化)再定位
+    LaunchedEffect(uiState.pendingScrollTargetId, chatListItems.size) {
+        val targetId = uiState.pendingScrollTargetId ?: return@LaunchedEffect
+        val index = chatListItems.indexOfFirst { listItem ->
+            listItem is ChatListItem.Message && listItem.message.id == targetId
+        }
+        if (index >= 0) {
+            isUserPinnedToBottom = false
+            listState.animateScrollToItem(index)
+            onConsumeScrollTarget()
+        }
+    }
+
     // IME 弹起/收起动画结束后,确保 index 0(最新消息)滚入视口。
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
@@ -343,6 +362,7 @@ fun ChatScreenContent(
                 isLoading = uiState.isLoading,
                 latestActivity = latestMessage?.takeIf { it.isStreaming }?.toolStatus,
                 hasError = uiState.error != null,
+                relationshipLabel = uiState.status.relationshipLabel,
                 onOpenMemoryRoom = onOpenMemoryRoom,
                 onOpenReminders = { isRemindersOpen = true },
                 onOpenConversations = { isConversationsOpen = true },
@@ -525,6 +545,33 @@ fun ChatScreenContent(
                 }
             }
 
+            // POST_CHAT 洞察在聊天现场可见:聊完接着想,不再只依赖主页
+            AnimatedVisibility(
+                visible = uiState.isInsightAnalyzing && !uiState.isLoading,
+                enter = fadeIn(tween(220)) + expandVertically(tween(240)),
+                exit = fadeOut(tween(180)) + shrinkVertically(tween(200)),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    AuraLoadingIndicator(
+                        modifier = Modifier.size(14.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text(
+                        text = "Aura 正在整理刚才的对话…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             AnimatedVisibility(
                 visible = uiState.permissionPrompt != null,
                 enter = fadeIn(tween(180)) + expandVertically(tween(220)),
@@ -607,6 +654,10 @@ fun ChatScreenContent(
             },
             onSwitchConversation = onSwitchConversation,
             onDeleteConversation = onDeleteConversation,
+            messageSearchQuery = uiState.messageSearchQuery,
+            messageSearchResults = uiState.messageSearchResults,
+            onMessageSearchQueryChange = onMessageSearchQueryChange,
+            onJumpToMessage = onJumpToMessage,
         )
     }
 }

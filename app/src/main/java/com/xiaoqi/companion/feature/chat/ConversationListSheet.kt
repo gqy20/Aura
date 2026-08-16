@@ -16,10 +16,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +46,10 @@ internal fun ConversationListSheet(
     onNewConversation: () -> Unit,
     onSwitchConversation: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
+    messageSearchQuery: String = "",
+    messageSearchResults: List<ChatMessageSearchHit> = emptyList(),
+    onMessageSearchQueryChange: (String) -> Unit = {},
+    onJumpToMessage: (ChatMessageSearchHit) -> Unit = {},
 ) {
     AuraDialogPanel(
         onDismiss = onDismiss,
@@ -68,6 +75,55 @@ internal fun ConversationListSheet(
                 }
             },
         )
+
+        OutlinedTextField(
+            value = messageSearchQuery,
+            onValueChange = onMessageSearchQueryChange,
+            placeholder = {
+                Text("搜索聊天记录…", style = MaterialTheme.typography.bodySmall)
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(18.dp),
+                )
+            },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+                .semantics { contentDescription = "搜索聊天记录" },
+        )
+
+        if (messageSearchResults.isNotEmpty()) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 10.dp),
+            ) {
+                messageSearchResults.take(5).forEach { hit ->
+                    MessageSearchHitRow(
+                        hit = hit,
+                        onClick = {
+                            onJumpToMessage(hit)
+                            onDismiss()
+                        },
+                    )
+                }
+            }
+        } else if (messageSearchQuery.trim().length >= 3) {
+            Text(
+                text = "没有找到相关消息",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .padding(bottom = 10.dp)
+                    .align(Alignment.CenterHorizontally),
+            )
+        }
 
         if (conversations.isEmpty()) {
             Box(
@@ -99,6 +155,50 @@ internal fun ConversationListSheet(
                         onDelete = { onDeleteConversation(conversation.id) },
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageSearchHitRow(
+    hit: ChatMessageSearchHit,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (hit.role == "USER") Icons.Outlined.Person else Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(16.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                Text(
+                    text = hit.preview,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${hit.sessionTitle} · ${if (hit.role == "USER") "我" else "Aura"} · " +
+                        DateFormat.getDateInstance(DateFormat.SHORT).format(Date(hit.timestamp)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

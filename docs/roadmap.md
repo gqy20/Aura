@@ -137,6 +137,16 @@
 - **动效**：错误卡与权限卡进出 `AnimatedVisibility`。
 - **验证**：`testDebugUnitTest` 691 测试、0 失败（+9：失败回填×2、日期标签×4、链接/时间戳/空态 UI×3）；模拟器装机确认头像/时间戳/日期分隔/空态建议/按钮均正常。
 
+### 近期打磨（2026-08-16 · 陪伴差异化批次）
+
+> 对应 `docs/chat-ux-benchmark.md` 第 4 批,聊天页从"工具感"向"陪伴感"补齐数据外露。
+
+- **聊天页 Insight 指示行**：POST_CHAT 分析进行中在聊天现场显示"Aura 正在整理刚才的对话…"轻量指示条（列表与输入栏之间,AnimatedVisibility）,不再只依赖主页。
+- **关系徽标**：顶栏状态行追加关系阶段胶囊（初识/熟悉/亲密,"陌生"不显示）,`relationshipLabel` 从死代码变为可见锚点。
+- **跨会话消息搜索**：对话列表 Sheet 顶部新增搜索框,FTS5 跨会话查询（新 `MessageSearchDao.searchAllSessionsFts`,时间倒序）;结果行含会话名/角色/日期元信息,点击跳转对应会话并 `animateScrollToItem` 滚动定位（`pendingScrollTargetId` 机制,跨会话时等消息加载完再定位）;门槛 ≥3 字符（trigram 下限）。
+- **androidTest FTS5 套件修复**（存量问题,stash 干净 HEAD 验证 7/8 失败与我无关）：`BaseAndroidDaoTest` 补 `SQLiteConnection` 回调变体（`setDriver(BundledSQLiteDriver)` 下老 `SupportSQLiteDatabase` onCreate 不触发,FTS 表从未建出）;用例改用 ≥3 字符 MATCH 词与确定性 bm25 种子（长度归一化会压长文档）——连机 8/8 全绿。
+- **验证**：`testDebugUnitTest` 694 全绿（+3 搜索 VM 用例）;`connectedDebugAndroidTest` FTS5 类 8/8;模拟器装机确认搜索→命中→跳转定位端到端工作。语音 I/O（SpeechRecognizer/TTS）留待独立批次。
+
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。
