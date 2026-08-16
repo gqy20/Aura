@@ -121,7 +121,10 @@
 - **流式光标**：`StreamingMessageText` 尾部加呼吸竖条 caret（独立 Composable，不污染 markdown 解析）——暂停的流与完成的流恢复可区分。
 - **杂项**：PerformancePill（tok/s）仅 debug 构建可见；用户发送消息与"回到最新"FAB 改 `animateScrollToItem`（流式跟随保持即时滚动）。
 - **验证**：`testDebugUnitTest` 680 测试、0 失败（+8：节奏驱动两例、复合工具步骤、意图段、时间线/意图段/空白期 UI 三例、stabilize 三例）；`assembleDebug` 通过。
-- **模拟器端到端验收**（2026-08-16）：纯文本流式（安抚轮播→呼吸 caret→完成恢复）与复合工具任务（maps_around_search+save_memory 两步时间线"已找到 1 家麦当劳/已保存"→地图卡片→步骤点击打开详情 Sheet）全链路通过；重启后回复正文可恢复、瞬态 UI（时间线/卡片/perf pill）按设计不持久化。同期观察到一次 GLM 流式 `Streaming response ended with incomplete tool calls`（`AnthropicMessagesLLMClient.kt:302`，既有协议兼容类别，非本批改动引入），待用 `llm_tool_protocol_probe.ps1` 复现跟进。意图段（intentText）因本轮模型直接调工具未触发，留待下次构造"先闲聊后查图"场景验收。
+- **模拟器端到端验收**（2026-08-16）：纯文本流式（安抚轮播→呼吸 caret→完成恢复）与复合工具任务（maps_around_search+save_memory 两步时间线"已找到 1 家麦当劳/已保存"→地图卡片→步骤点击打开详情 Sheet）全链路通过；重启后回复正文可恢复、瞬态 UI（时间线/卡片/perf pill）按设计不持久化。
+- **GLM 缺失 content_block_stop 修复**（`a930b5f`）：验收中撞上 GLM 偶发在工具块 `content_block_stop` 前结束 SSE（`Streaming response ended with incomplete tool calls: maps_text_search`，整轮失败）。改为流干净结束时补齐完成 pending 工具（累积参数规范化、空参数按 `{}`、finishReason 缺省 `tool_use`），截断参数与"stop 到达但参数畸形"同路交给 Koog 工具校验兜底；probe 脚本全场景 + 3 个新单测通过。
+- **意图段（intentText）真机验证**：用"先闲聊后查图"prompt 诱导模型工具前说话，完整三层结构呈现——浅色意图段（"好嘞好嘞~…我这就帮你找找附近的烘焙店！"）→ 绿勾时间线（"已找到 3 家烘焙店"）→ 正文流式 + 地图卡片，pre-tool 文本不再被 StreamingReset 擦掉。
+- 模拟器驱动/二进制拉取的坑（input text 空格切分、Git Bash 重定向损坏二进制、WAL 数周不 checkpoint）已固化到 `AGENTS.md` "ADB 日志与本地数据排查" 第 5 节。
 
 ## 部分实现
 

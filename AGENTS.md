@@ -204,6 +204,13 @@ for r in conn.execute('select id, type, source, importance, confidence, timestam
 - `tool_calls` 只有 `search_memory` 且结果 `count:0`：说明模型查了记忆但没有写入。
 - `memories` 没有对应内容：说明后处理抽取或保存没有命中。
 
+### 5. 模拟器驱动与二进制拉取的真机坑（2026-08-16 踩过）
+
+- **`adb shell input text` 的空格会被设备端 shell 重新切分**，`input text "a b c"` 实际只输入 `a`。空格一律用 `%s` 编码：`input text "Find%snearby%sstores"`；中文无法用 `input text` 输入（ADB Keyboard 广播在模拟器上也不生效），用英文 prompt 测即可，GLM 对英文意图识别正常。连续两次 `input text` 会**拼接**进同一输入框，注意先清空。
+- **Git Bash 的 `>` 重定向会对二进制做 CRLF 转换**，`adb exec-out screencap -p > x.png` 和 `exec-out run-as ... cat db > x.db` 出来的文件都是坏的（PNG 直接打不开；SQLite 静默丢 WAL 帧，出现"能看到最新一条写入却看不到更早写入"的诡异现象）。截图用设备端 `screencap -p /sdcard/t.png` + `adb pull`；注意 Git Bash 会把 `/sdcard/...` 转成 Windows 路径，命令前加 `MSYS_NO_PATHCONV=1`。
+- **主库可能数周不 checkpoint**（实测 mtime 停在 8-09，全部写入都在 4MB 的 WAL 里）。拉库要 `am force-stop` 停写后取 db+wal+shm 三件套；如果结论存疑，**用"重启应用看 UI 历史是否还在"做交叉验证**，比直接读拷贝的库可靠。
+- **uiautomator dump 对 Compose 树偶发返回全空 text 节点**，重试一次或改用截图 + 视觉分析；Compose 输入框的当前文本在 dump 里也不可靠，以截图为准。
+
 ## 网站截图规范
 
 所有网站（`web/apps/web`）相关截图、视觉审计素材、参考站对比图都放在**固定目录**：
