@@ -8,7 +8,7 @@
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪与关系的头像/表情层由 Compose Canvas 临时替代；Presence Layer 的 Rive/Lottie 动画资源仍缺；Pulse 的离线衰减/回归反应/主动通知仍缺
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest）、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
-- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-08-10 通过（**672 个测试，0 失败**；含聊天停止/重试/重新生成、复合 MCP 任务、安全重试、SSE 多工具索引累积、Android 裸字符串参数兼容、Koog 错误结果短路、地图交互与既有 DAO/Insight/ChatViewModel 测试。Robolectric 单 fork 复用）
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-08-16 通过（**680 个测试，0 失败**；含聊天停止/重试/重新生成、agent 回复体验专项（意图段保留/工具步骤时间线/节奏驱动流式/key 稳定）、复合 MCP 任务、安全重试、SSE 多工具索引累积、Android 裸字符串参数兼容、Koog 错误结果短路、地图交互与既有 DAO/Insight/ChatViewModel 测试。Robolectric 单 fork 复用）
 
 ## 常用验证命令
 
@@ -42,7 +42,7 @@ make test-one T=CompanionRuntimeTest
 ./gradlew.bat build
 ```
 
-以上 Gradle 命令已在 2026-08-10 验证通过（`testDebugUnitTest` **672 个测试全绿**）。测试性能优化详见 CLAUDE.md "并发配置：单 fork 复用 Robolectric Runtime" 段落。
+以上 Gradle 命令已在 2026-08-16 验证通过（`testDebugUnitTest` **680 个测试全绿**）。测试性能优化详见 CLAUDE.md "并发配置：单 fork 复用 Robolectric Runtime" 段落。
 
 ## MNN Benchmark 流程
 

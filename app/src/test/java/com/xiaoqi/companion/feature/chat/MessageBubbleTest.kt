@@ -214,4 +214,83 @@ class MessageBubbleTest {
         composeTestRule.onNodeWithText("val aura = true").assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("复制代码").assertIsDisplayed()
     }
+
+    @Test
+    fun assistantMessage_withToolSteps_rendersTimeline() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "查好了。",
+                    toolSteps = listOf(
+                        ChatToolStep(
+                            id = "s1",
+                            name = "search_memory",
+                            callId = "c1",
+                            label = "搜索记忆",
+                            status = ToolCallStatus.SUCCEEDED,
+                            startedAtMs = 0L,
+                            durationMs = 1_200L,
+                        ),
+                        ChatToolStep(
+                            id = "s2",
+                            name = "maps_around_search",
+                            label = "查询周边",
+                            status = ToolCallStatus.STARTED,
+                            startedAtMs = 1L,
+                        ),
+                    ),
+                )
+            )
+        }
+
+        // 完成的步骤带耗时,进行中的步骤只有文案
+        composeTestRule.onNodeWithText("搜索记忆 · 1.2s").assertIsDisplayed()
+        composeTestRule.onNodeWithText("查询周边").assertIsDisplayed()
+    }
+
+    @Test
+    fun assistantMessage_withIntentText_rendersDimmedPreamble() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "查到了。",
+                    intentText = "我先帮你查查。",
+                )
+            )
+        }
+
+        composeTestRule.onNodeWithText("我先帮你查查。").assertIsDisplayed()
+        composeTestRule.onNodeWithText("查到了。").assertIsDisplayed()
+    }
+
+    @Test
+    fun streamingBlankContent_withToolSteps_showsTimelineInsteadOfCarousel() {
+        composeTestRule.setContent {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "1",
+                    role = "ASSISTANT",
+                    content = "",
+                    isStreaming = true,
+                    toolSteps = listOf(
+                        ChatToolStep(
+                            id = "s1",
+                            name = "search_memory",
+                            callId = "c1",
+                            label = "搜索记忆",
+                            status = ToolCallStatus.STARTED,
+                            startedAtMs = 0L,
+                        )
+                    ),
+                )
+            )
+        }
+
+        composeTestRule.onNodeWithText("搜索记忆").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText(ThinkingHints.hintFor(0L, 0)).assertCountEquals(0)
+    }
 }

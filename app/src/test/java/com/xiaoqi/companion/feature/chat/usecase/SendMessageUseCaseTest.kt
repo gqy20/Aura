@@ -419,13 +419,15 @@ class SendMessageUseCaseTest {
     }
 
     @Test
-    fun sendMessage_toolEvents_showStatusOnAssistantBubble() = runTest {
+    fun sendMessage_toolEvents_showStepsOnAssistantBubble() = runTest {
         fakeRuntime.emitToolEvents = true
         sendMessageUseCase("remember tea", null, readyConfig(), this, update)
         advanceUntilIdle()
 
         val assistant = state.value.messages.first { it.role == "ASSISTANT" }
-        assertEquals("已保存", assistant.toolStatus)
+        assertEquals(1, assistant.toolSteps.size)
+        assertEquals(ToolCallStatus.SUCCEEDED, assistant.toolSteps.single().status)
+        assertEquals("已保存", assistant.toolSteps.single().label)
     }
 
     @Test
@@ -454,7 +456,9 @@ class SendMessageUseCaseTest {
         advanceUntilIdle()
 
         val assistant = state.value.messages.first { it.role == "ASSISTANT" }
-        assertEquals("已创建提醒 · 吃药", assistant.toolStatus)
+        val step = assistant.toolSteps.single()
+        assertEquals(ToolCallStatus.SUCCEEDED, step.status)
+        assertEquals("已创建提醒 · 吃药", step.label)
     }
 
     @Test
@@ -473,9 +477,10 @@ class SendMessageUseCaseTest {
         advanceUntilIdle()
 
         val assistant = state.value.messages.first { it.role == "ASSISTANT" }
-        // 关键断言:chip 仍是 tool call 的"已创建提醒 · 吃药",
-        // 没有被 MemorySaved 的"已记住 2 条"覆盖。
-        assertEquals("已创建提醒 · 吃药", assistant.toolStatus)
+        // 关键断言:时间线仍是 tool call 的"已创建提醒 · 吃药",
+        // MemorySaved 的"已记住 2 条"不挤占步骤/状态。
+        assertEquals("已创建提醒 · 吃药", assistant.toolSteps.single().label)
+        assertNull(assistant.toolStatus)
     }
 
     @Test
@@ -547,7 +552,7 @@ class SendMessageUseCaseTest {
     }
 
     @Test
-    fun sendMessage_streamReset_discardsTextEmittedBeforeToolCall() = runTest {
+    fun sendMessage_streamReset_preservesPreToolTextAsIntentSegment() = runTest {
         fakeRuntime.rawResponse = "查到一家距离很近的咖啡店。"
         fakeRuntime.scriptedEvents = listOf(
             AgentEvent.Streaming("我先帮你查一下。"),
@@ -563,6 +568,8 @@ class SendMessageUseCaseTest {
 
         val assistant = state.value.messages.single { it.role == "ASSISTANT" }
         assertEquals("查到一家距离很近的咖啡店。", assistant.content)
+        // 工具前流出的过渡文本不清屏,降级为"意图段"保留在正文上方
+        assertEquals("我先帮你查一下。", assistant.intentText)
         assertFalse(assistant.content.contains("我先帮你查一下"))
     }
 
@@ -590,7 +597,8 @@ class SendMessageUseCaseTest {
 
         val assistants = state.value.messages.filter { it.role == "ASSISTANT" }
         assertEquals(1, assistants.size)
-        assertEquals(persistedId, assistants.single().id)
+        // 保持列表里的 UI id 作 LazyColumn key(完成瞬间不重淡入);DB 行 id 记录到 persistedId
+        assertEquals(persistedId, assistants.single().persistedId)
         assertEquals(finalReply, assistants.single().content)
         assertFalse(assistants.single().isStreaming)
     }
@@ -611,18 +619,94 @@ class SendMessageUseCaseTest {
     }
 
     @Test
-    fun sendMessage_eachSmallDeltaFlushesImmediately() = runTest {
-        // P0: 每个 1-char delta 都立即 flush（leading flush 路径）。
-        // 不需要等 trailing 计时器累积 batch。
+    fun sendMessage_smallDeltasPaceOutViaTicker() = runTest {
+        // 首包立即上屏,后续 delta 进队列由 33ms ticker 按节奏出字。
+        // 直接调用 suspend useCase 会被 runTest 推进到完成,须用 launch 挂在半途观察。
         fakeRuntime.rawResponse = "abc"
         fakeRuntime.streamingDeltas = listOf("a", "b", "c")
         fakeRuntime.completeDelayMs = 200L
 
-        sendMessageUseCase("hello", null, readyConfig(), this, update)
-        // 同样不 advanceTime —— 验证三个 delta 都各自触发 leading flush
+        val sendJob = launch { sendMessageUseCase("hello", null, readyConfig(), this, update) }
+        runCurrent()
+        val assistant = { state.value.messages.lastOrNull { it.role == "ASSISTANT" } }
+        assertEquals("a", assistant()?.content)
 
-        val assistant = state.value.messages.lastOrNull { it.role == "ASSISTANT" }
-        assertEquals("abc", assistant?.content)
+        advanceTimeBy(33L)
+        runCurrent()
+        assertEquals("abc", assistant()?.content)
+        advanceUntilIdle()
+        sendJob.join()
+        assertEquals("abc", assistant()?.content)
+    }
+
+    @Test
+    fun sendMessage_bigChunkDrainsProgressivelyNotAllAtOnce() = runTest {
+        // 网络一次倒出的大 chunk 不整段上屏,由 ticker 分批摊平
+        val longText = "字".repeat(100)
+        fakeRuntime.rawResponse = longText
+        fakeRuntime.streamingDeltas = listOf(longText)
+        fakeRuntime.completeDelayMs = 1_000L
+
+        val sendJob = launch { sendMessageUseCase("hello", null, readyConfig(), this, update) }
+        runCurrent()
+        val contentLength = {
+            state.value.messages.lastOrNull { it.role == "ASSISTANT" }?.content?.length ?: 0
+        }
+        // 首包只上屏前 16 字
+        assertEquals(16, contentLength())
+        // backlog 84 ≥ 48 → 每 tick 12 字
+        advanceTimeBy(33L)
+        runCurrent()
+        assertEquals(28, contentLength())
+        advanceTimeBy(33L)
+        runCurrent()
+        assertEquals(40, contentLength())
+        // 完成时排空队列,内容与最终回复一致
+        advanceUntilIdle()
+        sendJob.join()
+        assertEquals(100, contentLength())
+    }
+
+    @Test
+    fun sendMessage_compoundToolCalls_accumulateOrderedSteps() = runTest {
+        // 复合工具调用按序累积成时间线;ToolStarted(无 callId) 与
+        // ToolCallUpdated(有 callId) 两种事件对同一次调用只占一步。
+        fakeRuntime.rawResponse = "都办好了。"
+        fakeRuntime.scriptedEvents = listOf(
+            AgentEvent.Streaming("我先看看。"),
+            AgentEvent.ToolStarted("search_memory"),
+            AgentEvent.ToolCallUpdated(
+                AgentToolCall("search_memory", ToolCallStatus.STARTED, callId = "c1")
+            ),
+            AgentEvent.ToolCallUpdated(
+                AgentToolCall("search_memory", ToolCallStatus.SUCCEEDED, callId = "c1")
+            ),
+            AgentEvent.StreamingReset,
+            AgentEvent.ToolStarted("maps_around_search"),
+            AgentEvent.ToolCallUpdated(
+                AgentToolCall("maps_around_search", ToolCallStatus.STARTED, callId = "c2")
+            ),
+            AgentEvent.ToolCallUpdated(
+                AgentToolCall(
+                    "maps_around_search",
+                    ToolCallStatus.SUCCEEDED,
+                    callId = "c2",
+                    resultJson = """{"status":"ok","count":1}""",
+                )
+            ),
+            AgentEvent.Streaming("都办好了。"),
+        )
+
+        sendMessageUseCase("帮我查", null, readyConfig(), this, update)
+        advanceUntilIdle()
+
+        val assistant = state.value.messages.single { it.role == "ASSISTANT" }
+        assertEquals(2, assistant.toolSteps.size)
+        assertEquals(listOf("c1", "c2"), assistant.toolSteps.map { it.callId })
+        assertTrue(assistant.toolSteps.all { it.status == ToolCallStatus.SUCCEEDED })
+        assertEquals(listOf("c1", "c2"), assistant.toolCallIds)
+        assertEquals("我先看看。", assistant.intentText)
+        assertEquals("都办好了。", assistant.content)
     }
 
     @Test

@@ -214,7 +214,8 @@ fun ChatScreenContent(
 
     LaunchedEffect(latestUserMessageId) {
         if (latestUserMessageId != null && hasCompletedInitialScroll) {
-            listState.scrollToItem(0)
+            // 用户主动发送用动画滚动;流式跟随保持即时滚动,快速增高时动画反而抖
+            listState.animateScrollToItem(0)
             isUserPinnedToBottom = true
             hasUnseenMessages = false
         }
@@ -383,6 +384,15 @@ fun ChatScreenContent(
                                     { selectedToolCall = toolCall }
                                 }
                             }
+                            val onToolStepClick = remember(message.id, uiState.toolCalls, uiState.mapToolCalls) {
+                                val callsById = (uiState.toolCalls + uiState.mapToolCalls)
+                                    .associateBy { call -> call.id }
+                                val handler: (ChatToolStep) -> Unit = { step ->
+                                    val target = step.callId?.let { id -> callsById[id] }
+                                    if (target != null) selectedToolCall = target
+                                }
+                                handler
+                            }
                             Column(
                                 modifier = Modifier.animateItem(
                                     fadeInSpec = androidx.compose.animation.core.tween(durationMillis = 250),
@@ -392,6 +402,7 @@ fun ChatScreenContent(
                                 MessageBubble(
                                     message = message,
                                     onToolStatusClick = onToolClick,
+                                    onToolStepClick = onToolStepClick,
                                     onRetry = if (message.role == "ASSISTANT") {
                                         { onRetryMessage(message.id) }
                                     } else {
@@ -433,7 +444,7 @@ fun ChatScreenContent(
                         SmallFloatingActionButton(
                             onClick = {
                                 coroutineScope.launch {
-                                    listState.scrollToItem(0)
+                                    listState.animateScrollToItem(0)
                                     isUserPinnedToBottom = true
                                     hasUnseenMessages = false
                                 }

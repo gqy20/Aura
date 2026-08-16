@@ -4,6 +4,15 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -30,6 +39,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -53,6 +64,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.core.companion.model.ToolCallStatus
 import com.xiaoqi.companion.ui.theme.ChatColors
 import com.xiaoqi.companion.ui.theme.ChatStatusColors
@@ -63,6 +75,7 @@ fun MessageBubble(
     message: ChatMessage,
     modifier: Modifier = Modifier,
     onToolStatusClick: (() -> Unit)? = null,
+    onToolStepClick: ((ChatToolStep) -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
     onRegenerate: (() -> Unit)? = null,
@@ -124,6 +137,7 @@ fun MessageBubble(
                         )
                         .padding(top = 1.dp, bottom = 8.dp),
                     onToolStatusClick = onToolStatusClick,
+                    onToolStepClick = onToolStepClick,
                     onRetry = onRetry,
                 )
             }
@@ -191,6 +205,7 @@ private fun MessageBubbleContent(
     contentColor: Color,
     modifier: Modifier = Modifier,
     onToolStatusClick: (() -> Unit)? = null,
+    onToolStepClick: ((ChatToolStep) -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
 ) {
     Column(
@@ -209,7 +224,16 @@ private fun MessageBubbleContent(
             )
             Spacer(modifier = Modifier.size(8.dp))
         }
-        if (!isUser && message.isStreaming && message.content.isBlank()) {
+        if (!isUser && message.intentText.isNotBlank()) {
+            MarkdownMessageText(
+                text = message.intentText,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.66f),
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp),
+            )
+            Spacer(modifier = Modifier.size(6.dp))
+        }
+        val blankStreamingContent = !isUser && message.isStreaming && message.content.isBlank()
+        if (blankStreamingContent && message.toolSteps.isEmpty()) {
             val activeToolStatus = message.toolStatus
                 ?.takeIf { message.toolStatusType == ToolCallStatus.STARTED }
             if (activeToolStatus == null) {
@@ -237,7 +261,7 @@ private fun MessageBubbleContent(
                     )
                 }
             }
-        } else if (message.isStreaming) {
+        } else if (message.isStreaming && !blankStreamingContent) {
             StreamingMessageText(
                 renderBlocks = message.renderBlocks,
                 renderDraft = message.renderDraft,
@@ -252,14 +276,39 @@ private fun MessageBubbleContent(
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
             )
         }
+        val steps = message.toolSteps
+        val hasRunningStep = steps.any { it.status == ToolCallStatus.STARTED }
+        if (!isUser && steps.isNotEmpty()) {
+            Spacer(modifier = Modifier.size(6.dp))
+            ToolStepTimeline(
+                steps = steps,
+                onStepClick = if (message.isStreaming && !hasRunningStep) {
+                    // 流式中正在推进的时间线不响应点击,避免打断观察
+                    null
+                } else {
+                    onToolStepClick
+                },
+            )
+            // 工具都已结束但正文还没流出:模型在重新推理,给一个"还在想"的小信号
+            if (message.isStreaming && message.content.isBlank() && !hasRunningStep) {
+                Spacer(modifier = Modifier.size(6.dp))
+                AuraLoadingIndicator(
+                    modifier = Modifier.size(14.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    contentDescription = null,
+                )
+            }
+        }
         val toolStatus = message.toolStatus
         val performanceInfo = message.performanceInfo
         val showToolStatus = !isUser &&
             toolStatus != null &&
             message.toolStatusType != null &&
             !(message.isStreaming && message.content.isBlank())
-        val showPerformance = !isUser && !message.isStreaming && performanceInfo != null
-        if (showToolStatus || showPerformance) {
+        // tok/s 是工程观测指标,release 用户界面不展示
+        val showPerformance = !isUser && !message.isStreaming &&
+            performanceInfo != null && BuildConfig.DEBUG
+        if (steps.isEmpty() && (showToolStatus || showPerformance)) {
             Spacer(modifier = Modifier.size(6.dp))
             // 工具状态 pill 和 耗时/tok/s pill 同一行（FlowRow 兜底换行），间距 10dp
             FlowRow(
@@ -284,6 +333,97 @@ private fun MessageBubbleContent(
             CompletionStatus(
                 state = completionState,
                 onRetry = onRetry,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolStepTimeline(
+    steps: List<ChatToolStep>,
+    onStepClick: ((ChatToolStep) -> Unit)?,
+) {
+    AnimatedVisibility(
+        visible = steps.isNotEmpty(),
+        enter = fadeIn(tween(180)) + expandVertically(
+            animationSpec = tween(220),
+            expandFrom = Alignment.Top,
+        ),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            steps.forEach { step ->
+                val stepClick: (() -> Unit)? = if (step.callId != null) {
+                    onStepClick?.let { handler -> { handler(step) } }
+                } else {
+                    null
+                }
+                ToolStepRow(step = step, onClick = stepClick)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolStepRow(
+    step: ChatToolStep,
+    onClick: (() -> Unit)?,
+) {
+    // 亚秒级耗时不展示,避免短工具调用后面挂一串"0.0s"噪音
+    val durationText = step.durationMs
+        ?.takeIf { it >= 1000 }
+        ?.let { " · %.1fs".format(it / 1000.0) }
+        .orEmpty()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        modifier = Modifier
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .semantics { contentDescription = "工具步骤：${step.label}" },
+    ) {
+        ToolStepStatusNode(status = step.status)
+        Text(
+            text = step.label + durationText,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+        )
+    }
+}
+
+@Composable
+private fun ToolStepStatusNode(status: ToolCallStatus) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(14.dp),
+    ) {
+        when (status) {
+            ToolCallStatus.STARTED -> {
+                val transition = rememberInfiniteTransition(label = "toolStepPulse")
+                val alpha by transition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(560, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "toolStepPulseAlpha",
+                )
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha), CircleShape),
+                )
+            }
+            ToolCallStatus.SUCCEEDED -> Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = ChatStatusColors.SuccessDot,
+                modifier = Modifier.size(14.dp),
+            )
+            ToolCallStatus.FAILED -> Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(14.dp),
             )
         }
     }

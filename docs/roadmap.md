@@ -110,6 +110,19 @@
 - **模拟器端到端验收**：GLM 流式回复、记忆写入/召回、提醒权限失败/成功调度/通知触发、高德 `maps_geo`、停止生成、新对话与 Photo Picker Vision 均已跑通。
 - **验证**：`assembleDebug` 与 `testDebugUnitTest` 通过，634 测试、0 失败。
 
+### 近期打磨（2026-08-16）
+
+> 背景：`docs/chat-ux-benchmark.md` 对标豆包/千问/ChatGPT/Claude 与 coding agent 的时间线模式，定位出 agent 回复的两处硬闪断、pill 覆盖式叙事与到达驱动出字节奏问题，本批落 P0 修复。
+
+- **止血闪断 #1（工具启动清屏）**：`StreamingReset` 不再把 pre-tool 文本整段擦掉，降级为消息内"意图段"（`ChatMessage.intentText`，弱化样式渲染在正文上方）；多工具连续调用时意图段按轮累积。
+- **止血闪断 #2（完成换 key 重淡入）**：完成与 DB 合并全程保持 transient id 作 LazyColumn key，DB 行 id 记录到新字段 `persistedId`（`ChatMessageReconciler` + `SendMessageUseCase.Complete` + 新增 `stabilizePersistedMessages` 在每次 DB 全量刷新时延续 UI id 与瞬态字段，顺带消除了用户消息发送后的 id 切换闪烁）。
+- **工具步骤时间线**：`ChatMessage.toolStatus`（单值覆盖）拆分为非工具状态（看图/本地加载/Progress）+ `toolSteps` 有序步骤列表；气泡下方渲染时间线（运行中呼吸圆点 → ✓/✗ + 动词化文案 + ≥1s 耗时），点步骤开详情 Sheet；工具全结束但正文未流出时补"还在想"信号点；`ToolStarted/ToolFinished`（无 callId）与 `ToolCallUpdated`（有 callId）两种事件去重为一格；工具阶段后失败保留意图段+时间线叙事不整条删消息；`RECENT_TOOL_CALL_LIMIT` 3→8 支撑复合调用详情反查。
+- **节奏驱动流式**：16ms 到达驱动批量 flush 改为 33ms ticker 出字队列（首包 16 字符立即上屏；积压 ≥96 时每 tick 排空 1/4 加速追平），网络"一坨坨"到达被摊平为匀速流出。
+- **流式光标**：`StreamingMessageText` 尾部加呼吸竖条 caret（独立 Composable，不污染 markdown 解析）——暂停的流与完成的流恢复可区分。
+- **杂项**：PerformancePill（tok/s）仅 debug 构建可见；用户发送消息与"回到最新"FAB 改 `animateScrollToItem`（流式跟随保持即时滚动）。
+- **验证**：`testDebugUnitTest` 680 测试、0 失败（+8：节奏驱动两例、复合工具步骤、意图段、时间线/意图段/空白期 UI 三例、stabilize 三例）；`assembleDebug` 通过。
+- **模拟器端到端验收**（2026-08-16）：纯文本流式（安抚轮播→呼吸 caret→完成恢复）与复合工具任务（maps_around_search+save_memory 两步时间线"已找到 1 家麦当劳/已保存"→地图卡片→步骤点击打开详情 Sheet）全链路通过；重启后回复正文可恢复、瞬态 UI（时间线/卡片/perf pill）按设计不持久化。同期观察到一次 GLM 流式 `Streaming response ended with incomplete tool calls`（`AnthropicMessagesLLMClient.kt:302`，既有协议兼容类别，非本批改动引入），待用 `llm_tool_protocol_probe.ps1` 复现跟进。意图段（intentText）因本轮模型直接调工具未触发，留待下次构造"先闲聊后查图"场景验收。
+
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。

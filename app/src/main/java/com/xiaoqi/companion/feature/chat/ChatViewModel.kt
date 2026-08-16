@@ -306,31 +306,16 @@ class ChatViewModel @Inject constructor(
                     if (streamingTail != null) {
                         state.copy(
                             messages = mergePersistedMessagesDuringStreaming(
-                                dbMessages = dbMessages,
+                                dbMessages = stabilizePersistedMessages(dbMessages, state.messages),
                                 streamingTail = streamingTail,
                             )
                         )
                     } else {
-                        // 无 streaming 消息时，从旧 state 搬运 performanceInfo。
-                        val previousAssistants = state.messages.filter { previous ->
-                            !previous.isStreaming && previous.role == "ASSISTANT"
-                        }
-                        val enriched = dbMessages.map { dbMsg ->
-                            val previous = previousAssistants.lastOrNull { it.content == dbMsg.content }
-                            if (previous == null || dbMsg.role != "ASSISTANT") {
-                                dbMsg
-                            } else {
-                                dbMsg.copy(
-                                    performanceInfo = previous.performanceInfo,
-                                    toolStatus = previous.toolStatus,
-                                    toolStatusType = previous.toolStatusType,
-                                    toolCallIds = previous.toolCallIds,
-                                    completionState = previous.completionState,
-                                )
-                            }
-                        }
-                        val prevAssistantWithPerf = previousAssistants.lastOrNull { it.performanceInfo != null }
+                        val enriched = stabilizePersistedMessages(dbMessages, state.messages)
                         // 调试:跟踪 performanceInfo 是否成功搬运
+                        val prevAssistantWithPerf = state.messages
+                            .filter { !it.isStreaming && it.role == "ASSISTANT" }
+                            .lastOrNull { it.performanceInfo != null }
                         val dbHasPerf = enriched.any { it.performanceInfo != null }
                         val prevHasPerf = prevAssistantWithPerf != null
                         if (prevHasPerf && !dbHasPerf) {
@@ -338,8 +323,10 @@ class ChatViewModel @Inject constructor(
                                 LogTags.Chat,
                                 "perf_info_lost_in_db_collector",
                                 "prevContentLen" to (prevAssistantWithPerf?.content?.length ?: 0),
-                                "dbAssistantCount" to dbMessages.count { it.role == "ASSISTANT" },
-                                "contentMatch" to dbMessages.any { it.role == "ASSISTANT" && it.content == prevAssistantWithPerf?.content },
+                                "dbAssistantCount" to enriched.count { it.role == "ASSISTANT" },
+                                "contentMatch" to enriched.any {
+                                    it.role == "ASSISTANT" && it.content == prevAssistantWithPerf?.content
+                                },
                             )
                         }
                         state.copy(messages = enriched)
@@ -1427,7 +1414,8 @@ class ChatViewModel @Inject constructor(
 
     companion object {
         private const val DEFAULT_COMPANION_ID = "default"
-        private const val RECENT_TOOL_CALL_LIMIT = 3
+        // 8 条窗口覆盖复合工具时间线的 detail 反查(3 条在多工具轮次里不够)
+        private const val RECENT_TOOL_CALL_LIMIT = 8
         private const val RECENT_MAP_TOOL_CALL_LIMIT = 64
         private const val INSIGHT_CARD_LIMIT = 3
         private const val MUTE_DAY_MS = 24L * 60L * 60L * 1000L

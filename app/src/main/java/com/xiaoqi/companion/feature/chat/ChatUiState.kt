@@ -17,8 +17,24 @@ data class ChatMessage(
     val imageUri: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val isStreaming: Boolean = false,
+    /**
+     * 非工具类状态文案(看图/本地模型加载/Progress 阶段提示)。
+     * 工具调用的过程叙事走 [toolSteps],不再挤占这个字段。
+     */
     val toolStatus: String? = null,
     val toolStatusType: ToolCallStatus? = null,
+    /**
+     * 模型在调工具前流出的过渡文本("我先帮你查查…")。
+     * StreamingReset 时从正文降级到这里保留展示,不进最终 [content](runtime 不持久化这段)。
+     */
+    val intentText: String = "",
+    /**
+     * Room 落库后的行 id。LazyColumn 的 key 始终用 [id](transient id),
+     * 完成/DB 刷新时靠本字段对齐行,避免换 key 导致整条消息重淡入。
+     */
+    val persistedId: String? = null,
+    /** 工具步骤时间线,按触发顺序累积,复合工具调用的过程叙事载体。 */
+    val toolSteps: List<ChatToolStep> = emptyList(),
     val renderBlocks: List<MessageRenderBlock> = emptyList(),
     val renderDraft: String = "",
     val isRenderDraftCode: Boolean = false,
@@ -33,6 +49,20 @@ data class ChatMessage(
      */
     val performanceInfo: PerformanceInfo? = null,
     val completionState: ChatMessageCompletionState? = null,
+)
+
+/**
+ * 气泡下工具时间线的单步。id 唯一标识一步([callId] 为空时用合成 id),
+ * ToolStarted/ToolFinished 无 callId,靠 name 匹配未终结的步骤补齐。
+ */
+data class ChatToolStep(
+    val id: String,
+    val name: String,
+    val callId: String? = null,
+    val label: String,
+    val status: ToolCallStatus,
+    val startedAtMs: Long,
+    val durationMs: Long? = null,
 )
 
 enum class ChatMessageCompletionState {

@@ -21,6 +21,7 @@ import com.xiaoqi.companion.feature.chat.ChatConfigStatus
 import com.xiaoqi.companion.feature.chat.ChatImageAttachment
 import com.xiaoqi.companion.feature.chat.ChatMessage
 import com.xiaoqi.companion.feature.chat.ChatMessageCompletionState
+import com.xiaoqi.companion.feature.chat.ChatToolStep
 import com.xiaoqi.companion.feature.chat.PerformanceInfo
 import com.xiaoqi.companion.feature.chat.ChatPermissionPrompt
 import com.xiaoqi.companion.feature.chat.ChatPermissionType
@@ -45,7 +46,7 @@ import javax.inject.Inject
  * - **配置未就绪** → 设置 [ChatUiState.error] 并返回(不发请求)
  * - **Vision 输入** → 自动准备 base64 并发送 [UserInput.Vision]
  * - **纯文本** → 发送 [UserInput.Text]
- * - **流式响应** → 90ms 批量渲染 + 30s 空闲超时
+ * - **流式响应** → 33ms ticker 节奏渲染 + 30s 空闲超时
  * - **AgentEvent.MemorySaved** → 触发 Presence 反应 + 状态提示
  * - **create_local_reminder 缺权限** → 设置精确闹钟权限提示
  * - **Complete** → 持久化 [CompanionStatus](mood/intensity/relationshipLevel) 到 AgentStateDao
@@ -53,7 +54,7 @@ import javax.inject.Inject
  * 状态写入:
  * - 通过 [update] 回调修改 [ChatUiState],**不持有** MutableStateFlow。
  *   这让 UseCase 可独立于 VM 单元测试。
- * - 副 coroutine(idleTimeoutJob / streamingRenderJob) 通过 [scope] 启动,与调用方生命周期一致。
+ * - 副 coroutine(idleTimeoutJob / streamingTickerJob) 通过 [scope] 启动,与调用方生命周期一致。
  */
 class SendMessageUseCase @Inject constructor(
     private val runtime: CompanionRuntime,
@@ -68,14 +69,18 @@ class SendMessageUseCase @Inject constructor(
     companion object {
         private const val DEFAULT_SESSION_ID = "default"
         private const val STREAMING_IDLE_TIMEOUT_MS = 30_000L
-        // 流式 batch 渲染：攒够 64 字符或 16ms 才 flush，减少 Compose 重绘频率。
-        // 首字符立即 flush（让用户看到"在动"），之后 batch 减少 jitter。
-        private const val STREAMING_RENDER_BATCH_MS = 16L
-        private const val STREAMING_RENDER_BATCH_CHARS = 64
-        private const val STREAMING_LEADING_FLUSH_CHARS = 4
+        // 流式渲染是节奏驱动而非到达驱动：delta 进队列，ticker 每 33ms 按预算出字，
+        // 网络抖动的"一坨坨"到达被摊平成匀速流出。预算随积压加速(积压≥96 字符时
+        // 每 tick 排空 1/4)，排空即真实速度，不整体拖慢回复。
+        private const val STREAMING_TICK_MS = 33L
+        private const val STREAMING_BASELINE_CHARS_PER_TICK = 4
+        private const val STREAMING_TICKER_PARK_IDLE_TICKS = 12
+        // 首包立即上屏的字符上限：让"在动"即刻可见，又不把大 chunk 一次倒出
+        private const val STREAMING_LEADING_FLUSH_CHARS = 16
         private const val IMAGE_ONLY_PROMPT = "我想给你看这张图片。先说说你看到了什么，再自然地回应我。"
         private const val LOCAL_GENERATION_STATUS = "本地模型加载并生成中"
         private const val VISION_READING_STATUS = "正在看图"
+        private const val TOOL_FAILED_STEP_LABEL = "工具未完成"
     }
 
     suspend operator fun invoke(
@@ -124,14 +129,15 @@ class SendMessageUseCase @Inject constructor(
         var assistantContent = ""
         var streamingChunker = StreamingMarkdownChunker()
         val pendingStreamingContent = StringBuilder()
-        var streamingRenderJob: Job? = null
+        var streamingTickerJob: Job? = null
+        var hasFlushedLeadingDelta = false
         var idleTimeoutJob: Job? = null
         var timedOut = false
         val toolCallIds = mutableListOf<String>()
-        // P0:跟踪最近一次 assistant 消息的 tool chip,用于 MemorySaved 时判断
-        // 是否已有真实工具 chip 显示(避免"已记住"覆盖"已创建提醒")。
-        // UseCase 不直接持有 MutableStateFlow,通过 updateAssistantToolStatus
-        // 闭包写入来同步。
+        var toolStepCounter = 0
+        var sawToolStep = false
+        // Progress 类状态(看图/本地加载/阶段提示)走 toolStatus 单值;
+        // 工具调用过程走 toolSteps 时间线,两者不再互相覆盖。
         var lastAssistantToolStatus: String? = null
         var isProgressStatus = false
 
@@ -150,10 +156,18 @@ class SendMessageUseCase @Inject constructor(
             }
         }
 
-        fun flushStreamingContent() {
+        fun flushStreamingContent(maxChars: Int = Int.MAX_VALUE) {
             if (pendingStreamingContent.isEmpty()) return
-            val renderState = streamingChunker.append(pendingStreamingContent.toString())
-            pendingStreamingContent.clear()
+            val chunk = if (maxChars < pendingStreamingContent.length) {
+                val head = pendingStreamingContent.substring(0, maxChars)
+                pendingStreamingContent.delete(0, maxChars)
+                head
+            } else {
+                val all = pendingStreamingContent.toString()
+                pendingStreamingContent.setLength(0)
+                all
+            }
+            val renderState = streamingChunker.append(chunk)
             updateAssistantMessage(assistantId, update) {
                 it.copy(
                     content = renderState.rawText,
@@ -164,35 +178,43 @@ class SendMessageUseCase @Inject constructor(
             }
         }
 
-        fun scheduleStreamingRender() {
-            val pendingLen = pendingStreamingContent.length
-            if (pendingLen >= STREAMING_RENDER_BATCH_CHARS) {
-                streamingRenderJob?.cancel()
-                streamingRenderJob = null
-                flushStreamingContent()
-                return
-            }
-            if (pendingLen >= STREAMING_LEADING_FLUSH_CHARS &&
-                streamingRenderJob?.isActive != true
-            ) {
-                flushStreamingContent()
-                return
-            }
-            if (streamingRenderJob?.isActive == true) return
-            streamingRenderJob = scope.launch {
-                delay(STREAMING_RENDER_BATCH_MS)
-                flushStreamingContent()
-                streamingRenderJob = null
+        fun ensureStreamingTicker() {
+            if (streamingTickerJob?.isActive == true) return
+            streamingTickerJob = scope.launch {
+                var idleTicks = 0
+                while (idleTicks < STREAMING_TICKER_PARK_IDLE_TICKS) {
+                    delay(STREAMING_TICK_MS)
+                    val backlog = pendingStreamingContent.length
+                    if (backlog == 0) {
+                        idleTicks += 1
+                        continue
+                    }
+                    idleTicks = 0
+                    val budget = when {
+                        backlog >= 96 -> backlog / 4
+                        backlog >= 48 -> 12
+                        else -> STREAMING_BASELINE_CHARS_PER_TICK
+                    }
+                    flushStreamingContent(budget)
+                }
             }
         }
 
         fun finishWithError(message: String) {
             idleTimeoutJob?.cancel()
-            streamingRenderJob?.cancel()
+            streamingTickerJob?.cancel()
             flushStreamingContent()
             update {
+                // 意图段/工具时间线也算部分回复:工具阶段后的失败保留过程叙事,
+                // 不把消息整条删成光秃秃的错误卡
                 val hasPartialAssistantReply = assistantContent.isNotBlank() ||
-                    messages.any { it.id == assistantId && it.content.isNotBlank() }
+                    messages.any { msg ->
+                        msg.id == assistantId && (
+                            msg.content.isNotBlank() ||
+                                msg.intentText.isNotBlank() ||
+                                msg.toolSteps.isNotEmpty()
+                            )
+                    }
                 val updatedMessages = if (hasPartialAssistantReply) {
                     messages.map { msg ->
                         if (msg.id == assistantId) {
@@ -220,7 +242,7 @@ class SendMessageUseCase @Inject constructor(
 
         fun finishCancelled() {
             idleTimeoutJob?.cancel()
-            streamingRenderJob?.cancel()
+            streamingTickerJob?.cancel()
             flushStreamingContent()
             update {
                 val updatedMessages = messages.mapNotNull { message ->
@@ -250,6 +272,106 @@ class SendMessageUseCase @Inject constructor(
             lastAssistantToolStatus = status
             isProgressStatus = progress
             updateAssistantMessage(assistantId, update) { it.copy(toolStatus = status, toolStatusType = type) }
+        }
+
+        // 工具步骤时间线：复合调用按序累积,每步 spinner→✓/✗。
+        // ToolStarted/ToolFinished 无 callId,靠"name + STARTED 未终结"匹配;
+        // ToolCallUpdated 有 callId,优先精确匹配,其次认领同名未终结的合成步骤,
+        // 保证两种事件顺序下同一次调用只占一步。
+        fun upsertToolStepFromCall(call: AgentToolCall) {
+            sawToolStep = true
+            val now = System.currentTimeMillis()
+            val callId = call.callId?.takeIf { it.isNotBlank() }
+            updateAssistantMessage(assistantId, update) { msg ->
+                val steps = msg.toolSteps.toMutableList()
+                val index = steps.indexOfFirst { it.callId != null && it.callId == callId }
+                    .takeIf { it >= 0 }
+                    ?: steps.indexOfLast {
+                        it.name == call.name && it.status == ToolCallStatus.STARTED && it.callId == null
+                    }.takeIf { it >= 0 }
+                val label = if (call.status == ToolCallStatus.FAILED) {
+                    TOOL_FAILED_STEP_LABEL
+                } else {
+                    toolDisplayRegistry.resolveLabel(
+                        toolName = call.name,
+                        status = call.status,
+                        resultJson = call.resultJson,
+                        errorMessage = call.errorMessage,
+                    )
+                }
+                if (index != null) {
+                    val prev = steps[index]
+                    val duration = if (call.status == ToolCallStatus.STARTED) {
+                        prev.durationMs
+                    } else {
+                        (now - prev.startedAtMs).coerceAtLeast(0)
+                    }
+                    steps[index] = prev.copy(
+                        callId = callId ?: prev.callId,
+                        label = label,
+                        status = call.status,
+                        durationMs = duration,
+                    )
+                } else {
+                    toolStepCounter += 1
+                    steps += ChatToolStep(
+                        id = callId ?: "step-${call.name}-$toolStepCounter",
+                        name = call.name,
+                        callId = callId,
+                        label = label,
+                        status = call.status,
+                        startedAtMs = now,
+                        durationMs = if (call.status == ToolCallStatus.STARTED) null else 0L,
+                    )
+                }
+                msg.copy(toolSteps = steps)
+            }
+        }
+
+        fun appendToolStartedStep(name: String) {
+            sawToolStep = true
+            val now = System.currentTimeMillis()
+            updateAssistantMessage(assistantId, update) { msg ->
+                val hasInFlightStep = msg.toolSteps.any {
+                    it.name == name && it.status == ToolCallStatus.STARTED
+                }
+                if (hasInFlightStep) {
+                    msg
+                } else {
+                    toolStepCounter += 1
+                    msg.copy(
+                        toolSteps = msg.toolSteps + ChatToolStep(
+                            id = "step-$name-$toolStepCounter",
+                            name = name,
+                            label = toolDisplayRegistry.label(name, ToolCallStatus.STARTED),
+                            status = ToolCallStatus.STARTED,
+                            startedAtMs = now,
+                        )
+                    )
+                }
+            }
+        }
+
+        fun finishToolStep(name: String, status: ToolCallStatus) {
+            sawToolStep = true
+            val now = System.currentTimeMillis()
+            updateAssistantMessage(assistantId, update) { msg ->
+                val index = msg.toolSteps.indexOfLast {
+                    it.name == name && it.status == ToolCallStatus.STARTED
+                }
+                if (index < 0) {
+                    msg
+                } else {
+                    val steps = msg.toolSteps.toMutableList()
+                    val prev = steps[index]
+                    steps[index] = prev.copy(
+                        label = toolDisplayRegistry.label(name, status),
+                        status = status,
+                        durationMs = (now - prev.startedAtMs).coerceAtLeast(0),
+                    )
+                    msg.copy(toolSteps = steps)
+                }
+            }
         }
 
         try {
@@ -339,21 +461,37 @@ class SendMessageUseCase @Inject constructor(
                         )
                         assistantContent += event.delta
                         pendingStreamingContent.append(event.delta)
-                        scheduleStreamingRender()
+                        if (!hasFlushedLeadingDelta) {
+                            hasFlushedLeadingDelta = true
+                            flushStreamingContent(STREAMING_LEADING_FLUSH_CHARS)
+                        }
+                        ensureStreamingTicker()
                     }
                     AgentEvent.StreamingReset -> {
-                        streamingRenderJob?.cancel()
-                        streamingRenderJob = null
+                        streamingTickerJob?.cancel()
+                        streamingTickerJob = null
                         pendingStreamingContent.clear()
                         assistantContent = ""
                         streamingChunker = StreamingMarkdownChunker()
+                        hasFlushedLeadingDelta = false
+                        // 不清屏：工具调用前流出的过渡文本降级为"意图段"保留展示，
+                        // 最终回答接着流。runtime 不持久化这段文本,所以只存内存字段。
                         updateAssistantMessage(assistantId, update) {
-                            it.copy(
-                                content = "",
-                                renderBlocks = emptyList(),
-                                renderDraft = "",
-                                isRenderDraftCode = false,
-                            )
+                            if (it.content.isBlank()) {
+                                it
+                            } else {
+                                it.copy(
+                                    intentText = if (it.intentText.isBlank()) {
+                                        it.content
+                                    } else {
+                                        it.intentText + "\n" + it.content
+                                    },
+                                    content = "",
+                                    renderBlocks = emptyList(),
+                                    renderDraft = "",
+                                    isRenderDraftCode = false,
+                                )
+                            }
                         }
                     }
                     is AgentEvent.Progress -> {
@@ -374,19 +512,9 @@ class SendMessageUseCase @Inject constructor(
                     }
                     is AgentEvent.ToolCallUpdated -> {
                         maybeShowPermissionPrompt(event.call, update)
-                        // P0 修复:切到 resolveLabel 动态路径,带 resultJson 的工具可以
-                        // 产出"已创建提醒 · 吃药"等带数据的 chip 文案(不再丢失 subject)。
-                        // 没有 resultJson 或解析失败时回退到静态 label,行为兼容。
-                        val statusLabel = when (event.call.status) {
-                            ToolCallStatus.FAILED -> formatToolError(event.call)
-                            else -> toolDisplayRegistry.resolveLabel(
-                                toolName = event.call.name,
-                                status = event.call.status,
-                                resultJson = event.call.resultJson,
-                                errorMessage = event.call.errorMessage,
-                            )
-                        }
-                        updateAssistantToolStatus(statusLabel, event.call.status)
+                        // 带 resultJson 的工具经 resolveLabel 产出"已创建提醒 · 吃药"
+                        // 等带数据的步骤文案;没有 resultJson 或解析失败回退静态 label。
+                        upsertToolStepFromCall(event.call)
                         // 记录 callId 到消息,让 detail panel 能反查具体 tool call
                         event.call.callId?.takeIf { it.isNotBlank() }?.let { id ->
                             if (id !in toolCallIds) {
@@ -398,26 +526,15 @@ class SendMessageUseCase @Inject constructor(
                         }
                     }
                     is AgentEvent.ToolStarted -> {
-                        updateAssistantToolStatus(
-                            toolDisplayRegistry.label(event.name, ToolCallStatus.STARTED),
-                            ToolCallStatus.STARTED,
-                        )
+                        appendToolStartedStep(event.name)
                     }
                     is AgentEvent.ToolFinished -> {
-                        updateAssistantToolStatus(
-                            toolDisplayRegistry.label(event.name, ToolCallStatus.SUCCEEDED),
-                            ToolCallStatus.SUCCEEDED,
-                        )
+                        finishToolStep(event.name, ToolCallStatus.SUCCEEDED)
                     }
                     is AgentEvent.MemorySaved -> {
-                        // P0 修复:后置记忆抽取的"已记住 N 条"提示是本轮 conversation
-                        // 级别的 reflection 信号,不应覆盖 assistant 消息上刚刚的
-                        // tool call chip(例如用户调用 create_local_reminder 时,
-                        // "已记住"会覆盖"已创建提醒 · 吃药",造成信息丢失)。
-                        //
-                        // 策略:只有当 assistant 消息还没显示 tool chip 时才覆盖,
-                        // 否则只通过 presence 反应通知用户,不挤占 chip 字段。
-                        if (lastAssistantToolStatus.isNullOrBlank()) {
+                        // 后置记忆抽取的"已记住 N 条"是 conversation 级 reflection 信号,
+                        // 不挤占工具时间线/工具状态;没有工具活动时才以 chip 呈现。
+                        if (!sawToolStep && lastAssistantToolStatus.isNullOrBlank()) {
                             updateAssistantToolStatus(
                                 if (event.count == 1) "已记住 1 条" else "已记住 ${event.count} 条",
                                 ToolCallStatus.SUCCEEDED,
@@ -429,7 +546,7 @@ class SendMessageUseCase @Inject constructor(
                     }
                     is AgentEvent.Complete -> {
                         idleTimeoutJob?.cancel()
-                        streamingRenderJob?.cancel()
+                        streamingTickerJob?.cancel()
                         flushStreamingContent()
 
                         val finalReply = event.textReply
@@ -466,7 +583,10 @@ class SendMessageUseCase @Inject constructor(
                                 content = "",
                             )
                             val completedMessage = source.copy(
-                                id = persistedId ?: assistantId,
+                                // 保持列表里已有的 id(transient 或 reconciler 换过的),
+                                // 换 key 会让 LazyColumn 把完成的消息当新条目重淡入;
+                                // DB 行 id 存 persistedId 供后续刷新对齐。
+                                persistedId = persistedId ?: source.persistedId,
                                 content = finalReply,
                                 isStreaming = false,
                                 renderBlocks = emptyList(),
@@ -594,9 +714,7 @@ class SendMessageUseCase @Inject constructor(
         return value
     }
 
-    // 原始异常与 JSON 保留在工具详情中，对话流只展示可行动的用户文案。
-    private fun formatToolError(call: AgentToolCall): String = "工具未完成 · 点击查看详情"
-
+    // 原始异常与 JSON 保留在工具详情中,时间线只展示"工具未完成"这类可行动文案。
     private fun persistStatus(status: CompanionStatus, scope: CoroutineScope) {
         scope.launch {
             val now = System.currentTimeMillis()

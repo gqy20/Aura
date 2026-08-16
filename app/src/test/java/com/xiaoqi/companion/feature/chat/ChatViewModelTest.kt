@@ -401,7 +401,8 @@ class ChatViewModelTest {
         advanceUntilIdle()
 
         val calls = viewModel.uiState.value.toolCalls
-        assertEquals(3, calls.size)
+        // RECENT_TOOL_CALL_LIMIT=8,4 条全部保留
+        assertEquals(4, calls.size)
         // save_memory 的 envelope ok data 有 memoryId → 动态 label "已保存记忆 · 记忆 mem-1"
         assertEquals("已保存记忆 · 记忆 mem-1", calls[0].label)
         assertEquals("Done", calls[0].status)
@@ -427,7 +428,8 @@ class ChatViewModelTest {
         )
         advanceUntilIdle()
 
-        assertEquals(3, viewModel.uiState.value.toolCalls.size)
+        // RECENT_TOOL_CALL_LIMIT=8,窗口内全保留;map 调用额外进 mapToolCalls
+        assertEquals(4, viewModel.uiState.value.toolCalls.size)
         assertEquals(listOf("map-4"), viewModel.uiState.value.mapToolCalls.map { it.id })
     }
 
