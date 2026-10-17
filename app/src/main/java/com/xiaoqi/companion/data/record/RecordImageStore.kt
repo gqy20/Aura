@@ -22,6 +22,10 @@ class RecordImageStore @Inject constructor(
         file.absolutePath
     }
 
+    // base64 解码留在本类:RecordImageStoreTest 走 Robolectric,ViewModel 纯 JVM 测试可继续 mock
+    suspend fun saveBase64(imageBase64: String, mediaType: String): String =
+        save(android.util.Base64.decode(imageBase64, android.util.Base64.DEFAULT), mediaType)
+
     fun resolve(path: String): File = File(path)
 
     suspend fun delete(path: String): Boolean = withContext(Dispatchers.IO) {

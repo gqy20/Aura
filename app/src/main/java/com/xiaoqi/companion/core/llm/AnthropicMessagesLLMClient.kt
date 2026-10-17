@@ -61,6 +61,13 @@ data class LlmRetryPolicy(
     }
 }
 
+/** tool_choice 强制调用返回的单个工具调用（inputJson 为模型填充的参数 JSON 文本）。 */
+data class ForcedToolCall(
+    val id: String,
+    val name: String,
+    val inputJson: String,
+)
+
 private class LlmHttpException(
     val statusCode: Int,
     val retryAfterMs: Long?,
@@ -350,18 +357,62 @@ class AnthropicMessagesLLMClient(
 
     override suspend fun models(): List<LLModel> = emptyList()
 
+    /**
+     * 强制工具调用:tool_choice 锁定 + thinking 禁用 + 原始嵌套 JSON schema。
+     * 结构化记录提取专用 —— Koog ToolDescriptor 只支持扁平参数,嵌套 items 数组必须走 rawTool。
+     * thinking 必须显式禁用:glm-5.3-flash 等推理模型默认思考 ~55s,事务面提取实测 5.5s。
+     */
+    suspend fun executeForcedTool(prompt: Prompt, model: LLModel, tool: JsonObject): ForcedToolCall {
+        val startedAt = System.currentTimeMillis()
+        val response = executeRequest(
+            prompt = prompt,
+            model = model,
+            stream = false,
+            tools = emptyList(),
+            rawTool = tool,
+            disableThinking = true,
+        )
+        val stopReason = response["stop_reason"]?.jsonPrimitive?.contentOrNull
+        val toolUseBlock = response["content"]?.jsonArray
+            ?.mapNotNull { it as? JsonObject }
+            ?.firstOrNull { it["type"]?.jsonPrimitive?.contentOrNull == "tool_use" }
+            ?: throw IOException("Forced tool call missing in response (stop_reason=$stopReason)")
+        val call = ForcedToolCall(
+            id = toolUseBlock["id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            name = toolUseBlock["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            inputJson = toolUseBlock["input"]?.toString() ?: "{}",
+        )
+        AppLogger.info(
+            LogTags.Llm,
+            "forced_tool_call_completed",
+            "model" to model.id,
+            "tool" to call.name,
+            "durationMs" to (System.currentTimeMillis() - startedAt),
+            "stopReason" to stopReason,
+            "inputLength" to call.inputJson.length,
+        )
+        return call
+    }
+
     override fun close() {
         (httpClient as? Closeable)?.close()
     }
 
-    private suspend fun executeRequest(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): JsonObject =
+    private suspend fun executeRequest(
+        prompt: Prompt,
+        model: LLModel,
+        stream: Boolean,
+        tools: List<ToolDescriptor>,
+        rawTool: JsonObject? = null,
+        disableThinking: Boolean = false,
+    ): JsonObject =
         withContext(Dispatchers.IO) {
             val startedAt = System.currentTimeMillis()
             withTransientRetry(
                 modelId = model.id,
                 operation = if (stream) "stream" else "request",
             ) {
-                val request = buildRequest(prompt, model, stream, tools)
+                val request = buildRequest(prompt, model, stream, tools, rawTool, disableThinking)
                 httpClient.newCall(request).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) {
@@ -445,10 +496,17 @@ class AnthropicMessagesLLMClient(
             errorBodyPreview = sanitizeErrorBody(errorBody),
         )
 
-    private fun buildRequest(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): Request {
+    private fun buildRequest(
+        prompt: Prompt,
+        model: LLModel,
+        stream: Boolean,
+        tools: List<ToolDescriptor>,
+        rawTool: JsonObject? = null,
+        disableThinking: Boolean = false,
+    ): Request {
         require(baseUrl.isNotBlank()) { "LLM_BASE_URL is not configured" }
         require(apiKey.isNotBlank()) { "LLM_API_KEY is not configured" }
-        val body = buildRequestBody(prompt, model, stream, tools)
+        val body = buildRequestBody(prompt, model, stream, tools, rawTool, disableThinking)
         AppLogger.debug(
             LogTags.Llm,
             "request_built",
@@ -469,12 +527,22 @@ class AnthropicMessagesLLMClient(
             .build()
     }
 
-    private fun buildRequestBody(prompt: Prompt, model: LLModel, stream: Boolean, tools: List<ToolDescriptor>): JsonObject =
+    private fun buildRequestBody(
+        prompt: Prompt,
+        model: LLModel,
+        stream: Boolean,
+        tools: List<ToolDescriptor>,
+        rawTool: JsonObject? = null,
+        disableThinking: Boolean = false,
+    ): JsonObject =
         buildJsonObject {
             put("model", model.id)
             put("max_tokens", prompt.params.maxTokens ?: model.maxOutputTokens?.toInt() ?: DEFAULT_MAX_TOKENS)
             prompt.params.temperature?.let { put("temperature", it) }
             put("stream", stream)
+            if (disableThinking) {
+                put("thinking", buildJsonObject { put("type", JsonPrimitive("disabled")) })
+            }
 
             val systemText = prompt.messages
                 .filterIsInstance<Message.System>()
@@ -495,7 +563,16 @@ class AnthropicMessagesLLMClient(
                 }
             )
 
-            if (tools.isNotEmpty()) {
+            if (rawTool != null) {
+                put("tools", buildJsonArray { add(rawTool) })
+                put(
+                    "tool_choice",
+                    buildJsonObject {
+                        put("type", JsonPrimitive("tool"))
+                        put("name", JsonPrimitive(rawTool["name"]?.jsonPrimitive?.contentOrNull.orEmpty()))
+                    },
+                )
+            } else if (tools.isNotEmpty()) {
                 put("tools", buildJsonArray {
                     tools.forEach { tool ->
                         add(buildJsonObject {

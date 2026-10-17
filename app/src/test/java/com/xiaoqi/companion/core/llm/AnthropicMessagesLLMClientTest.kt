@@ -8,14 +8,17 @@ import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.RequestMetaInfo
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
+import java.io.IOException
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
@@ -100,6 +103,78 @@ class AnthropicMessagesLLMClientTest {
 
         assertEquals("recovered", responses.single().content)
         assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun executeForcedTool_sendsToolChoiceAndDisabledThinking() = runTest {
+        server.enqueue(forcedToolResponse())
+        val tool = buildJsonObject {
+            put("name", "submit_meal_record")
+            put("description", "Submit one structured meal record")
+            put("input_schema", buildJsonObject {
+                put("type", "object")
+                put("properties", buildJsonObject {
+                    put("items", buildJsonObject { put("type", "array") })
+                })
+            })
+        }
+
+        val call = client().executeForcedTool(simplePrompt(), model, tool)
+
+        val recorded = server.takeRequest()
+        val body = json.parseToJsonElement(recorded.body.readUtf8()).jsonObject
+        val toolChoice = body.getValue("tool_choice").jsonObject
+        assertEquals("tool", toolChoice.getValue("type").jsonPrimitive.content)
+        assertEquals("submit_meal_record", toolChoice.getValue("name").jsonPrimitive.content)
+        assertEquals("disabled", body.getValue("thinking").jsonObject.getValue("type").jsonPrimitive.content)
+        val sentTool = body.getValue("tools").jsonArray.single().jsonObject
+        assertEquals("submit_meal_record", sentTool.getValue("name").jsonPrimitive.content)
+        assertEquals(
+            "array",
+            sentTool.getValue("input_schema").jsonObject
+                .getValue("properties").jsonObject
+                .getValue("items").jsonObject
+                .getValue("type").jsonPrimitive.content,
+        )
+
+        assertEquals("call-1", call.id)
+        assertEquals("submit_meal_record", call.name)
+        val input = json.parseToJsonElement(call.inputJson).jsonObject
+        assertEquals("LUNCH", input.getValue("meal_type").jsonPrimitive.content)
+    }
+
+    @Test
+    fun executeForcedTool_throwsWhenResponseHasNoToolUse() = runTest {
+        server.enqueue(successResponse("plain text"))
+        val tool = buildJsonObject { put("name", "submit_meal_record") }
+
+        val failure = runCatching {
+            client().executeForcedTool(simplePrompt(), model, tool)
+        }.exceptionOrNull()
+
+        assertTrue(failure is IOException)
+        assertTrue(failure?.message?.contains("Forced tool call missing") == true)
+    }
+
+    @Test
+    fun executeForcedTool_skipsThinkingBlockAndReadsToolUse() = runTest {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(
+                    """{"type":"message","role":"assistant","content":[""" +
+                        """{"type":"thinking","thinking":"let me analyze..."},""" +
+                        """{"type":"tool_use","id":"call-2","name":"submit_meal_record","input":{"meal_type":"DINNER","items":[]}}],""" +
+                        """"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":20}}"""
+                )
+        )
+
+        val call = client().executeForcedTool(simplePrompt(), model, buildJsonObject { put("name", "submit_meal_record") })
+
+        assertEquals("call-2", call.id)
+        val input = json.parseToJsonElement(call.inputJson).jsonObject
+        assertEquals("DINNER", input.getValue("meal_type").jsonPrimitive.content)
     }
 
     @Test
@@ -374,6 +449,15 @@ class AnthropicMessagesLLMClientTest {
         .setHeader("Content-Type", "application/json")
         .setBody(
             """{"type":"message","role":"assistant","content":[{"type":"text","text":"$text"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}"""
+        )
+
+    private fun forcedToolResponse() = MockResponse()
+        .setResponseCode(200)
+        .setHeader("Content-Type", "application/json")
+        .setBody(
+            """{"type":"message","role":"assistant","content":[{"type":"tool_use","id":"call-1","name":"submit_meal_record",""" +
+                """"input":{"meal_type":"LUNCH","confidence":0.9,"items":[{"name":"Beef Noodle Soup","portion_text":"1 bowl","calories":450,"protein_g":25}]}}],""" +
+                """"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":20}}"""
         )
 
     private fun sseResponse(vararg events: String) = MockResponse()

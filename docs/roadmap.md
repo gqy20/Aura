@@ -149,6 +149,16 @@
 - **androidTest FTS5 套件修复**（存量问题,stash 干净 HEAD 验证 7/8 失败与我无关）：`BaseAndroidDaoTest` 补 `SQLiteConnection` 回调变体（`setDriver(BundledSQLiteDriver)` 下老 `SupportSQLiteDatabase` onCreate 不触发,FTS 表从未建出）;用例改用 ≥3 字符 MATCH 词与确定性 bm25 种子（长度归一化会压长文档）——连机 8/8 全绿。
 - **验证**：`testDebugUnitTest` 694 全绿（+3 搜索 VM 用例）;`connectedDebugAndroidTest` FTS5 类 8/8;模拟器装机确认搜索→命中→跳转定位端到端工作。语音 I/O（SpeechRecognizer/TTS）留待独立批次。
 
+### 近期打磨（2026-10-18 · MR 结构化记录 P0/P1）
+
+> 对应 MR 里程碑前两个阶段，规划定稿见本文件 MR 章节 + `docs/design.md` §6。
+
+- **P0 数据地基**（`fcab75d`）：DB v11→v12 五张表（meal_records / meal_items / purchase_records / purchase_items / inventory_items，无外键、级联删除在 DAO `@Transaction`）；MealRecord / Purchase / Inventory 三个 Repository（采购可同步累加库存，身份键 normalize(name)+normalize(brand)）；`RecordImageStore` 文件系统存图 + DB 存路径（刻意偏离 `MemoryEntity.imageBase64` 模式，含目录越权删除防护）。
+- **P1 饮食域端到端**：`AnthropicMessagesLLMClient.executeForcedTool`（tool_choice 锁定 + thinking 禁用 + 原始嵌套 JSON schema——glm-5.3-flash 开思考 58s / 关思考 5.5s，事务面必须关）；`VisionMealExtractor`（photo → 强制工具调用 → lenient 解析 → 数值钳制 0-3000 kcal/项等 → meal_type 按小时兜底）；`RecordCaptureScreen` 确认页（餐次 chips、份量小/中/大**基准缩放**不累积、估算徽标、行编辑对话框、提取失败降级手填）；主屏"记一餐"入口卡 + `record-capture` 路由。
+- **模型切换**：GLM 默认模型改为 `glm-5.3-flash`（`glm-5v-turbo` 保留在选项中），probe 脚本与 `.env` 同步。
+- **构建坑修复**：`scripts/hooks/run_gradle.py` 锚定 cwd 而非 `Path.resolve()`（D:/E: junction 双路径污染 KSP 增量缓存，详见 AGENTS.md §5 新增条目）。
+- **验证**：`testDebugUnitTest` 751 全绿（+57）；probe ForcedToolChoice 在 glm-5.3-flash 通过；模拟器装机验收待做（P1 收尾项）。
+
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。
@@ -275,8 +285,8 @@
 
 阶段划分（总量预估：主代码 ~3.5-4k 行 + 测试 ~1.7-2k 行，25-35 文件；最大不确定项是确认页编辑交互深度）：
 
-- **P0 地基**：`llm_tool_protocol_probe.ps1` 加场景验证 GLM tool_choice 强制行为（**先于一切编码**，~800 行后续代码建立在"强制 schema 可行"上）→ 实体 / DAO / v11 迁移 / Repository + 图片文件存储 helper + 单测。
-- **P1 饮食域端到端**：`VisionRecordExtractor`（GLM + 强制工具 schema + 校验钳制）+ `RecordConfirmTable` 确认页 + ViewModel + 主屏"记一笔"入口。交付"拍照 → 表格 → 入库"闭环。
+- **P0 地基** ✅（2026-10-18，`fcab75d`）：`llm_tool_protocol_probe.ps1` ForcedToolChoice 场景验证 GLM tool_choice 强制行为通过（glm-5.3-flash 嵌套 items 正确填充，thinking 禁用后 5.5s）→ 实体 / DAO / v11→v12 迁移 / Repository + 图片文件存储 helper + 33 单测。
+- **P1 饮食域端到端** ✅（2026-10-18）：`VisionRecordExtractor`（GLM + 强制工具 schema + 校验钳制）+ `RecordConfirmTable` 确认页 + ViewModel + 主屏"记一餐"入口 + `record-capture` 路由 + 24 单测。交付"拍照 → 表格 → 入库"闭环。
 - **P2 采购/库存域**：同一提取管线第二套 schema（视觉分类餐食/采购，确认页可纠正）；库存累加；记录列表页 + 主屏"今日热量/库存"卡片。
 - **P3 工具化与联动**：`LogMealTool` / `QueryMealLogTool` / `LogPurchaseTool` / `QueryInventoryTool` 挂进 `CompanionToolRegistry`（envelope 协议）+ 聊天内确认卡 + meal↔inventory 消耗联动。
 - **P4 洞察联动**：meal 数据进 `DreamDataCollector` snapshot（周营养趋势 insight）；库存低于阈值走既有 Reminder 通知链路。

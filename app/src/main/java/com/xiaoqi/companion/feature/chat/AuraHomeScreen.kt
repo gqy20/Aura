@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -83,6 +86,7 @@ fun AuraHomeScreen(
     onOpenSettings: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
     onOpenMcpSettings: () -> Unit,
+    onOpenRecordCapture: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -98,6 +102,7 @@ fun AuraHomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenMemoryRoom = onOpenMemoryRoom,
         onOpenMcpSettings = onOpenMcpSettings,
+        onOpenRecordCapture = onOpenRecordCapture,
         onInsightLongPress = { insight ->
             AppLogger.debug(
                 LogTags.Chat,
@@ -184,6 +189,7 @@ private fun AuraHomeContent(
     onOpenSettings: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
     onOpenMcpSettings: () -> Unit,
+    onOpenRecordCapture: () -> Unit,
     onInsightLongPress: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
     onInsightDismiss: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
     onInsightChat: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
@@ -252,6 +258,10 @@ private fun AuraHomeContent(
                         )
                         Spacer(Modifier.height(12.dp))
                     }
+                }
+                item {
+                    RecordCaptureEntry(onClick = onOpenRecordCapture)
+                    Spacer(Modifier.height(12.dp))
                 }
                 item {
                     com.xiaoqi.companion.feature.insight.MoodTrendChartSection(
@@ -328,6 +338,46 @@ private fun LongTaskEntry(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
             )
+        }
+    }
+}
+
+// 事务面入口卡片(design.md §6.4):确定性文案,无人格表达
+@Composable
+private fun RecordCaptureEntry(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.58f),
+        tonalElevation = 0.dp,
+        shadowElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.PhotoCamera,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "记一餐",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "拍照识别食物,估算热量与营养",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                )
+            }
         }
     }
 }

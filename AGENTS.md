@@ -3,12 +3,12 @@
 ## 当前项目状态
 
 - 项目名称：Aura · 奥拉（Android AI 陪伴应用）
-- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形
+- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形；**MR 结构化生活记录（饮食/采购）已立项，P0 数据地基 + P1 饮食域端到端已落**（2026-10-18，拍照 → GLM 强制工具 schema 提取 → 表格确认 → 入库）
 - 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系/Health/Insight/Reminder）；**工具系统双开关**（`mcpEnabled` MCP 总开关 + `systemToolsEnabled` 系统内置工具开关，`CompanionToolRegistry.create()` 按开关短路，与 per-server `enabled` 是"总闸 vs 分闸"关系）；**MCP 渐进加载**（`McpServerRouter` 按请求选择服务器、`McpToolSelector` 在服务器内裁剪工具，tool spec 缓存、失败冷却与选择指标）；**LLM 工具协议兼容**（Anthropic SSE 按 `content_block.index` 并行累积工具调用、扁平 JSON 裸字符串保守修复、HTTP 错误体脱敏摘要与请求结构指纹、Koog `Failure`/`ValidationError` 结果终止错误循环）；NavHost 六条路由（Home/Chat/Settings/McpSettings/MemoryRoom/Onboarding）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`OnboardingScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）；`LlmConnectivityChecker`；`DataTransparencySection`；`HealthSyncManager` / `HealthDataSection`；**Insight 双路径**（`DreamLoopWorker` 6h 周期 + `ChatViewModel` POST_CHAT 3min 冷却即时触发）；**EvidenceResolver** 中文 FTS + 兜底策略；**InsightValidator** 低门槛（confidence 0.2 / evidence reality 10%）；POST_CHAT 卡片 UI（蓝色徽标 + 分析中指示器）
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪与关系的头像/表情层由 Compose Canvas 临时替代；Presence Layer 的 Rive/Lottie 动画资源仍缺；Pulse 的离线衰减/回归反应/主动通知仍缺
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest）、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
-- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-08-16 通过（**694 个测试，0 失败**；含聊天停止/重试/重新生成、agent 回复体验专项（意图段保留/工具步骤时间线/节奏驱动流式/key 稳定）、复合 MCP 任务、安全重试、SSE 多工具索引累积、Android 裸字符串参数兼容、Koog 错误结果短路、地图交互与既有 DAO/Insight/ChatViewModel 测试。Robolectric 单 fork 复用）
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-10-18 通过（**751 个测试，0 失败**；694 存量 + MR 结构化记录 P0/P1 新增 57：五表 DAO/Repository/图片文件存储、强制工具调用协议、提取钳制、捕获流 ViewModel。Robolectric 单 fork 复用）
 
 ## 常用验证命令
 
@@ -211,6 +211,7 @@ for r in conn.execute('select id, type, source, importance, confidence, timestam
 - **Git Bash 的 `>` 重定向会对二进制做 CRLF 转换**，`adb exec-out screencap -p > x.png` 和 `exec-out run-as ... cat db > x.db` 出来的文件都是坏的（PNG 直接打不开；SQLite 静默丢 WAL 帧，出现"能看到最新一条写入却看不到更早写入"的诡异现象）。截图用设备端 `screencap -p /sdcard/t.png` + `adb pull`；注意 Git Bash 会把 `/sdcard/...` 转成 Windows 路径，命令前加 `MSYS_NO_PATHCONV=1`。
 - **主库可能数周不 checkpoint**（实测 mtime 停在 8-09，全部写入都在 4MB 的 WAL 里）。拉库要 `am force-stop` 停写后取 db+wal+shm 三件套；如果结论存疑，**用"重启应用看 UI 历史是否还在"做交叉验证**，比直接读拷贝的库可靠。
 - **uiautomator dump 对 Compose 树偶发返回全空 text 节点**，重试一次或改用截图 + 视觉分析；Compose 输入框的当前文本在 dump 里也不可靠，以截图为准。
+- **`D:\C\Desktop\ai\android` 是 `E:\ai\android` 的 junction 链**（Python `Path.resolve()`/`os.path.realpath` 会切到 E:）。曾踩坑：pre-commit 的 `scripts/hooks/run_gradle.py` 用 `resolve()` 定位构建根 → 钩子从 E: 跑 Gradle 而手工构建从 D: 跑，共享的 `app/build` 增量缓存里混入两套绝对路径 → KSP 报 `this and base files have different roots`。已改锚定 `cwd`；**构建/提交固定从同一路径发起**，再遇到该报错就 `rm -rf app/build` 从该路径重建。
 
 ## 网站截图规范
 

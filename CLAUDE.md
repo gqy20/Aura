@@ -12,11 +12,11 @@
 
 ## 当前项目状态
 
-- 当前阶段：**Phase 1（文本聊天闭环 / agent tools）已完成，进入 Phase 2+「长期认识你」主线**——Dream Loop 后台觉察、Insight 卡片、本地 LLM、Vision→Memory 闭环、Health 多源已实质落地。M0–M4 大部分完成；M5 Pulse / M6 产品化 / M7 远端 Agent Server 待做（详见 roadmap）。
+- 当前阶段：**Phase 1（文本聊天闭环 / agent tools）已完成，进入 Phase 2+「长期认识你」主线**——Dream Loop 后台觉察、Insight 卡片、本地 LLM、Vision→Memory 闭环、Health 多源已实质落地。M0–M4 大部分完成；M5 Pulse / M6 产品化 / M7 远端 Agent Server 待做（详见 roadmap）。**MR 结构化生活记录已立项：P0 数据地基 + P1 饮食域端到端已落（2026-10-18，拍照 → GLM tool_choice 强制提取 → 表格确认 → 入库）。**
 - 已实现（按代码核对，2026-08-09）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`（Koog `AIAgent` 多轮 tool-use + SSE 流式）、停止/重试/重新生成/编辑后重发/复制/离底新消息提示；`AnthropicMessagesLLMClient`（手写 OkHttp SSE 解析、并行 tool index 累积、Android 裸字符串兼容）；**Room v10**（9→10 新增 FTS5 trigram 全文搜索 `message_search_docs_fts`）/DataStore/Hilt；NavHost 六条路由；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`OnboardingScreen`；**11 个内置 Agent tools** + **MCP 渐进加载**（按请求选择 server、裁剪 tools、spec 缓存、失败冷却）；工具系统双开关；`PresenceController` + `PresenceReactionPolicy`；Reminder 四件套；本地 LLM 全链路；Dream Loop + POST_CHAT 即时洞察；EvidenceResolver 中文兼容；InsightValidator；Vision→Memory；Health 双源；`InsightCardList` + `MoodTrendChart`；`LlmConnectivityChecker`；`DataTransparencySection`。
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪/关系头像由 Compose Canvas 自绘替代，Rive/Lottie 动画资源仍缺；记忆的完整编辑/全文搜索框/批量管理仍缺；`InsightPrompts` 已启用 `patternDetect` + `conversationReflection`（POST_CHAT）两个 prompt，`anniversaryScan` / `connectionDetect` 已写好但无调用入口；`AutoMemoryStore` MVP 阶段 Onboarding 答案只当 String 存、未接 LLM 解析；本地 vision 的 native `aura_mnn_llm.so` 真机 NDK 编译验证待补。
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O（仅 DataStore 开关、无实现）、`PulseWorker`（离线衰减/回归反应/主动通知；Dream Loop 周期任务已落，Reminder 走 OneTimeWorkRequest）、Weekly Insight / AnniversaryScanner / InsightLog 反馈回路、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`。
-- 已验证：`./gradlew.bat testDebugUnitTest` 通过（**694 个测试，0 失败**；最近核对 2026-08-16，含聊天恢复交互、agent 回复体验专项（意图段保留/工具步骤时间线/节奏驱动流式/key 稳定）、复合 MCP 任务、工具安全重试、Android 工具参数兼容、Dream Loop、InsightValidator、EvidenceResolver、ReactiveCompanion、FTS5、Health 双源与 ChatViewModel POST_CHAT 触发等用例）。
+- 已验证：`./gradlew.bat testDebugUnitTest` 通过（**751 个测试，0 失败**；最近核对 2026-10-18 = 694 存量 + MR 结构化记录 P0/P1 新增 57：五表 DAO/Repository/图片文件存储、强制工具调用协议、提取钳制、捕获流 ViewModel。存量覆盖见 git 历史）。
 
 ## Compose UI: Window Insets 速查
 

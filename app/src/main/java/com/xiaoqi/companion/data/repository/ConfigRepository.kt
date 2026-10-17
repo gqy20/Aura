@@ -20,7 +20,8 @@ data class LlmConfig(
 
 object DefaultLlmValues {
     const val GLM_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
-    const val GLM_MODEL = "glm-5v-turbo"
+    const val GLM_MODEL = "glm-5.3-flash"
+    const val GLM_VISION_MODEL = "glm-5v-turbo"
     const val KIMI_BASE_URL = "https://api.kimi.com/coding"
     const val KIMI_MODEL = "kimi-for-coding"
     // 魔搭 (ModelScope) Inference 端点,兼容 Anthropic Messages 协议:
@@ -50,7 +51,7 @@ object DefaultLlmValues {
 
     fun modelOptions(provider: LlmProvider): List<String> =
         when (provider) {
-            LlmProvider.GLM -> listOf(GLM_MODEL)
+            LlmProvider.GLM -> listOf(GLM_MODEL, GLM_VISION_MODEL)
             LlmProvider.KIMI -> listOf(KIMI_MODEL)
             LlmProvider.MODELSCOPE -> listOf(MODELSCOPE_MODEL)
             LlmProvider.LOCAL_QWEN -> listOf(
