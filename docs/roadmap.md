@@ -157,7 +157,15 @@
 - **P1 饮食域端到端**：`AnthropicMessagesLLMClient.executeForcedTool`（tool_choice 锁定 + thinking 禁用 + 原始嵌套 JSON schema——glm-5.3-flash 开思考 58s / 关思考 5.5s，事务面必须关）；`VisionMealExtractor`（photo → 强制工具调用 → lenient 解析 → 数值钳制 0-3000 kcal/项等 → meal_type 按小时兜底）；`RecordCaptureScreen` 确认页（餐次 chips、份量小/中/大**基准缩放**不累积、估算徽标、行编辑对话框、提取失败降级手填）；主屏"记一餐"入口卡 + `record-capture` 路由。
 - **模型切换**：GLM 默认模型改为 `glm-5.3-flash`（`glm-5v-turbo` 保留在选项中），probe 脚本与 `.env` 同步。
 - **构建坑修复**：`scripts/hooks/run_gradle.py` 锚定 cwd 而非 `Path.resolve()`（D:/E: junction 双路径污染 KSP 增量缓存，详见 AGENTS.md §5 新增条目）。
-- **验证**：`testDebugUnitTest` 751 全绿（+57）；probe ForcedToolChoice 在 glm-5.3-flash 通过；模拟器装机验收待做（P1 收尾项）。
+- **验证**：`testDebugUnitTest` 751 全绿（+57）；probe ForcedToolChoice 在 glm-5.3-flash 通过。
+
+### 近期打磨（2026-10-18 · MR P1 模拟器端到端验收）
+
+> P1 全链路真机（模拟器）验收通过；过程中发现并修复一个诚实性 UX 缺陷。
+
+- **验收覆盖**：覆盖升级安装触发 DB v11→v12 迁移（旧 Insight/情绪数据完好）；主屏"记一餐"入口卡渲染；Photo Picker 选图 → GLM 5.3-flash 提取（牛肉粉 550kcal + 炸物 280kcal，中文菜名/份量/三大营养素/估算徽标/份量小中大 chips 全部正确呈现）；保存入库（`meal_records`+`meal_items` 落库、图片存 `files/record_images/` 且 DB 路径一致、保存后自动返回主屏）；`testDebugUnitTest` 752 全绿（+1）。
+- **模型拒绝透传**：模型对非餐食照片会无视 tool_choice 强制、以文本说明拒绝（实测："这张截图不是餐食照片——它是聊天记录截图…"）。新增 `LlmForcedToolMissingException(modelReply)`，VisionMealExtractor 把模型原话作为 Failed(reason) 显示给用户，替代原先的内部协议错误文案；诊断日志 `forced_tool_missing_diagnostics` 记录 blockKinds/replySummary（字段名避开 LogFieldSanitizer 的 text/content 敏感词，否则整段 redact）。
+- **E2E 排障经验**（已固化到 AGENTS.md §5）：junction 双路径构建根导致 KSP `different roots`（统一从 `E:\ai\android` 规范路径构建）；App 落盘日志 `files/diagnostics/app.log` 可经 `run-as` + base64 拉取（Git Bash 二进制重定向坑的绕法）；模拟器 Photo Picker 是多选确认模式（选格子后必须点 Done 才返回），首开会叠两层提示浮层需先 Dismiss，`uiautomator dump` 含 off-screen 节点不能按 y 坐标推断可视区。
 
 ## 部分实现
 

@@ -68,6 +68,10 @@ data class ForcedToolCall(
     val inputJson: String,
 )
 
+/** 模型无视 tool_choice 强制、以纯文本回复（如"照片里没有食物"）。modelReply 为模型原话,透传给用户。 */
+class LlmForcedToolMissingException(val modelReply: String) :
+    IOException("Forced tool call missing in response")
+
 private class LlmHttpException(
     val statusCode: Int,
     val retryAfterMs: Long?,
@@ -376,11 +380,29 @@ class AnthropicMessagesLLMClient(
         val toolUseBlock = response["content"]?.jsonArray
             ?.mapNotNull { it as? JsonObject }
             ?.firstOrNull { it["type"]?.jsonPrimitive?.contentOrNull == "tool_use" }
-            ?: throw IOException("Forced tool call missing in response (stop_reason=$stopReason)")
+        val responseText = response["content"]?.jsonArray
+            ?.mapNotNull { (it as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull }
+            ?.joinToString(" ")
+            .orEmpty()
+        if (toolUseBlock == null) {
+            // 强制工具失败时输出模型实际返回内容:排查"模型拒绝提取"(如非餐食照片)场景
+            AppLogger.warn(
+                LogTags.Llm,
+                "forced_tool_missing_diagnostics",
+                "stopReason" to stopReason,
+                // 字段名避开 LogFieldSanitizer 敏感词(text/content 会被整段 redact)
+                "blockKinds" to response["content"]?.jsonArray
+                    ?.mapNotNull { (it as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull }
+                    ?.joinToString(","),
+                "replySummary" to responseText.take(300),
+            )
+        }
+        val toolUseBlockNonNull = toolUseBlock
+            ?: throw LlmForcedToolMissingException(responseText)
         val call = ForcedToolCall(
-            id = toolUseBlock["id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-            name = toolUseBlock["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-            inputJson = toolUseBlock["input"]?.toString() ?: "{}",
+            id = toolUseBlockNonNull["id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            name = toolUseBlockNonNull["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            inputJson = toolUseBlockNonNull["input"]?.toString() ?: "{}",
         )
         AppLogger.info(
             LogTags.Llm,

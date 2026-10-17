@@ -14,6 +14,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -155,6 +156,27 @@ class VisionMealExtractorTest {
 
         val failure = result as MealExtractionResult.Failed
         assertTrue(failure.reason.contains("提取请求失败"))
+    }
+
+    @Test
+    fun extractMeal_modelDeclineSurfacesModelReply() = runTest {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(
+                    """{"type":"message","content":[{"type":"text",""" +
+                        """"text":"这张照片不是餐食照片,而是应用截图,无法提取餐食记录。\n\n请提供包含食物的照片。"}],""" +
+                        """"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}"""
+                )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM)
+
+        val result = extractor.extractMeal("aGk=", "image/jpeg")
+
+        val failure = result as MealExtractionResult.Failed
+        assertTrue(failure.reason.contains("这张照片不是餐食照片"))
+        assertFalse(failure.reason.contains("提取请求失败"))
     }
 
     private fun extractor(provider: LlmProvider, apiKey: String = "test-key") = VisionMealExtractor(

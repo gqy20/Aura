@@ -152,8 +152,8 @@ class AnthropicMessagesLLMClientTest {
             client().executeForcedTool(simplePrompt(), model, tool)
         }.exceptionOrNull()
 
-        assertTrue(failure is IOException)
-        assertTrue(failure?.message?.contains("Forced tool call missing") == true)
+        assertTrue(failure is LlmForcedToolMissingException)
+        assertEquals("plain text", (failure as LlmForcedToolMissingException).modelReply)
     }
 
     @Test

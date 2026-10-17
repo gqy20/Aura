@@ -7,6 +7,7 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.AttachmentContent
 import ai.koog.prompt.message.ContentPart
 import com.xiaoqi.companion.core.llm.AnthropicMessagesLLMClientFactory
+import com.xiaoqi.companion.core.llm.LlmForcedToolMissingException
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.data.db.converter.MealType
@@ -74,6 +75,19 @@ class VisionMealExtractor @Inject constructor(
         }
         val call = try {
             client.executeForcedTool(requestPrompt, model, MEAL_TOOL_SCHEMA)
+        } catch (error: LlmForcedToolMissingException) {
+            // 模型以文本拒绝(如"照片里没有食物"):原话透传给用户,比内部协议错误诚实得多
+            AppLogger.warn(
+                LogTags.Record,
+                "meal_extraction_model_declined",
+                "model" to config.modelName,
+                "replyLength" to error.modelReply.length,
+            )
+            val reason = error.modelReply.lineSequence().firstOrNull { it.isNotBlank() }
+                ?.take(200)
+                ?.ifBlank { null }
+                ?: "未识别出结构化餐食记录,可手动填写"
+            return MealExtractionResult.Failed(reason)
         } catch (error: Exception) {
             AppLogger.warn(
                 LogTags.Record,

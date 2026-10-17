@@ -211,7 +211,7 @@ for r in conn.execute('select id, type, source, importance, confidence, timestam
 - **Git Bash 的 `>` 重定向会对二进制做 CRLF 转换**，`adb exec-out screencap -p > x.png` 和 `exec-out run-as ... cat db > x.db` 出来的文件都是坏的（PNG 直接打不开；SQLite 静默丢 WAL 帧，出现"能看到最新一条写入却看不到更早写入"的诡异现象）。截图用设备端 `screencap -p /sdcard/t.png` + `adb pull`；注意 Git Bash 会把 `/sdcard/...` 转成 Windows 路径，命令前加 `MSYS_NO_PATHCONV=1`。
 - **主库可能数周不 checkpoint**（实测 mtime 停在 8-09，全部写入都在 4MB 的 WAL 里）。拉库要 `am force-stop` 停写后取 db+wal+shm 三件套；如果结论存疑，**用"重启应用看 UI 历史是否还在"做交叉验证**，比直接读拷贝的库可靠。
 - **uiautomator dump 对 Compose 树偶发返回全空 text 节点**，重试一次或改用截图 + 视觉分析；Compose 输入框的当前文本在 dump 里也不可靠，以截图为准。
-- **`D:\C\Desktop\ai\android` 是 `E:\ai\android` 的 junction 链**（Python `Path.resolve()`/`os.path.realpath` 会切到 E:）。曾踩坑：pre-commit 的 `scripts/hooks/run_gradle.py` 用 `resolve()` 定位构建根 → 钩子从 E: 跑 Gradle 而手工构建从 D: 跑，共享的 `app/build` 增量缓存里混入两套绝对路径 → KSP 报 `this and base files have different roots`。已改锚定 `cwd`；**构建/提交固定从同一路径发起**，再遇到该报错就 `rm -rf app/build` 从该路径重建。
+- **`D:\C\Desktop\ai\android` 是 `E:\ai\android` 的 junction 链**（`git rev-parse --show-toplevel` 从 D: 调用也返回 `E:/ai/`，Python `Path.resolve()`/`os.path.realpath` 同样切到 E:）。曾踩坑：pre-commit 钩子从 E: 根跑 Gradle、手工从 D: 根跑，共享的 `app/build` 增量缓存混入两套绝对路径 → KSP/Kotlin 增量编译报 `this and base files have different roots`。**结论：一切 Gradle 构建统一从 `E:\ai\android`（规范路径）发起**；再遇到该报错就 `rm -rf app/build` 从 E: 重建。
 
 ## 网站截图规范
 
