@@ -12,6 +12,8 @@ enum class MemoryType { FACT, EPISODE, PROCEDURAL }
 enum class SummaryType { DAILY, SESSION, TOPIC, PROJECT, RELATIONSHIP }
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 enum class LlmProvider { GLM, KIMI, MODELSCOPE, LOCAL_QWEN }
+enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }
+enum class RecordSource { PHOTO, TEXT, MANUAL }
 
 @Serializable
 data class MessageMetadata(

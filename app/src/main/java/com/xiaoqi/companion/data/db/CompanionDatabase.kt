@@ -11,21 +11,29 @@ import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.ConversationDao
 import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.InsightDao
+import com.xiaoqi.companion.data.db.dao.InventoryDao
+import com.xiaoqi.companion.data.db.dao.MealRecordDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
+import com.xiaoqi.companion.data.db.dao.PurchaseDao
 import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import com.xiaoqi.companion.data.db.entity.AgentStateEntity
 import com.xiaoqi.companion.data.db.entity.ConversationEntity
 import com.xiaoqi.companion.data.db.entity.HealthSnapshotEntity
 import com.xiaoqi.companion.data.db.entity.InsightEntity
+import com.xiaoqi.companion.data.db.entity.InventoryItemEntity
+import com.xiaoqi.companion.data.db.entity.MealItemEntity
+import com.xiaoqi.companion.data.db.entity.MealRecordEntity
 import com.xiaoqi.companion.data.db.entity.MessageEntity
 import com.xiaoqi.companion.data.db.entity.MemoryEntity
 import com.xiaoqi.companion.data.db.entity.MemorySummaryEntity
 import com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity
+import com.xiaoqi.companion.data.db.entity.PurchaseItemEntity
+import com.xiaoqi.companion.data.db.entity.PurchaseRecordEntity
 import com.xiaoqi.companion.data.db.entity.ReminderEntity
 import com.xiaoqi.companion.data.db.entity.ToolCallEntity
 
@@ -41,8 +49,13 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         InsightEntity::class,
         HealthSnapshotEntity::class,
         ConversationEntity::class,
+        MealRecordEntity::class,
+        MealItemEntity::class,
+        PurchaseRecordEntity::class,
+        PurchaseItemEntity::class,
+        InventoryItemEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -59,6 +72,9 @@ abstract class CompanionDatabase : RoomDatabase() {
     abstract fun insightDao(): InsightDao
     abstract fun healthSnapshotDao(): HealthSnapshotDao
     abstract fun conversationDao(): ConversationDao
+    abstract fun mealRecordDao(): MealRecordDao
+    abstract fun purchaseDao(): PurchaseDao
+    abstract fun inventoryDao(): InventoryDao
 
     companion object {
         val MIGRATION_1_2 = object : DualMigration(1, 2) {
@@ -257,6 +273,94 @@ abstract class CompanionDatabase : RoomDatabase() {
                     FROM messages WHERE session_id = 'default'
                     """.trimIndent()
                 )
+            }
+        }
+
+        // MR 结构化生活记录:饮食(头表+明细行) / 采购(头表+明细行) / 库存 五张表
+        val MIGRATION_11_12 = object : DualMigration(11, 12) {
+            override fun apply(executor: SqlExecutor) {
+                executor.exec(
+                    """
+                    CREATE TABLE IF NOT EXISTS `meal_records` (
+                        `id` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `mealType` TEXT NOT NULL,
+                        `source` TEXT NOT NULL,
+                        `totalCalories` REAL NOT NULL,
+                        `totalProteinG` REAL NOT NULL,
+                        `totalCarbsG` REAL NOT NULL,
+                        `totalFatG` REAL NOT NULL,
+                        `confidence` REAL NOT NULL,
+                        `imageLocalPath` TEXT,
+                        `rawNote` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                executor.exec("CREATE INDEX IF NOT EXISTS `index_meal_records_createdAt` ON `meal_records` (`createdAt`)")
+                executor.exec(
+                    """
+                    CREATE TABLE IF NOT EXISTS `meal_items` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `recordId` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `portionText` TEXT NOT NULL,
+                        `estCalories` REAL NOT NULL,
+                        `estProteinG` REAL NOT NULL,
+                        `estCarbsG` REAL NOT NULL,
+                        `estFatG` REAL NOT NULL,
+                        `isEstimate` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                executor.exec("CREATE INDEX IF NOT EXISTS `index_meal_items_recordId` ON `meal_items` (`recordId`)")
+                executor.exec(
+                    """
+                    CREATE TABLE IF NOT EXISTS `purchase_records` (
+                        `id` TEXT NOT NULL,
+                        `purchasedAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `source` TEXT NOT NULL,
+                        `storeName` TEXT,
+                        `totalCost` REAL,
+                        `imageLocalPath` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                executor.exec("CREATE INDEX IF NOT EXISTS `index_purchase_records_purchasedAt` ON `purchase_records` (`purchasedAt`)")
+                executor.exec(
+                    """
+                    CREATE TABLE IF NOT EXISTS `purchase_items` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `recordId` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `brand` TEXT,
+                        `quantity` REAL NOT NULL,
+                        `unit` TEXT NOT NULL,
+                        `unitPrice` REAL
+                    )
+                    """.trimIndent()
+                )
+                executor.exec("CREATE INDEX IF NOT EXISTS `index_purchase_items_recordId` ON `purchase_items` (`recordId`)")
+                executor.exec(
+                    """
+                    CREATE TABLE IF NOT EXISTS `inventory_items` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `brand` TEXT,
+                        `unit` TEXT NOT NULL,
+                        `currentQuantity` REAL NOT NULL,
+                        `lowStockThreshold` REAL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                executor.exec("CREATE INDEX IF NOT EXISTS `index_inventory_items_name` ON `inventory_items` (`name`)")
+                executor.exec("CREATE INDEX IF NOT EXISTS `index_inventory_items_updatedAt` ON `inventory_items` (`updatedAt`)")
             }
         }
 

@@ -1,7 +1,7 @@
 param(
     [ValidateSet('GLM', 'MODELSCOPE')]
     [string]$Provider = 'GLM',
-    [ValidateSet('All', 'BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult')]
+    [ValidateSet('All', 'BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult', 'ForcedToolChoice')]
     [string]$Scenario = 'All',
     [string]$Model = '',
     [string]$EnvFile = (Join-Path $PSScriptRoot '..\.env')
@@ -54,7 +54,13 @@ function Get-ResponseSummary([string]$Body, [bool]$Stream) {
         try {
             $json = $Body | ConvertFrom-Json
             $types = @($json.content | ForEach-Object { $_.type }) -join ','
-            return "stop_reason=$($json.stop_reason) content_types=$types"
+            $toolInputs = @($json.content | Where-Object { $_.type -eq 'tool_use' } | ForEach-Object {
+                $inputJson = ($_.input | ConvertTo-Json -Depth 20 -Compress)
+                "$($_.name):$($inputJson.Substring(0, [Math]::Min(220, $inputJson.Length)))"
+            }) -join ' | '
+            $summary = "stop_reason=$($json.stop_reason) content_types=$types"
+            if ($toolInputs) { $summary += " tool_inputs=[$toolInputs]" }
+            return $summary
         } catch {
             return "non_json_body_length=$($Body.Length)"
         }
@@ -216,6 +222,44 @@ JSON input: {"topic":睡眠,"limit":10}
             $body.tools = @((New-Tool 'lookup_place' 'query'), (New-Tool 'lookup_note' 'topic'))
             Invoke-Probe $Name $body
         }
+        'ForcedToolChoice' {
+            # MR 结构化记录 P0 前置验证:tool_choice 强制 + 嵌套 items 数组 schema,
+            # 模拟 VisionRecordExtractor 的 submit_meal_record 协议(文本版,图片协议已由既有 vision 链路覆盖)。
+            # glm-5.3-flash 是推理模型,thinking 块会消耗预算,max_tokens 需给足
+            $body = New-BaseBody $false 'I had a bowl of beef noodle soup and one braised egg for lunch.'
+            $body.max_tokens = 4096
+            $body.tools = @(
+                [ordered]@{
+                    name = 'submit_meal_record'
+                    description = 'Submit one structured meal record extracted from the user message. Call this tool exactly once with the full record.'
+                    input_schema = [ordered]@{
+                        type = 'object'
+                        properties = [ordered]@{
+                            meal_type = [ordered]@{ type = 'string'; enum = @('BREAKFAST','LUNCH','DINNER','SNACK') }
+                            confidence = [ordered]@{ type = 'number'; description = '0.0 to 1.0' }
+                            items = [ordered]@{
+                                type = 'array'
+                                items = [ordered]@{
+                                    type = 'object'
+                                    properties = [ordered]@{
+                                        name = [ordered]@{ type = 'string' }
+                                        portion_text = [ordered]@{ type = 'string' }
+                                        calories = [ordered]@{ type = 'number' }
+                                        protein_g = [ordered]@{ type = 'number' }
+                                    }
+                                    required = @('name','portion_text','calories','protein_g')
+                                }
+                            }
+                        }
+                        required = @('meal_type','items')
+                    }
+                }
+            )
+            $body.tool_choice = [ordered]@{ type = 'tool'; name = 'submit_meal_record' }
+            # glm-5.3-flash 默认思考 ~55s;关 thinking 验证提取场景的可行时延
+            $body.thinking = [ordered]@{ type = 'disabled' }
+            Invoke-Probe $Name $body
+        }
     }
 }
 
@@ -224,7 +268,7 @@ $envValues = Read-DotEnv $EnvFile
 if ($Provider -eq 'GLM') {
     $script:BaseUrl = 'https://open.bigmodel.cn/api/anthropic'
     $script:ApiKey = [string]$envValues.GLM_API_KEY
-    $script:ResolvedModel = if ($Model) { $Model } else { 'glm-5v-turbo' }
+    $script:ResolvedModel = if ($Model) { $Model } elseif ($envValues.LLM_MODEL) { [string]$envValues.LLM_MODEL } else { 'glm-5.3-flash' }
 } else {
     $script:BaseUrl = 'https://api-inference.modelscope.cn'
     $script:ApiKey = [string]$envValues.MODELSCOPE_API_KEY
@@ -238,7 +282,7 @@ $script:HttpClient.Timeout = [TimeSpan]::FromSeconds(60)
 try {
     Write-Output "provider=$Provider model=$script:ResolvedModel base_url=$script:BaseUrl"
     $scenarios = if ($Scenario -eq 'All') {
-        @('BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult')
+        @('BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult', 'ForcedToolChoice')
     } else {
         @($Scenario)
     }

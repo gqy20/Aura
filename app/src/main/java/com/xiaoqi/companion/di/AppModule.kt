@@ -32,8 +32,14 @@ import com.xiaoqi.companion.core.weather.OpenMeteoWeatherProvider
 import com.xiaoqi.companion.core.weather.WeatherProvider
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.ConfigRepositoryImpl
+import com.xiaoqi.companion.data.repository.InventoryRepository
+import com.xiaoqi.companion.data.repository.InventoryRepositoryImpl
+import com.xiaoqi.companion.data.repository.MealRecordRepository
+import com.xiaoqi.companion.data.repository.MealRecordRepositoryImpl
 import com.xiaoqi.companion.data.repository.MessageRepository
 import com.xiaoqi.companion.data.repository.MessageRepositoryImpl
+import com.xiaoqi.companion.data.repository.PurchaseRepository
+import com.xiaoqi.companion.data.repository.PurchaseRepositoryImpl
 import com.xiaoqi.companion.data.repository.ReminderRepository
 import com.xiaoqi.companion.data.repository.ReminderRepositoryImpl
 import com.xiaoqi.companion.data.repository.ToolCallRepository
@@ -103,6 +109,18 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindReminderRepository(repository: ReminderRepositoryImpl): ReminderRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMealRecordRepository(repository: MealRecordRepositoryImpl): MealRecordRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPurchaseRepository(repository: PurchaseRepositoryImpl): PurchaseRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindInventoryRepository(repository: InventoryRepositoryImpl): InventoryRepository
 
     @Binds
     @Singleton

@@ -16,11 +16,14 @@ import com.xiaoqi.companion.data.db.dao.AgentStateDao
 import com.xiaoqi.companion.data.db.dao.ConversationDao
 import com.xiaoqi.companion.data.db.dao.HealthSnapshotDao
 import com.xiaoqi.companion.data.db.dao.InsightDao
+import com.xiaoqi.companion.data.db.dao.InventoryDao
+import com.xiaoqi.companion.data.db.dao.MealRecordDao
 import com.xiaoqi.companion.data.db.dao.MemoryDao
 import com.xiaoqi.companion.data.db.dao.MemorySummaryDao
 import com.xiaoqi.companion.data.db.dao.MessageDao
 import com.xiaoqi.companion.data.db.dao.MessageSearchDao
 import com.xiaoqi.companion.data.db.dao.MoodSnapshotDao
+import com.xiaoqi.companion.data.db.dao.PurchaseDao
 import com.xiaoqi.companion.data.db.dao.ReminderDao
 import com.xiaoqi.companion.data.db.dao.ToolCallDao
 import dagger.Module
@@ -80,6 +83,7 @@ object DataModule {
                 CompanionDatabase.MIGRATION_8_9,
                 CompanionDatabase.MIGRATION_9_10,
                 CompanionDatabase.MIGRATION_10_11,
+                CompanionDatabase.MIGRATION_11_12,
             )
             .addCallback(
                 object : RoomDatabase.Callback() {
@@ -137,4 +141,16 @@ object DataModule {
     @Provides
     fun provideConversationDao(database: CompanionDatabase): ConversationDao =
         database.conversationDao()
+
+    @Provides
+    fun provideMealRecordDao(database: CompanionDatabase): MealRecordDao =
+        database.mealRecordDao()
+
+    @Provides
+    fun providePurchaseDao(database: CompanionDatabase): PurchaseDao =
+        database.purchaseDao()
+
+    @Provides
+    fun provideInventoryDao(database: CompanionDatabase): InventoryDao =
+        database.inventoryDao()
 }
