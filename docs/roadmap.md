@@ -1,6 +1,6 @@
 # Aura Roadmap
 
-> 最后核对：2026-08-09
+> 最后核对：2026-10-17（本轮仅规划更新：新增 MR 结构化记录里程碑与设计规范，未跑新验证；代码实现进度仍以 2026-08-16 核对为准）
 >
 > 本文档用于跟踪当前实现进度，并把 `README.md` / `docs/architecture.md` 中的产品愿景拆成可执行里程碑。
 
@@ -16,6 +16,8 @@
 ## 当前状态
 
 项目当前处于 **文本聊天技术闭环 / Phase 1 agent tools** 阶段，并已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形。
+
+**2026-10-17 新方向立项：MR 结构化生活记录**（饮食 / 采购，拍照 → 结构化表格确认 → 入库）。给 Aura 在自然语言记忆轨道之外开出"结构化记录"第二数据轨道，长期喂给 Insight（周营养趋势）与 Reminder（库存告警）。设计定稿见下方 MR 里程碑与 `docs/design.md` §6（事务面 / 陪伴面双交互面规范）；纯云端 GLM 提取，本地 Qwen 不参与。
 
 同时已经开始规划 Phase 2+ 的端云协同智能体能力：Android 端继续承担亲密交互、本地状态和用户授权边界；远程 Agent Server 承担 MCP、浏览器工具、长期任务、云端记忆和 Skills 编排。云端核心智能体实现规范见 `docs/plan/cloud-agent-core-guidelines.md`，端云整体方案见 `docs/plan/agent-capability-server-plan.md`，Vision 与 Agent tools 协同策略见 `docs/plan/vision-tools-plan.md`。产品表现层也开始转向 Presence Layer 思路：借鉴 Looi 一类陪伴设备的状态动画，但目标不是玩具化机器人，而是把 Aura 的情绪、关系、思考、工具调用和主动关怀变成可感知的细腻行为。
 
@@ -256,6 +258,29 @@
 - **【新增，叙事主轴】** Connection 类 insight 第一版可触发（找到 2 条不相关数据的潜在联系，confidence 必须 < 0.5，宁缺毋滥）。`core/insight/InsightPrompts.connectionDetect` 字面量已定义，M4 复用 `LocalQwenExecutor.execute()` 即可落地。（待 PoC Qwen 模型下载后端到端跑通）
 - **MCP Gateway 准备**（plan §8 收窄到"信息回写"主轴）：`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 两个 Key + Flow + setter，M4 起可直接对接。
 
+### MR：结构化生活记录（饮食 / 采购）
+
+> 2026-10-17 规划。交互与数据设计已定稿讨论；事务面 UI 规范见 `docs/design.md` §6。产品定位：日常场景"中午吃了什么 / 超市买了什么" → 拍一张图 → 模型转成格式化表格 → 确认入库；长期作为 Insight（周营养趋势）与 Reminder（库存告警）的新数据源。
+
+目标：拍照/一句话 → 结构化表格确认 → 入库，**30 秒闭环**。
+
+核心设计决策：
+
+- **双交互面，记录是动词不是模式**：快记流（事务面：主屏"记一笔"入口 + App Shortcut 深链 → Photo Picker → 表格确认 → 入库，走效率，无寒暄）与聊天兜底（陪伴面：agent 工具，P3 后随口说也能入库）**共用同一 Extractor 与数据层**；确认组件两种容器复用（快记流全屏页 / 聊天紧凑卡片）。
+- **提取协议：tool-call 强制 schema**：给模型 `submit_meal_record` 类工具（schema 即表格列定义，`tool_choice` 强制调用），复用 `AnthropicMessagesLLMClient` 已趟平的工具协议（参数修复 / SSE 索引累积 / 流干净结束补齐）。校验层做数值钳制（单项热量 0–3000 kcal、蛋白 0–150g）+ confidence + 失败降级手填。
+- **数据模型（DB v11 → v12）**：饮食域 `MealRecord`（头表：时间/餐次/总量/confidence/图片路径）+ `MealItem`（明细行：菜名/份量/热量/三大营养素）；采购域 `PurchaseRecord` + `PurchaseItem` + `InventoryItem`（库存由采购确认累加；P3 起 meal 消耗联动扣减）。
+- **图片存文件系统**（`files/record_images/`）+ DB 存路径——刻意偏离 `MemoryEntity.imageBase64` 模式：每天多张餐食/小票照片走 base64 会撑爆 Room。
+- **云端强依赖**：本地 Qwen 不做结构化 vision 提取（质量不可靠）；离线时记录功能降级为手动填表或置灰。
+- **精度策略**：照片估热量天然 ±30-50% 误差，营养值全部标注"估算"+ confidence，份量确认交给用户（小/中/大 chips 一击切换）；后续可升级"模型识别菜名 + 本地食物营养库查表"两段式。
+
+阶段划分（总量预估：主代码 ~3.5-4k 行 + 测试 ~1.7-2k 行，25-35 文件；最大不确定项是确认页编辑交互深度）：
+
+- **P0 地基**：`llm_tool_protocol_probe.ps1` 加场景验证 GLM tool_choice 强制行为（**先于一切编码**，~800 行后续代码建立在"强制 schema 可行"上）→ 实体 / DAO / v11 迁移 / Repository + 图片文件存储 helper + 单测。
+- **P1 饮食域端到端**：`VisionRecordExtractor`（GLM + 强制工具 schema + 校验钳制）+ `RecordConfirmTable` 确认页 + ViewModel + 主屏"记一笔"入口。交付"拍照 → 表格 → 入库"闭环。
+- **P2 采购/库存域**：同一提取管线第二套 schema（视觉分类餐食/采购，确认页可纠正）；库存累加；记录列表页 + 主屏"今日热量/库存"卡片。
+- **P3 工具化与联动**：`LogMealTool` / `QueryMealLogTool` / `LogPurchaseTool` / `QueryInventoryTool` 挂进 `CompanionToolRegistry`（envelope 协议）+ 聊天内确认卡 + meal↔inventory 消耗联动。
+- **P4 洞察联动**：meal 数据进 `DreamDataCollector` snapshot（周营养趋势 insight）；库存低于阈值走既有 Reminder 通知链路。
+
 ### M5：Pulse + Insight 主线化
 
 > 调整说明（2026-06-15）：Pulse 不再只是"主动关怀通知"，而是 Weekly Insight + 重要日期 + 外部回写的统一调度。
@@ -308,11 +333,12 @@
 2. ~~M1 设置与配置 MVP。~~（已完成，连通性检查 + Save 按钮 + api_key 实时保存全已落）
 3. ~~M2 记忆 + Insight 框架 MVP。~~（已完成，`insights` 表 + Validator + Onboarding 5 问 + 主页 Insight 卡片 + 数据透明面板全落）
 4. ~~M3 情绪 + Insight Pattern MVP。~~（已完成，DreamLoop pipeline + Mood Trend Chart + Prefill 路由打通；PoC 阶段待 Qwen 模型下载后端到端可跑通）
-5. **M3 PoC 完善：用户在真机触发 Qwen 模型下载 → DreamLoop 跑出第一条 LLM 真实生成的 insight**（已写好 `LocalQwenModelDownloader` UI 入口，仅需用户操作 + 等待下载完成）。
-6. **M4 Vision + Insight 增强**：**vision→memory→dream 闭环已落（commit `1b826d1`）+ 本地 vision 路径已落（PR B）**；余下 CameraX UI、Connection insight 端到端、Pattern 跨 mood+memory+图片三种数据源生成验证。
-7. **M5 Pulse + Weekly Insight**：离线衰减 / 回归反应 Worker、AnniversaryScanner 周期任务、Weekly Insight 自动汇总 + 通知、InsightLog 用户反馈回路（👍/👎/文字 → 训练样本）。本地 vision 已就绪后 Pulse Worker 可复用 vision 元数据驱动"记得你拍过的照片"型通知。
-8. ~~**dual-mind Phase 1**：拆云端对话体 / 本地觉察面。~~ **已重新评估（2026-06-17）**：经核实，`KoogAgentFactoryImpl` 的 2-way 分支（云端 / 本地）已是合理的 Provider 切换形态；本地的"觉察面"职责由 `core/presence/runtime/` 下的 `DreamLoopWorker` / `LocalQwenExecutor` 等独立组件承担，不在 `KoogAgentWrapper` 主路径里。**不再需要拆 dual-mind Phase 1**，专注把 Pulse Worker（M5）和本地 vision 路径走通即可。AuraMemoryStore 文件系统层属于 M5+ 配套（auto memory PoC 验证后启动）。
-9. ~~**抽象 `AgentRuntime`**：~~ **已重新评估（2026-06-17）**：经讨论，`KoogAgentWrapper` 4 方法契约已能覆盖云端 / 本地两端（PR A 对齐后行为契约一致）。**不引入新接口层**；M7 远端 Agent Server 落地时如需切换入口，可在 `CompanionRuntime` 上做小范围重构，不应预先抽 `AgentRuntime` 接口。
-10. **M6 产品化加固**：扩展 instrumented tests（CameraX / WorkManager 真实场景）；GitHub Release 已具备版本一致性、签名密钥、单测、lint 与构建门禁，正式签名待 tag 发布验收。
-11. **云端核心智能体规范落地**：按 `docs/plan/cloud-agent-core-guidelines.md` 先做 P0-P3（配置可信度、Tool Policy、Post-turn 兜底、Vision 稳定增强），再启动远端工具 MVP。
-12. **M7 远端 Agent Server**（plan §8 收窄到"信息回写"主轴）：最小 Aura Agent Server 先支持文本输入 / 流式输出 / 只读远程工具；`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 字段，M4 起可对接。
+5. **MR 结构化生活记录（2026-10-17 起的近期主线）**：P0 probe 验证 GLM tool_choice 强制 schema + 数据层地基 → P1 饮食域端到端（拍照 → 表格确认 → 入库）→ P2 采购/库存域 → P3 agent 工具化 + 库存消耗联动 → P4 Insight / Reminder 联动。详见上方 MR 里程碑章节与 `docs/design.md` §6。
+6. **M3 PoC 完善：用户在真机触发 Qwen 模型下载 → DreamLoop 跑出第一条 LLM 真实生成的 insight**（已写好 `LocalQwenModelDownloader` UI 入口，仅需用户操作 + 等待下载完成）。
+7. **M4 Vision + Insight 增强**：**vision→memory→dream 闭环已落（commit `1b826d1`）+ 本地 vision 路径已落（PR B）**；余下 CameraX UI、Connection insight 端到端、Pattern 跨 mood+memory+图片三种数据源生成验证。
+8. **M5 Pulse + Weekly Insight**：离线衰减 / 回归反应 Worker、AnniversaryScanner 周期任务、Weekly Insight 自动汇总 + 通知、InsightLog 用户反馈回路（👍/👎/文字 → 训练样本）。本地 vision 已就绪后 Pulse Worker 可复用 vision 元数据驱动"记得你拍过的照片"型通知。
+9. ~~**dual-mind Phase 1**：拆云端对话体 / 本地觉察面。~~ **已重新评估（2026-06-17）**：经核实，`KoogAgentFactoryImpl` 的 2-way 分支（云端 / 本地）已是合理的 Provider 切换形态；本地的"觉察面"职责由 `core/presence/runtime/` 下的 `DreamLoopWorker` / `LocalQwenExecutor` 等独立组件承担，不在 `KoogAgentWrapper` 主路径里。**不再需要拆 dual-mind Phase 1**，专注把 Pulse Worker（M5）和本地 vision 路径走通即可。AuraMemoryStore 文件系统层属于 M5+ 配套（auto memory PoC 验证后启动）。
+10. ~~**抽象 `AgentRuntime`**：~~ **已重新评估（2026-06-17）**：经讨论，`KoogAgentWrapper` 4 方法契约已能覆盖云端 / 本地两端（PR A 对齐后行为契约一致）。**不引入新接口层**；M7 远端 Agent Server 落地时如需切换入口，可在 `CompanionRuntime` 上做小范围重构，不应预先抽 `AgentRuntime` 接口。
+11. **M6 产品化加固**：扩展 instrumented tests（CameraX / WorkManager 真实场景）；GitHub Release 已具备版本一致性、签名密钥、单测、lint 与构建门禁，正式签名待 tag 发布验收。
+12. **云端核心智能体规范落地**：按 `docs/plan/cloud-agent-core-guidelines.md` 先做 P0-P3（配置可信度、Tool Policy、Post-turn 兜底、Vision 稳定增强），再启动远端工具 MVP。
+13. **M7 远端 Agent Server**（plan §8 收窄到"信息回写"主轴）：最小 Aura Agent Server 先支持文本输入 / 流式输出 / 只读远程工具；`AppPreferences` 已加 `mcpProviderId` / `mcpApiKey` 字段，M4 起可对接。

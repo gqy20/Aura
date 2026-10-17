@@ -68,6 +68,7 @@ make test-one T=CompanionRuntimeTest
 - `docs/koog-api-reference.md` — Koog v0.8.0 完整 API 签名（从 Gradle 缓存 JAR 提取），Agent/Builder/Strategy/Service/Tool/Pipeline/Prompt&LLM 等 15 个模块
 - `docs/koog-android-integration.md` — Koog Android 集成状态与注意事项（线程规则、生命周期模式、待补项）
 - `docs/engineering-standards.md` — 测试、CI、代码规范
+- `docs/design.md` — 前端设计规范（Compose token / 组件 / 动效 / 事务面-陪伴面原则，2026-10-17 从代码反向提取；结构化记录流 UI 规范见其 §6）
 - `docs/reference-android-ai-projects.md` — 同类 Android AI 聊天/陪伴开源项目调研（Operit / skydoves-chatgpt-android / gpt_mobile 等）
 
 ## 注释规范
