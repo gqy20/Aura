@@ -151,13 +151,16 @@ class VisionRecordExtractorTest {
 
     @Test
     fun extract_mealPhoto_viaAutoClassification() = runTest {
-        server.enqueue(toolUseResponse("submit_meal_record", """{"meal_type":"LUNCH","confidence":0.9,"items":[{"name":"牛肉面","portion_text":"1碗","calories":450,"protein_g":25,"carbs_g":50,"fat_g":10}]}"""))
+        server.enqueue(toolUseResponse("submit_meal_record", """{"confidence":0.9,"items":[{"name":"牛肉面","portion_text":"1碗","calories":450,"protein_g":25,"carbs_g":50,"fat_g":10}]}"""))
         val extractor = extractor(provider = LlmProvider.GLM)
+        // 用 EXIF 拍摄时刻(今天 08:30)固定餐次,避免 runner 时区差异导致 flaky
+        val breakfastMillis = java.time.LocalDate.now()
+            .atTime(8, 30).atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli()
 
-        val result = extractor.extract("aGk=", "image/jpeg")
+        val result = extractor.extract("aGk=", "image/jpeg", photoTakenAtMillis = breakfastMillis)
 
         val draft = (result as RecordExtractionResult.Meal).draft
-        // 无 EXIF → 当前时间判定;nowProvider 固定 NOW(本地时区 06:13)→ 早餐
         assertEquals(MealType.BREAKFAST, draft.mealType)
         val requestBody = server.takeRequest().body.readUtf8()
         // 无 hint → tool_choice=any + 两个 schema 都在
