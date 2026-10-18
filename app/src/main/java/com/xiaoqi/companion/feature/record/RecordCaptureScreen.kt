@@ -154,13 +154,19 @@ fun RecordCaptureScreen(
                 onDismissRequest = { showHelp = false },
                 title = { Text("热量是怎么算的") },
                 text = {
-                    Text(
-                        "Aura 先识别照片里的食物,并按碗中、盘中的比例估算克重;" +
-                            "再对照《中国食物成分表》(1621 种食物)查出营养,按克重换算成热量。" +
-                            "表里查不到的菜由 AI 按经验估算,这类数值误差较大,都标着「估算」。" +
-                            "数值都可以手动修改,你改过的记录会被记住,下次遇到同样的菜优先使用。",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    val step = @Composable { num: String, line: String ->
+                        Row(modifier = Modifier.padding(top = 6.dp)) {
+                            Text(num, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.width(8.dp))
+                            Text(line, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    Column {
+                        step("1", "识别照片里的食物,按碗中、盘中的比例估算克重")
+                        step("2", "对照《中国食物成分表》查出营养,按克重换算热量")
+                        step("3", "查不到的菜由 AI 估算,数值标着「估算」,误差偏大")
+                        step("4", "手动改过的数值会被记住,下次同样的菜优先使用")
+                    }
                 },
                 confirmButton = {
                     TextButton(onClick = { showHelp = false }) { Text("知道了") }

@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Notifications
@@ -67,6 +69,8 @@ internal fun CompanionHeader(
     hasError: Boolean = false,
     /** 关系阶段徽标(陌生/初识/熟悉/亲密);"陌生"阶段不显示。 */
     relationshipLabel: String? = null,
+    onBackToHome: () -> Unit,
+    onOpenRecordHistory: () -> Unit,
     onOpenMemoryRoom: () -> Unit,
     onOpenReminders: () -> Unit,
     onOpenConversations: () -> Unit,
@@ -155,6 +159,16 @@ internal fun CompanionHeader(
                     }
                 }
             }
+            HeaderCapabilityAction(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "返回主页",
+                onClick = onBackToHome,
+            )
+            HeaderCapabilityAction(
+                imageVector = Icons.Default.ReceiptLong,
+                contentDescription = "打开记录列表",
+                onClick = onOpenRecordHistory,
+            )
             HeaderCapabilityAction(
                 imageVector = Icons.AutoMirrored.Filled.List,
                 contentDescription = "打开对话列表",

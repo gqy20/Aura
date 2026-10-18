@@ -218,6 +218,8 @@ private fun AuraAppNavHost(
         composable(AuraRoutes.Chat) {
             ChatScreen(
                 viewModel = viewModel,
+                onOpenRecordHistory = { navController.navigate(AuraRoutes.RecordHistory) },
+                onBackToHome = { navController.popBackStack() },
                 onOpenMemoryRoom = { navController.navigate(AuraRoutes.MemoryRoom) },
                 onOpenSettings = {
                     viewModel.prepareSettings()
