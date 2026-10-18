@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -263,15 +266,19 @@ private fun AuraHomeContent(
                     }
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // 两卡等高:内容结构一致(标签/主行/副行),避免半宽卡文字挤断行
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.height(IntrinsicSize.Min),
+                    ) {
                         RecordCaptureEntry(
                             onClick = onOpenRecordCapture,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
                         TodayMealCard(
                             totals = uiState.todayMealTotals,
                             onClick = onOpenRecordHistory,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
                     }
                     Spacer(Modifier.height(12.dp))
@@ -355,50 +362,63 @@ private fun LongTaskEntry(
     }
 }
 
-// 今日餐食状态卡:与"记一餐"动作卡并排,零记录时引导记录
+// 今日餐食状态卡:与"记一餐"动作卡同构三层(标签/主行/副行),零记录时引导
 @Composable
 private fun TodayMealCard(
     totals: com.xiaoqi.companion.data.db.dao.MealTotalsRow,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
     Surface(
         modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        color = Color.White.copy(alpha = 0.58f),
+        shape = RoundedCornerShape(10.dp),
+        color = Color.White.copy(alpha = 0.72f),
         tonalElevation = 0.dp,
         shadowElevation = 1.dp,
+        border = BorderStroke(0.5.dp, borderColor),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text(
                 text = "今日",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             )
+            Spacer(Modifier.height(2.dp))
             if (totals.recordCount > 0) {
+                // 主数值行:数字大、单位小,baseline 对齐;蛋白/条数并入副行,不与数值挤一行
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "%,d".format(totals.calories.toInt()),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = " kcal",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                }
                 Text(
-                    text = "${totals.calories.toInt()} kcal · 蛋白 ${totals.proteinG.toInt()}g",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                )
-                Text(
-                    text = "${totals.recordCount} 项记录",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                    text = "蛋白 ${totals.proteinG.toInt()}g · ${totals.recordCount} 项记录",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
             } else {
                 Text(
-                    text = "还没有记录",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                    text = "0 kcal",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                 )
                 Text(
-                    text = "记一餐看看",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "记一餐开始记录",
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
                 )
             }
         }
@@ -408,38 +428,43 @@ private fun TodayMealCard(
 // 事务面入口卡片(design.md §6.4):确定性文案,无人格表达
 @Composable
 private fun RecordCaptureEntry(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
     Surface(
-        modifier = modifier
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        color = Color.White.copy(alpha = 0.58f),
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        color = Color.White.copy(alpha = 0.72f),
         tonalElevation = 0.dp,
         shadowElevation = 1.dp,
+        border = BorderStroke(0.5.dp, borderColor),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.PhotoCamera,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "记一餐",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "拍照识别食物,估算热量与营养",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                Icon(
+                    imageVector = Icons.Default.PhotoCamera,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp),
                 )
             }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "拍照识别",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+            Text(
+                text = "热量与营养自动估算",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }
