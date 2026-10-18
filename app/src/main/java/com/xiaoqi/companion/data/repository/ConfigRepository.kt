@@ -28,6 +28,10 @@ object DefaultLlmValues {
     // 鉴权用 `x-api-key: <ms-token>`,请求路径 `${baseUrl}/v1/messages`。
     const val MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn"
     const val MODELSCOPE_MODEL = "Qwen/Qwen3.5-397B-A17B"
+    // MiniMax Anthropic 兼容端点(x-api-key 鉴权),2026-10-18 probe 验证:
+    // SSE 流式 / tool_choice 强制 + 嵌套 schema / 图片全通过,thinking 禁用后 ~4s
+    const val MINIMAX_BASE_URL = "https://api.minimaxi.com/anthropic"
+    const val MINIMAX_MODEL = "MiniMax-M3"
     const val LOCAL_QWEN_BASE_URL = ""
     const val LOCAL_QWEN_MODEL = "Qwen3.5-0.8B-MNN"
     const val LOCAL_QWEN_2B_MODEL = "Qwen3.5-2B-MNN"
@@ -39,6 +43,7 @@ object DefaultLlmValues {
             LlmProvider.KIMI -> KIMI_BASE_URL
             LlmProvider.MODELSCOPE -> MODELSCOPE_BASE_URL
             LlmProvider.LOCAL_QWEN -> LOCAL_QWEN_BASE_URL
+            LlmProvider.MINIMAX -> MINIMAX_BASE_URL
         }
 
     fun defaultModel(provider: LlmProvider): String =
@@ -47,6 +52,7 @@ object DefaultLlmValues {
             LlmProvider.KIMI -> KIMI_MODEL
             LlmProvider.MODELSCOPE -> MODELSCOPE_MODEL
             LlmProvider.LOCAL_QWEN -> LOCAL_QWEN_MODEL
+            LlmProvider.MINIMAX -> MINIMAX_MODEL
         }
 
     fun modelOptions(provider: LlmProvider): List<String> =
@@ -59,6 +65,7 @@ object DefaultLlmValues {
                 LOCAL_QWEN_2B_MODEL,
                 LOCAL_QWEN_4B_MODEL,
             )
+            LlmProvider.MINIMAX -> listOf(MINIMAX_MODEL)
         }
 }
 

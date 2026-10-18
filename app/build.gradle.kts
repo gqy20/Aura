@@ -130,6 +130,7 @@ android {
         buildConfigField("String", "ENV_GLM_API_KEY", "\"\"")
         buildConfigField("String", "ENV_MODELSCOPE_API_KEY", "\"\"")
         buildConfigField("String", "ENV_KIMI_API_KEY", "\"\"")
+        buildConfigField("String", "ENV_MINIMAX_API_KEY", "\"\"")
         buildConfigField("String", "ENV_LOCAL_QWEN_MODEL", "\"\"")
         buildConfigField("String", "ENV_MCP_AMAP_KEY", "\"\"")
         for (i in 1..6) {
@@ -194,6 +195,7 @@ android {
             buildConfigField("String", "ENV_GLM_API_KEY", "\"${escForBuildConfig(env("GLM_API_KEY"))}\"")
             buildConfigField("String", "ENV_MODELSCOPE_API_KEY", "\"${escForBuildConfig(env("MODELSCOPE_API_KEY"))}\"")
             buildConfigField("String", "ENV_KIMI_API_KEY", "\"${escForBuildConfig(env("KIMI_API_KEY"))}\"")
+            buildConfigField("String", "ENV_MINIMAX_API_KEY", "\"${escForBuildConfig(env("MINIMAX_API_KEY"))}\"")
             buildConfigField("String", "ENV_LOCAL_QWEN_MODEL", "\"${escForBuildConfig(env("LOCAL_QWEN_MODEL"))}\"")
             buildConfigField("String", "ENV_MCP_AMAP_KEY", "\"${escForBuildConfig(env("MCP_AMAP_API_KEY"))}\"")
             for (i in 1..6) {

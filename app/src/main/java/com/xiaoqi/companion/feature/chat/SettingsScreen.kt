@@ -867,6 +867,11 @@ private fun ProviderPicker(
             label = { Text("Kimi") },
         )
         FilterChip(
+            selected = provider == LlmProvider.MINIMAX,
+            onClick = { onProviderChanged(LlmProvider.MINIMAX) },
+            label = { Text("MiniMax") },
+        )
+        FilterChip(
             selected = provider == LlmProvider.MODELSCOPE,
             onClick = { onProviderChanged(LlmProvider.MODELSCOPE) },
             label = { Text("ModelScope") },

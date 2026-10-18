@@ -176,6 +176,13 @@
 - **E2E 验证（模拟器真机）**：聊天口述"I just had a bowl of beef noodle soup... Also ate two eggs from my fridge" → 模型在 15 个工具中正确调 `log_meal`（LUNCH / 2 项 / consumedCount=1）→ 644 kcal 入库（模型自填中文 rawNote"牛肉面用户自估约500 kcal；鸡蛋取自家中冰箱库存"）→ 库存扣减 2 个鸡蛋（无库存条目时安全忽略不产生负库存）→ 时间线正确渲染"已记录餐食 · LUNCH 2 项 · 644 kcal · 库存消耗 1 项"。
 - **验证**：`testDebugUnitTest` 776 全绿（+12:P2 双域 VM/提取器 + P3 四工具/schema 渲染器/registry 计数）;probe ForcedToolChoice + AnyChoiceDualTool 全过。
 
+### 近期打磨（2026-10-18 · MiniMax Provider 接入）
+
+- **MiniMax-M3 全链路接入**：`LlmProvider.MINIMAX` 枚举 + `DefaultLlmValues`（`https://api.minimaxi.com/anthropic`，`x-api-key` 鉴权）+ `ProviderCapabilities`（流式/工具/图片全支持，chatDefault 策略）+ 设置页 Provider chip + `DebugConfigSeeder` per-provider key map（`ENV_MINIMAX_API_KEY`）+ probe 脚本 `-Provider MINIMAX`。
+- **协议验证（2026-10-18 probe）**：非流式基线/SSE 流式（事件序列与 GLM 同构）/tool_choice 强制 + 嵌套 items schema/thinking 禁用（~4s）/图片输入全通过；端点路径为 `/anthropic/v1/messages`（根域名 `/v1/messages` 不通）。
+- **真机验证**：设置页切 Provider 自动带出模型与接口地址；聊天流式回复 2.7s 正常渲染。**踩坑**：首跑 401——per-provider key 设计下，旧安装的 key map 没有 MINIMAX 条目且种子只在 key map 为空时写入，需在设置页手动填一次 key（预期行为，非 bug）。
+- **验证**：`testDebugUnitTest` 776 全绿（ProviderCapabilities 补 MINIMAX 断言）。
+
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。

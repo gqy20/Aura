@@ -110,6 +110,7 @@ make test-one T=CompanionRuntimeTest
 ```powershell
 .\scripts\llm_tool_protocol_probe.ps1 -Provider GLM -Scenario All
 .\scripts\llm_tool_protocol_probe.ps1 -Provider MODELSCOPE -Scenario All
+.\scripts\llm_tool_protocol_probe.ps1 -Provider MINIMAX -Scenario ForcedToolChoice
 .\gradlew.bat testDebugUnitTest --tests "com.xiaoqi.companion.core.llm.AnthropicMessagesLLMClientTest"
 ```
 

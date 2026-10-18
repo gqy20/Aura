@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('GLM', 'MODELSCOPE')]
+    [ValidateSet('GLM', 'MODELSCOPE', 'MINIMAX')]
     [string]$Provider = 'GLM',
     [ValidateSet('All', 'BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult', 'ForcedToolChoice', 'AnyChoiceDualTool')]
     [string]$Scenario = 'All',
@@ -310,6 +310,11 @@ if ($Provider -eq 'GLM') {
     $script:BaseUrl = 'https://open.bigmodel.cn/api/anthropic'
     $script:ApiKey = [string]$envValues.GLM_API_KEY
     $script:ResolvedModel = if ($Model) { $Model } elseif ($envValues.LLM_MODEL) { [string]$envValues.LLM_MODEL } else { 'glm-5.3-flash' }
+} elseif ($Provider -eq 'MINIMAX') {
+    # MiniMax Anthropic 兼容端点,x-api-key 鉴权(2026-10-18 实测 SSE/强制工具/嵌套 schema/图片全通过)
+    $script:BaseUrl = 'https://api.minimaxi.com/anthropic'
+    $script:ApiKey = [string]$envValues.MINIMAX_API_KEY
+    $script:ResolvedModel = if ($Model) { $Model } else { 'MiniMax-M3' }
 } else {
     $script:BaseUrl = 'https://api-inference.modelscope.cn'
     $script:ApiKey = [string]$envValues.MODELSCOPE_API_KEY

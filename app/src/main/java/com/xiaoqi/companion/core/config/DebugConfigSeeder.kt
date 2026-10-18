@@ -50,6 +50,7 @@ class DebugConfigSeeder @Inject constructor(
             LlmProvider.GLM to BuildConfig.ENV_GLM_API_KEY,
             LlmProvider.MODELSCOPE to BuildConfig.ENV_MODELSCOPE_API_KEY,
             LlmProvider.KIMI to BuildConfig.ENV_KIMI_API_KEY,
+            LlmProvider.MINIMAX to BuildConfig.ENV_MINIMAX_API_KEY,
         ).filterValues { it.isNotBlank() }
 
         if (keyMap.isNotEmpty()) {

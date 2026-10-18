@@ -12,12 +12,17 @@ class ProviderCapabilitiesTest {
     fun remoteProviders_supportStreamingAndTools() {
         val glm = ProviderCapabilityRegistry.forProvider(LlmProvider.GLM)
         val kimi = ProviderCapabilityRegistry.forProvider(LlmProvider.KIMI)
+        val minimax = ProviderCapabilityRegistry.forProvider(LlmProvider.MINIMAX)
 
         assertTrue(glm.supportsStreaming)
         assertTrue(glm.supportsTools)
         assertTrue(ToolCategory.REMOTE_READ in glm.defaultToolPolicy.allowedCategories)
         assertTrue(kimi.supportsStreaming)
         assertTrue(kimi.supportsTools)
+        assertTrue(minimax.supportsStreaming)
+        assertTrue(minimax.supportsTools)
+        assertTrue(minimax.supportsVision)
+        assertTrue(ToolCategory.REMOTE_READ in minimax.defaultToolPolicy.allowedCategories)
     }
 
     @Test

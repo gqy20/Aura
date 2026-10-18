@@ -39,6 +39,15 @@ object ProviderCapabilityRegistry {
                 maxContextTokens = 128_000,
                 defaultToolPolicy = ToolPolicy.chatDefault,
             )
+            LlmProvider.MINIMAX -> ProviderCapabilities(
+                // 2026-10-18 probe 实测:SSE/tool_choice 强制/嵌套 schema/图片全通过
+                supportsStreaming = true,
+                supportsVision = true,
+                supportsTools = true,
+                supportsThinking = true,
+                maxContextTokens = 200_000,
+                defaultToolPolicy = ToolPolicy.chatDefault,
+            )
             LlmProvider.LOCAL_QWEN -> ProviderCapabilities(
                 supportsStreaming = true,
                 supportsVision = true,
