@@ -40,6 +40,7 @@ class RecordCaptureViewModelTest {
     private lateinit var imageStore: RecordImageStore
     private lateinit var barcodeScanner: com.xiaoqi.companion.core.record.BarcodeScannerSource
     private lateinit var openFoodFactsClient: com.xiaoqi.companion.data.record.OpenFoodFactsClient
+    private lateinit var photoMetadataReader: com.xiaoqi.companion.core.record.PhotoMetadataReader
     private lateinit var imageProcessor: FakeChatImageProcessor
     private lateinit var viewModel: RecordCaptureViewModel
 
@@ -52,10 +53,13 @@ class RecordCaptureViewModelTest {
         imageStore = mockk()
         barcodeScanner = mockk()
         openFoodFactsClient = mockk()
+        photoMetadataReader = mockk {
+            coEvery { read(any()) } returns com.xiaoqi.companion.core.record.PhotoMeta()
+        }
         imageProcessor = FakeChatImageProcessor()
         viewModel = RecordCaptureViewModel(
             extractor, mealRepository, purchaseRepository, imageProcessor, imageStore,
-            barcodeScanner, openFoodFactsClient,
+            barcodeScanner, openFoodFactsClient, photoMetadataReader,
         )
     }
 
@@ -200,7 +204,7 @@ class RecordCaptureViewModelTest {
         stubExtraction(extractedMeal())
         viewModel.onImagePicked("content://photo/1")
         coEvery {
-            extractor.extract("prepared-base64", "image/jpeg", null, RecordDomain.PURCHASE)
+            extractor.extract("prepared-base64", "image/jpeg", null, RecordDomain.PURCHASE, null)
         } returns extractedPurchase()
 
         viewModel.switchDomain(RecordDomain.PURCHASE)
@@ -218,7 +222,7 @@ class RecordCaptureViewModelTest {
 
         assertEquals(RecordDomain.PURCHASE, viewModel.state.value.domain)
         assertEquals(RecordCapturePhase.CONFIRMING, viewModel.state.value.phase)
-        coVerify(exactly = 0) { extractor.extract(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { extractor.extract(any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -326,8 +330,124 @@ class RecordCaptureViewModelTest {
         assertEquals(true, state.purchaseItems.isEmpty())
     }
 
+    // --- 多图追加(B 批次) ---
+
+    @Test
+    fun onImagesPicked_twoImages_appendsItemsWithPhotoIndex() = runTest {
+        val first = RecordExtractionResult.Meal(
+            MealRecordDraft(
+                mealType = MealType.LUNCH,
+                source = RecordSource.PHOTO,
+                items = listOf(MealItemDraft("牛肉面", "1碗", 550.0, 30.0, 70.0, 12.0)),
+                confidence = 0.9,
+            )
+        )
+        val second = RecordExtractionResult.Meal(
+            MealRecordDraft(
+                mealType = MealType.DINNER,
+                source = RecordSource.PHOTO,
+                items = listOf(MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0)),
+                confidence = 0.8,
+            )
+        )
+        // FakeChatImageProcessor 对所有 uri 返回同一 base64,多图场景按调用序区分
+        coEvery { extractor.extract(any(), any(), any(), any(), any()) } returnsMany listOf(first, second)
+
+        viewModel.onImagesPicked(listOf("content://photo/1", "content://photo/2"))
+
+        val state = viewModel.state.value
+        assertEquals(RecordCapturePhase.CONFIRMING, state.phase)
+        assertEquals(2, state.photos.size)
+        assertEquals(2, state.items.size)
+        assertEquals(0, state.items[0].photoIndex)
+        assertEquals(1, state.items[1].photoIndex)
+        assertEquals(listOf(1.0, 1.0), state.portionScales)
+        // 追加图不覆盖首图的餐次
+        assertEquals(MealType.LUNCH, state.mealType)
+    }
+
+    @Test
+    fun removePhoto_dropsOnlyThatPhotosItems() = runTest {
+        coEvery { extractor.extract(any(), any(), any(), any(), any()) } returnsMany listOf(
+            extractedMeal(),
+            RecordExtractionResult.Meal(
+                MealRecordDraft(
+                    mealType = MealType.LUNCH,
+                    source = RecordSource.PHOTO,
+                    items = listOf(MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0)),
+                    confidence = 0.8,
+                )
+            ),
+        )
+        viewModel.onImagesPicked(listOf("content://photo/1", "content://photo/2"))
+
+        assertEquals(3, viewModel.state.value.items.size)
+
+        viewModel.removePhoto(0)
+
+        val state = viewModel.state.value
+        assertEquals(1, state.photos.size)
+        assertEquals(1, state.items.size)
+        assertEquals("酸奶", state.items.single().name)
+        assertEquals(1, state.items.single().photoIndex)
+    }
+
+    @Test
+    fun onImagesPicked_appendFailure_doesNotBlockExistingItems() = runTest {
+        coEvery { extractor.extract(any(), any(), any(), any(), any()) } returnsMany listOf(
+            extractedMeal(),
+            RecordExtractionResult.Failed("未识别出食物"),
+        )
+        viewModel.onImagesPicked(listOf("content://photo/1", "content://photo/2"))
+
+        val state = viewModel.state.value
+        assertEquals(RecordCapturePhase.CONFIRMING, state.phase)
+        assertEquals(2, state.items.size)
+        assertEquals("未识别出食物", state.appendFailure)
+    }
+
+    @Test
+    fun onImagePicked_passesExifTakenAtToExtractor() = runTest {
+        val takenAt = 1_700_000_000_000L
+        coEvery { photoMetadataReader.read("content://photo/1") } returns
+            com.xiaoqi.companion.core.record.PhotoMeta(takenAtMillis = takenAt, lat = 30.2, lon = 120.1)
+        coEvery { extractor.extract("prepared-base64", "image/jpeg", null, RecordDomain.MEAL, takenAt) } returns extractedMeal()
+
+        viewModel.onImagePicked("content://photo/1")
+
+        val state = viewModel.state.value
+        assertEquals(takenAt, state.photos.single().takenAt)
+        assertEquals(30.2, state.photos.single().lat!!, 0.001)
+        assertEquals(120.1, state.photos.single().lon!!, 0.001)
+    }
+
+    @Test
+    fun save_meal_persistsJoinedImagePathsAndExif() = runTest {
+        coEvery { extractor.extract(any(), any(), any(), any(), any()) } returnsMany listOf(
+            extractedMeal(),
+            RecordExtractionResult.Meal(
+                MealRecordDraft(
+                    mealType = MealType.LUNCH,
+                    source = RecordSource.PHOTO,
+                    items = listOf(MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0)),
+                    confidence = 0.8,
+                )
+            ),
+        )
+        viewModel.onImagesPicked(listOf("content://photo/1", "content://photo/2"))
+        val draftSlot = slot<MealRecordDraft>()
+        coEvery { imageStore.saveBase64(any(), any()) } returns "/data/record_images/a.jpg"
+        coEvery { mealRepository.saveMeal(capture(draftSlot)) } returns "record-9"
+
+        viewModel.save()
+
+        val draft = draftSlot.captured
+        assertEquals(2, draft.imageLocalPath!!.split(",").size)
+        assertEquals(3, draft.items.size)
+    }
+
     private fun stubExtraction(result: RecordExtractionResult) {
-        coEvery { extractor.extract("prepared-base64", "image/jpeg", null, null) } returns result
+        coEvery { extractor.extract("prepared-base64", "image/jpeg", null, RecordDomain.MEAL, null) } returns result
     }
 
     private fun extractedMeal() = RecordExtractionResult.Meal(

@@ -201,6 +201,14 @@
 - **E2E（模拟器）**：标准 EAN-13 图（Nutella 3017620422003）→ `barcode_scan_completed found=true length=13` → `off_lookup_completed found=true` → 预填行渲染成功。手搓条码位模式踩坑记录：EAN 的 G 位模式是 R 的**镜像**而非取反，生成测试条码请直接用 python-barcode。
 - **验证**：`testDebugUnitTest` 798 全绿（+9：OFF 客户端 6 例 + VM 条码路径 3 例）。
 
+### 近期打磨（2026-10-18 · MR EXIF 元数据 + 多图追加 + 确认页分层改版）
+
+- **EXIF 元数据链（DB v12→v13）**：`PhotoMetadataReader`（exifinterface）读 `DateTimeOriginal` + GPS；新增列 `photoTakenAt/lat/lon`（meal & purchase 头表）与 `photoIndex`（明细行，多图条目归属）。**餐次自动判定改为 EXIF 拍摄时刻 > 模型判断 > 当前时间**——修复"晚上补记午饭被记成晚餐"的正确性缺陷（实测 EXIF 08:30 图覆盖模型输出的 LUNCH，落库 BREAKFAST）。
+- **ACCESS_MEDIA_LOCATION**：Android 10+ Photo Picker 默认剥离 GPS EXIF，已声明权限并在选图前请求（拒绝不阻塞）。**实测注意**：模拟器 (API 36) Photo Picker 前端即使授权后仍剥离 GPS（`hasGps=false`）——时间不受影响；真机相机路径待 P4 店名反查时实测。
+- **多图追加流**：`PickMultipleVisualMedia(maxItems=5)` 一次选多张，逐张提取、条目追加进同一张表（每张图 `photoIndex` 归属 + `photoRanges` 范围映射）；追加中已出条目保持可编辑；单张追加失败只提示不阻塞；**按图删除** = 删该图贡献的条目（E2E 实测范围平移正确，剩条目 photoIndex 与合计对账吻合）。保存时多路径逗号分隔落 `imageLocalPath`。
+- **确认页分层改版**（用户分层原则：每层一类信息、非必要不加行）：第 1 层图片（缩略图横排 + 再加一张 + 识别中进度）、第 2 层餐次 chips、第 3 层条目（**两行卡片**：行 1 菜名+估算徽标+小/中/大 chips+删除，行 2 kcal/三大营养素/份量合并单行）、第 4 层汇总与保存；域切换（餐食↔采购）从内容区收进顶栏 actions。
+- **验证**：`testDebugUnitTest` 806 全绿（+8：EXIF 餐次 3 例、多图追加/删图/EXIF 透传/失败降级 5 例）；E2E 覆盖 EXIF 餐次落库、双图追加、按图删除、v13 列迁移。
+
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。

@@ -1,8 +1,10 @@
 package com.xiaoqi.companion.feature.record
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import android.Manifest
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +21,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -55,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,10 +79,6 @@ private val MEAL_TYPE_LABELS = mapOf(
     MealType.SNACK to "加餐",
 )
 private val PORTION_OPTIONS = listOf("小" to 0.75, "中" to 1.0, "大" to 1.25)
-private val DOMAIN_LABELS = mapOf(
-    RecordDomain.MEAL to "餐食",
-    RecordDomain.PURCHASE to "采购",
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,18 +87,31 @@ fun RecordCaptureScreen(
     onDone: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val pickImage = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> uri?.let { viewModel.onImagePicked(it.toString()) } },
+    // 多选:一餐多图(面条+配菜+饮料分拍) 一次选齐,逐张提取追加进同一张表
+    val pickImages = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5),
+        onResult = { uris -> viewModel.onImagesPicked(uris.map { it.toString() }) },
     )
-    val launchPicker = {
-        pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-    }
     // 扫条码复用同一个 Photo Picker,但走独立入口(不触发整图提取)
     val pickBarcode = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri -> uri?.let { viewModel.onBarcodeImagePicked(it.toString()) } },
     )
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // ACCESS_MEDIA_LOCATION: Photo Picker 默认剥离 GPS EXIF,授权后选图才带拍摄位置。
+    // 拒绝不阻塞 —— 位置只是店名/趋势的增强源,时间 EXIF 不受此权限影响。
+    val pickAfterPermission = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { _ -> pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+    val launchPicker = {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_MEDIA_LOCATION) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        } else {
+            pickAfterPermission.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
+        }
+    }
 
     LaunchedEffect(state.phase) {
         if (state.phase == RecordCapturePhase.SAVED) {
@@ -115,6 +129,13 @@ fun RecordCaptureScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "返回")
                     }
                 },
+                // 域切换低频(模型自动分类),收进顶栏,给内容层让出整行
+                actions = {
+                    val target = if (state.domain == RecordDomain.MEAL) RecordDomain.PURCHASE else RecordDomain.MEAL
+                    TextButton(onClick = { viewModel.switchDomain(target) }) {
+                        Text(if (target == RecordDomain.PURCHASE) "→ 采购" else "→ 餐食")
+                    }
+                },
             )
         },
     ) { padding ->
@@ -123,46 +144,29 @@ fun RecordCaptureScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            when (state.phase) {
-                RecordCapturePhase.PICK_IMAGE -> PickImageContent(
+            val showConfirming = state.phase == RecordCapturePhase.CONFIRMING ||
+                state.phase == RecordCapturePhase.SAVING ||
+                (state.phase == RecordCapturePhase.EXTRACTING && state.hasExtractedContent)
+            val launchBarcode = { pickBarcode.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+            when {
+                state.phase == RecordCapturePhase.PICK_IMAGE -> PickImageContent(
                     note = state.note,
                     onNoteChange = viewModel::setNote,
-                    onPickImage = launchPicker,
+                    onPickImages = launchPicker,
                 )
-                RecordCapturePhase.EXTRACTING -> ExtractingContent(state = state)
-                RecordCapturePhase.FAILED -> FailedContent(
+                showConfirming && state.domain == RecordDomain.MEAL ->
+                    MealConfirmContent(state, viewModel, launchPicker)
+                showConfirming && state.domain == RecordDomain.PURCHASE ->
+                    PurchaseConfirmContent(state, viewModel, launchBarcode, launchPicker)
+                state.phase == RecordCapturePhase.EXTRACTING -> ExtractingContent(state = state)
+                state.phase == RecordCapturePhase.FAILED -> FailedContent(
                     state = state,
                     onRetry = viewModel::retryExtraction,
                     onManual = viewModel::startManualEntry,
-                    onPickImage = launchPicker,
+                    onPickImages = launchPicker,
                 )
-                RecordCapturePhase.CONFIRMING, RecordCapturePhase.SAVING -> {
-                    if (state.domain == RecordDomain.MEAL) {
-                        MealConfirmContent(
-                            state = state,
-                            onMealType = viewModel::setMealType,
-                            onSwitchDomain = viewModel::switchDomain,
-                            onUpdateItem = viewModel::updateItem,
-                            onDeleteItem = viewModel::deleteItem,
-                            onAddItem = viewModel::addItem,
-                            onAdjustPortion = viewModel::adjustPortion,
-                            onSave = viewModel::save,
-                        )
-                    } else {
-                        PurchaseConfirmContent(
-                            state = state,
-                            onSwitchDomain = viewModel::switchDomain,
-                            onStoreName = viewModel::setStoreName,
-                            onAdjustInventory = viewModel::setAdjustInventory,
-                            onUpdateItem = viewModel::updatePurchaseItem,
-                            onDeleteItem = viewModel::deletePurchaseItem,
-                            onAddItem = viewModel::addPurchaseItem,
-                            onScanBarcode = { pickBarcode.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                            onSave = viewModel::save,
-                        )
-                    }
-                }
-                RecordCapturePhase.SAVED -> SavedContent()
+                state.phase == RecordCapturePhase.SAVED -> SavedContent()
+                else -> PickImageContent(note = state.note, onNoteChange = viewModel::setNote, onPickImages = launchPicker)
             }
         }
     }
@@ -172,7 +176,7 @@ fun RecordCaptureScreen(
 private fun PickImageContent(
     note: String,
     onNoteChange: (String) -> Unit,
-    onPickImage: () -> Unit,
+    onPickImages: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -191,9 +195,10 @@ private fun PickImageContent(
         Text("拍下一餐或一次采购", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         Text(
-            "食物照片会估算热量与营养,小票或货品照片会提取品牌与数量",
+            "可以一次选多张,食物照片估算热量与营养,小票或货品照片提取品牌与数量",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(20.dp))
         OutlinedTextField(
@@ -206,7 +211,7 @@ private fun PickImageContent(
             maxLines = 3,
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onPickImage, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = onPickImages, modifier = Modifier.fillMaxWidth()) {
             Text("选择照片")
         }
     }
@@ -221,9 +226,9 @@ private fun ExtractingContent(state: RecordCaptureUiState) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        state.imageUriString?.let { uri ->
+        state.photos.firstOrNull()?.let { photo ->
             AsyncImage(
-                model = uri,
+                model = photo.uriString,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -243,7 +248,7 @@ private fun FailedContent(
     state: RecordCaptureUiState,
     onRetry: () -> Unit,
     onManual: () -> Unit,
-    onPickImage: () -> Unit,
+    onPickImages: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -258,30 +263,83 @@ private fun FailedContent(
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(16.dp))
-        if (state.imageBase64 != null) {
-            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("重试识别") }
-            Spacer(Modifier.height(8.dp))
-        }
-        OutlinedButton(onClick = onPickImage, modifier = Modifier.fillMaxWidth()) { Text("换一张照片") }
+        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("重试识别") }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onPickImages, modifier = Modifier.fillMaxWidth()) { Text("换一张照片") }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = onManual, modifier = Modifier.fillMaxWidth()) { Text("手动填写") }
     }
 }
 
-// 提取器自动分类,这两个 chip 是手动纠正兜底(design.md §6.2)
+/**
+ * 第 1 层:图片行。缩略图横排(点击删除该图及其条目) + "再加一张" + 提取进度。
+ */
 @Composable
-private fun DomainSwitcher(
-    domain: RecordDomain,
-    enabled: Boolean,
-    onSwitchDomain: (RecordDomain) -> Unit,
+private fun PhotoStrip(
+    state: RecordCaptureUiState,
+    onAddPhoto: () -> Unit,
+    onRemovePhoto: (Int) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        DOMAIN_LABELS.forEach { (candidate, label) ->
-            FilterChip(
-                selected = domain == candidate,
-                enabled = enabled,
-                onClick = { onSwitchDomain(candidate) },
-                label = { Text(label) },
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                items(state.photos) { photo ->
+                    Box {
+                        AsyncImage(
+                            model = photo.uriString,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .height(64.dp)
+                                .width(88.dp)
+                                .clip(MaterialTheme.shapes.small),
+                        )
+                        IconButton(
+                            onClick = { onRemovePhoto(state.photos.indexOf(photo)) },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(20.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "删除这张图",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                item {
+                    OutlinedButton(
+                        onClick = onAddPhoto,
+                        enabled = state.extractingCount == 0,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("再加一张", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+            if (state.extractingCount > 0) {
+                Spacer(Modifier.width(8.dp))
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "识别中 ${state.extractingCount} 张",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        state.appendFailure?.let { reason ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "有一张没识别出来:$reason",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -290,63 +348,50 @@ private fun DomainSwitcher(
 @Composable
 private fun MealConfirmContent(
     state: RecordCaptureUiState,
-    onMealType: (MealType) -> Unit,
-    onSwitchDomain: (RecordDomain) -> Unit,
-    onUpdateItem: (Int, MealItemDraft) -> Unit,
-    onDeleteItem: (Int) -> Unit,
-    onAddItem: () -> Unit,
-    onAdjustPortion: (Int, Double) -> Unit,
-    onSave: () -> Unit,
+    viewModel: RecordCaptureViewModel,
+    onPickImages: () -> Unit,
 ) {
     var editingIndex by rememberSaveable { mutableStateOf<Int?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item {
-            state.imageUriString?.let { uri ->
-                AsyncImage(
-                    model = uri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 200.dp)
-                        .clip(MaterialTheme.shapes.medium),
-                )
-            }
-        }
-        item { DomainSwitcher(state.domain, enabled = state.phase == RecordCapturePhase.CONFIRMING, onSwitchDomain) }
+        // 第 1 层:图片
+        item { PhotoStrip(state, onPickImages, viewModel::removePhoto) }
+        // 第 2 层:餐次(EXIF 自动预选,错了才需要点)
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MEAL_TYPE_LABELS.forEach { (type, label) ->
                     FilterChip(
                         selected = state.mealType == type,
-                        onClick = { onMealType(type) },
+                        onClick = { viewModel.setMealType(type) },
                         label = { Text(label) },
                     )
                 }
             }
         }
+        // 第 3 层:条目(两行卡片)
         itemsIndexed(state.items, key = { index, _ -> index }) { index, item ->
             MealItemCard(
                 item = item,
                 portionScale = state.portionScales.getOrNull(index) ?: 1.0,
                 onEdit = { editingIndex = index },
-                onDelete = { onDeleteItem(index) },
-                onAdjustPortion = { scale -> onAdjustPortion(index, scale) },
+                onDelete = { viewModel.deleteItem(index) },
+                onAdjustPortion = { scale -> viewModel.adjustPortion(index, scale) },
             )
         }
         item {
-            TextButton(onClick = onAddItem) {
+            TextButton(onClick = { viewModel.addItem() }) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("添加一项")
             }
         }
+        // 第 4 层:汇总 + 保存
         item { MealTotalsRow(items = state.items) }
-        item { SaveSection(state = state, failureReason = state.failureReason, onSave = onSave) }
+        item { SaveSection(state = state, failureReason = state.failureReason, onSave = viewModel::save) }
     }
 
     val editingItem = editingIndex?.let { index -> state.items.getOrNull(index) }
@@ -355,7 +400,7 @@ private fun MealConfirmContent(
             item = item,
             onDismiss = { editingIndex = null },
             onSave = { updated ->
-                editingIndex?.let { index -> onUpdateItem(index, updated) }
+                editingIndex?.let { index -> viewModel.updateItem(index, updated) }
                 editingIndex = null
             },
         )
@@ -365,39 +410,22 @@ private fun MealConfirmContent(
 @Composable
 private fun PurchaseConfirmContent(
     state: RecordCaptureUiState,
-    onSwitchDomain: (RecordDomain) -> Unit,
-    onStoreName: (String) -> Unit,
-    onAdjustInventory: (Boolean) -> Unit,
-    onUpdateItem: (Int, PurchaseItemDraft) -> Unit,
-    onDeleteItem: (Int) -> Unit,
-    onAddItem: () -> Unit,
+    viewModel: RecordCaptureViewModel,
     onScanBarcode: () -> Unit,
-    onSave: () -> Unit,
+    onPickImages: () -> Unit,
 ) {
     var editingIndex by rememberSaveable { mutableStateOf<Int?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item {
-            state.imageUriString?.let { uri ->
-                AsyncImage(
-                    model = uri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 200.dp)
-                        .clip(MaterialTheme.shapes.medium),
-                )
-            }
-        }
-        item { DomainSwitcher(state.domain, enabled = state.phase == RecordCapturePhase.CONFIRMING, onSwitchDomain) }
+        item { PhotoStrip(state, onPickImages, viewModel::removePhoto) }
         item {
             OutlinedTextField(
                 value = state.storeName,
-                onValueChange = onStoreName,
+                onValueChange = viewModel::setStoreName,
                 label = { Text("商店(可选)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -407,7 +435,7 @@ private fun PurchaseConfirmContent(
             PurchaseItemCard(
                 item = item,
                 onEdit = { editingIndex = index },
-                onDelete = { onDeleteItem(index) },
+                onDelete = { viewModel.deletePurchaseItem(index) },
             )
         }
         item {
@@ -415,7 +443,7 @@ private fun PurchaseConfirmContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TextButton(onClick = onAddItem) {
+                TextButton(onClick = { viewModel.addPurchaseItem() }) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("添加一项")
@@ -471,11 +499,11 @@ private fun PurchaseConfirmContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Switch(checked = state.adjustInventory, onCheckedChange = onAdjustInventory)
+                Switch(checked = state.adjustInventory, onCheckedChange = viewModel::setAdjustInventory)
             }
         }
         item { PurchaseTotalsRow(items = state.purchaseItems) }
-        item { SaveSection(state = state, failureReason = state.failureReason, onSave = onSave) }
+        item { SaveSection(state = state, failureReason = state.failureReason, onSave = viewModel::save) }
     }
 
     val editingItem = editingIndex?.let { index -> state.purchaseItems.getOrNull(index) }
@@ -484,7 +512,7 @@ private fun PurchaseConfirmContent(
             item = item,
             onDismiss = { editingIndex = null },
             onSave = { updated ->
-                editingIndex?.let { index -> onUpdateItem(index, updated) }
+                editingIndex?.let { index -> viewModel.updatePurchaseItem(index, updated) }
                 editingIndex = null
             },
         )
@@ -539,6 +567,11 @@ private fun EstimateBadge() {
     )
 }
 
+/**
+ * 两行卡片(用户分层原则:非必要不加行,文字组织进单行):
+ * 行 1 = 菜名 + 估算徽标 + 份量小/中/大 chips + 删除(都是"这条是什么"的信息)
+ * 行 2 = kcal + 三大营养素 + 份量描述,合并成一行数值文字(都是"这条是多少")
+ */
 @Composable
 private fun MealItemCard(
     item: MealItemDraft,
@@ -550,16 +583,24 @@ private fun MealItemCard(
     ChatCardSurface(
         modifier = Modifier.clickable(onClick = onEdit),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     item.name.ifBlank { "未命名" },
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 if (item.isEstimate) {
                     EstimateBadge()
-                    Spacer(Modifier.width(8.dp))
+                }
+                PORTION_OPTIONS.forEach { (label, scale) ->
+                    FilterChip(
+                        selected = portionScale == scale,
+                        onClick = { onAdjustPortion(scale) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    )
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
                     Icon(
@@ -570,43 +611,20 @@ private fun MealItemCard(
                     )
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                PORTION_OPTIONS.forEach { (label, scale) ->
-                    FilterChip(
-                        selected = portionScale == scale,
-                        onClick = { onAdjustPortion(scale) },
-                        label = { Text(label) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    "${item.calories.toInt()}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    " kcal",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "蛋白 ${item.proteinG.toInt()}g · 碳水 ${item.carbsG.toInt()}g · 脂肪 ${item.fatG.toInt()}g",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (item.portionText.isNotBlank()) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    item.portionText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                buildString {
+                    append("${item.calories.toInt()} kcal")
+                    append(" · 蛋白 ${item.proteinG.toInt()}g")
+                    append(" · 碳水 ${item.carbsG.toInt()}g")
+                    append(" · 脂肪 ${item.fatG.toInt()}g")
+                    if (item.portionText.isNotBlank()) append(" · ${item.portionText}")
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -620,17 +638,23 @@ private fun PurchaseItemCard(
     ChatCardSurface(
         modifier = Modifier.clickable(onClick = onEdit),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(item.name.ifBlank { "未命名" }, style = MaterialTheme.typography.titleSmall)
-                    item.brand?.let { brand ->
-                        Text(
-                            brand,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    item.name.ifBlank { "未命名" },
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                item.brand?.let { brand ->
+                    Text(
+                        brand,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
                     Icon(
@@ -642,26 +666,16 @@ private fun PurchaseItemCard(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    formatQuantity(item.quantity),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    " ${item.unit}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(12.dp))
-                item.unitPrice?.let { price ->
-                    Text(
-                        "单价 %.2f 元".format(price),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            Text(
+                buildString {
+                    append("${formatQuantity(item.quantity)} ${item.unit}")
+                    item.unitPrice?.let { price -> append(" · 单价 %.2f 元".format(price)) }
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -674,26 +688,18 @@ private fun MealTotalsRow(items: List<MealItemDraft>) {
     val calories = items.sumOf { it.calories }
     val protein = items.sumOf { it.proteinG }
     ChatCardSurface {
-        Row(
+        Text(
+            buildString {
+                append("合计 ${calories.toInt()} kcal")
+                append(" · 蛋白 ${protein.toInt()}g")
+                append(" · ${items.size} 项")
+            },
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("合计", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.weight(1f))
-            Text(
-                "${calories.toInt()} kcal",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                "蛋白 ${protein.toInt()}g",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        )
     }
 }
 
@@ -701,28 +707,17 @@ private fun MealTotalsRow(items: List<MealItemDraft>) {
 private fun PurchaseTotalsRow(items: List<PurchaseItemDraft>) {
     val totalCost = items.sumOf { (it.unitPrice ?: 0.0) * it.quantity }
     ChatCardSurface {
-        Row(
+        Text(
+            buildString {
+                append("合计 ${items.size} 项商品")
+                if (totalCost > 0) append(" · %.2f 元".format(totalCost))
+            },
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("合计", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.weight(1f))
-            Text(
-                "${items.size} 项商品",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (totalCost > 0) {
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "%.2f 元".format(totalCost),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
+        )
     }
 }
 
