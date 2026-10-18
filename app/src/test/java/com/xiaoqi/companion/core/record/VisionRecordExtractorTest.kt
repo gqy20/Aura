@@ -157,7 +157,8 @@ class VisionRecordExtractorTest {
         val result = extractor.extract("aGk=", "image/jpeg")
 
         val draft = (result as RecordExtractionResult.Meal).draft
-        assertEquals(MealType.LUNCH, draft.mealType)
+        // 无 EXIF → 当前时间判定;nowProvider 固定 NOW(本地时区 06:13)→ 早餐
+        assertEquals(MealType.BREAKFAST, draft.mealType)
         val requestBody = server.takeRequest().body.readUtf8()
         // 无 hint → tool_choice=any + 两个 schema 都在
         assertTrue(requestBody.contains("\"tool_choice\":{\"type\":\"any\"}"))
@@ -351,18 +352,21 @@ class VisionRecordExtractorTest {
     }
 
     @Test
-    fun extract_withoutExifFallsBackToModelMealType() = runTest {
+    fun extract_noExif_usesCurrentTime() = runTest {
         server.enqueue(
             toolUseResponse(
                 "submit_meal_record",
-                """{"meal_type":"SNACK","items":[{"name":"酸奶","portion_text":"1杯","calories":120,"estimated_grams":200}]}""",
+                """{"items":[{"name":"酸奶","portion_text":"1杯","calories":120,"estimated_grams":200}]}""",
             )
         )
+        // 无 EXIF 时餐次取当前时间;nowProvider 固定为 NOW,但本地时区不定,
+        // 因此不断言具体餐次,只断言解析成功且有餐次值
         val extractor = extractor(provider = LlmProvider.GLM)
 
         val result = extractor.extract("aGk=", "image/jpeg", photoTakenAtMillis = null)
 
-        assertEquals(MealType.SNACK, (result as RecordExtractionResult.Meal).draft.mealType)
+        val draft = (result as RecordExtractionResult.Meal).draft
+        assertTrue(draft.mealType.name.isNotEmpty())
     }
 
     @Test

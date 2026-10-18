@@ -16,7 +16,6 @@ import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MealRecordRepository
 import java.time.Instant
-import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
@@ -137,10 +136,10 @@ class VisionRecordExtractor(
         }
         val hour = photoTakenAtMillis?.let { takenAt ->
             Instant.ofEpochMilli(takenAt).atZone(ZoneId.systemDefault()).hour
-        } ?: LocalTime.now().hour
+        } ?: Instant.ofEpochMilli(nowProvider()).atZone(ZoneId.systemDefault()).hour
         return when (call.name.ifBlank { forceName ?: "" }) {
             MEAL_TOOL_NAME -> {
-                val parsed = parseMealToolInput(call.inputJson, note, hour, photoTakenAtMillis)
+                val parsed = parseMealToolInput(call.inputJson, note, hour)
                 if (parsed is RecordExtractionResult.Meal) {
                     RecordExtractionResult.Meal(resolveMealNutrition(parsed.draft))
                 } else {
@@ -278,7 +277,6 @@ private data class MealItemDto(
 
 @Serializable
 private data class MealRecordDto(
-    val meal_type: String = "",
     val confidence: Double? = null,
     val items: List<MealItemDto> = emptyList(),
 )
@@ -308,12 +306,6 @@ internal val MEAL_TOOL_SCHEMA: JsonObject = buildJsonObject {
     put("input_schema", buildJsonObject {
         put("type", "object")
         put("properties", buildJsonObject {
-            put("meal_type", buildJsonObject {
-                put("type", "string")
-                put("enum", buildJsonArray {
-                    listOf("BREAKFAST", "LUNCH", "DINNER", "SNACK").forEach { add(JsonPrimitive(it)) }
-                })
-            })
             put("confidence", buildJsonObject {
                 put("type", "number")
                 put("description", "Overall extraction confidence, 0.0 to 1.0")
@@ -351,7 +343,6 @@ internal val MEAL_TOOL_SCHEMA: JsonObject = buildJsonObject {
             })
         })
         put("required", buildJsonArray {
-            add(JsonPrimitive("meal_type"))
             add(JsonPrimitive("items"))
         })
     })
@@ -412,7 +403,6 @@ internal fun parseMealToolInput(
     inputJson: String,
     note: String?,
     hour: Int,
-    photoTakenAtMillis: Long? = null,
 ): RecordExtractionResult {
     val dto = try {
         extractionJson.decodeFromString<MealRecordDto>(inputJson)
@@ -438,12 +428,8 @@ internal fun parseMealToolInput(
     }
     return RecordExtractionResult.Meal(
         MealRecordDraft(
-            // EXIF 拍摄时刻优先于模型判断:模型看不到照片拍摄时间,补记场景下模型只能猜
-            mealType = if (photoTakenAtMillis != null) {
-                mealTypeForHour(hour)
-            } else {
-                dto.meal_type.toMealTypeOrDefault(hour)
-            },
+            // 餐次只由时间决定(拍摄时间优先,否则当前时间),与食物内容无关
+            mealType = mealTypeForHour(hour),
             source = RecordSource.PHOTO,
             items = items,
             confidence = (dto.confidence ?: 0.5).coerceIn(0.0, 1.0),
@@ -482,14 +468,6 @@ internal fun parsePurchaseToolInput(inputJson: String, note: String?): RecordExt
             imageLocalPath = null,
         ),
     )
-}
-
-private fun String.toMealTypeOrDefault(hour: Int): MealType = when (uppercase().trim()) {
-    "BREAKFAST" -> MealType.BREAKFAST
-    "LUNCH" -> MealType.LUNCH
-    "DINNER" -> MealType.DINNER
-    "SNACK" -> MealType.SNACK
-    else -> mealTypeForHour(hour)
 }
 
 private fun mealTypeForHour(hour: Int): MealType = when (hour) {

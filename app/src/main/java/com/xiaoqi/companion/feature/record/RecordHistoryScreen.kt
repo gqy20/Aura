@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -33,6 +35,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,9 +67,28 @@ private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
 @Composable
 fun RecordHistoryScreen(
     viewModel: RecordHistoryViewModel = hiltViewModel(),
+    highlightId: String?,
     onBack: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val listState = rememberLazyListState()
+
+    // 保存后跳转过来:滚动定位新条目并高亮 2 秒
+    LaunchedEffect(state.days, highlightId) {
+        if (highlightId.isNullOrBlank() || state.days.isEmpty()) return@LaunchedEffect
+        var index = 0
+        var found = false
+        for (day in state.days) {
+            index += 1 // day header
+            for (entry in day.entries) {
+                if (entry.id == highlightId) { found = true; break }
+                index += 1
+            }
+            if (found) break
+            // entries 与 header 的偏移在上方已累计
+        }
+        if (found) listState.animateScrollToItem(index - 1)
+    }
 
     Scaffold(
         topBar = {
@@ -97,6 +119,7 @@ fun RecordHistoryScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
@@ -108,6 +131,7 @@ fun RecordHistoryScreen(
                     items(day.entries, key = { it.id }) { entry ->
                         HistoryEntryCard(
                             entry = entry,
+                            highlighted = entry.id == highlightId,
                             expanded = state.expandedEntryId == entry.id,
                             onToggle = { viewModel.toggleExpand(entry.id) },
                             onDelete = { viewModel.deleteEntry(entry.id) },
@@ -162,6 +186,7 @@ private fun DayHeader(day: HistoryDay) {
 @Composable
 private fun HistoryEntryCard(
     entry: HistoryEntry,
+    highlighted: Boolean,
     expanded: Boolean,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
@@ -172,6 +197,11 @@ private fun HistoryEntryCard(
             onDelete()
             dismissState.snapTo(SwipeToDismissBoxValue.Settled)
         }
+    }
+    val cardColor = if (highlighted) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
     }
     SwipeToDismissBox(
         state = dismissState,
@@ -196,8 +226,9 @@ private fun HistoryEntryCard(
             }
         },
     ) {
-        ChatCardSurface(
-            modifier = Modifier.clickable(onClick = onToggle),
+        androidx.compose.material3.Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = cardColor,
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

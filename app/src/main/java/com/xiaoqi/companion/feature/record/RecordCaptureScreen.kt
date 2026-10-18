@@ -84,7 +84,7 @@ private val PORTION_OPTIONS = listOf("小" to 0.75, "中" to 1.0, "大" to 1.25)
 @Composable
 fun RecordCaptureScreen(
     viewModel: RecordCaptureViewModel = hiltViewModel(),
-    onDone: () -> Unit,
+    onSaved: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     // 多选:一餐多图(面条+配菜+饮料分拍) 一次选齐,逐张提取追加进同一张表
@@ -115,8 +115,9 @@ fun RecordCaptureScreen(
 
     LaunchedEffect(state.phase) {
         if (state.phase == RecordCapturePhase.SAVED) {
-            delay(700)
-            onDone()
+            delay(600)
+            // 带着新记录 id 去列表页高亮定位,强确认"存上了"
+            state.savedRecordId?.let(onSaved) ?: onSaved("")
         }
     }
 
@@ -125,7 +126,7 @@ fun RecordCaptureScreen(
             TopAppBar(
                 title = { Text(if (state.domain == RecordDomain.MEAL) "记一餐" else "记采购") },
                 navigationIcon = {
-                    IconButton(onClick = onDone) {
+                    IconButton(onClick = { onSaved("") }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "返回")
                     }
                 },

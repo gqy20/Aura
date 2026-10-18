@@ -253,11 +253,18 @@ private fun AuraAppNavHost(
         }
         composable(AuraRoutes.RecordCapture) {
             com.xiaoqi.companion.feature.record.RecordCaptureScreen(
-                onDone = { navController.popBackStack() },
+                // 保存成功(或空手退出)→ 进列表页;新记录 id 经 savedStateHandle 传给列表页高亮
+                onSaved = { savedId ->
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle?.set("highlight_id", savedId)
+                    navController.navigate(AuraRoutes.RecordHistory)
+                },
             )
         }
-        composable(AuraRoutes.RecordHistory) {
+        composable(AuraRoutes.RecordHistory) { entry ->
+            val highlightId = entry.savedStateHandle.get<String>("highlight_id")
             com.xiaoqi.companion.feature.record.RecordHistoryScreen(
+                highlightId = highlightId,
                 onBack = { navController.popBackStack() },
             )
         }
