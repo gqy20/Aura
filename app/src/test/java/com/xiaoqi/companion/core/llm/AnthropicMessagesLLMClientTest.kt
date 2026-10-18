@@ -119,7 +119,7 @@ class AnthropicMessagesLLMClientTest {
             })
         }
 
-        val call = client().executeForcedTool(simplePrompt(), model, tool)
+        val call = client().executeForcedTool(simplePrompt(), model, listOf(tool), forceName = "submit_meal_record")
 
         val recorded = server.takeRequest()
         val body = json.parseToJsonElement(recorded.body.readUtf8()).jsonObject
@@ -144,12 +144,37 @@ class AnthropicMessagesLLMClientTest {
     }
 
     @Test
+    fun executeForcedTool_multipleToolsWithoutForceNameSendsAny() = runTest {
+        server.enqueue(forcedToolResponse())
+        val tools = listOf(
+            buildJsonObject { put("name", "submit_meal_record") },
+            buildJsonObject { put("name", "submit_purchase_record") },
+        )
+
+        client().executeForcedTool(simplePrompt(), model, tools, forceName = null)
+
+        val body = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        val toolChoice = body.getValue("tool_choice").jsonObject
+        assertEquals("any", toolChoice.getValue("type").jsonPrimitive.content)
+        assertEquals(2, body.getValue("tools").jsonArray.size)
+    }
+
+    @Test
+    fun executeForcedTool_emptyToolsRejected() = runTest {
+        val failure = runCatching {
+            client().executeForcedTool(simplePrompt(), model, emptyList())
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
     fun executeForcedTool_throwsWhenResponseHasNoToolUse() = runTest {
         server.enqueue(successResponse("plain text"))
         val tool = buildJsonObject { put("name", "submit_meal_record") }
 
         val failure = runCatching {
-            client().executeForcedTool(simplePrompt(), model, tool)
+            client().executeForcedTool(simplePrompt(), model, listOf(tool), forceName = "submit_meal_record")
         }.exceptionOrNull()
 
         assertTrue(failure is LlmForcedToolMissingException)
@@ -165,16 +190,20 @@ class AnthropicMessagesLLMClientTest {
                 .setBody(
                     """{"type":"message","role":"assistant","content":[""" +
                         """{"type":"thinking","thinking":"let me analyze..."},""" +
-                        """{"type":"tool_use","id":"call-2","name":"submit_meal_record","input":{"meal_type":"DINNER","items":[]}}],""" +
+                        """{"type":"tool_use","id":"call-2","name":"submit_purchase_record","input":{"items":[]}}],""" +
                         """"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":20}}"""
                 )
         )
 
-        val call = client().executeForcedTool(simplePrompt(), model, buildJsonObject { put("name", "submit_meal_record") })
+        val call = client().executeForcedTool(
+            simplePrompt(),
+            model,
+            listOf(buildJsonObject { put("name", "submit_purchase_record") }),
+            forceName = "submit_purchase_record",
+        )
 
         assertEquals("call-2", call.id)
-        val input = json.parseToJsonElement(call.inputJson).jsonObject
-        assertEquals("DINNER", input.getValue("meal_type").jsonPrimitive.content)
+        assertEquals("submit_purchase_record", call.name)
     }
 
     @Test

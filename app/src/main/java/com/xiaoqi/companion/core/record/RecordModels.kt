@@ -3,6 +3,9 @@ package com.xiaoqi.companion.core.record
 import com.xiaoqi.companion.data.db.converter.MealType
 import com.xiaoqi.companion.data.db.converter.RecordSource
 
+/** 记录域:餐食 / 采购。提取器按照片内容分类,确认页可手动切换兜底。 */
+enum class RecordDomain { MEAL, PURCHASE }
+
 data class MealItemDraft(
     val name: String,
     val portionText: String,

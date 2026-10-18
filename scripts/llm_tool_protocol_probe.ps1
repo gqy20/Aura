@@ -1,7 +1,7 @@
 param(
     [ValidateSet('GLM', 'MODELSCOPE')]
     [string]$Provider = 'GLM',
-    [ValidateSet('All', 'BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult', 'ForcedToolChoice')]
+    [ValidateSet('All', 'BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult', 'ForcedToolChoice', 'AnyChoiceDualTool')]
     [string]$Scenario = 'All',
     [string]$Model = '',
     [string]$EnvFile = (Join-Path $PSScriptRoot '..\.env')
@@ -260,6 +260,47 @@ JSON input: {"topic":睡眠,"limit":10}
             $body.thinking = [ordered]@{ type = 'disabled' }
             Invoke-Probe $Name $body
         }
+        'AnyChoiceDualTool' {
+            # MR P2 双域分类验证:tool_choice=any 让模型在 meal/purchase 两 schema 间自选;
+            # 两轮分别用餐食/采购消息,期望按内容选对工具
+            $mealSchema = [ordered]@{
+                name = 'submit_meal_record'
+                description = 'Submit one structured MEAL record for food / a dish / a meal being eaten.'
+                input_schema = [ordered]@{
+                    type = 'object'
+                    properties = [ordered]@{
+                        meal_type = [ordered]@{ type = 'string'; enum = @('BREAKFAST','LUNCH','DINNER','SNACK') }
+                        items = [ordered]@{ type = 'array'; items = [ordered]@{ type = 'object'; properties = [ordered]@{
+                            name = [ordered]@{ type = 'string' }; calories = [ordered]@{ type = 'number' } } } }
+                    }
+                    required = @('meal_type','items')
+                }
+            }
+            $purchaseSchema = [ordered]@{
+                name = 'submit_purchase_record'
+                description = 'Submit one structured PURCHASE record for groceries / a receipt / packaged products bought.'
+                input_schema = [ordered]@{
+                    type = 'object'
+                    properties = [ordered]@{
+                        items = [ordered]@{ type = 'array'; items = [ordered]@{ type = 'object'; properties = [ordered]@{
+                            name = [ordered]@{ type = 'string' }; quantity = [ordered]@{ type = 'number' } } } }
+                    }
+                    required = @('items')
+                }
+            }
+            foreach ($case in @(
+                @{ Label = 'meal'; Prompt = 'I had a bowl of beef noodle soup for lunch.' },
+                @{ Label = 'purchase'; Prompt = 'I bought a tray of 15 eggs, brand Deqingyuan, 1.6 yuan each.' }
+            )) {
+                $body = New-BaseBody $false $case.Prompt
+                $body.max_tokens = 4096
+                $body.system = 'Life logging extractor. Choose the ONE tool matching the content and fill it completely.'
+                $body.tools = @($mealSchema, $purchaseSchema)
+                $body.tool_choice = [ordered]@{ type = 'any' }
+                $body.thinking = [ordered]@{ type = 'disabled' }
+                Invoke-Probe "$Name-$($case.Label)" $body
+            }
+        }
     }
 }
 
@@ -282,7 +323,7 @@ $script:HttpClient.Timeout = [TimeSpan]::FromSeconds(60)
 try {
     Write-Output "provider=$Provider model=$script:ResolvedModel base_url=$script:BaseUrl"
     $scenarios = if ($Scenario -eq 'All') {
-        @('BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult', 'ForcedToolChoice')
+        @('BaselineStream', 'SingleToolStream', 'DualToolStream', 'FollowupCanonical', 'FollowupSplit', 'FollowupAppLike', 'FollowupMissingResult', 'ForcedToolChoice', 'AnyChoiceDualTool')
     } else {
         @($Scenario)
     }

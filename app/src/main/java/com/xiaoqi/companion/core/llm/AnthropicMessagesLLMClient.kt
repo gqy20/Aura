@@ -362,18 +362,28 @@ class AnthropicMessagesLLMClient(
     override suspend fun models(): List<LLModel> = emptyList()
 
     /**
-     * 强制工具调用:tool_choice 锁定 + thinking 禁用 + 原始嵌套 JSON schema。
+     * 强制工具调用:thinking 禁用 + 原始嵌套 JSON schema。
      * 结构化记录提取专用 —— Koog ToolDescriptor 只支持扁平参数,嵌套 items 数组必须走 rawTool。
      * thinking 必须显式禁用:glm-5.3-flash 等推理模型默认思考 ~55s,事务面提取实测 5.5s。
+     *
+     * @param forceName 指定工具名则 tool_choice 锁定该工具;为 null 时 tool_choice=any,
+     *   模型必须在 tools 里自选一个(P2 双域分类:餐食/采购)。
      */
-    suspend fun executeForcedTool(prompt: Prompt, model: LLModel, tool: JsonObject): ForcedToolCall {
+    suspend fun executeForcedTool(
+        prompt: Prompt,
+        model: LLModel,
+        tools: List<JsonObject>,
+        forceName: String? = null,
+    ): ForcedToolCall {
+        require(tools.isNotEmpty()) { "forced tool call requires at least one tool" }
         val startedAt = System.currentTimeMillis()
         val response = executeRequest(
             prompt = prompt,
             model = model,
             stream = false,
             tools = emptyList(),
-            rawTool = tool,
+            rawTools = tools,
+            forcedToolName = forceName,
             disableThinking = true,
         )
         val stopReason = response["stop_reason"]?.jsonPrimitive?.contentOrNull
@@ -425,7 +435,8 @@ class AnthropicMessagesLLMClient(
         model: LLModel,
         stream: Boolean,
         tools: List<ToolDescriptor>,
-        rawTool: JsonObject? = null,
+        rawTools: List<JsonObject> = emptyList(),
+        forcedToolName: String? = null,
         disableThinking: Boolean = false,
     ): JsonObject =
         withContext(Dispatchers.IO) {
@@ -434,7 +445,7 @@ class AnthropicMessagesLLMClient(
                 modelId = model.id,
                 operation = if (stream) "stream" else "request",
             ) {
-                val request = buildRequest(prompt, model, stream, tools, rawTool, disableThinking)
+                val request = buildRequest(prompt, model, stream, tools, rawTools, forcedToolName, disableThinking)
                 httpClient.newCall(request).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) {
@@ -523,12 +534,13 @@ class AnthropicMessagesLLMClient(
         model: LLModel,
         stream: Boolean,
         tools: List<ToolDescriptor>,
-        rawTool: JsonObject? = null,
+        rawTools: List<JsonObject> = emptyList(),
+        forcedToolName: String? = null,
         disableThinking: Boolean = false,
     ): Request {
         require(baseUrl.isNotBlank()) { "LLM_BASE_URL is not configured" }
         require(apiKey.isNotBlank()) { "LLM_API_KEY is not configured" }
-        val body = buildRequestBody(prompt, model, stream, tools, rawTool, disableThinking)
+        val body = buildRequestBody(prompt, model, stream, tools, rawTools, forcedToolName, disableThinking)
         AppLogger.debug(
             LogTags.Llm,
             "request_built",
@@ -554,7 +566,8 @@ class AnthropicMessagesLLMClient(
         model: LLModel,
         stream: Boolean,
         tools: List<ToolDescriptor>,
-        rawTool: JsonObject? = null,
+        rawTools: List<JsonObject> = emptyList(),
+        forcedToolName: String? = null,
         disableThinking: Boolean = false,
     ): JsonObject =
         buildJsonObject {
@@ -585,13 +598,18 @@ class AnthropicMessagesLLMClient(
                 }
             )
 
-            if (rawTool != null) {
-                put("tools", buildJsonArray { add(rawTool) })
+            if (rawTools.isNotEmpty()) {
+                put("tools", buildJsonArray { rawTools.forEach { add(it) } })
                 put(
                     "tool_choice",
-                    buildJsonObject {
-                        put("type", JsonPrimitive("tool"))
-                        put("name", JsonPrimitive(rawTool["name"]?.jsonPrimitive?.contentOrNull.orEmpty()))
+                    if (forcedToolName != null) {
+                        buildJsonObject {
+                            put("type", JsonPrimitive("tool"))
+                            put("name", JsonPrimitive(forcedToolName))
+                        }
+                    } else {
+                        // any:模型必须在提供的工具里自选一个(双域分类)
+                        buildJsonObject { put("type", JsonPrimitive("any")) }
                     },
                 )
             } else if (tools.isNotEmpty()) {
