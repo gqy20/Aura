@@ -171,10 +171,8 @@ object RecordExporter {
     private fun buildDailySummaryCsv(meals: List<MealRecordWithItems>, zone: ZoneId): String = buildString {
         appendLine("date,meal_count,total_calories,total_protein_g,total_carbs_g,total_fat_g")
         meals.groupBy { meal ->
-            LocalDate.ofInstant(
-                Instant.ofEpochMilli(meal.record.photoTakenAt ?: meal.record.createdAt),
-                zone,
-            )
+            Instant.ofEpochMilli(meal.record.photoTakenAt ?: meal.record.createdAt)
+                .atZone(zone).toLocalDate()
         }.toSortedMap().forEach { (date, dayMeals) ->
             appendLine(
                 listOf(

@@ -44,6 +44,10 @@ make test-one T=CompanionRuntimeTest
 
 以上 Gradle 命令已在 2026-08-16 验证通过（`testDebugUnitTest` **694 个测试全绿**）。测试性能优化详见 CLAUDE.md "并发配置：单 fork 复用 Robolectric Runtime" 段落。
 
+## Push 后 CI 核查（强制流程）
+
+**每次 `git push` 之后必须用 `gh run list --repo gqy20/Aura --limit 2` 确认 CI/Build 两个 workflow 状态**，红了当场修（`gh run view <id> --log-failed` 定位）。本地全绿不代表 CI 绿——CI 会跑完整 lint（如 NewApi API-level 检查本地增量编译不触发）+ UTC 时区（时区敏感断言本地 +8 过、UTC 挂）。本轮踩过：`LocalDate.ofInstant` API 34 lint 红、`nowProvider` 时区断言 UTC 翻转。
+
 ## MNN Benchmark 流程
 
 - `make benchmark-mnn` 走主 App 进程 benchmark，不走 androidTest。
