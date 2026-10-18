@@ -259,7 +259,10 @@ private fun AuraAppNavHost(
                 onSaved = { savedId ->
                     navController.previousBackStackEntry
                         ?.savedStateHandle?.set("highlight_id", savedId)
-                    navController.navigate(AuraRoutes.RecordHistory)
+                    // 弹出已保存的捕获页:列表 BACK 直达主页,不落回编辑死胡同
+                    navController.navigate(AuraRoutes.RecordHistory) {
+                        popUpTo(AuraRoutes.Home)
+                    }
                 },
             )
         }

@@ -150,22 +150,43 @@ fun RecordCaptureScreen(
         },
     ) { padding ->
         if (showHelp) {
+            // 按域给文案:餐食讲热量换算,采购讲条码/库存
+            val helpTitle: String
+            val helpLines: List<Pair<String, String>>
+            if (state.domain == RecordDomain.MEAL) {
+                helpTitle = "热量是怎么算的"
+                helpLines = listOf(
+                    "1" to "识别照片里的食物,按碗中、盘中的比例估算克重",
+                    "2" to "对照《中国食物成分表》查出营养,按克重换算热量",
+                    "3" to "查不到的菜由 AI 估算,数值标着「估算」,误差偏大",
+                    "4" to "手动改过的数值会被记住,下次同样的菜优先使用",
+                )
+            } else {
+                helpTitle = "采购是怎么记录的"
+                helpLines = listOf(
+                    "1" to "识别小票或包装上的商品名、品牌、数量与单价",
+                    "2" to "扫条码可从开放商品库直接带入,无需手填",
+                    "3" to "保存后自动累加进家庭库存,可用开关关闭",
+                    "4" to "库存条目可在聊天里问 Aura:家里还有什么",
+                )
+            }
             AlertDialog(
                 onDismissRequest = { showHelp = false },
-                title = { Text("热量是怎么算的") },
+                title = { Text(helpTitle) },
                 text = {
-                    val step = @Composable { num: String, line: String ->
-                        Row(modifier = Modifier.padding(top = 6.dp)) {
-                            Text(num, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.width(8.dp))
-                            Text(line, style = MaterialTheme.typography.bodyMedium)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        helpLines.forEach { (num, line) ->
+                            Row {
+                                Text(
+                                    num,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.width(16.dp),
+                                )
+                                Text(line, style = MaterialTheme.typography.bodyMedium)
+                            }
                         }
-                    }
-                    Column {
-                        step("1", "识别照片里的食物,按碗中、盘中的比例估算克重")
-                        step("2", "对照《中国食物成分表》查出营养,按克重换算热量")
-                        step("3", "查不到的菜由 AI 估算,数值标着「估算」,误差偏大")
-                        step("4", "手动改过的数值会被记住,下次同样的菜优先使用")
                     }
                 },
                 confirmButton = {
