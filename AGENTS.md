@@ -3,12 +3,12 @@
 ## 当前项目状态
 
 - 项目名称：Aura · 奥拉（Android AI 陪伴应用）
-- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形；**MR 结构化生活记录（饮食/采购）已立项，P0 数据地基 + P1 饮食域端到端已落**（2026-10-18，拍照 → GLM 强制工具 schema 提取 → 表格确认 → 入库）
+- 当前阶段：**文本聊天技术闭环 / Phase 1 agent tools**，已进入 Phase 2+ 的 Presence Layer / 本地 LLM / Reminder 系统雏形；**MR 结构化生活记录 P0-P3 已落**（2026-10-18：拍照/口述 → GLM 提取 → 确认 → 入库 + 聊天工具化 + 库存联动；余 P4 洞察联动与记录列表页）
 - 已实现（按代码核对）：Compose 聊天页 + `AuraHomeScreen` 角色主屏、`ChatViewModel`、`CompanionRuntime`、Koog `AIAgent` 流式调用；Room/DataStore/Hilt；Agent tools（记忆/情绪/关系/Health/Insight/Reminder）；**工具系统双开关**（`mcpEnabled` MCP 总开关 + `systemToolsEnabled` 系统内置工具开关，`CompanionToolRegistry.create()` 按开关短路，与 per-server `enabled` 是"总闸 vs 分闸"关系）；**MCP 渐进加载**（`McpServerRouter` 按请求选择服务器、`McpToolSelector` 在服务器内裁剪工具，tool spec 缓存、失败冷却与选择指标）；**LLM 工具协议兼容**（Anthropic SSE 按 `content_block.index` 并行累积工具调用、扁平 JSON 裸字符串保守修复、HTTP 错误体脱敏摘要与请求结构指纹、Koog `Failure`/`ValidationError` 结果终止错误循环）；NavHost 六条路由（Home/Chat/Settings/McpSettings/MemoryRoom/Onboarding）；`SettingsScreen` + `McpSettingsScreen`；`MemoryRoomScreen`；`OnboardingScreen`；`PresenceController` + `PresenceReactionPolicy`（状态推导逻辑）；Reminder 模块（AlarmManager + `ReminderNotificationWorker` + `ReminderNotificationPoster`）；本地 LLM 链路（`LocalQwenEngine` / `MnnLocalQwenEngine` / `NativeMnnLlmBridge` / `LocalQwenModelDownloader`）；Memory Summary（DAO/Entity + `SearchSummariesTool`）；`LlmConnectivityChecker`；`DataTransparencySection`；`HealthSyncManager` / `HealthDataSection`；**Insight 双路径**（`DreamLoopWorker` 6h 周期 + `ChatViewModel` POST_CHAT 3min 冷却即时触发）；**EvidenceResolver** 中文 FTS + 兜底策略；**InsightValidator** 低门槛（confidence 0.2 / evidence reality 10%）；POST_CHAT 卡片 UI（蓝色徽标 + 分析中指示器）
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪与关系的头像/表情层由 Compose Canvas 临时替代；Presence Layer 的 Rive/Lottie 动画资源仍缺；Pulse 的离线衰减/回归反应/主动通知仍缺
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest）、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
-- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-10-18 通过（**751 个测试，0 失败**；694 存量 + MR 结构化记录 P0/P1 新增 57：五表 DAO/Repository/图片文件存储、强制工具调用协议、提取钳制、捕获流 ViewModel。Robolectric 单 fork 复用）
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-10-18 通过（**776 个测试，0 失败**；694 存量 + MR 结构化记录新增 82：五表 DAO/Repository/图片文件存储、强制工具调用协议、双域分类提取、捕获流 ViewModel、log/query 四工具与 Koog 嵌套 schema 渲染器。聊天口述记餐 + 库存消耗真机验证通过。Robolectric 单 fork 复用）
 
 ## 常用验证命令
 

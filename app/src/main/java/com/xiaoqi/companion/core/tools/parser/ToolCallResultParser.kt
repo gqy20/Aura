@@ -66,6 +66,10 @@ class ToolCallResultParser @Inject constructor() {
             "get_user_context_settings" -> parseUserContextSettings(data)
             "update_state" -> parseUpdateState(data)
             "query_health_data" -> parseHealthData(data)
+            "log_meal" -> parseLogMeal(data)
+            "log_purchase" -> parseLogPurchase(data)
+            "query_meal_log" -> parseQueryMealLog(data)
+            "query_inventory" -> parseQueryInventory(data)
             else -> ToolResultSummary.Unknown(raw = data.toString())
         }
     }
@@ -115,6 +119,69 @@ class ToolCallResultParser @Inject constructor() {
             subject = subject,
             triggerAtMillis = triggerAt,
             exact = exact,
+        )
+    }
+
+    private fun parseLogMeal(data: JsonObject): ToolResultSummary {
+        val calories = data.str("totalCalories")?.toDoubleOrNull() ?: 0.0
+        val itemCount = data.int("itemCount") ?: 0
+        val consumed = data.int("consumedInventoryCount") ?: 0
+        val subject = buildString {
+            append("${data.str("mealType") ?: "MEAL"} $itemCount 项")
+            if (calories > 0) append(" · ${calories.toInt()} kcal")
+            if (consumed > 0) append(" · 库存消耗 $consumed 项")
+        }
+        return ToolResultSummary.SavedOne(title = "记录餐食", subject = subject)
+    }
+
+    private fun parseLogPurchase(data: JsonObject): ToolResultSummary {
+        val itemCount = data.int("itemCount") ?: 0
+        val cost = data.str("totalCost")?.toDoubleOrNull() ?: 0.0
+        val adjusted = data.bool("inventoryAdjusted") ?: false
+        val subject = buildString {
+            append("$itemCount 件商品")
+            if (cost > 0) append(" · %.2f 元".format(cost))
+            if (adjusted) append(" · 已同步库存")
+        }
+        return ToolResultSummary.SavedOne(title = "记录采购", subject = subject)
+    }
+
+    private fun parseQueryMealLog(data: JsonObject): ToolResultSummary {
+        val count = data.int("count") ?: 0
+        if (count == 0) return ToolResultSummary.Empty(title = "饮食记录")
+        val calories = data.str("totalCalories")?.toDoubleOrNull() ?: 0.0
+        val protein = data.str("totalProteinG")?.toDoubleOrNull() ?: 0.0
+        val records = data.arrayAt("records")
+            .mapNotNull { record ->
+                val obj = record.asObject()
+                val mealType = obj.str("mealType") ?: return@mapNotNull null
+                val recordCalories = obj.str("totalCalories")?.toDoubleOrNull() ?: 0.0
+                "$mealType ${recordCalories.toInt()}kcal"
+            }
+        return ToolResultSummary.ListHits(
+            title = "饮食记录($count 条 · 共 ${calories.toInt()} kcal · 蛋白 ${protein.toInt()}g)",
+            count = count,
+            items = records,
+        )
+    }
+
+    private fun parseQueryInventory(data: JsonObject): ToolResultSummary {
+        val count = data.int("count") ?: 0
+        if (count == 0) return ToolResultSummary.Empty(title = "家庭库存")
+        val lowCount = data.int("lowCount") ?: 0
+        val items = data.arrayAt("items")
+            .mapNotNull { item ->
+                val obj = item.asObject()
+                val name = obj.str("name") ?: return@mapNotNull null
+                val quantity = obj.str("quantity")?.toDoubleOrNull() ?: 0.0
+                val unit = obj.str("unit") ?: ""
+                val low = if (obj.bool("isLow") == true) " ⚠️" else ""
+                "$name $quantity$unit$low"
+            }
+        return ToolResultSummary.ListHits(
+            title = "家庭库存($count 项${if (lowCount > 0) " · $lowCount 项偏低" else ""})",
+            count = count,
+            items = items,
         )
     }
 
@@ -202,6 +269,13 @@ class ToolCallResultParser @Inject constructor() {
             if (toolName == "create_local_reminder" && obj.str("status") == "scheduled") {
                 return@runCatching parseCreateReminder(obj)
             }
+            // query_meal_log / query_inventory 真实路径同样返回裸 JSON(Json.encodeToString)
+            if (toolName == "query_meal_log" && obj.int("count") != null) {
+                return@runCatching parseQueryMealLog(obj)
+            }
+            if (toolName == "query_inventory" && obj.int("count") != null) {
+                return@runCatching parseQueryInventory(obj)
+            }
 
             // 通用 search_* 工具的 {count, results} 旧结构
             val count = obj.int("count")
@@ -228,6 +302,10 @@ class ToolCallResultParser @Inject constructor() {
         "get_user_context_settings" -> "上下文设置"
         "update_state" -> "状态更新"
         "query_health_data" -> "健康数据"
+        "log_meal" -> "记录餐食"
+        "log_purchase" -> "记录采购"
+        "query_meal_log" -> "饮食记录"
+        "query_inventory" -> "家庭库存"
         else -> toolName
     }
 

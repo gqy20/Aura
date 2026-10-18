@@ -73,6 +73,19 @@ class CompanionToolRegistryTest {
         relationshipModel = mockk(relaxed = true),
         memoryRepository = mockk(relaxed = true),
     )
+    private val logMealTool = LogMealTool(
+        mealRepository = mockk(relaxed = true),
+        inventoryRepository = mockk(relaxed = true),
+    )
+    private val logPurchaseTool = LogPurchaseTool(
+        purchaseRepository = mockk(relaxed = true),
+    )
+    private val queryMealLogTool = QueryMealLogTool(
+        mealRepository = mockk(relaxed = true),
+    )
+    private val queryInventoryTool = QueryInventoryTool(
+        inventoryRepository = mockk(relaxed = true),
+    )
 
     private val readyMcpServer = McpServerConfig(
         id = "amap-1",
@@ -98,6 +111,10 @@ class CompanionToolRegistryTest {
         createLocalReminderTool = createLocalReminderTool,
         queryHealthDataTool = queryHealthDataTool,
         updateStateTool = updateStateTool,
+        logMealTool = logMealTool,
+        logPurchaseTool = logPurchaseTool,
+        queryMealLogTool = queryMealLogTool,
+        queryInventoryTool = queryInventoryTool,
         remoteMcpClient = remoteMcpClient,
         mcpServerListRepository = mcpServerListRepository,
         appPreferences = appPreferences,
@@ -123,7 +140,7 @@ class CompanionToolRegistryTest {
         val tools = registry.create(ToolScope.ALL)
 
         // 11 内置 + 1 MCP = 12
-        assertEquals(12, tools.tools.size)
+        assertEquals(16, tools.tools.size)
         assertTrue(tools.tools.any { it.name == "search_memory" })
         // MCP 工具名形如 mcp__<serverSlug>__amap_search
         assertTrue(tools.tools.any { it.name.endsWith("__amap_search") })
@@ -139,7 +156,7 @@ class CompanionToolRegistryTest {
 
         val tools = registry.create(ToolScope.ALL)
 
-        assertEquals(11, tools.tools.size)
+        assertEquals(15, tools.tools.size)
         assertTrue(tools.tools.none { it.name.endsWith("__amap_search") })
     }
 
@@ -177,7 +194,7 @@ class CompanionToolRegistryTest {
 
         val tools = registry.create(ToolScope.SYSTEM_ONLY)
 
-        assertEquals(11, tools.tools.size)
+        assertEquals(15, tools.tools.size)
         assertTrue(tools.tools.none { it.name.endsWith("__amap_search") })
     }
 

@@ -167,6 +167,15 @@
 - **模型拒绝透传**：模型对非餐食照片会无视 tool_choice 强制、以文本说明拒绝（实测："这张截图不是餐食照片——它是聊天记录截图…"）。新增 `LlmForcedToolMissingException(modelReply)`，VisionMealExtractor 把模型原话作为 Failed(reason) 显示给用户，替代原先的内部协议错误文案；诊断日志 `forced_tool_missing_diagnostics` 记录 blockKinds/replySummary（字段名避开 LogFieldSanitizer 的 text/content 敏感词，否则整段 redact）。
 - **E2E 排障经验**（已固化到 AGENTS.md §5）：junction 双路径构建根导致 KSP `different roots`（统一从 `E:\ai\android` 规范路径构建）；App 落盘日志 `files/diagnostics/app.log` 可经 `run-as` + base64 拉取（Git Bash 二进制重定向坑的绕法）；模拟器 Photo Picker 是多选确认模式（选格子后必须点 Done 才返回），首开会叠两层提示浮层需先 Dismiss，`uiautomator dump` 含 off-screen 节点不能按 y 坐标推断可视区。
 
+### 近期打磨（2026-10-18 · MR P2 采购域 + P3 工具化）
+
+> P2/P3 一批落地,`docs/design.md` §6 的事务面/陪伴面双交互面全部成形。
+
+- **P2 采购域**（`78d2f2e`）：`executeForcedTool` 升级多工具 + `tool_choice=any`（probe AnyChoiceDualTool 实测:餐食/采购消息各选对工具,无关消息文本拒绝）;`VisionMealExtractor` → `VisionRecordExtractor` 统一提取器（双 schema,`domainHint` 域切换时强制单工具重提）;确认页加域切换 chips / 采购行卡片（品牌/数量/单位/单价 + 编辑对话框）/ 商店名 / 库存同步开关;采购钳制（数量 0.01-10000、单价 ≤10 万）。**库存联动落地**：`InventoryRepository.adjustStock` 身份键 `normalize(name)+normalize(brand)`,采购确认累加、不存在且 delta≤0 时安全忽略。
+- **P3 工具化**（本提交）：`log_meal` / `log_purchase` / `query_meal_log` / `query_inventory` 四工具挂进 `CompanionToolRegistry`（envelope 协议 + policy 分级:写入 MEDIUM、查询 LOW）;**Koog 嵌套 schema 渲染器**（`ToolParameterType.toJsonSchema()` 递归渲染 Enum/List/Object/AnyOf——此前 `type.toString()` 会把枚举渲染成垃圾文本,嵌套工具参数根本没法用）;meal→inventory 消耗联动（`consumed_items` 由模型显式给出,只在用户明确说"吃了家里 N 个 X"时填）;persona 工具教学补全。
+- **E2E 验证（模拟器真机）**：聊天口述"I just had a bowl of beef noodle soup... Also ate two eggs from my fridge" → 模型在 15 个工具中正确调 `log_meal`（LUNCH / 2 项 / consumedCount=1）→ 644 kcal 入库（模型自填中文 rawNote"牛肉面用户自估约500 kcal；鸡蛋取自家中冰箱库存"）→ 库存扣减 2 个鸡蛋（无库存条目时安全忽略不产生负库存）→ 时间线正确渲染"已记录餐食 · LUNCH 2 项 · 644 kcal · 库存消耗 1 项"。
+- **验证**：`testDebugUnitTest` 776 全绿（+12:P2 双域 VM/提取器 + P3 四工具/schema 渲染器/registry 计数）;probe ForcedToolChoice + AnyChoiceDualTool 全过。
+
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。
@@ -295,8 +304,8 @@
 
 - **P0 地基** ✅（2026-10-18，`fcab75d`）：`llm_tool_protocol_probe.ps1` ForcedToolChoice 场景验证 GLM tool_choice 强制行为通过（glm-5.3-flash 嵌套 items 正确填充，thinking 禁用后 5.5s）→ 实体 / DAO / v11→v12 迁移 / Repository + 图片文件存储 helper + 33 单测。
 - **P1 饮食域端到端** ✅（2026-10-18）：`VisionRecordExtractor`（GLM + 强制工具 schema + 校验钳制）+ `RecordConfirmTable` 确认页 + ViewModel + 主屏"记一餐"入口 + `record-capture` 路由 + 24 单测。交付"拍照 → 表格 → 入库"闭环。
-- **P2 采购/库存域**：同一提取管线第二套 schema（视觉分类餐食/采购，确认页可纠正）；库存累加；记录列表页 + 主屏"今日热量/库存"卡片。
-- **P3 工具化与联动**：`LogMealTool` / `QueryMealLogTool` / `LogPurchaseTool` / `QueryInventoryTool` 挂进 `CompanionToolRegistry`（envelope 协议）+ 聊天内确认卡 + meal↔inventory 消耗联动。
+- **P2 采购/库存域** ✅（2026-10-18，`78d2f2e`）：同一提取管线第二套 schema（视觉分类餐食/采购，确认页可纠正）+ 库存累加已落；余下：记录列表页 + 主屏"今日热量/库存"卡片。
+- **P3 工具化与联动** ✅（2026-10-18，聊天口述端到端真机验证通过）：`log_meal` / `query_meal_log` / `log_purchase` / `query_inventory` 挂进 `CompanionToolRegistry`（envelope 协议）+ meal↔inventory 消耗联动（`consumed_items` 显式联动）；余下：聊天内确认卡片。
 - **P4 洞察联动**：meal 数据进 `DreamDataCollector` snapshot（周营养趋势 insight）；库存低于阈值走既有 Reminder 通知链路。
 
 ### M5：Pulse + Insight 主线化

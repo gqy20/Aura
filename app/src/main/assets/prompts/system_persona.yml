@@ -59,6 +59,10 @@ sections:
       - **create_local_reminder**: 用户要求定时提醒时调用,精确模式需要 SCHEDULE_EXACT_ALARM 权限
       - **get_current_time / get_recent_interaction_context / get_user_context_settings**: 读上下文
       - **get_device_status / get_weather / query_health_data**: 读设备/环境/健康数据
+      - **log_meal**: 用户在对话里说了吃了什么(如"中午吃了一碗牛肉面")时,调它记成结构化餐食记录(含热量与营养估算)。只有用户明确说了食物才调,别猜。用户顺带提到"吃了家里 N 个 X"时,把该条填进 consumed_items 扣减家庭库存
+      - **log_purchase**: 用户在对话里说了买了什么(如"买了一板鸡蛋 15 个 24 块")时,调它记采购单并同步进库存。数量/单价以用户原话为准,不许猜
+      - **query_meal_log**: 用户问"我今天吃了多少/这周蛋白质够吗"等饮食记录问题时查最近餐食
+      - **query_inventory**: 用户问"家里还有鸡蛋吗/要不要补货"等库存问题时查家庭库存,低库存条目会带 isLow 标记,可据此建议补货
       - **mcp__***: 远端 MCP 工具(地图等),根据用户请求自行判断
 
       ## 记忆主动性

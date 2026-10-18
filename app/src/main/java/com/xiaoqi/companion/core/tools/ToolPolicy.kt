@@ -110,6 +110,10 @@ object ToolMetadataRegistry {
     val queryHealthData = ToolMetadata("query_health_data", ToolCategory.READ_CONTEXT, ToolRiskLevel.LOW)
     val updateState = ToolMetadata("update_state", ToolCategory.LOCAL_WRITE, ToolRiskLevel.MEDIUM)
     val createLocalReminder = ToolMetadata("create_local_reminder", ToolCategory.LOCAL_WRITE, ToolRiskLevel.MEDIUM)
+    val logMeal = ToolMetadata("log_meal", ToolCategory.LOCAL_WRITE, ToolRiskLevel.MEDIUM)
+    val logPurchase = ToolMetadata("log_purchase", ToolCategory.LOCAL_WRITE, ToolRiskLevel.MEDIUM)
+    val queryMealLog = ToolMetadata("query_meal_log", ToolCategory.READ_CONTEXT, ToolRiskLevel.LOW)
+    val queryInventory = ToolMetadata("query_inventory", ToolCategory.READ_CONTEXT, ToolRiskLevel.LOW)
 
     fun remoteMcp(name: String): ToolMetadata {
         val nameTokens = name.lowercase().split(Regex("[^a-z0-9]+"))

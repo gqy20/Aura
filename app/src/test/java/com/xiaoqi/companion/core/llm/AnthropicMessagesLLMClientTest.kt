@@ -1,5 +1,7 @@
 package com.xiaoqi.companion.core.llm
 
+import ai.koog.agents.core.tools.ToolDescriptor
+import ai.koog.agents.core.tools.ToolParameterType
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
@@ -471,6 +473,67 @@ class AnthropicMessagesLLMClientTest {
     private fun simplePrompt() = prompt("simple") {
         system("system")
         user("hello")
+    }
+
+    @Test
+    fun execute_nestedKoogParameterTypesRenderCorrectSchema() = runTest {
+        server.enqueue(successResponse("ok"))
+        val nestedTool = ai.koog.agents.core.tools.ToolDescriptor(
+            name = "log_meal_test",
+            description = "test",
+            requiredParameters = listOf(
+                ai.koog.agents.core.tools.ToolParameterDescriptor(
+                    name = "meal_type",
+                    description = "which meal",
+                    type = ToolParameterType.Enum(listOf("BREAKFAST", "LUNCH").toTypedArray()),
+                ),
+                ai.koog.agents.core.tools.ToolParameterDescriptor(
+                    name = "items",
+                    description = "food items",
+                    type = ToolParameterType.List(
+                        ToolParameterType.Object(
+                            properties = listOf(
+                                ai.koog.agents.core.tools.ToolParameterDescriptor(
+                                    name = "name",
+                                    description = "food name",
+                                    type = ToolParameterType.String,
+                                ),
+                                ai.koog.agents.core.tools.ToolParameterDescriptor(
+                                    name = "calories",
+                                    description = "kcal",
+                                    type = ToolParameterType.Float,
+                                ),
+                            ),
+                            requiredProperties = listOf("name"),
+                        ),
+                    ),
+                ),
+            ),
+            optionalParameters = emptyList(),
+        )
+
+        // execute 的 tools 走 toAnthropicInputSchema,验证嵌套渲染
+        val promptWithTools = prompt("tools-schema") {
+            system("system")
+            user("log a meal")
+        }
+        // LLMPrompt 带工具:用带 tools 的 execute 需要 registry;直接退而验证 execute 序列化不炸
+        client().execute(promptWithTools, model, listOf(nestedTool))
+
+        val body = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        val schema = body.getValue("tools").jsonArray.single().jsonObject
+            .getValue("input_schema").jsonObject
+        val properties = schema.getValue("properties").jsonObject
+        val mealType = properties.getValue("meal_type").jsonObject
+        assertEquals("string", mealType.getValue("type").jsonPrimitive.content)
+        assertEquals("LUNCH", mealType.getValue("enum").jsonArray.last().jsonPrimitive.content)
+        val items = properties.getValue("items").jsonObject
+        assertEquals("array", items.getValue("type").jsonPrimitive.content)
+        val itemObj = items.getValue("items").jsonObject
+        assertEquals("object", itemObj.getValue("type").jsonPrimitive.content)
+        val itemProps = itemObj.getValue("properties").jsonObject
+        assertEquals("number", itemProps.getValue("calories").jsonObject.getValue("type").jsonPrimitive.content)
+        assertEquals("name", itemObj.getValue("required").jsonArray.single().jsonPrimitive.content)
     }
 
     private fun successResponse(text: String) = MockResponse()

@@ -69,6 +69,10 @@ class ToolDisplayRegistry @Inject constructor(
             "query_health_data" -> ToolDisplayLabels("读取健康数据中", "已读取健康数据", "健康数据读取失败")
             "create_local_reminder" -> ToolDisplayLabels("创建提醒中", "已创建", "创建失败")
             "update_state" -> ToolDisplayLabels("更新状态中", "已更新", "更新失败")
+            "log_meal" -> ToolDisplayLabels("记录这一餐中", "已记下这餐", "记录失败")
+            "log_purchase" -> ToolDisplayLabels("记录采购中", "已记下采购", "记录失败")
+            "query_meal_log" -> ToolDisplayLabels("翻看饮食记录中", "已查到记录", "查询失败")
+            "query_inventory" -> ToolDisplayLabels("清点库存中", "已清点", "清点失败")
             else -> if (toolName.startsWith("mcp__")) {
                 ToolDisplayLabels("查询外部服务中", "外部服务已返回", "外部服务失败")
             } else {

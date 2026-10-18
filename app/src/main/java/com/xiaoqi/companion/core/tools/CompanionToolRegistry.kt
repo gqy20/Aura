@@ -49,6 +49,10 @@ class CompanionToolRegistry @Inject constructor(
     private val createLocalReminderTool: CreateLocalReminderTool,
     private val queryHealthDataTool: QueryHealthDataTool,
     private val updateStateTool: UpdateStateTool,
+    private val logMealTool: LogMealTool,
+    private val logPurchaseTool: LogPurchaseTool,
+    private val queryMealLogTool: QueryMealLogTool,
+    private val queryInventoryTool: QueryInventoryTool,
     private val remoteMcpClient: RemoteMcpClient,
     private val mcpServerListRepository: McpServerListRepository,
     private val appPreferences: AppPreferences,
@@ -97,6 +101,10 @@ class CompanionToolRegistry @Inject constructor(
             if (policy.allows(ToolMetadataRegistry.createLocalReminder)) builder.tool(createLocalReminderTool)
             if (policy.allows(ToolMetadataRegistry.queryHealthData)) builder.tool(queryHealthDataTool)
             if (policy.allows(ToolMetadataRegistry.updateState)) builder.tool(updateStateTool)
+            if (policy.allows(ToolMetadataRegistry.logMeal)) builder.tool(logMealTool)
+            if (policy.allows(ToolMetadataRegistry.logPurchase)) builder.tool(logPurchaseTool)
+            if (policy.allows(ToolMetadataRegistry.queryMealLog)) builder.tool(queryMealLogTool)
+            if (policy.allows(ToolMetadataRegistry.queryInventory)) builder.tool(queryInventoryTool)
         }
 
         // MCP 注册独立于 systemToolsEnabled,只受 mcpEnabled + scope 控制。

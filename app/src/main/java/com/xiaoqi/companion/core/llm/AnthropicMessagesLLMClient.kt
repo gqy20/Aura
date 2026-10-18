@@ -1,6 +1,7 @@
 package com.xiaoqi.companion.core.llm
 
 import ai.koog.agents.core.tools.ToolDescriptor
+import ai.koog.agents.core.tools.ToolParameterType
 import ai.koog.prompt.dsl.ModerationResult
 import ai.koog.prompt.dsl.Prompt
 import ai.koog.prompt.executor.clients.LLMClient
@@ -633,8 +634,8 @@ class AnthropicMessagesLLMClient(
             put("properties", buildJsonObject {
                 allParams.forEach { param ->
                     put(param.name, buildJsonObject {
-                        put("type", JsonPrimitive(param.type.toString()))
                         put("description", JsonPrimitive(param.description))
+                        param.type.toJsonSchema().forEach { (key, value) -> put(key, value) }
                     })
                 }
             })
@@ -844,6 +845,47 @@ class AnthropicMessagesLLMClient(
 
 private fun nextSyntheticToolIndex(pending: Map<Int, PendingToolCall>): Int =
     generateSequence(-1) { it - 1 }.first { it !in pending }
+
+/**
+ * Koog [ToolParameterType] → Anthropic tool input_schema 的 JSON 子树。
+ * 嵌套工具(log_meal 的 items 数组)依赖 List/Object/Enum 的递归渲染;
+ * 此前的 `type.toString()` 会把枚举渲染成 "Enum(entries=[...])" 垃圾文本。
+ */
+private fun ToolParameterType.toJsonSchema(): JsonObject = buildJsonObject {
+    when (this@toJsonSchema) {
+        is ToolParameterType.String -> put("type", JsonPrimitive("string"))
+        is ToolParameterType.Integer -> put("type", JsonPrimitive("integer"))
+        is ToolParameterType.Float -> put("type", JsonPrimitive("number"))
+        is ToolParameterType.Boolean -> put("type", JsonPrimitive("boolean"))
+        is ToolParameterType.Enum -> {
+            put("type", JsonPrimitive("string"))
+            put("enum", buildJsonArray { entries.forEach { add(JsonPrimitive(it)) } })
+        }
+        is ToolParameterType.List -> {
+            put("type", JsonPrimitive("array"))
+            put("items", itemsType.toJsonSchema())
+        }
+        is ToolParameterType.Object -> {
+            put("type", JsonPrimitive("object"))
+            put("properties", buildJsonObject {
+                properties.forEach { prop ->
+                    put(prop.name, buildJsonObject {
+                        put("description", JsonPrimitive(prop.description))
+                        prop.type.toJsonSchema().forEach { (key, value) -> put(key, value) }
+                    })
+                }
+            })
+            if (requiredProperties.isNotEmpty()) {
+                put("required", buildJsonArray { requiredProperties.forEach { add(JsonPrimitive(it)) } })
+            }
+        }
+        is ToolParameterType.AnyOf -> {
+            // anyOf 子节点本身是 descriptor(带 name 的包装),渲染时只取 type
+            put("anyOf", buildJsonArray { types.forEach { add(it.type.toJsonSchema()) } })
+        }
+        is ToolParameterType.Null -> put("type", JsonPrimitive("null"))
+    }
+}
 
 private fun normalizeToolInput(raw: String): NormalizedToolInput {
     val repaired = repairFlatJsonValues(raw)
