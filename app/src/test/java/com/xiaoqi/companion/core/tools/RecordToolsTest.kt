@@ -7,7 +7,9 @@ import com.xiaoqi.companion.data.db.converter.MealType
 import com.xiaoqi.companion.data.db.entity.InventoryItemEntity
 import com.xiaoqi.companion.data.repository.InventoryRepository
 import com.xiaoqi.companion.data.repository.MealRecordRepository
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.PurchaseRepository
+import com.xiaoqi.companion.data.repository.ReminderRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -20,6 +22,11 @@ import org.junit.Test
 
 class RecordToolsTest {
 
+    private val reminderRepo = mockk<ReminderRepository>(relaxed = true)
+    private val appPrefs = mockk<AppPreferences> {
+        io.mockk.every { notificationEnabled } returns kotlinx.coroutines.flow.flowOf(true)
+    }
+
     // --- log_meal ---
 
     @Test
@@ -29,7 +36,7 @@ class RecordToolsTest {
         val draftSlot = slot<MealRecordDraft>()
         coEvery { mealRepo.saveMeal(capture(draftSlot)) } returns "meal-1"
         coEvery { inventoryRepo.adjustStock("鸡蛋", null, "个", -2.0) } returns makeItem(quantity = 13.0)
-        val tool = LogMealTool(mealRepo, inventoryRepo, nowProvider = { 1_000L })
+        val tool = LogMealTool(mealRepo, inventoryRepo, reminderRepo, appPrefs, nowProvider = { 1_000L })
 
         val result = tool.execute(
             LogMealTool.Args(
@@ -66,7 +73,7 @@ class RecordToolsTest {
         val mealRepo = mockk<MealRecordRepository>()
         val draftSlot = slot<MealRecordDraft>()
         coEvery { mealRepo.saveMeal(capture(draftSlot)) } returns "meal-1"
-        val tool = LogMealTool(mealRepo, mockk(relaxed = true), nowProvider = { 1L })
+        val tool = LogMealTool(mealRepo, mockk(relaxed = true), reminderRepo, appPrefs, nowProvider = { 1L })
 
         tool.execute(
             LogMealTool.Args(
@@ -84,7 +91,7 @@ class RecordToolsTest {
 
     @Test
     fun logMeal_emptyItemsReturnsEnvelopeError() = runTest {
-        val tool = LogMealTool(mockk(), mockk(relaxed = true), nowProvider = { 1L })
+        val tool = LogMealTool(mockk(), mockk(relaxed = true), reminderRepo, appPrefs, nowProvider = { 1L })
 
         val result = tool.execute(
             LogMealTool.Args(meal_type = MealType.LUNCH, items = listOf(LogMealTool.MealItemArg(name = "  ")))
@@ -95,11 +102,57 @@ class RecordToolsTest {
     }
 
     @Test
+    fun logMeal_lowStockAfterConsumption_schedulesReminder() = runTest {
+        val mealRepo = mockk<MealRecordRepository>()
+        coEvery { mealRepo.saveMeal(any()) } returns "meal-1"
+        val inventoryRepo = mockk<InventoryRepository>()
+        coEvery { inventoryRepo.adjustStock("鸡蛋", null, "个", -6.0) } returns makeItem(id = "eggs", quantity = 1.0)
+        val reminderRepo = mockk<ReminderRepository>()
+        val scheduled = io.mockk.slot<com.xiaoqi.companion.core.reminder.ScheduledReminder>()
+        coEvery { reminderRepo.createReminder(any(), any(), any(), any(), any()) } returns
+            com.xiaoqi.companion.core.reminder.ScheduledReminder(
+                id = "r1", title = "库存不多:鸡蛋", triggerAtMillis = 61_000L, delayMillis = 60_000L, exact = false,
+            )
+        val tool = LogMealTool(mealRepo, inventoryRepo, reminderRepo, appPrefs, nowProvider = { 1_000L })
+
+        tool.execute(
+            LogMealTool.Args(
+                meal_type = MealType.BREAKFAST,
+                items = listOf(LogMealTool.MealItemArg(name = "鸡蛋", calories = 200.0)),
+                consumed_items = listOf(LogMealTool.ConsumedItemArg(name = "鸡蛋", quantity = 6.0, unit = "个")),
+            )
+        )
+
+        coVerify(exactly = 1) { reminderRepo.createReminder(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun logMeal_sufficientStock_noReminder() = runTest {
+        val mealRepo = mockk<MealRecordRepository>()
+        coEvery { mealRepo.saveMeal(any()) } returns "meal-1"
+        val inventoryRepo = mockk<InventoryRepository>()
+        // 库存充足:15-2=13 > 阈值 2
+        coEvery { inventoryRepo.adjustStock("鸡蛋", null, "个", -2.0) } returns makeItem(id = "eggs", quantity = 13.0)
+        val reminderRepo = mockk<ReminderRepository>()
+        val tool = LogMealTool(mealRepo, inventoryRepo, reminderRepo, appPrefs, nowProvider = { 1_000L })
+
+        tool.execute(
+            LogMealTool.Args(
+                meal_type = MealType.BREAKFAST,
+                items = listOf(LogMealTool.MealItemArg(name = "鸡蛋", calories = 200.0)),
+                consumed_items = listOf(LogMealTool.ConsumedItemArg(name = "鸡蛋", quantity = 2.0, unit = "个")),
+            )
+        )
+
+        coVerify(exactly = 0) { reminderRepo.createReminder(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
     fun logMeal_skipsNonPositiveConsumedEntries() = runTest {
         val inventoryRepo = mockk<InventoryRepository>(relaxed = true)
         val mealRepo = mockk<MealRecordRepository>()
         coEvery { mealRepo.saveMeal(any()) } returns "meal-1"
-        val tool = LogMealTool(mealRepo, inventoryRepo, nowProvider = { 1L })
+        val tool = LogMealTool(mealRepo, inventoryRepo, reminderRepo, appPrefs, nowProvider = { 1L })
 
         tool.execute(
             LogMealTool.Args(

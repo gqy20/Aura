@@ -26,6 +26,7 @@ class DreamDataCollector @Inject constructor(
     private val messageDao: MessageDao,
     private val memoryDao: com.xiaoqi.companion.data.db.dao.MemoryDao,
     private val healthSnapshotDao: HealthSnapshotDao,
+    private val mealRecordDao: com.xiaoqi.companion.data.db.dao.MealRecordDao,
     private val appPreferences: AppPreferences,
 ) {
 
@@ -43,6 +44,14 @@ class DreamDataCollector @Inject constructor(
         val importance: Float,
     )
 
+    // MR P4:近 7 天每日餐食聚合(本地 Qwen 只需要日级趋势,不需要每餐明细)
+    data class DailyMealStats(
+        val day: String,
+        val recordCount: Int,
+        val totalCalories: Double,
+        val totalProteinG: Double,
+    )
+
     data class Snapshot(
         val rangeStart: Long,
         val rangeEnd: Long,
@@ -51,13 +60,15 @@ class DreamDataCollector @Inject constructor(
         val memoryCount: Int,
         val imageMemories: List<ImageMemorySummary> = emptyList(),
         val healthSnapshots: List<HealthSnapshotEntity> = emptyList(),
+        val dailyMeals: List<DailyMealStats> = emptyList(),
     ) {
         val isEmpty: Boolean
             get() = moodSnapshots.isEmpty() &&
                 messages.isEmpty() &&
                 memoryCount == 0 &&
                 imageMemories.isEmpty() &&
-                healthSnapshots.isEmpty()
+                healthSnapshots.isEmpty() &&
+                dailyMeals.isEmpty()
     }
 
     suspend fun collectLast7Days(
@@ -95,6 +106,20 @@ class DreamDataCollector @Inject constructor(
         val startDate = endDate - HEALTH_LOOKBACK_DAYS * 100  // 简单按月内回退,跨月会被 Dream 端的 SQL 兜住
         val healthSnapshots = healthSnapshotDao.findInRange(startDate.coerceAtLeast(0), endDate)
 
+        // MR P4:餐食日聚合(拍照时刻优先,回填窗口覆盖补记场景)
+        val mealRecords = mealRecordDao.getRecordsBetween(start, end)
+        val dailyMeals = mealRecords
+            .groupBy { r -> dayOfWeek(r.record.photoTakenAt ?: r.record.createdAt) }
+            .map { (day, list) ->
+                DailyMealStats(
+                    day = day,
+                    recordCount = list.size,
+                    totalCalories = list.sumOf { it.record.totalCalories },
+                    totalProteinG = list.sumOf { it.record.totalProteinG },
+                )
+            }
+            .sortedBy { it.day }
+
         Snapshot(
             rangeStart = start,
             rangeEnd = end,
@@ -103,6 +128,7 @@ class DreamDataCollector @Inject constructor(
             memoryCount = memoryCount,
             imageMemories = imageMemories,
             healthSnapshots = healthSnapshots,
+            dailyMeals = dailyMeals,
         )
     }
 
@@ -137,6 +163,14 @@ class DreamDataCollector @Inject constructor(
             appendLine("## 视觉证据(${snapshot.imageMemories.size} 张)")
             snapshot.imageMemories.forEach { img ->
                 appendLine("- [id:${img.id}] ${formatTimestamp(img.timestamp)} ${img.content}")
+            }
+        }
+        // MR P4:餐食记录日聚合 — 营养趋势 Pattern 的核心数据源
+        if (snapshot.dailyMeals.isNotEmpty()) {
+            appendLine()
+            appendLine("## 餐食记录(${snapshot.dailyMeals.sumOf { it.recordCount }} 餐)")
+            snapshot.dailyMeals.forEach { d ->
+                appendLine("- ${d.day}: ${d.recordCount} 餐,${d.totalCalories.toInt()} kcal,蛋白 ${d.totalProteinG.toInt()}g")
             }
         }
         // Health Connect 健康快照(小米运动健康等)

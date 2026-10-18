@@ -76,6 +76,8 @@ class CompanionToolRegistryTest {
     private val logMealTool = LogMealTool(
         mealRepository = mockk(relaxed = true),
         inventoryRepository = mockk(relaxed = true),
+        reminderRepository = io.mockk.mockk(relaxed = true),
+        appPreferences = io.mockk.mockk(relaxed = true),
     )
     private val logPurchaseTool = LogPurchaseTool(
         purchaseRepository = mockk(relaxed = true),

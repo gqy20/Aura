@@ -9,8 +9,11 @@ import com.xiaoqi.companion.core.record.MealItemDraft
 import com.xiaoqi.companion.core.record.MealRecordDraft
 import com.xiaoqi.companion.data.db.converter.MealType
 import com.xiaoqi.companion.data.db.converter.RecordSource
+import com.xiaoqi.companion.data.datastore.AppPreferences
 import com.xiaoqi.companion.data.repository.InventoryRepository
 import com.xiaoqi.companion.data.repository.MealRecordRepository
+import com.xiaoqi.companion.data.repository.ReminderRepository
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,6 +34,8 @@ import kotlinx.serialization.json.put
 class LogMealTool(
     private val mealRepository: MealRecordRepository,
     private val inventoryRepository: InventoryRepository,
+    private val reminderRepository: ReminderRepository,
+    private val appPreferences: AppPreferences,
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
 ) : SimpleTool<LogMealTool.Args>(
     typeToken<Args>(),
@@ -45,7 +50,9 @@ class LogMealTool(
     constructor(
         mealRepository: MealRecordRepository,
         inventoryRepository: InventoryRepository,
-    ) : this(mealRepository, inventoryRepository, { System.currentTimeMillis() })
+        reminderRepository: ReminderRepository,
+        appPreferences: AppPreferences,
+    ) : this(mealRepository, inventoryRepository, reminderRepository, appPreferences, { System.currentTimeMillis() })
 
     @Serializable
     data class MealItemArg(
@@ -143,6 +150,8 @@ class LogMealTool(
                 "consumedCount" to consumedResults.size,
                 "quantities" to consumedResults.associate { (name, qty) -> name to (qty ?: -1.0) },
             )
+            // P4b:扣减后跌破阈值 → 下一餐时间前提醒补货(非精准闹钟,不要求权限)
+            scheduleLowStockReminders(consumedResults)
         }
 
         val totalCalories = draft.items.sumOf { it.calories }
@@ -159,10 +168,35 @@ class LogMealTool(
         )
     }
 
+    private suspend fun scheduleLowStockReminders(consumedResults: List<Pair<String, Double?>>) {
+        val notificationsEnabled = runCatching { appPreferences.notificationEnabled.first() }.getOrDefault(true)
+        if (!notificationsEnabled) return
+        consumedResults.forEach { (name, remaining) ->
+            // remaining==null 表示库存没有这个条目(未知库存),不提醒
+            val left = remaining ?: return@forEach
+            val unit = "份"
+            if (left > LOW_STOCK_FLOOR) return@forEach
+            runCatching {
+                reminderRepository.createReminder(
+                    title = "库存不多:$name",
+                    message = "只剩约 $left $unit 了,记得补货",
+                    triggerAtMillis = nowProvider() + LOW_STOCK_REMIND_DELAY_MS,
+                    exact = false,
+                    source = "record:low_stock",
+                )
+            }.onSuccess {
+                AppLogger.info(LogTags.Record, "low_stock_reminder_scheduled", "item" to name, "remaining" to left)
+            }
+        }
+    }
+
     private companion object {
         const val MAX_CALORIES = 3000.0
         const val MAX_PROTEIN = 150.0
         const val MAX_CARBS = 300.0
         const val MAX_FAT = 150.0
+        // 简化阈值:剩余 ≤ 2 视为偏低(后续接 lowStockThreshold 字段做个性化)
+        const val LOW_STOCK_FLOOR = 2.0
+        const val LOW_STOCK_REMIND_DELAY_MS = 30 * 60_000L
     }
 }

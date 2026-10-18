@@ -32,7 +32,7 @@ class DreamDataCollectorHealthTest {
         every { currentSessionId } returns flowOf("default")
     }
 
-    private val collector = DreamDataCollector(moodDao, messageDao, memoryDao, healthDao, appPreferences)
+    private val collector = DreamDataCollector(moodDao, messageDao, memoryDao, healthDao, io.mockk.mockk<com.xiaoqi.companion.data.db.dao.MealRecordDao>(relaxed = true), appPreferences)
 
     @Test fun `snapshot includes health data`() = runTest {
         coEvery { moodDao.findInRange(any(), any(), any()) } returns emptyList()
