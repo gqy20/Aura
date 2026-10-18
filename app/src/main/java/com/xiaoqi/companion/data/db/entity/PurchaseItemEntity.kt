@@ -17,4 +17,6 @@ data class PurchaseItemEntity(
     val quantity: Double,
     val unit: String,
     val unitPrice: Double? = null,
+    // 多图场景:该条目来自第几张图(0-based)
+    val photoIndex: Int? = null,
 )

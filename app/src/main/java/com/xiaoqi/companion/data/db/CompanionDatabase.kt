@@ -55,7 +55,7 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         PurchaseItemEntity::class,
         InventoryItemEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -361,6 +361,20 @@ abstract class CompanionDatabase : RoomDatabase() {
                 )
                 executor.exec("CREATE INDEX IF NOT EXISTS `index_inventory_items_name` ON `inventory_items` (`name`)")
                 executor.exec("CREATE INDEX IF NOT EXISTS `index_inventory_items_updatedAt` ON `inventory_items` (`updatedAt`)")
+            }
+        }
+
+        // MR 拍摄元数据:EXIF 时间/GPS(餐次自动判定+位置存档) + 多图条目归属
+        val MIGRATION_12_13 = object : DualMigration(12, 13) {
+            override fun apply(executor: SqlExecutor) {
+                executor.exec("ALTER TABLE `meal_records` ADD COLUMN `photoTakenAt` INTEGER")
+                executor.exec("ALTER TABLE `meal_records` ADD COLUMN `lat` REAL")
+                executor.exec("ALTER TABLE `meal_records` ADD COLUMN `lon` REAL")
+                executor.exec("ALTER TABLE `purchase_records` ADD COLUMN `photoTakenAt` INTEGER")
+                executor.exec("ALTER TABLE `purchase_records` ADD COLUMN `lat` REAL")
+                executor.exec("ALTER TABLE `purchase_records` ADD COLUMN `lon` REAL")
+                executor.exec("ALTER TABLE `meal_items` ADD COLUMN `photoIndex` INTEGER")
+                executor.exec("ALTER TABLE `purchase_items` ADD COLUMN `photoIndex` INTEGER")
             }
         }
 

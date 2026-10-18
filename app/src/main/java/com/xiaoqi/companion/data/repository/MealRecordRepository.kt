@@ -55,6 +55,9 @@ class MealRecordRepositoryImpl @Inject constructor(
                 confidence = draft.confidence,
                 imageLocalPath = draft.imageLocalPath,
                 rawNote = draft.rawNote,
+                photoTakenAt = draft.photoTakenAt,
+                lat = draft.lat,
+                lon = draft.lon,
             ),
             draft.items.map { item ->
                 MealItemEntity(
@@ -66,6 +69,7 @@ class MealRecordRepositoryImpl @Inject constructor(
                     estCarbsG = item.carbsG,
                     estFatG = item.fatG,
                     isEstimate = item.isEstimate,
+                    photoIndex = item.photoIndex,
                 )
             },
         )

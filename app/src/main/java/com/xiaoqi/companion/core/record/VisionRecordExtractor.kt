@@ -15,7 +15,9 @@ import com.xiaoqi.companion.data.db.converter.RecordSource
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.MealRecordRepository
+import java.time.Instant
 import java.time.LocalTime
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
@@ -74,6 +76,7 @@ class VisionRecordExtractor(
         mediaType: String,
         note: String? = null,
         domainHint: RecordDomain? = null,
+        photoTakenAtMillis: Long? = null,
     ): RecordExtractionResult {
         val config = configRepository.getCurrentLlmConfig().first()
         if (config.provider == LlmProvider.LOCAL_QWEN) {
@@ -132,10 +135,12 @@ class VisionRecordExtractor(
             )
             return RecordExtractionResult.Failed("提取请求失败:${error.message ?: "网络错误"}")
         }
-        val hour = LocalTime.now().hour
+        val hour = photoTakenAtMillis?.let { takenAt ->
+            Instant.ofEpochMilli(takenAt).atZone(ZoneId.systemDefault()).hour
+        } ?: LocalTime.now().hour
         return when (call.name.ifBlank { forceName ?: "" }) {
             MEAL_TOOL_NAME -> {
-                val parsed = parseMealToolInput(call.inputJson, note, hour)
+                val parsed = parseMealToolInput(call.inputJson, note, hour, photoTakenAtMillis)
                 if (parsed is RecordExtractionResult.Meal) {
                     RecordExtractionResult.Meal(resolveMealNutrition(parsed.draft))
                 } else {
@@ -403,7 +408,12 @@ internal val PURCHASE_TOOL_SCHEMA: JsonObject = buildJsonObject {
     })
 }
 
-internal fun parseMealToolInput(inputJson: String, note: String?, hour: Int): RecordExtractionResult {
+internal fun parseMealToolInput(
+    inputJson: String,
+    note: String?,
+    hour: Int,
+    photoTakenAtMillis: Long? = null,
+): RecordExtractionResult {
     val dto = try {
         extractionJson.decodeFromString<MealRecordDto>(inputJson)
     } catch (error: Exception) {
@@ -428,7 +438,12 @@ internal fun parseMealToolInput(inputJson: String, note: String?, hour: Int): Re
     }
     return RecordExtractionResult.Meal(
         MealRecordDraft(
-            mealType = dto.meal_type.toMealTypeOrDefault(hour),
+            // EXIF 拍摄时刻优先于模型判断:模型看不到照片拍摄时间,补记场景下模型只能猜
+            mealType = if (photoTakenAtMillis != null) {
+                mealTypeForHour(hour)
+            } else {
+                dto.meal_type.toMealTypeOrDefault(hour)
+            },
             source = RecordSource.PHOTO,
             items = items,
             confidence = (dto.confidence ?: 0.5).coerceIn(0.0, 1.0),

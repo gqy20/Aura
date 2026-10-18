@@ -22,6 +22,11 @@ data class MealRecordEntity(
     val totalCarbsG: Double,
     val totalFatG: Double,
     val confidence: Double,
+    // 多图逗号分隔路径;单图场景即单路径(向后兼容)
     val imageLocalPath: String? = null,
     val rawNote: String? = null,
+    // EXIF 拍摄时刻:餐次自动判定的锚点,补记场景下比 createdAt 更接近真实用餐时间
+    val photoTakenAt: Long? = null,
+    val lat: Double? = null,
+    val lon: Double? = null,
 )

@@ -43,6 +43,9 @@ class PurchaseRepositoryImpl @Inject constructor(
                     storeName = draft.storeName?.trim()?.takeIf { it.isNotBlank() },
                     totalCost = draft.totalCost ?: draft.items.sumOf { (it.unitPrice ?: 0.0) * it.quantity }.takeIf { it > 0.0 },
                     imageLocalPath = draft.imageLocalPath,
+                    photoTakenAt = draft.photoTakenAt,
+                    lat = draft.lat,
+                    lon = draft.lon,
                 ),
                 draft.items.map { item ->
                     PurchaseItemEntity(
@@ -52,6 +55,7 @@ class PurchaseRepositoryImpl @Inject constructor(
                         quantity = item.quantity,
                         unit = item.unit,
                         unitPrice = item.unitPrice,
+                        photoIndex = item.photoIndex,
                     )
                 },
             )

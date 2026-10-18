@@ -20,4 +20,6 @@ data class MealItemEntity(
     val estFatG: Double,
     // 用户改过数值后置 false，与模型估算区分（design.md 估算诚实原则）
     val isEstimate: Boolean = true,
+    // 多图场景:该条目来自第几张图(0-based),单图为 0;回看图文对应与按图删除的依据
+    val photoIndex: Int? = null,
 )

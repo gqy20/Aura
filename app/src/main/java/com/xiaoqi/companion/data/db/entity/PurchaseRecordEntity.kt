@@ -16,5 +16,10 @@ data class PurchaseRecordEntity(
     val source: RecordSource,
     val storeName: String? = null,
     val totalCost: Double? = null,
+    // 多图逗号分隔路径;单图场景即单路径(向后兼容)
     val imageLocalPath: String? = null,
+    // EXIF:拍摄时刻与 GPS(后期店名反查预填的数据源)
+    val photoTakenAt: Long? = null,
+    val lat: Double? = null,
+    val lon: Double? = null,
 )

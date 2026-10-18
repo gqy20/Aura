@@ -84,6 +84,7 @@ object DataModule {
                 CompanionDatabase.MIGRATION_9_10,
                 CompanionDatabase.MIGRATION_10_11,
                 CompanionDatabase.MIGRATION_11_12,
+                CompanionDatabase.MIGRATION_12_13,
             )
             .addCallback(
                 object : RoomDatabase.Callback() {

@@ -332,6 +332,58 @@ class VisionRecordExtractorTest {
     }
 
     @Test
+    fun extract_exifTimeOverridesModelMealType() = runTest {
+        // 模型说 LUNCH,EXIF 说 08:30 早餐 —— EXIF 优先(模型看不到拍摄时刻)
+        server.enqueue(
+            toolUseResponse(
+                "submit_meal_record",
+                """{"meal_type":"LUNCH","items":[{"name":"包子","portion_text":"2个","calories":300,"estimated_grams":150}]}""",
+            )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM)
+        val breakfastMillis = java.time.LocalDate.now()
+            .atTime(8, 30).atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli()
+
+        val result = extractor.extract("aGk=", "image/jpeg", photoTakenAtMillis = breakfastMillis)
+
+        assertEquals(MealType.BREAKFAST, (result as RecordExtractionResult.Meal).draft.mealType)
+    }
+
+    @Test
+    fun extract_withoutExifFallsBackToModelMealType() = runTest {
+        server.enqueue(
+            toolUseResponse(
+                "submit_meal_record",
+                """{"meal_type":"SNACK","items":[{"name":"酸奶","portion_text":"1杯","calories":120,"estimated_grams":200}]}""",
+            )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM)
+
+        val result = extractor.extract("aGk=", "image/jpeg", photoTakenAtMillis = null)
+
+        assertEquals(MealType.SNACK, (result as RecordExtractionResult.Meal).draft.mealType)
+    }
+
+    @Test
+    fun extract_exifEveningDerivesDinner() = runTest {
+        server.enqueue(
+            toolUseResponse(
+                "submit_meal_record",
+                """{"meal_type":"LUNCH","items":[{"name":"面条","portion_text":"1碗","calories":400,"estimated_grams":350}]}""",
+            )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM)
+        val eveningMillis = java.time.LocalDate.now()
+            .atTime(19, 0).atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli()
+
+        val result = extractor.extract("aGk=", "image/jpeg", photoTakenAtMillis = eveningMillis)
+
+        assertEquals(MealType.DINNER, (result as RecordExtractionResult.Meal).draft.mealType)
+    }
+
+    @Test
     fun extract_noGrams_infersFromModelCalories() = runTest {
         // 模型没给克重(老协议/弱模型):按 kcal 反推克重再查表,鸡蛋 999kcal → 718g → 999kcal(自洽)
         server.enqueue(

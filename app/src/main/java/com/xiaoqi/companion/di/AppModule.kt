@@ -26,12 +26,14 @@ import com.xiaoqi.companion.core.presence.runtime.WorkManagerScheduler
 import com.xiaoqi.companion.core.presence.runtime.WorkScheduler
 import com.xiaoqi.companion.core.record.BarcodeScannerSource
 import com.xiaoqi.companion.core.record.FoodDensitySource
+import com.xiaoqi.companion.core.record.PhotoMetadataReader
 import com.xiaoqi.companion.core.reminder.AndroidReminderScheduler
 import com.xiaoqi.companion.core.reminder.ReminderScheduler
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.core.tools.CompanionToolRegistry
 import com.xiaoqi.companion.core.weather.OpenMeteoWeatherProvider
 import com.xiaoqi.companion.core.weather.WeatherProvider
+import com.xiaoqi.companion.data.record.AndroidPhotoMetadataReader
 import com.xiaoqi.companion.data.record.AssetFoodDensitySource
 import com.xiaoqi.companion.data.record.MlKitBarcodeScanner
 import com.xiaoqi.companion.data.repository.ConfigRepository
@@ -137,6 +139,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindBarcodeScannerSource(scanner: MlKitBarcodeScanner): BarcodeScannerSource
+
+    @Binds
+    @Singleton
+    abstract fun bindPhotoMetadataReader(reader: AndroidPhotoMetadataReader): PhotoMetadataReader
 
     @Binds
     @Singleton

@@ -317,6 +317,8 @@ dependencies {
     implementation(libs.coil.compose)
     // 条码静态图识别(打包内置模型,无需 Play Services)
     implementation(libs.mlkit.barcode)
+    // 拍摄时间/GPS 元数据读取(EXIF)——餐次自动判定与位置存档
+    implementation(libs.androidx.exifinterface)
 
     // Camera
     implementation(libs.bundles.camera)
