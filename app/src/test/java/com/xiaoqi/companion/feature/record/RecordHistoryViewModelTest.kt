@@ -54,7 +54,9 @@ class RecordHistoryViewModelTest {
 
     @Test
     fun groupsEntriesByDayMostRecentFirst() = runTest {
-        val today = System.currentTimeMillis()
+        // 正午锚点:'几小时前'永不跨天(午夜附近跑测试时 now-Nh 落到昨天)
+        val zone = java.time.ZoneId.systemDefault()
+        val today = java.time.LocalDate.now(zone).atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
         val yesterday = today - 86_400_000L
         mealsFlow.value = listOf(
             mealRecord(id = "m1", time = today - 3_600_000L),

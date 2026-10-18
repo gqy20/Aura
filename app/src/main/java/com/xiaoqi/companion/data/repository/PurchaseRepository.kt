@@ -10,6 +10,7 @@ import com.xiaoqi.companion.data.db.entity.PurchaseRecordEntity
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
@@ -21,6 +22,9 @@ interface PurchaseRepository {
 
     // 删除采购单不回滚库存（数量已流入现实，回滚反而失真）；纠错时手动 adjustStock 负数
     suspend fun deletePurchase(recordId: String)
+
+    /** 全量快照(导出用):按时间正序,含明细。 */
+    suspend fun getAllPurchases(): List<PurchaseRecordWithItems>
 }
 
 class PurchaseRepositoryImpl @Inject constructor(
@@ -78,4 +82,7 @@ class PurchaseRepositoryImpl @Inject constructor(
         purchaseDao.deletePurchaseWithItems(recordId)
         AppLogger.info(LogTags.Record, "purchase_record_deleted", "recordId" to recordId)
     }
+
+    override suspend fun getAllPurchases(): List<PurchaseRecordWithItems> =
+        withContext(Dispatchers.IO) { purchaseDao.observeRecent(Int.MAX_VALUE).let { it.first() } }
 }

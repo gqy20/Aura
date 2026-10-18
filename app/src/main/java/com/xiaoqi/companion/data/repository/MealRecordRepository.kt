@@ -25,6 +25,9 @@ interface MealRecordRepository {
 
     /** 用户修正过数值的条目(sinceAt 以来),提取器用作个人化校准锚点。 */
     suspend fun getRecentCalibratedItems(sinceAt: Long, limit: Int): List<CalibratedMealItemRow>
+
+    /** 全量快照(导出用):按时间正序,含明细。 */
+    suspend fun getAllRecords(): List<MealRecordWithItems>
 }
 
 class MealRecordRepositoryImpl @Inject constructor(
@@ -96,4 +99,7 @@ class MealRecordRepositoryImpl @Inject constructor(
 
     override suspend fun getRecentCalibratedItems(sinceAt: Long, limit: Int): List<CalibratedMealItemRow> =
         withContext(Dispatchers.IO) { mealRecordDao.getCalibratedItems(sinceAt, limit) }
+
+    override suspend fun getAllRecords(): List<MealRecordWithItems> =
+        withContext(Dispatchers.IO) { mealRecordDao.getRecordsBetween(0, Long.MAX_VALUE) }
 }

@@ -216,6 +216,14 @@
 - **P4b 低库存提醒**：`LogMealTool` 消耗库存后检查剩余量（≤2 视为偏低），走既有 `ReminderRepository` 创建 30 分钟后提醒（非精准闹钟，尊重通知开关）；`record:low_stock` source。阈值暂用简化常量，个性化接 `lowStockThreshold` 字段留后续。
 - **验证**：`testDebugUnitTest` 811 全绿（+5：历史分组/展开 3 例、低库存提醒 2 例）；E2E：今日卡片 2764 kcal 渲染、按天分组列表、展开明细、左滑删除全链路。
 
+### 近期打磨（2026-10-18 · MR 数据出口：分析导出契约）
+
+- **导出契约**（`RecordExporter`）：设置页"系统 → 数据透明"新增**"导出记录数据(zip)"**——餐食/采购/库存 → 6 文件 zip：`manifest.json`（schema_version/行数/导出时刻/时区，外部系统校验锚点）、`meals.jsonl`（一行一餐嵌套 items，结构保真给程序消费）、`items.csv`（拍平明细 + record_id 关联，给 pandas/Excel）、`daily_summary.csv`（天×营养聚合）、`purchases.csv`/`inventory.csv`；CSV RFC 4180 转义（菜名含逗号不撕裂列）。
+- **语义约定**：`effective_time` = photoTakenAt（EXIF）优先、缺失回退 createdAt 并标 `time_source: exif/recorded`；`value_source: user_verified/estimated` 数值质量分级（isEstimate 布尔的导出侧延伸）。分析与"隐私 dump"（导出全部 JSON）双入口并存、用途分离。
+- **实现**：`getAllRecords/getAllPurchases` 仓库快照查询 + `RecordExportViewModel`（cache 落盘）+ SAF CreateDocument("application/zip") 保存，默认文件名 `aura_records_时间戳.zip`。
+- **E2E（模拟器）**：聊天口述记一餐 → 设置 → 导出 → SAF 对话框带默认名 → 保存到 Downloads → 拉回解包：8 餐 16 条明细、中文菜名/份量在 CSV/JSONL 中完好、daily_summary 两天聚合（830/6494 kcal）与主页卡片一致。
+- **验证**：`testDebugUnitTest` 818 全绿（+7：zip 文件集/manifest 计数/JSONL 嵌套与 time_source/CSV 转义/日聚合/空输入/采购库存行）。顺带修复 RecordHistoryViewModelTest 午夜边界 flaky（正午锚点）。
+
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。

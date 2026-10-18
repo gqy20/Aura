@@ -1229,6 +1229,34 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
         }
     }
 
+    // 分析导出:独立 VM(三域仓库),SAF 保存 + 分享共用导出文件
+    val exportViewModel: com.xiaoqi.companion.feature.record.RecordExportViewModel =
+        androidx.hilt.navigation.compose.hiltViewModel()
+    val exportState by exportViewModel.state.collectAsStateWithLifecycle()
+    val zipLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        val file = exportState.exportedFile
+        if (uri == null || file == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(file.readBytes())
+                }
+                exportViewModel.consumeFile()
+            }.onFailure { e ->
+                AppLogger.error(LogTags.App, e, "export_records_zip_failed")
+            }
+        }
+    }
+    LaunchedEffect(exportState.exportedFile) {
+        val file = exportState.exportedFile
+        if (file != null) {
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(java.util.Date())
+            zipLauncher.launch("aura_records_$timestamp.zip")
+        }
+    }
+
     LaunchedEffect(Unit) {
         insightCount = viewModel.insightCount()
         memoryCount = viewModel.memoryCount()
@@ -1258,6 +1286,23 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("导出全部为 JSON")
+                }
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { exportViewModel.export() },
+                    enabled = !exportState.exporting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (exportState.exporting) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text("导出记录数据(zip)")
+                }
+                exportState.error?.let { err ->
+                    Text(err, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
                 // 二次确认由 AlertDialog 处理,无需额外标题。
                 Row(
