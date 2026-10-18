@@ -279,6 +279,11 @@ data class ChatUiState(
     /** 本地模型是否正在分析对话生成洞察(首页显示"正在思考..."指示器) */
     val isInsightAnalyzing: Boolean = false,
     val moodTrend: List<com.xiaoqi.companion.data.db.entity.MoodSnapshotEntity> = emptyList(),
+    // 今日餐食汇总:主屏"今日热量"卡片数据源(记录零条时 recordCount=0)
+    val todayMealTotals: com.xiaoqi.companion.data.db.dao.MealTotalsRow =
+        com.xiaoqi.companion.data.db.dao.MealTotalsRow(
+            calories = 0.0, proteinG = 0.0, carbsG = 0.0, fatG = 0.0, recordCount = 0,
+        ),
     val pendingPrefill: String? = null,
     /** 对话列表 Sheet 的消息搜索框文本;≥3 字符触发 FTS 查询(trigram 下限)。 */
     val messageSearchQuery: String = "",

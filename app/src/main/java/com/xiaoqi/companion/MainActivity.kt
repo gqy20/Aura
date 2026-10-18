@@ -159,6 +159,7 @@ private object AuraRoutes {
     const val MemoryRoom = "memory-room"
     const val Onboarding = "onboarding"
     const val RecordCapture = "record-capture"
+    const val RecordHistory = "record-history"
 }
 
 @Composable
@@ -211,6 +212,7 @@ private fun AuraAppNavHost(
                     navController.navigate(AuraRoutes.McpSettings)
                 },
                 onOpenRecordCapture = { navController.navigate(AuraRoutes.RecordCapture) },
+                onOpenRecordHistory = { navController.navigate(AuraRoutes.RecordHistory) },
             )
         }
         composable(AuraRoutes.Chat) {
@@ -252,6 +254,11 @@ private fun AuraAppNavHost(
         composable(AuraRoutes.RecordCapture) {
             com.xiaoqi.companion.feature.record.RecordCaptureScreen(
                 onDone = { navController.popBackStack() },
+            )
+        }
+        composable(AuraRoutes.RecordHistory) {
+            com.xiaoqi.companion.feature.record.RecordHistoryScreen(
+                onBack = { navController.popBackStack() },
             )
         }
         composable(AuraRoutes.Onboarding) {

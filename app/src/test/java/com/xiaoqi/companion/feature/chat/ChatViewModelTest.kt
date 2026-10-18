@@ -223,6 +223,11 @@ class ChatViewModelTest {
             memoryRepository = memoryRepository,
             insightRepository = insightRepository,
             moodSnapshotDao = moodSnapshotDao,
+            mealRecordRepository = io.mockk.mockk {
+                every { observeTotalsBetween(any(), any()) } returns kotlinx.coroutines.flow.flowOf(
+                    com.xiaoqi.companion.data.db.dao.MealTotalsRow(0.0, 0.0, 0.0, 0.0, 0)
+                )
+            },
             messageDao = mockk(relaxed = true),
             messageSearchDao = messageSearchDao,
             agentStateDao = agentStateDao,
@@ -462,6 +467,11 @@ class ChatViewModelTest {
             memoryRepository = memoryRepository,
             insightRepository = insightRepository,
             moodSnapshotDao = moodSnapshotDao,
+            mealRecordRepository = io.mockk.mockk {
+                every { observeTotalsBetween(any(), any()) } returns kotlinx.coroutines.flow.flowOf(
+                    com.xiaoqi.companion.data.db.dao.MealTotalsRow(0.0, 0.0, 0.0, 0.0, 0)
+                )
+            },
             messageDao = mockk(relaxed = true),
             messageSearchDao = messageSearchDao,
             agentStateDao = agentStateDao,

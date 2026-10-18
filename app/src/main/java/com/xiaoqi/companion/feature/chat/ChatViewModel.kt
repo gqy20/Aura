@@ -96,6 +96,7 @@ class ChatViewModel @Inject constructor(
     private val memoryRepository: MemoryRepository,
     private val insightRepository: InsightRepository,
     private val moodSnapshotDao: MoodSnapshotDao,
+    private val mealRecordRepository: com.xiaoqi.companion.data.repository.MealRecordRepository,
     private val messageDao: MessageDao,
     private val messageSearchDao: MessageSearchDao,
     private val agentStateDao: AgentStateDao,
@@ -444,6 +445,27 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(moodTrend = list) }
             }
         }
+
+        viewModelScope.launch {
+            // 今日热量/蛋白:主屏卡片数据源;窗口按本地日界滚动,每天首帧自然刷新
+            mealRecordRepository.observeTotalsBetween(startOfTodayMillis(), startOfTodayMillis() + DAY_MILLIS)
+                .collect { totals ->
+                    _uiState.update {
+                        it.copy(todayMealTotals = com.xiaoqi.companion.data.db.dao.MealTotalsRow(
+                            calories = totals.calories,
+                            proteinG = totals.proteinG,
+                            carbsG = totals.carbsG,
+                            fatG = totals.fatG,
+                            recordCount = totals.recordCount,
+                        ))
+                    }
+                }
+        }
+    }
+
+    private fun startOfTodayMillis(): Long {
+        val zone = java.time.ZoneId.systemDefault()
+        return java.time.LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
     }
 
     //region 简单 UI 反馈
@@ -1471,6 +1493,7 @@ class ChatViewModel @Inject constructor(
 
     companion object {
         private const val DEFAULT_COMPANION_ID = "default"
+        private const val DAY_MILLIS = 86_400_000L
         // 8 条窗口覆盖复合工具时间线的 detail 反查(3 条在多工具轮次里不够)
         private const val RECENT_TOOL_CALL_LIMIT = 8
         private const val MESSAGE_SEARCH_LIMIT = 30

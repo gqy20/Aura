@@ -87,6 +87,7 @@ fun AuraHomeScreen(
     onOpenMemoryRoom: () -> Unit,
     onOpenMcpSettings: () -> Unit,
     onOpenRecordCapture: () -> Unit = {},
+    onOpenRecordHistory: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -103,6 +104,7 @@ fun AuraHomeScreen(
         onOpenMemoryRoom = onOpenMemoryRoom,
         onOpenMcpSettings = onOpenMcpSettings,
         onOpenRecordCapture = onOpenRecordCapture,
+        onOpenRecordHistory = onOpenRecordHistory,
         onInsightLongPress = { insight ->
             AppLogger.debug(
                 LogTags.Chat,
@@ -190,6 +192,7 @@ private fun AuraHomeContent(
     onOpenMemoryRoom: () -> Unit,
     onOpenMcpSettings: () -> Unit,
     onOpenRecordCapture: () -> Unit,
+    onOpenRecordHistory: () -> Unit,
     onInsightLongPress: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
     onInsightDismiss: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
     onInsightChat: (com.xiaoqi.companion.feature.chat.ChatInsight) -> Unit,
@@ -260,7 +263,17 @@ private fun AuraHomeContent(
                     }
                 }
                 item {
-                    RecordCaptureEntry(onClick = onOpenRecordCapture)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        RecordCaptureEntry(
+                            onClick = onOpenRecordCapture,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TodayMealCard(
+                            totals = uiState.todayMealTotals,
+                            onClick = onOpenRecordHistory,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                 }
                 item {
@@ -342,12 +355,61 @@ private fun LongTaskEntry(
     }
 }
 
+// 今日餐食状态卡:与"记一餐"动作卡并排,零记录时引导记录
+@Composable
+private fun TodayMealCard(
+    totals: com.xiaoqi.companion.data.db.dao.MealTotalsRow,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.58f),
+        tonalElevation = 0.dp,
+        shadowElevation = 1.dp,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                text = "今日",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (totals.recordCount > 0) {
+                Text(
+                    text = "${totals.calories.toInt()} kcal · 蛋白 ${totals.proteinG.toInt()}g",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                Text(
+                    text = "${totals.recordCount} 项记录",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                    maxLines = 1,
+                )
+            } else {
+                Text(
+                    text = "还没有记录",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                )
+                Text(
+                    text = "记一餐看看",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
 // 事务面入口卡片(design.md §6.4):确定性文案,无人格表达
 @Composable
-private fun RecordCaptureEntry(onClick: () -> Unit) {
+private fun RecordCaptureEntry(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         color = Color.White.copy(alpha = 0.58f),
