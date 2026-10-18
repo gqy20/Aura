@@ -136,7 +136,7 @@ fun RecordCaptureScreen(
                     // 域切换低频(模型自动分类),收进顶栏,给内容层让出整行
                     val target = if (state.domain == RecordDomain.MEAL) RecordDomain.PURCHASE else RecordDomain.MEAL
                     TextButton(onClick = { viewModel.switchDomain(target) }) {
-                        Text(if (target == RecordDomain.PURCHASE) "→ 采购" else "→ 餐食")
+                        Text(if (target == RecordDomain.PURCHASE) "采购" else "餐食")
                     }
                     IconButton(onClick = { showHelp = true }) {
                         Icon(

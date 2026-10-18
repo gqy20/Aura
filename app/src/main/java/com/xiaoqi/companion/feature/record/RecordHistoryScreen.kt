@@ -22,8 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SwipeToDismissBox
@@ -220,7 +218,7 @@ private fun HistoryEntryCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
-                    contentDescription = "删除记录",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
@@ -230,14 +228,8 @@ private fun HistoryEntryCard(
             shape = MaterialTheme.shapes.medium,
             color = cardColor,
         ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Column(modifier = Modifier.clickable(onClick = onToggle).padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(
-                        imageVector = if (entry is HistoryEntry.Meal) Icons.Default.Restaurant else Icons.Default.ShoppingCart,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp),
-                    )
                     Text(
                         text = firstLineSummary(entry),
                         style = MaterialTheme.typography.bodyMedium,
