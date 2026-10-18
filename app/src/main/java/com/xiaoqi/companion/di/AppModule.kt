@@ -24,12 +24,14 @@ import com.xiaoqi.companion.core.mcp.McpHttpClient
 import com.xiaoqi.companion.core.mcp.RemoteMcpClient
 import com.xiaoqi.companion.core.presence.runtime.WorkManagerScheduler
 import com.xiaoqi.companion.core.presence.runtime.WorkScheduler
+import com.xiaoqi.companion.core.record.FoodDensitySource
 import com.xiaoqi.companion.core.reminder.AndroidReminderScheduler
 import com.xiaoqi.companion.core.reminder.ReminderScheduler
 import com.xiaoqi.companion.core.tools.AgentToolRegistry
 import com.xiaoqi.companion.core.tools.CompanionToolRegistry
 import com.xiaoqi.companion.core.weather.OpenMeteoWeatherProvider
 import com.xiaoqi.companion.core.weather.WeatherProvider
+import com.xiaoqi.companion.data.record.AssetFoodDensitySource
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.ConfigRepositoryImpl
 import com.xiaoqi.companion.data.repository.InventoryRepository
@@ -125,6 +127,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindChatImageProcessor(processor: AndroidChatImageProcessor): ChatImageProcessor
+
+    @Binds
+    @Singleton
+    abstract fun bindFoodDensitySource(source: AssetFoodDensitySource): FoodDensitySource
 
     @Binds
     @Singleton

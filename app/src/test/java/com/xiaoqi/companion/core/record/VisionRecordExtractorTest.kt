@@ -6,6 +6,7 @@ import com.xiaoqi.companion.data.db.converter.MealType
 import com.xiaoqi.companion.data.db.converter.RecordSource
 import com.xiaoqi.companion.data.repository.ConfigRepository
 import com.xiaoqi.companion.data.repository.LlmConfig
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
@@ -254,6 +255,101 @@ class VisionRecordExtractorTest {
         assertTrue((result as RecordExtractionResult.Failed).reason.contains("未知记录类型"))
     }
 
+    // --- 两段式营养解析 ---
+
+    private val densityTable = FoodDensityTable(
+        listOf(
+            FoodDensityEntry(n = "米饭（蒸，代表值）", k = 116.0, p = 2.6, f = 0.3, b = 25.9),
+            FoodDensityEntry(n = "鸡蛋（代表值）", k = 139.0, p = 13.3, f = 8.8, b = 2.8),
+        )
+    )
+
+    @Test
+    fun extract_densityHit_recomputesNutritionFromGrams() = runTest {
+        // 模型估 999 kcal;密度表鸡蛋 139kcal/100g × 100g = 139 —— 查表值覆盖模型值
+        server.enqueue(
+            toolUseResponse(
+                "submit_meal_record",
+                """{"meal_type":"LUNCH","items":[{"name":"鸡蛋","portion_text":"2个","calories":999,"estimated_grams":100}]}""",
+            )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM, densityTable = densityTable)
+
+        val result = extractor.extract("aGk=", "image/jpeg")
+
+        val item = (result as RecordExtractionResult.Meal).draft.items.single()
+        assertEquals(139.0, item.calories, 0.01)
+        assertEquals(13.3, item.proteinG, 0.01)
+        assertEquals(100.0, item.estimatedGrams, 0.01)
+    }
+
+    @Test
+    fun extract_densityMiss_keepsModelValues() = runTest {
+        server.enqueue(
+            toolUseResponse(
+                "submit_meal_record",
+                """{"meal_type":"LUNCH","items":[{"name":"张记招牌套餐","portion_text":"1份","calories":650,"protein_g":30,"estimated_grams":400}]}""",
+            )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM, densityTable = densityTable)
+
+        val result = extractor.extract("aGk=", "image/jpeg")
+
+        val item = (result as RecordExtractionResult.Meal).draft.items.single()
+        assertEquals(650.0, item.calories, 0.001)
+        assertEquals(30.0, item.proteinG, 0.001)
+    }
+
+    @Test
+    fun extract_calibratedItem_beatsDensityTable() = runTest {
+        server.enqueue(
+            toolUseResponse(
+                "submit_meal_record",
+                """{"meal_type":"DINNER","items":[{"name":"鸡蛋","portion_text":"2个","calories":999,"estimated_grams":120}]}""",
+            )
+        )
+        val extractor = extractor(
+            provider = LlmProvider.GLM,
+            densityTable = densityTable,
+            calibratedItems = listOf(
+                com.xiaoqi.companion.data.db.dao.CalibratedMealItemRow(
+                    name = "鸡蛋",
+                    portionText = "2个(100g)",
+                    estCalories = 160.0,
+                    estProteinG = 14.0,
+                    estCarbsG = 2.0,
+                    estFatG = 10.0,
+                )
+            ),
+        )
+
+        val result = extractor.extract("aGk=", "image/jpeg")
+
+        val item = (result as RecordExtractionResult.Meal).draft.items.single()
+        // 校准基线 100g=160kcal,本次 120g → 160*1.2=192;密度表(139/100g)不参与
+        assertEquals(192.0, item.calories, 0.01)
+        assertEquals(false, item.isEstimate)
+    }
+
+    @Test
+    fun extract_noGrams_infersFromModelCalories() = runTest {
+        // 模型没给克重(老协议/弱模型):按 kcal 反推克重再查表,鸡蛋 999kcal → 718g → 999kcal(自洽)
+        server.enqueue(
+            toolUseResponse(
+                "submit_meal_record",
+                """{"meal_type":"LUNCH","items":[{"name":"鸡蛋","portion_text":"一些","calories":999}]}""",
+            )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM, densityTable = densityTable)
+
+        val result = extractor.extract("aGk=", "image/jpeg")
+
+        val item = (result as RecordExtractionResult.Meal).draft.items.single()
+        // kcal 反推克重的查表值与模型 kcal 数学上等价,但宏量素来自成分表(一致性收益)
+        assertEquals(999.0, item.calories, 1.0)
+        assertEquals(95.2, item.proteinG, 1.0)
+    }
+
     private fun toolUseResponse(toolName: String, inputJson: String) = MockResponse()
         .setResponseCode(200)
         .setHeader("Content-Type", "application/json")
@@ -263,7 +359,12 @@ class VisionRecordExtractorTest {
                 """"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":20}}"""
         )
 
-    private fun extractor(provider: LlmProvider, apiKey: String = "test-key") = VisionRecordExtractor(
+    private fun extractor(
+        provider: LlmProvider,
+        apiKey: String = "test-key",
+        densityTable: FoodDensityTable? = null,
+        calibratedItems: List<com.xiaoqi.companion.data.db.dao.CalibratedMealItemRow> = emptyList(),
+    ) = VisionRecordExtractor(
         configRepository = mockk {
             every { getCurrentLlmConfig() } returns flowOf(
                 LlmConfig(
@@ -275,5 +376,17 @@ class VisionRecordExtractorTest {
             )
         },
         clientFactory = AnthropicMessagesLLMClientFactory(),
+        foodDensitySource = object : FoodDensitySource {
+            override suspend fun load(): FoodDensityTable? = densityTable
+        },
+        mealRepository = mockk {
+            coEvery { getRecentCalibratedItems(any(), any()) } returns calibratedItems
+        },
+        nowProvider = { NOW },
     )
+
+    private companion object {
+        // 固定时钟:校准窗口断言不依赖真实时间
+        const val NOW = 1_700_000_000_000L
+    }
 }

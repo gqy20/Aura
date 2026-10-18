@@ -3,6 +3,7 @@ package com.xiaoqi.companion.data.repository
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.record.MealRecordDraft
+import com.xiaoqi.companion.data.db.dao.CalibratedMealItemRow
 import com.xiaoqi.companion.data.db.dao.MealRecordDao
 import com.xiaoqi.companion.data.db.dao.MealRecordWithItems
 import com.xiaoqi.companion.data.db.dao.MealTotalsRow
@@ -21,6 +22,9 @@ interface MealRecordRepository {
     suspend fun saveMeal(draft: MealRecordDraft): String
     suspend fun deleteMeal(recordId: String)
     suspend fun getRecordsBetween(from: Long, to: Long): List<MealRecordWithItems>
+
+    /** 用户修正过数值的条目(sinceAt 以来),提取器用作个人化校准锚点。 */
+    suspend fun getRecentCalibratedItems(sinceAt: Long, limit: Int): List<CalibratedMealItemRow>
 }
 
 class MealRecordRepositoryImpl @Inject constructor(
@@ -85,4 +89,7 @@ class MealRecordRepositoryImpl @Inject constructor(
 
     override suspend fun getRecordsBetween(from: Long, to: Long): List<MealRecordWithItems> =
         withContext(Dispatchers.IO) { mealRecordDao.getRecordsBetween(from, to) }
+
+    override suspend fun getRecentCalibratedItems(sinceAt: Long, limit: Int): List<CalibratedMealItemRow> =
+        withContext(Dispatchers.IO) { mealRecordDao.getCalibratedItems(sinceAt, limit) }
 }

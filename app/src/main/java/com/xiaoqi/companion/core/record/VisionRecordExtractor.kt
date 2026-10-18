@@ -14,6 +14,7 @@ import com.xiaoqi.companion.data.db.converter.MealType
 import com.xiaoqi.companion.data.db.converter.RecordSource
 import com.xiaoqi.companion.data.db.converter.LlmProvider
 import com.xiaoqi.companion.data.repository.ConfigRepository
+import com.xiaoqi.companion.data.repository.MealRecordRepository
 import java.time.LocalTime
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
@@ -38,18 +39,35 @@ internal const val CARB_MAX_PER_ITEM = 300.0
 internal const val FAT_MAX_PER_ITEM = 150.0
 internal const val PURCHASE_QUANTITY_MAX = 10_000.0
 internal const val PURCHASE_PRICE_MAX = 100_000.0
+internal const val GRAMS_MAX_PER_ITEM = 5_000.0
 
 /**
  * 生活记录图片 → 结构化提取器。一次强制工具调用,按 tool_choice=any 让模型在
  * submit_meal_record / submit_purchase_record 间自选完成域分类(design.md §6:
  * 提取器分类,确认页域切换兜底 —— [domainHint] 供手动切换后按指定域重提)。
  *
+ * 餐食营养走两段式(MR 精度策略):模型只负责菜名 + 可食部克重,密度命中时营养
+ * 由《成分表》密度 × 克重本地计算,消掉"同一道菜每次估的热量都不同"的方差;
+ * 密度未命中再降级模型估算。用户修正过的条目(isEstimate=false)优先级最高。
+ *
  * 云端 GLM 专用 —— 本地 Qwen 不做结构化 vision 提取(质量不可靠,roadmap MR 决策)。
  */
-class VisionRecordExtractor @Inject constructor(
+class VisionRecordExtractor(
     private val configRepository: ConfigRepository,
     private val clientFactory: AnthropicMessagesLLMClientFactory,
+    private val foodDensitySource: FoodDensitySource,
+    private val mealRepository: MealRecordRepository,
+    private val nowProvider: () -> Long = { System.currentTimeMillis() },
 ) {
+
+    // Dagger 不认 Function0 默认参数,注入走这个不含 nowProvider 的构造
+    @Inject
+    constructor(
+        configRepository: ConfigRepository,
+        clientFactory: AnthropicMessagesLLMClientFactory,
+        foodDensitySource: FoodDensitySource,
+        mealRepository: MealRecordRepository,
+    ) : this(configRepository, clientFactory, foodDensitySource, mealRepository, { System.currentTimeMillis() })
 
     suspend fun extract(
         imageBase64: String,
@@ -116,7 +134,14 @@ class VisionRecordExtractor @Inject constructor(
         }
         val hour = LocalTime.now().hour
         return when (call.name.ifBlank { forceName ?: "" }) {
-            MEAL_TOOL_NAME -> parseMealToolInput(call.inputJson, note, hour)
+            MEAL_TOOL_NAME -> {
+                val parsed = parseMealToolInput(call.inputJson, note, hour)
+                if (parsed is RecordExtractionResult.Meal) {
+                    RecordExtractionResult.Meal(resolveMealNutrition(parsed.draft))
+                } else {
+                    parsed
+                }
+            }
             PURCHASE_TOOL_NAME -> parsePurchaseToolInput(call.inputJson, note)
             else -> {
                 AppLogger.warn(LogTags.Record, "record_extraction_unknown_tool", "tool" to call.name)
@@ -125,19 +150,113 @@ class VisionRecordExtractor @Inject constructor(
         }
     }
 
+    /**
+     * 营养数值三级解析,优先级从高到低:
+     * 1. 个人校准:用户修正过同名条目 → 直接套用其克重换算(用户比任何表都懂自己的碗)
+     * 2. 密度表:菜名命中《成分表》→ 密度 × 模型克重
+     * 3. 模型估算:保留原值(唯一误差源=模型,方差回到纯 prompt 水平)
+     */
+    private suspend fun resolveMealNutrition(draft: MealRecordDraft): MealRecordDraft {
+        if (draft.items.isEmpty()) return draft
+        val densityTable = foodDensitySource.load()
+        val calibrated = runCatching {
+            mealRepository.getRecentCalibratedItems(
+                sinceAt = nowProvider() - CALIBRATION_WINDOW_DAYS * MILLIS_PER_DAY,
+                limit = 30,
+            )
+        }.getOrDefault(emptyList())
+            .associateBy { it.name.trim().lowercase() }
+        if (densityTable == null && calibrated.isEmpty()) return draft
+
+        var densityHitCount = 0
+        var calibrationHitCount = 0
+        val resolved = draft.items.map { item ->
+            val nameKey = item.name.trim().lowercase()
+            calibrated[nameKey]?.let { calib ->
+                calibrationHitCount += 1
+                val grams = item.estimatedGrams
+                return@map if (grams > 0) scaleCalibrated(calib, grams) else item
+            }
+            val entry = densityTable?.lookup(item.name) ?: return@map item
+            val grams = if (item.estimatedGrams > 0) item.estimatedGrams else gramsFromCalories(item.calories, entry)
+            if (grams <= 0.0) return@map item
+            densityHitCount += 1
+            item.copy(
+                calories = round1(entry.kcalPer100g * grams / 100.0),
+                proteinG = round1(entry.proteinPer100g * grams / 100.0),
+                carbsG = round1(entry.carbsPer100g * grams / 100.0),
+                fatG = round1(entry.fatPer100g * grams / 100.0),
+                estimatedGrams = grams,
+            )
+        }
+        AppLogger.info(
+            LogTags.Record,
+            "meal_nutrition_resolved",
+            "itemCount" to draft.items.size,
+            "densityHitCount" to densityHitCount,
+            "calibrationHitCount" to calibrationHitCount,
+            "tableLoaded" to (densityTable != null),
+        )
+        return draft.copy(items = resolved)
+    }
+
+    private fun scaleCalibrated(calib: com.xiaoqi.companion.data.db.dao.CalibratedMealItemRow, grams: Double): MealItemDraft {
+        // 修正记录的克重从 portionText 里的数字提取(如"1碗(350g)"),拿不到就按比例近似不缩放
+        val baseGrams = GRAMS_IN_PORTION.find(calib.portionText)?.groupValues?.get(1)?.toDoubleOrNull() ?: return run {
+            MealItemDraft(
+                name = calib.name,
+                portionText = calib.portionText,
+                calories = calib.estCalories,
+                proteinG = calib.estProteinG,
+                carbsG = calib.estCarbsG,
+                fatG = calib.estFatG,
+                isEstimate = false,
+                estimatedGrams = grams,
+            )
+        }
+        val scale = if (baseGrams > 0) grams / baseGrams else 1.0
+        return MealItemDraft(
+            name = calib.name,
+            portionText = calib.portionText,
+            calories = round1(calib.estCalories * scale),
+            proteinG = round1(calib.estProteinG * scale),
+            carbsG = round1(calib.estCarbsG * scale),
+            fatG = round1(calib.estFatG * scale),
+            isEstimate = false,
+            estimatedGrams = grams,
+        )
+    }
+
+    private fun gramsFromCalories(calories: Double, entry: FoodDensityEntry): Double =
+        if (entry.kcalPer100g > 0) calories / entry.kcalPer100g * 100.0 else 0.0
+
+    private fun round1(v: Double): Double = Math.round(v * 10.0) / 10.0
+
     companion object {
         private const val MEAL_TOOL_NAME = "submit_meal_record"
         private const val PURCHASE_TOOL_NAME = "submit_purchase_record"
+        private const val CALIBRATION_WINDOW_DAYS = 60
+        private const val MILLIS_PER_DAY = 86_400_000L
+        private val GRAMS_IN_PORTION = Regex("""(\d+(?:\.\d+)?)\s*g""", RegexOption.IGNORE_CASE)
 
         private const val EXTRACTION_SYSTEM_PROMPT =
             "You are a life logging extractor. Analyze the photo (plus the optional user note) and submit ONE " +
                 "structured record by choosing the matching tool. Photo of prepared food, a dish, or a meal being " +
-                "eaten → submit_meal_record (nutrition values are estimates based on visible food and typical " +
-                "portions; record the portion basis in portion_text; never leave items empty if any food is visible). " +
-                "Photo of groceries, a supermarket receipt, or packaged products bought → submit_purchase_record " +
-                "(extract brand, quantity, unit and unit price from labels or receipt). " +
+                "eaten → submit_meal_record. Photo of groceries, a supermarket receipt, or packaged products bought " +
+                "→ submit_purchase_record (extract brand, quantity, unit and unit price from labels or receipt). " +
                 "If the photo shows neither, reply in plain text explaining why. " +
-                "Use the language of the photo/note for item names."
+                "Use the language of the photo/note for item names.\n\n" +
+                "## Estimating grams (meal items)\n" +
+                "estimated_grams is the weight of the EDIBLE portion on the plate/in the bowl, not the raw weight. " +
+                "Use reference objects in the photo to judge volume:\n" +
+                "- standard rice bowl ≈ 300ml (cooked rice ≈ 200g), large ramen bowl ≈ 600ml (noodles ≈ 300g)\n" +
+                "- chinese soup spoon ≈ 10ml; pair of disposable chopsticks ≈ 25cm long (plate diameter reference)\n" +
+                "- palm-sized piece of meat ≈ 100g; one egg ≈ 50g; one bottle cap of oil ≈ 5g\n" +
+                "- packaged foods: read the label and use its net weight\n" +
+                "Prefer the user's note when it states amounts. When unsure, choose the midpoint of plausible range.\n" +
+                "Nutrition fields are fallbacks only — the app recomputes them from a food composition table when the " +
+                "dish name matches, so put your effort into naming the dish precisely (generic core name, e.g. " +
+                "牛肉面 not 张记招牌牛肉拉面) and estimating grams."
     }
 }
 
@@ -149,6 +268,7 @@ private data class MealItemDto(
     val protein_g: Double = 0.0,
     val carbs_g: Double = 0.0,
     val fat_g: Double = 0.0,
+    val estimated_grams: Double = 0.0,
 )
 
 @Serializable
@@ -211,11 +331,16 @@ internal val MEAL_TOOL_SCHEMA: JsonObject = buildJsonObject {
                         put("protein_g", buildJsonObject { put("type", "number") })
                         put("carbs_g", buildJsonObject { put("type", "number") })
                         put("fat_g", buildJsonObject { put("type", "number") })
+                        put("estimated_grams", buildJsonObject {
+                            put("type", "number")
+                            put("description", "Estimated weight of the edible portion in grams")
+                        })
                     })
                     put("required", buildJsonArray {
                         add(JsonPrimitive("name"))
                         add(JsonPrimitive("portion_text"))
                         add(JsonPrimitive("calories"))
+                        add(JsonPrimitive("estimated_grams"))
                     })
                 })
             })
@@ -295,6 +420,7 @@ internal fun parseMealToolInput(inputJson: String, note: String?, hour: Int): Re
                 proteinG = item.protein_g.coerceIn(0.0, PROTEIN_MAX_PER_ITEM),
                 carbsG = item.carbs_g.coerceIn(0.0, CARB_MAX_PER_ITEM),
                 fatG = item.fat_g.coerceIn(0.0, FAT_MAX_PER_ITEM),
+                estimatedGrams = item.estimated_grams.coerceIn(0.0, GRAMS_MAX_PER_ITEM),
             )
         }
     if (items.isEmpty()) {

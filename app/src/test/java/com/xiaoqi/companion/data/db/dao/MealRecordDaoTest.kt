@@ -79,6 +79,46 @@ class MealRecordDaoTest : BaseDaoTest() {
         assertTrue(dao.getRecordsBetween(0, 100_000).isEmpty())
     }
 
+    @Test
+    fun getCalibratedItems_returnsUserCorrectedRowsDeduped() = runTest {
+        val now = System.currentTimeMillis()
+        dao.insertRecordWithItems(
+            makeRecord(id = "r1", createdAt = now - 10_000),
+            listOf(
+                MealItemEntity(recordId = "r1", name = "牛肉面", portionText = "1碗(400g)", estCalories = 550.0, estProteinG = 25.0, estCarbsG = 70.0, estFatG = 12.0, isEstimate = false),
+                MealItemEntity(recordId = "r1", name = "米饭", portionText = "1碗", estCalories = 200.0, estProteinG = 4.0, estCarbsG = 46.0, estFatG = 0.5, isEstimate = true),
+            ),
+        )
+        // 同名条目更晚的修正应胜出
+        dao.insertRecordWithItems(
+            makeRecord(id = "r2", createdAt = now - 1_000),
+            listOf(
+                MealItemEntity(recordId = "r2", name = "牛肉面", portionText = "1大碗(500g)", estCalories = 680.0, estProteinG = 31.0, estCarbsG = 86.0, estFatG = 15.0, isEstimate = false),
+            ),
+        )
+
+        val calibrated = dao.getCalibratedItems(sinceAt = now - 60_000, limit = 30)
+
+        assertEquals(1, calibrated.size)
+        assertEquals("牛肉面", calibrated.single().name)
+        assertEquals(680.0, calibrated.single().estCalories, 0.001)
+        assertEquals("1大碗(500g)", calibrated.single().portionText)
+    }
+
+    @Test
+    fun getCalibratedItems_respectsSinceAt() = runTest {
+        val now = System.currentTimeMillis()
+        dao.insertRecordWithItems(
+            makeRecord(id = "r1", createdAt = now - 100_000),
+            listOf(
+                MealItemEntity(recordId = "r1", name = "鸡蛋", portionText = "2个", estCalories = 160.0, estProteinG = 14.0, estCarbsG = 2.0, estFatG = 10.0, isEstimate = false),
+            ),
+        )
+
+        assertTrue(dao.getCalibratedItems(sinceAt = now - 50_000, limit = 30).isEmpty())
+        assertEquals(1, dao.getCalibratedItems(sinceAt = now - 200_000, limit = 30).size)
+    }
+
     private fun makeRecord(id: String, createdAt: Long = 1_000, totalCalories: Double = 530.0) =
         MealRecordEntity(
             id = id,

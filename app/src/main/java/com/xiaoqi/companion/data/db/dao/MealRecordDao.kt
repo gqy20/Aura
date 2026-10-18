@@ -25,6 +25,16 @@ data class MealTotalsRow(
     val recordCount: Int,
 )
 
+/** 用户修正过数值的条目(isEstimate=false),供提取器做个人化校准锚点。 */
+data class CalibratedMealItemRow(
+    val name: String,
+    val portionText: String,
+    val estCalories: Double,
+    val estProteinG: Double,
+    val estCarbsG: Double,
+    val estFatG: Double,
+)
+
 @Dao
 abstract class MealRecordDao {
 
@@ -46,6 +56,22 @@ abstract class MealRecordDao {
 
     @Query("SELECT * FROM meal_records WHERE id = :id")
     abstract suspend fun getRecord(id: String): MealRecordEntity?
+
+    // 同名条目只取最近一次修正(旧值可能已被后续修正覆盖)
+    @Query(
+        """
+        SELECT mi.name AS name, mi.portionText AS portionText,
+               mi.estCalories AS estCalories, mi.estProteinG AS estProteinG,
+               mi.estCarbsG AS estCarbsG, mi.estFatG AS estFatG
+        FROM meal_items mi
+        JOIN meal_records mr ON mi.recordId = mr.id
+        WHERE mi.isEstimate = 0 AND mr.createdAt >= :sinceAt
+        GROUP BY mi.name
+        ORDER BY MAX(mr.createdAt) DESC
+        LIMIT :limit
+        """
+    )
+    abstract suspend fun getCalibratedItems(sinceAt: Long, limit: Int): List<CalibratedMealItemRow>
 
     @Transaction
     @Query("SELECT * FROM meal_records WHERE createdAt >= :from AND createdAt < :to ORDER BY createdAt ASC")

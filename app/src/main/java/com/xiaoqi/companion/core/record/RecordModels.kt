@@ -14,6 +14,8 @@ data class MealItemDraft(
     val carbsG: Double,
     val fatG: Double,
     val isEstimate: Boolean = true,
+    // 模型估的可食部克重;两段式提取(密度表 × 克重)与后续 UI 微调的依据,不持久化到 meal_items
+    val estimatedGrams: Double = 0.0,
 )
 
 data class MealRecordDraft(
