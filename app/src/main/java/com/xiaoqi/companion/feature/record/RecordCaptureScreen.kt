@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -92,6 +93,11 @@ fun RecordCaptureScreen(
     val launchPicker = {
         pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
+    // 扫条码复用同一个 Photo Picker,但走独立入口(不触发整图提取)
+    val pickBarcode = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> uri?.let { viewModel.onBarcodeImagePicked(it.toString()) } },
+    )
 
     LaunchedEffect(state.phase) {
         if (state.phase == RecordCapturePhase.SAVED) {
@@ -151,6 +157,7 @@ fun RecordCaptureScreen(
                             onUpdateItem = viewModel::updatePurchaseItem,
                             onDeleteItem = viewModel::deletePurchaseItem,
                             onAddItem = viewModel::addPurchaseItem,
+                            onScanBarcode = { pickBarcode.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onSave = viewModel::save,
                         )
                     }
@@ -364,6 +371,7 @@ private fun PurchaseConfirmContent(
     onUpdateItem: (Int, PurchaseItemDraft) -> Unit,
     onDeleteItem: (Int) -> Unit,
     onAddItem: () -> Unit,
+    onScanBarcode: () -> Unit,
     onSave: () -> Unit,
 ) {
     var editingIndex by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -403,10 +411,44 @@ private fun PurchaseConfirmContent(
             )
         }
         item {
-            TextButton(onClick = onAddItem) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("添加一项")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(onClick = onAddItem) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("添加一项")
+                }
+                // 条码预填:包装条码照片 → OFF 查询,零估算录入(design.md 估算诚实原则)
+                TextButton(onClick = onScanBarcode, enabled = !state.barcodeScanning) {
+                    if (state.barcodeScanning) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(4.dp))
+                    } else {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text("扫条码")
+                }
+            }
+        }
+        if (state.barcodeNotFound) {
+            item {
+                Text(
+                    "没识别到条码——换一张清晰的条码特写,或直接手动添加",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (state.barcodeLookupFailed) {
+            item {
+                Text(
+                    "条码识别成功,但商品库暂未收录——名称请手动补一下",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         item {

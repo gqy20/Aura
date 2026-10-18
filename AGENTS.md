@@ -8,7 +8,7 @@
 - 部分实现：Vision 以 Photo Picker 选图为 MVP，CameraX 拍摄 UI 仍缺；情绪与关系的头像/表情层由 Compose Canvas 临时替代；Presence Layer 的 Rive/Lottie 动画资源仍缺；Pulse 的离线衰减/回归反应/主动通知仍缺
 - 尚未实现：`SpeechRecognizer`/`TextToSpeech` 语音 I/O、`PulseWorker`（仅 reminder 使用 OneTimeWorkRequest）、Rive/Lottie 状态机动画、Instrumented UI 测试、CI 工作流、远程 Agent Server / `RemoteAgentRuntime`
 - 详细进度见：`docs/roadmap.md`
-- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-10-18 通过（**776 个测试，0 失败**；694 存量 + MR 结构化记录新增 82：五表 DAO/Repository/图片文件存储、强制工具调用协议、双域分类提取、捕获流 ViewModel、log/query 四工具与 Koog 嵌套 schema 渲染器。聊天口述记餐 + 库存消耗真机验证通过。Robolectric 单 fork 复用）
+- 验证日期：`./gradlew.bat testDebugUnitTest` 于 2026-10-18 通过（**798 个测试，0 失败**；694 存量 + MR 结构化记录新增 82：五表 DAO/Repository/图片文件存储、强制工具调用协议、双域分类提取、捕获流 ViewModel、log/query 四工具与 Koog 嵌套 schema 渲染器。聊天口述记餐 + 库存消耗真机验证通过。Robolectric 单 fork 复用）
 
 ## 常用验证命令
 

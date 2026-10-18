@@ -193,6 +193,14 @@
 - **E2E（模拟器）**：密度表从 assets 加载正常（tableLoaded=true）；复合菜照片正确回退模型值（680 kcal/蛋白 38g，合理区间）。
 - **验证**：`testDebugUnitTest` 789 全绿（+13：密度表匹配 7 例、两段式提取 4 例、校准 DAO 2 例）。
 
+### 近期打磨（2026-10-18 · MR 估算精度阶段 3：条码零估算录入）
+
+- **ML Kit 静态图条码识别**（`MlKitBarcodeScanner`，EAN-13/8 + UPC + QR）：走 Photo Picker 既有 MVP 路线，不引入 CameraX——生命周期与运行时权限成本全免；5s 超时、失败静默降级提示。
+- **Open Food Facts v2 客户端**（`OpenFoodFactsClient`，无需 key）：条码 → 商品名/品牌预填采购行（数量默认 1 件），营养字段每 100g 一并返回作参考；离线/未收录/识别失败三种路径均有友好文案，不阻塞手填。baseUrl 可注入（测试用 MockWebServer）。
+- **采购确认页"扫条码"入口**：与"添加一项"同行；扫码进行中禁用并显示 spinner。
+- **E2E（模拟器）**：标准 EAN-13 图（Nutella 3017620422003）→ `barcode_scan_completed found=true length=13` → `off_lookup_completed found=true` → 预填行渲染成功。手搓条码位模式踩坑记录：EAN 的 G 位模式是 R 的**镜像**而非取反，生成测试条码请直接用 python-barcode。
+- **验证**：`testDebugUnitTest` 798 全绿（+9：OFF 客户端 6 例 + VM 条码路径 3 例）。
+
 ## 部分实现
 
 - **模型切换**：Repository/Config、聊天页配置状态提示、聊天页内设置弹层、独立设置页、MCP 设置页、模型连通性检查均已落地；后续主要是可用性和真实 provider 兼容性打磨。

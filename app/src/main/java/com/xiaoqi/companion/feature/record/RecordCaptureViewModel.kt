@@ -13,7 +13,9 @@ import com.xiaoqi.companion.core.record.RecordExtractionResult
 import com.xiaoqi.companion.core.record.VisionRecordExtractor
 import com.xiaoqi.companion.data.db.converter.MealType
 import com.xiaoqi.companion.data.db.converter.RecordSource
+import com.xiaoqi.companion.data.record.OpenFoodFactsClient
 import com.xiaoqi.companion.data.record.RecordImageStore
+import com.xiaoqi.companion.core.record.BarcodeScannerSource
 import com.xiaoqi.companion.data.repository.MealRecordRepository
 import com.xiaoqi.companion.data.repository.PurchaseRepository
 import com.xiaoqi.companion.feature.chat.ChatImageProcessor
@@ -48,6 +50,10 @@ data class RecordCaptureUiState(
     val confidence: Double = 0.0,
     val failureReason: String? = null,
     val savedRecordId: String? = null,
+    // --- 条码(采购域) ---
+    val barcodeScanning: Boolean = false,
+    val barcodeNotFound: Boolean = false,
+    val barcodeLookupFailed: Boolean = false,
 )
 
 @HiltViewModel
@@ -57,6 +63,8 @@ class RecordCaptureViewModel @Inject constructor(
     private val purchaseRepository: PurchaseRepository,
     private val imageProcessor: ChatImageProcessor,
     private val imageStore: RecordImageStore,
+    private val barcodeScanner: BarcodeScannerSource,
+    private val openFoodFactsClient: OpenFoodFactsClient,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RecordCaptureUiState())
@@ -199,6 +207,45 @@ class RecordCaptureViewModel @Inject constructor(
 
     fun addPurchaseItem() {
         _state.update { it.copy(purchaseItems = it.purchaseItems + blankPurchaseItem()) }
+    }
+
+    /**
+     * 扫条码预填(采购域):选包装条码照片 → ML Kit 识别 → OFF 查商品 → 追加预填行。
+     * 扫不到条码或 OFF 未收录时提示手填,绝不阻塞记录(design.md 事务面规范)。
+     */
+    fun onBarcodeImagePicked(uriString: String) {
+        _state.update { it.copy(barcodeScanning = true, barcodeNotFound = false, barcodeLookupFailed = false) }
+        viewModelScope.launch {
+            val barcode = runCatching { barcodeScanner.scanFirst(uriString) }.getOrNull()
+            if (barcode == null) {
+                _state.update { it.copy(barcodeScanning = false, barcodeNotFound = true) }
+                return@launch
+            }
+            val product = openFoodFactsClient.lookup(barcode)
+            _state.update { state ->
+                if (product == null) {
+                    state.copy(barcodeScanning = false, barcodeLookupFailed = true)
+                } else {
+                    state.copy(
+                        barcodeScanning = false,
+                        barcodeNotFound = false,
+                        barcodeLookupFailed = false,
+                        purchaseItems = state.purchaseItems + PurchaseItemDraft(
+                            name = product.name,
+                            brand = product.brand,
+                            quantity = 1.0,
+                            unit = "件",
+                        ),
+                    )
+                }
+            }
+            AppLogger.info(
+                LogTags.Record,
+                "barcode_prefill_completed",
+                "found" to (product != null),
+                "nameLength" to product?.name?.length,
+            )
+        }
     }
 
     // --- 保存 ---

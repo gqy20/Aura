@@ -38,6 +38,8 @@ class RecordCaptureViewModelTest {
     private lateinit var mealRepository: MealRecordRepository
     private lateinit var purchaseRepository: PurchaseRepository
     private lateinit var imageStore: RecordImageStore
+    private lateinit var barcodeScanner: com.xiaoqi.companion.core.record.BarcodeScannerSource
+    private lateinit var openFoodFactsClient: com.xiaoqi.companion.data.record.OpenFoodFactsClient
     private lateinit var imageProcessor: FakeChatImageProcessor
     private lateinit var viewModel: RecordCaptureViewModel
 
@@ -48,8 +50,13 @@ class RecordCaptureViewModelTest {
         mealRepository = mockk()
         purchaseRepository = mockk()
         imageStore = mockk()
+        barcodeScanner = mockk()
+        openFoodFactsClient = mockk()
         imageProcessor = FakeChatImageProcessor()
-        viewModel = RecordCaptureViewModel(extractor, mealRepository, purchaseRepository, imageProcessor, imageStore)
+        viewModel = RecordCaptureViewModel(
+            extractor, mealRepository, purchaseRepository, imageProcessor, imageStore,
+            barcodeScanner, openFoodFactsClient,
+        )
     }
 
     @After
@@ -263,6 +270,60 @@ class RecordCaptureViewModelTest {
         viewModel.updatePurchaseItem(0, viewModel.state.value.purchaseItems[0].copy(quantity = 20.0))
 
         assertEquals(20.0, viewModel.state.value.purchaseItems[0].quantity, 0.001)
+    }
+
+    // --- 条码预填(阶段3) ---
+
+    @Test
+    fun onBarcodeImagePicked_appendsPrefilledRow() = runTest {
+        coEvery { barcodeScanner.scanFirst("content://barcode/1") } returns "3017620422003"
+        coEvery { openFoodFactsClient.lookup("3017620422003") } returns com.xiaoqi.companion.data.record.OpenFoodFactsProduct(
+            barcode = "3017620422003",
+            name = "Nutella",
+            brand = "Ferrero",
+            kcalPer100g = 539.0,
+            proteinPer100g = 6.3,
+            carbsPer100g = 57.5,
+            fatPer100g = 30.9,
+        )
+
+        viewModel.onBarcodeImagePicked("content://barcode/1")
+
+        val state = viewModel.state.value
+        assertEquals(false, state.barcodeScanning)
+        assertEquals(false, state.barcodeNotFound)
+        assertEquals(false, state.barcodeLookupFailed)
+        val row = state.purchaseItems.single()
+        assertEquals("Nutella", row.name)
+        assertEquals("Ferrero", row.brand)
+        assertEquals(1.0, row.quantity, 0.001)
+        assertEquals("件", row.unit)
+    }
+
+    @Test
+    fun onBarcodeImagePicked_noBarcodeShowsHint() = runTest {
+        coEvery { barcodeScanner.scanFirst(any()) } returns null
+
+        viewModel.onBarcodeImagePicked("content://barcode/none")
+
+        val state = viewModel.state.value
+        assertEquals(false, state.barcodeScanning)
+        assertEquals(true, state.barcodeNotFound)
+        assertEquals(true, state.purchaseItems.isEmpty())
+        coVerify(exactly = 0) { openFoodFactsClient.lookup(any()) }
+    }
+
+    @Test
+    fun onBarcodeImagePicked_productNotInOffShowsHint() = runTest {
+        coEvery { barcodeScanner.scanFirst(any()) } returns "1234567890123"
+        coEvery { openFoodFactsClient.lookup(any()) } returns null
+
+        viewModel.onBarcodeImagePicked("content://barcode/x")
+
+        val state = viewModel.state.value
+        assertEquals(false, state.barcodeScanning)
+        assertEquals(true, state.barcodeLookupFailed)
+        assertEquals(true, state.purchaseItems.isEmpty())
     }
 
     private fun stubExtraction(result: RecordExtractionResult) {

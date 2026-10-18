@@ -315,6 +315,8 @@ dependencies {
     // Media / Animation
     implementation(libs.lottie.compose)
     implementation(libs.coil.compose)
+    // 条码静态图识别(打包内置模型,无需 Play Services)
+    implementation(libs.mlkit.barcode)
 
     // Camera
     implementation(libs.bundles.camera)
