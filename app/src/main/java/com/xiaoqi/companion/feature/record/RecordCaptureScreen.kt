@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -87,6 +88,7 @@ fun RecordCaptureScreen(
     onSaved: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showHelp by rememberSaveable { mutableStateOf(false) }
     // 多选:一餐多图(面条+配菜+饮料分拍) 一次选齐,逐张提取追加进同一张表
     val pickImages = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5),
@@ -130,16 +132,41 @@ fun RecordCaptureScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "返回")
                     }
                 },
-                // 域切换低频(模型自动分类),收进顶栏,给内容层让出整行
                 actions = {
+                    // 域切换低频(模型自动分类),收进顶栏,给内容层让出整行
                     val target = if (state.domain == RecordDomain.MEAL) RecordDomain.PURCHASE else RecordDomain.MEAL
                     TextButton(onClick = { viewModel.switchDomain(target) }) {
                         Text(if (target == RecordDomain.PURCHASE) "→ 采购" else "→ 餐食")
+                    }
+                    IconButton(onClick = { showHelp = true }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.HelpOutline,
+                            contentDescription = "热量估算说明",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
             )
         },
     ) { padding ->
+        if (showHelp) {
+            AlertDialog(
+                onDismissRequest = { showHelp = false },
+                title = { Text("热量是怎么算的") },
+                text = {
+                    Text(
+                        "Aura 先识别照片里的食物,并按碗中、盘中的比例估算克重;" +
+                            "再对照《中国食物成分表》(1621 种食物)查出营养,按克重换算成热量。" +
+                            "表里查不到的菜由 AI 按经验估算,这类数值误差较大,都标着「估算」。" +
+                            "数值都可以手动修改,你改过的记录会被记住,下次遇到同样的菜优先使用。",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showHelp = false }) { Text("知道了") }
+                },
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
