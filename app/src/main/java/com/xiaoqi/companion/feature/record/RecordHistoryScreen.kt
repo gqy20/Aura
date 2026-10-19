@@ -1,7 +1,9 @@
 package com.xiaoqi.companion.feature.record
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,8 +11,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,20 +29,23 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -178,8 +186,8 @@ private fun DayHeader(day: HistoryDay) {
 }
 
 /**
- * 左滑删除卡片:向左滑露出红色垃圾桶背景,点击垃圾桶或滑到底触发删除;
- * 点卡片本体展开/收起明细(两行:摘要行 + 展开的明细/原图)。
+ * 左滑露出删除按钮的两步交互:向左滑 → 卡片偏移露出红色删除按钮 → 点击按钮才删除;
+ * 右滑或点卡片本体收回。点卡片展开/收起明细(两行:摘要行 + 展开的明细/原图)。
  */
 @Composable
 private fun HistoryEntryCard(
@@ -189,46 +197,73 @@ private fun HistoryEntryCard(
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val dismissState = rememberSwipeToDismissBoxState()
-    androidx.compose.runtime.LaunchedEffect(dismissState.currentValue) {
-        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
-            onDelete()
-            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
-        }
-    }
+    var isRevealed by remember { mutableStateOf(false) }
+    var totalDrag by remember { mutableFloatStateOf(0f) }
+
     val cardColor = if (highlighted) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
         MaterialTheme.colorScheme.surface
     }
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            // 垃圾桶背景:点击也触发删除(轻扫到一半时更顺手)
+    // 露出宽度 = 删除按钮 + 右侧留白
+    val revealOffset by animateDpAsState(
+        targetValue = if (isRevealed) (-72.dp) else 0.dp,
+        label = "reveal",
+    )
+
+    Box(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        // 底层:删除按钮(卡片滑开后可见,点击才触发删除)
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.errorContainer,
+            modifier = Modifier.matchParentSize(),
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.errorContainer)
-                    .clickable(onClick = onDelete)
-                    .padding(horizontal = 20.dp),
+                    .padding(end = 8.dp),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                )
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "删除记录",
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
             }
-        },
-    ) {
-        androidx.compose.material3.Surface(
+        }
+
+        // 前层:卡片内容,滑动偏移 + 点击展开(露出时点卡片先收回)
+        Surface(
             shape = MaterialTheme.shapes.medium,
             color = cardColor,
+            modifier = Modifier
+                .offset(x = revealOffset)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            totalDrag += dragAmount
+                        },
+                        onDragEnd = {
+                            // 左滑(负)露出,右滑(正)收回;40px 约等于 12dp 的有意滑动
+                            if (totalDrag < -40f) isRevealed = true
+                            else if (totalDrag > 40f) isRevealed = false
+                            totalDrag = 0f
+                        },
+                    )
+                }
+                .clickable(onClick = {
+                    if (isRevealed) {
+                        isRevealed = false
+                    } else {
+                        onToggle()
+                    }
+                }),
         ) {
-            Column(modifier = Modifier.clickable(onClick = onToggle).padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = firstLineSummary(entry),
