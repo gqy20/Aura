@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -211,7 +210,10 @@ private fun HistoryEntryCard(
         label = "reveal",
     )
 
-    Box(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+    // 不用 height(IntrinsicSize.Min):展开动画中 AnimatedVisibility 的 intrinsic 会先报
+    // 目标高度,Box 连带红色删除层瞬间变高,红色从卡片下沿露出片刻(点击展开时的红光闪现)。
+    // 让 Box 包裹前层卡片的实际动画高度,matchParentSize 的删除层逐帧贴合,永不外露。
+    Box(modifier = Modifier.fillMaxWidth()) {
         // 底层:删除按钮(卡片滑开后可见,点击才触发删除)
         Surface(
             shape = MaterialTheme.shapes.medium,
