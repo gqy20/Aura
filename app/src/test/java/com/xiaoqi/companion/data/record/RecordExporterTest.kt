@@ -11,32 +11,46 @@ import com.xiaoqi.companion.data.db.entity.PurchaseItemEntity
 import com.xiaoqi.companion.data.db.entity.PurchaseRecordEntity
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.time.LocalDate
 import java.time.ZoneId
 import java.util.zip.ZipInputStream
 import org.junit.Test
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 
 class RecordExporterTest {
 
     private val zone = ZoneId.of("Asia/Shanghai")
 
-    private fun export(vararg extraMeals: MealRecordWithItems): Map<String, String> {
+    private fun export(vararg extraMeals: MealRecordWithItems): Map<String, String> =
+        readZipEntries(writeZipToBytes(defaultMeals() + extraMeals, defaultPurchases(), emptyList()))
+            .mapValues { (_, bytes) -> bytes.toString(Charsets.UTF_8) }
+
+    private fun writeZipToBytes(
+        meals: List<MealRecordWithItems>,
+        purchases: List<PurchaseRecordWithItems>,
+        images: List<RecordExporter.ExportImage>,
+    ): ByteArray {
         val out = ByteArrayOutputStream()
         RecordExporter.writeZip(
             out = out,
-            meals = defaultMeals() + extraMeals,
-            purchases = defaultPurchases(),
+            meals = meals,
+            purchases = purchases,
             inventory = defaultInventory(),
+            images = images,
             exportedAtMillis = 1_792_312_200_000L, // 2026-10-18 08:30 +08:00
             zone = zone,
         )
-        val files = mutableMapOf<String, String>()
-        ZipInputStream(ByteArrayInputStream(out.toByteArray())).use { zip ->
+        return out.toByteArray()
+    }
+
+    private fun readZipEntries(raw: ByteArray): Map<String, ByteArray> {
+        val files = mutableMapOf<String, ByteArray>()
+        ZipInputStream(ByteArrayInputStream(raw)).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
-                files[entry.name] = zip.readBytes().toString(Charsets.UTF_8)
+                files[entry.name] = zip.readBytes()
                 entry = zip.nextEntry
             }
         }
@@ -55,7 +69,7 @@ class RecordExporterTest {
     @Test
     fun manifestCountsRowsAndStampsVersion() {
         val manifest = export()["manifest.json"]!!
-        assertTrue(manifest.contains("\"schema_version\":1"))
+        assertTrue(manifest.contains("\"schema_version\":2"))
         assertTrue(manifest.contains("\"meal_count\":2"))
         assertTrue(manifest.contains("\"meal_item_count\":3"))
         assertTrue(manifest.contains("\"purchase_count\":1"))
@@ -114,18 +128,70 @@ class RecordExporterTest {
 
     @Test
     fun emptyInputsYieldHeadersOnly() {
-        val out = ByteArrayOutputStream()
-        RecordExporter.writeZip(out, emptyList(), emptyList(), emptyList(), zone = zone)
-        val files = mutableMapOf<String, String>()
-        ZipInputStream(ByteArrayInputStream(out.toByteArray())).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                files[entry.name] = zip.readBytes().toString(Charsets.UTF_8)
-                entry = zip.nextEntry
-            }
-        }
-        assertEquals("record_id,effective_time,time_source,meal_type,food_name,portion,calories,protein_g,carbs_g,fat_g,value_source,photo_index", files["items.csv"]!!.trim())
+        val files = readZipEntries(
+            writeZipToBytes(emptyList(), emptyList(), emptyList())
+        ).mapValues { (_, bytes) -> bytes.toString(Charsets.UTF_8) }
+        assertEquals(
+            "record_id,effective_time,time_source,meal_type,food_name,portion,calories,protein_g,carbs_g,fat_g,value_source,photo_index,image_path",
+            files["items.csv"]!!.trim(),
+        )
         assertTrue(files["meals.jsonl"]!!.isEmpty())
+        // 无图片时 manifest 不携带图片字段,zip 也不含 images/ 条目
+        assertFalse(files["manifest.json"]!!.contains("image_count"))
+        assertFalse(files.keys.any { it.startsWith("images/") })
+    }
+
+    @Test
+    fun imagesWrittenAsZipEntriesWithRelativeReferences() {
+        val bytesA = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 3)
+        val bytesB = byteArrayOf(9, 8, 7)
+        val files = readZipEntries(
+            writeZipToBytes(
+                defaultMeals() + photoMealWithImages(),
+                defaultPurchases() + purchaseWithImage(),
+                listOf(
+                    RecordExporter.ExportImage("/data/record_images/uuid-a.jpg", bytesA),
+                    RecordExporter.ExportImage("/data/record_images/uuid-b.jpg", bytesB),
+                    RecordExporter.ExportImage("/data/record_images/uuid-c.jpg", byteArrayOf(4)),
+                ),
+            )
+        )
+
+        assertArrayEquals(bytesA, files["images/uuid-a.jpg"])
+        assertArrayEquals(bytesB, files["images/uuid-b.jpg"])
+        assertArrayEquals(byteArrayOf(4), files["images/uuid-c.jpg"])
+
+        val jsonl = files["meals.jsonl"]!!.toString(Charsets.UTF_8)
+        assertTrue(jsonl.contains("\"image_paths\":[\"images/uuid-a.jpg\",\"images/uuid-b.jpg\"]"))
+        val itemsCsv = files["items.csv"]!!.toString(Charsets.UTF_8)
+        // photo_index 对应位次的图,行尾 image_path 列
+        assertTrue(itemsCsv.contains("宫保鸡丁,1份,300.0,15.0,20.0,10.0,estimated,0,images/uuid-a.jpg"))
+        assertTrue(itemsCsv.contains("米饭,1碗,200.0,10.0,40.0,5.0,estimated,1,images/uuid-b.jpg"))
+        val purchasesCsv = files["purchases.csv"]!!.toString(Charsets.UTF_8)
+        assertTrue(purchasesCsv.contains("三文鱼,,1.0,份,39.9,0,images/uuid-c.jpg"))
+        val manifest = files["manifest.json"]!!.toString(Charsets.UTF_8)
+        assertTrue(manifest.contains("\"image_count\":3"))
+        assertTrue(manifest.contains("\"image_total_bytes\":9"))
+    }
+
+    @Test
+    fun missingImageFileLeavesNullPlaceholderWithoutDanglingReference() {
+        val files = readZipEntries(
+            writeZipToBytes(
+                defaultMeals() + photoMealWithImages(),
+                defaultPurchases(),
+                listOf(RecordExporter.ExportImage("/data/record_images/uuid-a.jpg", byteArrayOf(1))),
+            )
+        )
+
+        assertFalse(files.containsKey("images/uuid-b.jpg"))
+        val jsonl = files["meals.jsonl"]!!.toString(Charsets.UTF_8)
+        // 按位对齐:缺失文件的位次是 null,photo_index 引用不错位
+        assertTrue(jsonl.contains("\"image_paths\":[\"images/uuid-a.jpg\",null]"))
+        val itemsCsv = files["items.csv"]!!.toString(Charsets.UTF_8)
+        assertTrue(itemsCsv.contains("米饭,1碗,200.0,10.0,40.0,5.0,estimated,1,"))
+        val manifest = files["manifest.json"]!!.toString(Charsets.UTF_8)
+        assertTrue(manifest.contains("\"image_count\":1"))
     }
 
     private fun millis(date: String, time: String): Long =
@@ -184,6 +250,42 @@ class RecordExporterTest {
                     recordId = "p1", name = "鸡蛋", brand = "德清源", quantity = 15.0, unit = "个",
                     unitPrice = 1.6, photoIndex = 0,
                 ),
+            ),
+        ),
+    )
+
+    private fun purchaseWithImage(): PurchaseRecordWithItems = PurchaseRecordWithItems(
+        record = PurchaseRecordEntity(
+            id = "p2", purchasedAt = millis("2026-10-18", "13:00"), updatedAt = millis("2026-10-18", "13:00"),
+            source = RecordSource.PHOTO, storeName = "盒马", imageLocalPath = "/data/record_images/uuid-c.jpg",
+            photoTakenAt = millis("2026-10-18", "13:00"),
+        ),
+        items = listOf(
+            PurchaseItemEntity(
+                recordId = "p2", name = "三文鱼", brand = null, quantity = 1.0, unit = "份",
+                unitPrice = 39.9, photoIndex = 0,
+            ),
+        ),
+    )
+
+    private fun photoMealWithImages(): MealRecordWithItems = MealRecordWithItems(
+        record = MealRecordEntity(
+            id = "m3", createdAt = millis("2026-10-18", "12:10"), updatedAt = millis("2026-10-18", "12:10"),
+            mealType = MealType.LUNCH, source = RecordSource.PHOTO,
+            totalCalories = 500.0, totalProteinG = 25.0, totalCarbsG = 60.0, totalFatG = 15.0,
+            confidence = 0.85, photoTakenAt = millis("2026-10-18", "12:00"),
+            imageLocalPath = "/data/record_images/uuid-a.jpg,/data/record_images/uuid-b.jpg",
+        ),
+        items = listOf(
+            MealItemEntity(
+                recordId = "m3", name = "宫保鸡丁", portionText = "1份",
+                estCalories = 300.0, estProteinG = 15.0, estCarbsG = 20.0, estFatG = 10.0,
+                isEstimate = true, photoIndex = 0,
+            ),
+            MealItemEntity(
+                recordId = "m3", name = "米饭", portionText = "1碗",
+                estCalories = 200.0, estProteinG = 10.0, estCarbsG = 40.0, estFatG = 5.0,
+                isEstimate = true, photoIndex = 1,
             ),
         ),
     )

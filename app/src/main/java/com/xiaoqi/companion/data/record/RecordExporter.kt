@@ -22,17 +22,23 @@ import kotlinx.serialization.json.Json
  * - items.csv          拍平明细(record_id 关联,给 pandas/Excel)
  * - daily_summary.csv  天×营养聚合(最常用粒度,省下游自己算)
  * - purchases.csv / inventory.csv
- * - manifest.json      版本/行数/导出时间
+ * - images/<uuid>.jpg  记录原图(入库时已压到 1280px/JPEG 82,导出不再二次压缩)
+ * - manifest.json      版本/行数/导出时间/图片数
  *
  * 语义约定:
  * - effective_time = photoTakenAt(EXIF 拍摄时刻)优先,缺失回退 createdAt/purchasedAt;
  *   time_source 标注 exif/recorded,下游不需要猜用哪个时间。
  * - value_source = user_verified(isEstimate=false) / estimated —— 数值质量分级。
+ * - image_paths 与 items 的 photo_index 按位对齐;文件缺失的位次为 null,不产生悬空引用。
  */
 object RecordExporter {
 
-    const val SCHEMA_VERSION = 1
+    const val SCHEMA_VERSION = 2
     private const val APP_VERSION = "0.1.6"
+    private const val IMAGE_DIR = "images"
+
+    /** sourcePath 是 DB imageLocalPath 里的原始绝对路径,导出时改写为 images/<文件名>。 */
+    class ExportImage(val sourcePath: String, val bytes: ByteArray)
 
     private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
     private val json = Json { encodeDefaults = false }
@@ -58,6 +64,8 @@ object RecordExporter {
         val lat: Double? = null,
         val lon: Double? = null,
         val confidence: Double = 0.0,
+        // zip 相对路径,与 items.photo_index 按位对齐;未导出的位次为 null
+        val image_paths: List<String?> = emptyList(),
         val items: List<MealItemJson>,
     )
 
@@ -71,6 +79,8 @@ object RecordExporter {
         val meal_item_count: Int,
         val purchase_count: Int,
         val inventory_count: Int,
+        val image_count: Int = 0,
+        val image_total_bytes: Long = 0,
     )
 
     fun writeZip(
@@ -78,6 +88,7 @@ object RecordExporter {
         meals: List<MealRecordWithItems>,
         purchases: List<PurchaseRecordWithItems>,
         inventory: List<InventoryItemEntity>,
+        images: List<ExportImage> = emptyList(),
         exportedAtMillis: Long = System.currentTimeMillis(),
         zone: ZoneId = ZoneId.systemDefault(),
     ) {
@@ -90,7 +101,11 @@ object RecordExporter {
             meal_item_count = meals.sumOf { it.items.size },
             purchase_count = purchases.size,
             inventory_count = inventory.size,
+            image_count = images.size,
+            image_total_bytes = images.sumOf { it.bytes.size.toLong() },
         )
+        // 引用改写映射:只有真正进 zip 的文件才生成相对路径引用
+        val imageMap = images.associate { it.sourcePath to "$IMAGE_DIR/${it.sourcePath.substringAfterLast('/')}" }
         ZipOutputStream(out).use { zip ->
             fun entry(name: String, content: String) {
                 zip.putNextEntry(ZipEntry(name))
@@ -99,13 +114,25 @@ object RecordExporter {
             }
 
             entry("manifest.json", json.encodeToString(manifest))
-            entry("meals.jsonl", buildMealsJsonl(meals, zone))
-            entry("items.csv", buildItemsCsv(meals, zone))
+            entry("meals.jsonl", buildMealsJsonl(meals, zone, imageMap))
+            entry("items.csv", buildItemsCsv(meals, zone, imageMap))
             entry("daily_summary.csv", buildDailySummaryCsv(meals, zone))
-            entry("purchases.csv", buildPurchasesCsv(purchases, zone))
+            entry("purchases.csv", buildPurchasesCsv(purchases, zone, imageMap))
             entry("inventory.csv", buildInventoryCsv(inventory))
+            images.forEach { image ->
+                zip.putNextEntry(ZipEntry(imageMap.getValue(image.sourcePath)))
+                zip.write(image.bytes)
+                zip.closeEntry()
+            }
         }
     }
+
+    // imageLocalPath 逗号分隔 → 逐位映射;未传入 images 的位次为 null
+    private fun relativePaths(imageLocalPath: String?, imageMap: Map<String, String>): List<String?> =
+        imageLocalPath?.split(',')?.filter { it.isNotBlank() }?.map { imageMap[it] } ?: emptyList()
+
+    private fun imageCell(paths: List<String?>, photoIndex: Int?): String =
+        photoIndex?.let { paths.getOrNull(it) } ?: ""
 
     private fun effectiveTime(takenAt: Long?, fallback: Long, zone: ZoneId): Pair<String, String> {
         val millis = takenAt ?: fallback
@@ -113,7 +140,7 @@ object RecordExporter {
         return timeFormatter.format(Instant.ofEpochMilli(millis).atZone(zone)) to source
     }
 
-    private fun buildMealsJsonl(meals: List<MealRecordWithItems>, zone: ZoneId): String {
+    private fun buildMealsJsonl(meals: List<MealRecordWithItems>, zone: ZoneId, imageMap: Map<String, String>): String {
         if (meals.isEmpty()) return ""
         return meals.joinToString("\n") { meal ->
             val (time, source) = effectiveTime(meal.record.photoTakenAt, meal.record.createdAt, zone)
@@ -126,6 +153,7 @@ object RecordExporter {
                     lat = meal.record.lat,
                     lon = meal.record.lon,
                     confidence = meal.record.confidence,
+                    image_paths = relativePaths(meal.record.imageLocalPath, imageMap),
                     items = meal.items.map { item ->
                         MealItemJson(
                             name = item.name,
@@ -143,10 +171,11 @@ object RecordExporter {
         } + "\n"
     }
 
-    private fun buildItemsCsv(meals: List<MealRecordWithItems>, zone: ZoneId): String = buildString {
-        appendLine("record_id,effective_time,time_source,meal_type,food_name,portion,calories,protein_g,carbs_g,fat_g,value_source,photo_index")
+    private fun buildItemsCsv(meals: List<MealRecordWithItems>, zone: ZoneId, imageMap: Map<String, String>): String = buildString {
+        appendLine("record_id,effective_time,time_source,meal_type,food_name,portion,calories,protein_g,carbs_g,fat_g,value_source,photo_index,image_path")
         meals.forEach { meal ->
             val (time, source) = effectiveTime(meal.record.photoTakenAt, meal.record.createdAt, zone)
+            val imagePaths = relativePaths(meal.record.imageLocalPath, imageMap)
             meal.items.forEach { item ->
                 appendLine(
                     listOf(
@@ -162,6 +191,7 @@ object RecordExporter {
                         item.estFatG,
                         if (item.isEstimate) "estimated" else "user_verified",
                         item.photoIndex ?: "",
+                        csvCell(imageCell(imagePaths, item.photoIndex)),
                     ).joinToString(",")
                 )
             }
@@ -187,10 +217,11 @@ object RecordExporter {
         }
     }
 
-    private fun buildPurchasesCsv(purchases: List<PurchaseRecordWithItems>, zone: ZoneId): String = buildString {
-        appendLine("record_id,effective_time,time_source,store_name,item_name,brand,quantity,unit,unit_price,photo_index")
+    private fun buildPurchasesCsv(purchases: List<PurchaseRecordWithItems>, zone: ZoneId, imageMap: Map<String, String>): String = buildString {
+        appendLine("record_id,effective_time,time_source,store_name,item_name,brand,quantity,unit,unit_price,photo_index,image_path")
         purchases.forEach { purchase ->
             val (time, source) = effectiveTime(purchase.record.photoTakenAt, purchase.record.purchasedAt, zone)
+            val imagePaths = relativePaths(purchase.record.imageLocalPath, imageMap)
             purchase.items.forEach { item ->
                 appendLine(
                     listOf(
@@ -204,6 +235,7 @@ object RecordExporter {
                         csvCell(item.unit),
                         item.unitPrice ?: "",
                         item.photoIndex ?: "",
+                        csvCell(imageCell(imagePaths, item.photoIndex)),
                     ).joinToString(",")
                 )
             }

@@ -67,6 +67,26 @@ class MealRecordRepositoryTest {
     }
 
     @Test
+    fun deleteMeal_deletesEveryImageInMultiPhotoPath() = runTest {
+        val dao = mockk<MealRecordDao>()
+        val imageStore = mockk<RecordImageStore>()
+        coEvery { dao.getRecord("r1") } returns MealRecordEntity(
+            id = "r1", createdAt = 1L, updatedAt = 1L,
+            mealType = MealType.LUNCH, source = RecordSource.PHOTO,
+            totalCalories = 0.0, totalProteinG = 0.0, totalCarbsG = 0.0, totalFatG = 0.0,
+            confidence = 0.0, imageLocalPath = "/data/record_images/a.jpg,/data/record_images/b.jpg",
+        )
+        coEvery { dao.deleteRecordWithItems("r1") } just runs
+        coEvery { imageStore.delete(any()) } returns true
+        val repository = MealRecordRepositoryImpl(dao, imageStore)
+
+        repository.deleteMeal("r1")
+
+        coVerify(exactly = 1) { imageStore.delete("/data/record_images/a.jpg") }
+        coVerify(exactly = 1) { imageStore.delete("/data/record_images/b.jpg") }
+    }
+
+    @Test
     fun deleteMeal_withoutImageSkipsImageDeletion() = runTest {
         val dao = mockk<MealRecordDao>()
         val imageStore = mockk<RecordImageStore>()

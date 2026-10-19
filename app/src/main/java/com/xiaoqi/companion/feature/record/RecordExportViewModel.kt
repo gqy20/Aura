@@ -5,7 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
+import com.xiaoqi.companion.data.db.dao.MealRecordWithItems
+import com.xiaoqi.companion.data.db.dao.PurchaseRecordWithItems
 import com.xiaoqi.companion.data.record.RecordExporter
+import com.xiaoqi.companion.data.record.RecordImageStore
 import com.xiaoqi.companion.data.repository.InventoryRepository
 import com.xiaoqi.companion.data.repository.MealRecordRepository
 import com.xiaoqi.companion.data.repository.PurchaseRepository
@@ -36,7 +39,7 @@ data class RecordExportUiState(
 )
 
 /**
- * 记录分析导出:三域数据 → zip 契约(RecordExporter)写到 cache。
+ * 记录分析导出:三域数据 + 记录原图 → zip 契约(RecordExporter)写到 cache。
  * SAF 保存与系统分享共用导出文件,由 SettingsScreen 的入口触发。
  */
 @HiltViewModel
@@ -45,6 +48,7 @@ class RecordExportViewModel @Inject constructor(
     private val mealRecordRepository: MealRecordRepository,
     private val purchaseRepository: PurchaseRepository,
     private val inventoryRepository: InventoryRepository,
+    private val imageStore: RecordImageStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RecordExportUiState())
@@ -59,9 +63,10 @@ class RecordExportViewModel @Inject constructor(
                     val meals = mealRecordRepository.getAllRecords()
                     val purchases = purchaseRepository.getAllPurchases()
                     val inventory = inventoryRepository.observeInventory().first()
+                    val images = collectImages(meals, purchases)
                     val file = File(context.cacheDir, "record-export-${System.currentTimeMillis()}.zip")
                     file.outputStream().use { out ->
-                        RecordExporter.writeZip(out, meals, purchases, inventory)
+                        RecordExporter.writeZip(out, meals, purchases, inventory, images)
                     }
                     AppLogger.info(
                         LogTags.Record,
@@ -69,6 +74,9 @@ class RecordExportViewModel @Inject constructor(
                         "meals" to meals.size,
                         "purchases" to purchases.size,
                         "inventory" to inventory.size,
+                        // key 带 image 会被 LogFieldSanitizer 整值脱敏,计数/长度用白名单后缀命名
+                        "imageCount" to images.size,
+                        "imageByteLength" to images.sumOf { it.bytes.size },
                     )
                     file
                 }
@@ -82,6 +90,19 @@ class RecordExportViewModel @Inject constructor(
                     },
                 )
             }
+        }
+    }
+
+    // 图片文件缺失(被外部清理)时跳过该张,导出引用自动降级为 null,不阻断整次导出
+    private fun collectImages(
+        meals: List<MealRecordWithItems>,
+        purchases: List<PurchaseRecordWithItems>,
+    ): List<RecordExporter.ExportImage> {
+        val paths = meals.flatMap { it.record.imageLocalPath?.split(',') ?: emptyList() } +
+            purchases.flatMap { it.record.imageLocalPath?.split(',') ?: emptyList() }
+        return paths.filter { it.isNotBlank() }.distinct().mapNotNull { path ->
+            val file = imageStore.resolve(path)
+            if (file.isFile) RecordExporter.ExportImage(path, file.readBytes()) else null
         }
     }
 

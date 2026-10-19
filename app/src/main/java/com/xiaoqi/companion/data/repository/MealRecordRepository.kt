@@ -90,7 +90,8 @@ class MealRecordRepositoryImpl @Inject constructor(
     override suspend fun deleteMeal(recordId: String) = withContext(Dispatchers.IO) {
         val record = mealRecordDao.getRecord(recordId)
         mealRecordDao.deleteRecordWithItems(recordId)
-        record?.imageLocalPath?.let { imageStore.delete(it) }
+        // imageLocalPath 是逗号分隔的多图串,必须逐个删,整串当一个路径会全部漏删
+        record?.imageLocalPath?.split(',')?.filter { it.isNotBlank() }?.forEach { imageStore.delete(it) }
         AppLogger.info(LogTags.Record, "meal_record_deleted", "recordId" to recordId)
     }
 

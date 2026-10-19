@@ -7,6 +7,7 @@ import com.xiaoqi.companion.data.db.dao.PurchaseDao
 import com.xiaoqi.companion.data.db.dao.PurchaseRecordWithItems
 import com.xiaoqi.companion.data.db.entity.PurchaseItemEntity
 import com.xiaoqi.companion.data.db.entity.PurchaseRecordEntity
+import com.xiaoqi.companion.data.record.RecordImageStore
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,7 @@ interface PurchaseRepository {
 class PurchaseRepositoryImpl @Inject constructor(
     private val purchaseDao: PurchaseDao,
     private val inventoryRepository: InventoryRepository,
+    private val imageStore: RecordImageStore,
 ) : PurchaseRepository {
 
     override fun observeRecentPurchases(limit: Int): Flow<List<PurchaseRecordWithItems>> =
@@ -79,6 +81,8 @@ class PurchaseRepositoryImpl @Inject constructor(
         }
 
     override suspend fun deletePurchase(recordId: String) = withContext(Dispatchers.IO) {
+        purchaseDao.getRecord(recordId)?.imageLocalPath
+            ?.split(',')?.filter { it.isNotBlank() }?.forEach { imageStore.delete(it) }
         purchaseDao.deletePurchaseWithItems(recordId)
         AppLogger.info(LogTags.Record, "purchase_record_deleted", "recordId" to recordId)
     }

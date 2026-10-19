@@ -36,6 +36,9 @@ abstract class PurchaseDao {
     @Query("SELECT * FROM purchase_records ORDER BY purchasedAt DESC LIMIT :limit")
     abstract fun observeRecent(limit: Int): Flow<List<PurchaseRecordWithItems>>
 
+    @Query("SELECT * FROM purchase_records WHERE id = :id")
+    abstract suspend fun getRecord(id: String): PurchaseRecordEntity?
+
     @Query("DELETE FROM purchase_records WHERE id = :id")
     abstract suspend fun deleteRecord(id: String)
 
