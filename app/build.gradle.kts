@@ -34,6 +34,12 @@ val brandPackage: String = brand("PACKAGE", "com.xiaoqi.companion")
 val brandVersionName: String = brand("VERSION_NAME", "0.1.6")
 val brandVersionCode: String = brand("VERSION_CODE", "7")
 
+// 构建标识(短 sha):导出 manifest 的 build_id 靠它区分"哪个 commit 的构建"产出。
+// 踩过坑:手写 app_version 常量在两个构建里一模一样,导出无法对账。
+val buildGitSha: String = providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+}.standardOutput.asText.get().trim().ifEmpty { "unknown" }
+
 // ---------------------------------------------------------------------------
 // Local dev/.env config — debug-only BuildConfig injection.
 // .env is gitignored; copy .env.example -> .env and fill your keys.
@@ -121,6 +127,8 @@ android {
         buildConfigField("String", "BRAND_PACKAGE", "\"$brandPackage\"")
         buildConfigField("String", "BRAND_VERSION_NAME", "\"$brandVersionName\"")
         buildConfigField("int",    "BRAND_VERSION_CODE", brandVersionCode)
+        // 导出 manifest 的 build_id:定位产出该导出的确切构建
+        buildConfigField("String", "BUILD_GIT_SHA", "\"${escForBuildConfig(buildGitSha)}\"")
 
         // .env -> BuildConfig.ENV_*：defaultConfig 给空占位，保证 main 源码（DebugConfigSeeder）
         // 在 release 编译也能找到符号；debug buildType 用 .env 真实值覆盖。release 不含敏感值。

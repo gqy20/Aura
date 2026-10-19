@@ -69,7 +69,11 @@ class RecordExporterTest {
     @Test
     fun manifestCountsRowsAndStampsVersion() {
         val manifest = export()["manifest.json"]!!
-        assertTrue(manifest.contains("\"schema_version\":2"))
+        assertTrue(manifest.contains("\"schema_version\":3"))
+        // 构建标识来自 BuildConfig(brand 版本 + git sha),不再是手写常量
+        assertTrue(manifest.contains("\"app_version\":\"${com.xiaoqi.companion.BuildConfig.BRAND_VERSION_NAME}\""))
+        assertTrue(manifest.contains("\"version_code\":${com.xiaoqi.companion.BuildConfig.BRAND_VERSION_CODE}"))
+        assertTrue(manifest.contains("\"build_id\":\"${com.xiaoqi.companion.BuildConfig.BUILD_GIT_SHA}\""))
         assertTrue(manifest.contains("\"meal_count\":2"))
         assertTrue(manifest.contains("\"meal_item_count\":3"))
         assertTrue(manifest.contains("\"purchase_count\":1"))

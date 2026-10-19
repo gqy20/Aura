@@ -217,6 +217,12 @@
 - **确认页**：receipt 来源条目加"小票"徽标（tertiaryContainer，与"估算"徽标并排），`RecordNameSource` 不持久化。
 - **验证**：`testDebugUnitTest` 全绿（extractor 多图请求/解析 5 例 + VM 单调用/事务追加/切域回滚/删图位移等 7 例）；E2E 实测模拟器双图（菜品+小票）单次调用（`imageCount=2`），4 条名字全部来自小票印刷文本（牛肉面(大)/凉拌黄瓜/酸梅汤/纸巾）、小票独有条目 photoIndex=0、可见菜品 photoIndex=1，2 图入库。
 
+### 近期打磨（2026-10-19 · 导出构建标识（manifest v3））
+
+- **动机**：手写 `app_version` 常量在所有构建里一模一样，用户拿两个不同 APK 的导出无法对账"数据是哪个版本记的"（实际踩到：同一导出被误判为旧版产出）。
+- **实现**：`build.gradle.kts` 用 `providers.exec { git rev-parse --short HEAD }` 注入 `BuildConfig.BUILD_GIT_SHA`；`RecordExporter` 的 manifest 改从 BuildConfig 取 `app_version`(BRAND_VERSION_NAME)/`version_code`(BRAND_VERSION_CODE)/`build_id`(git 短 sha)，schema v3。注意：build_id 是**构建时刻**的 commit——本 commit 的构建会带前一个 sha，属正常先后关系。
+- **验证**：单测断言 manifest 三字段来自 BuildConfig；模拟器实测导出 `{"schema_version":3,"app_version":"0.1.6","version_code":7,"build_id":"be132a6",...}`。
+
 ### 近期打磨（2026-10-18 · MR 回看闭环 + P4 洞察联动）
 
 - **回看闭环落地**：主屏"记一餐"入口卡与**"今日热量"状态卡并排**（动作+状态同层，零记录时引导）；点击进**记录列表页**（`record-history` 路由）——餐食+采购合并按天分组（今天/昨天/M月d日），日小计合并进行头（"餐 2764 kcal · 购 3 件"）；条目两行卡：摘要单行（时间+餐次+kcal+菜名列表），点行展开明细+原图缩略；**左滑删除**（SwipeToDismissBox 露红色垃圾桶，点击或滑满触发，E2E 验证 `history_entry_deleted`）。

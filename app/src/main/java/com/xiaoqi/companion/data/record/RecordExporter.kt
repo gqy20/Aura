@@ -1,5 +1,6 @@
 package com.xiaoqi.companion.data.record
 
+import com.xiaoqi.companion.BuildConfig
 import com.xiaoqi.companion.data.db.dao.MealRecordWithItems
 import com.xiaoqi.companion.data.db.dao.PurchaseRecordWithItems
 import com.xiaoqi.companion.data.db.entity.InventoryItemEntity
@@ -23,18 +24,19 @@ import kotlinx.serialization.json.Json
  * - daily_summary.csv  天×营养聚合(最常用粒度,省下游自己算)
  * - purchases.csv / inventory.csv
  * - images/<uuid>.jpg  记录原图(入库时已压到 1280px/JPEG 82,导出不再二次压缩)
- * - manifest.json      版本/行数/导出时间/图片数
+ * - manifest.json      版本/构建标识/行数/导出时间/图片数
  *
  * 语义约定:
  * - effective_time = photoTakenAt(EXIF 拍摄时刻)优先,缺失回退 createdAt/purchasedAt;
  *   time_source 标注 exif/recorded,下游不需要猜用哪个时间。
  * - value_source = user_verified(isEstimate=false) / estimated —— 数值质量分级。
  * - image_paths 与 items 的 photo_index 按位对齐;文件缺失的位次为 null,不产生悬空引用。
+ * - app_version/version_code/build_id 来自构建(Brand 版本 + git sha),
+ *   用于对账"哪个构建产出的导出"——不再手写常量。
  */
 object RecordExporter {
 
-    const val SCHEMA_VERSION = 2
-    private const val APP_VERSION = "0.1.6"
+    const val SCHEMA_VERSION = 3
     private const val IMAGE_DIR = "images"
 
     /** sourcePath 是 DB imageLocalPath 里的原始绝对路径,导出时改写为 images/<文件名>。 */
@@ -73,6 +75,9 @@ object RecordExporter {
     data class Manifest(
         val schema_version: Int,
         val app_version: String,
+        val version_code: Int,
+        // 产出该导出的构建 git 短 sha;定位"数据是哪个版本记的"
+        val build_id: String,
         val exported_at: String,
         val zone: String,
         val meal_count: Int,
@@ -94,7 +99,9 @@ object RecordExporter {
     ) {
         val manifest = Manifest(
             schema_version = SCHEMA_VERSION,
-            app_version = APP_VERSION,
+            app_version = BuildConfig.BRAND_VERSION_NAME,
+            version_code = BuildConfig.BRAND_VERSION_CODE,
+            build_id = BuildConfig.BUILD_GIT_SHA,
             exported_at = timeFormatter.format(Instant.ofEpochMilli(exportedAtMillis).atZone(zone)),
             zone = zone.id,
             meal_count = meals.size,
