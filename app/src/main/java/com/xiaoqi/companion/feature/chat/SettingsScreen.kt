@@ -1261,6 +1261,7 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
         insightCount = viewModel.insightCount()
         memoryCount = viewModel.memoryCount()
         moodCount = viewModel.moodSnapshotCount()
+        exportViewModel.loadCounts()
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1276,6 +1277,9 @@ private fun DataTransparencySection(viewModel: ChatViewModel) {
                 CountRow(ClearTarget.Insights.label, insightCount)
                 CountRow(ClearTarget.MoodSnapshots.label, moodCount)
                 CountRow(ClearTarget.Memories.label, memoryCount)
+                CountRow("餐食记录", exportState.counts.meals)
+                CountRow("采购记录", exportState.counts.purchases)
+                CountRow("库存条目", exportState.counts.inventoryItems)
                 Spacer(Modifier.height(4.dp))
                 androidx.compose.material3.OutlinedButton(
                     onClick = {

@@ -22,10 +22,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+data class RecordCounts(
+    val meals: Int = 0,
+    val purchases: Int = 0,
+    val inventoryItems: Int = 0,
+)
+
 data class RecordExportUiState(
     val exporting: Boolean = false,
     val exportedFile: File? = null,
     val error: String? = null,
+    val counts: RecordCounts = RecordCounts(),
 )
 
 /**
@@ -79,4 +86,21 @@ class RecordExportViewModel @Inject constructor(
     }
 
     fun consumeFile() = _state.update { RecordExportUiState() }
+
+    /** 透明区条数展示(进入设置页时调用一次)。 */
+    fun loadCounts() {
+        if (_state.value.counts.meals > 0 || _state.value.counts.purchases > 0 || _state.value.counts.inventoryItems > 0) return
+        viewModelScope.launch {
+            val counts = runCatching {
+                withContext(Dispatchers.IO) {
+                    RecordCounts(
+                        meals = mealRecordRepository.getAllRecords().size,
+                        purchases = purchaseRepository.getAllPurchases().size,
+                        inventoryItems = inventoryRepository.observeInventory().first().size,
+                    )
+                }
+            }.getOrDefault(RecordCounts())
+            _state.update { it.copy(counts = counts) }
+        }
+    }
 }
