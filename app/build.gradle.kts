@@ -323,6 +323,7 @@ dependencies {
     // Media / Animation
     implementation(libs.lottie.compose)
     implementation(libs.coil.compose)
+    implementation(libs.telephoto.zoomable.image.coil)
     // 条码静态图识别(打包内置模型,无需 Play Services)
     implementation(libs.mlkit.barcode)
     // 拍摄时间/GPS 元数据读取(EXIF)——餐次自动判定与位置存档

@@ -4,6 +4,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import me.saket.telephoto.zoomable.coil.ZoomableAsyncImage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -77,6 +83,8 @@ fun RecordHistoryScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    // 非空 = 正在全屏查看某条记录的图片(多图可横滑/缩放)
+    var viewerRequest by remember { mutableStateOf<ImageViewerRequest?>(null) }
 
     // 保存后跳转过来:滚动定位新条目并高亮 2 秒
     LaunchedEffect(state.days, highlightId) {
@@ -140,9 +148,64 @@ fun RecordHistoryScreen(
                             expanded = state.expandedEntryId == entry.id,
                             onToggle = { viewModel.toggleExpand(entry.id) },
                             onDelete = { viewModel.deleteEntry(entry.id) },
+                            onImageClick = { index ->
+                                viewerRequest = ImageViewerRequest(entryImagePaths(entry), index)
+                            },
                         )
                     }
                 }
+            }
+        }
+    }
+
+    viewerRequest?.let { request ->
+        RecordImageViewerDialog(
+            paths = request.paths,
+            initialIndex = request.index,
+            onDismiss = { viewerRequest = null },
+        )
+    }
+}
+
+/** 一次全屏看图请求:该条记录的图片路径列表 + 点按的起始页。 */
+private data class ImageViewerRequest(val paths: List<String>, val index: Int)
+
+/**
+ * 全屏看图:黑底 + Pager 左右翻页 + 双指/双击缩放(telephoto),单击任意处关闭。
+ * 系统返回键同样关闭(Dialog 默认行为)。
+ */
+@Composable
+private fun RecordImageViewerDialog(
+    paths: List<String>,
+    initialIndex: Int,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.92f))) {
+            val pagerState = rememberPagerState(initialPage = initialIndex) { paths.size }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { index ->
+                ZoomableAsyncImage(
+                    model = File(paths[index]),
+                    contentDescription = "记录原图 ${index + 1}",
+                    modifier = Modifier.fillMaxSize(),
+                    onClick = { onDismiss() },
+                )
+            }
+            if (paths.size > 1) {
+                Text(
+                    text = "${pagerState.currentPage + 1} / ${paths.size}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp),
+                )
             }
         }
     }
@@ -195,6 +258,7 @@ private fun HistoryEntryCard(
     expanded: Boolean,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
+    onImageClick: (Int) -> Unit,
 ) {
     var isRevealed by remember { mutableStateOf(false) }
     var totalDrag by remember { mutableFloatStateOf(0f) }
@@ -281,7 +345,7 @@ private fun HistoryEntryCard(
                 AnimatedVisibility(visible = expanded) {
                     Column {
                         DetailLines(entry)
-                        ImageStrip(entry)
+                        ImageStrip(entry, onImageClick)
                     }
                 }
             }
@@ -333,29 +397,31 @@ private fun DetailLines(entry: HistoryEntry) {
     }
 }
 
+// 过滤掉已不存在的文件放在这里做:缩略图与全屏看图共用同一路径列表,索引才会对齐
+private fun entryImagePaths(entry: HistoryEntry): List<String> = when (entry) {
+    is HistoryEntry.Meal -> entry.record.record.imageLocalPath?.split(",") ?: emptyList()
+    is HistoryEntry.Purchase -> entry.record.record.imageLocalPath?.split(",") ?: emptyList()
+}.filter { File(it).exists() }
+
 @Composable
-private fun ImageStrip(entry: HistoryEntry) {
-    val paths: List<String> = when (entry) {
-        is HistoryEntry.Meal -> entry.record.record.imageLocalPath?.split(",") ?: emptyList()
-        is HistoryEntry.Purchase -> entry.record.record.imageLocalPath?.split(",") ?: emptyList()
-    }
+private fun ImageStrip(entry: HistoryEntry, onImageClick: (Int) -> Unit) {
+    val paths = entryImagePaths(entry)
     if (paths.isEmpty()) return
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(top = 6.dp),
     ) {
-        paths.take(4).forEach { path ->
-            val file = File(path)
-            if (file.exists()) {
-                AsyncImage(
-                    model = file,
-                    contentDescription = "记录原图",
-                    modifier = Modifier
-                        .height(64.dp)
-                        .width(88.dp)
-                        .clip(MaterialTheme.shapes.small),
-                )
-            }
+        paths.take(4).forEachIndexed { index, path ->
+            AsyncImage(
+                model = File(path),
+                contentDescription = "记录原图 ${index + 1},点击放大查看",
+                modifier = Modifier
+                    .height(64.dp)
+                    .width(88.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    // 子级 clickable 消费点击,不会误触发卡片收起
+                    .clickable { onImageClick(index) },
+            )
         }
     }
 }
