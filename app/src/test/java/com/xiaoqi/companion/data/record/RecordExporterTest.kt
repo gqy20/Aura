@@ -69,7 +69,7 @@ class RecordExporterTest {
     @Test
     fun manifestCountsRowsAndStampsVersion() {
         val manifest = export()["manifest.json"]!!
-        assertTrue(manifest.contains("\"schema_version\":3"))
+        assertTrue(manifest.contains("\"schema_version\":4"))
         // 构建标识来自 BuildConfig(brand 版本 + git sha),不再是手写常量
         assertTrue(manifest.contains("\"app_version\":\"${com.xiaoqi.companion.BuildConfig.BRAND_VERSION_NAME}\""))
         assertTrue(manifest.contains("\"version_code\":${com.xiaoqi.companion.BuildConfig.BRAND_VERSION_CODE}"))
@@ -93,6 +93,10 @@ class RecordExporterTest {
         assertTrue(first.contains("\"meal_type\":\"BREAKFAST\""))
         assertTrue(first.contains("\"value_source\":\"estimated\""))
         assertTrue(first.contains("\"value_source\":\"user_verified\""))
+        // 名字来源分级:receipt(小票真值) 导出为小写;无来源的条目字段省略
+        assertTrue(first.contains("\"name_source\":\"receipt\""))
+        // 牛肉面条目无来源,首行 name_source 仅出现一次(鸡蛋条目)
+        assertEquals(1, first.split("\"name_source\"").size - 1)
         // 嵌套 items 而非拍平
         assertTrue(first.contains("\"items\":["))
         // 第二条无 EXIF → recorded
@@ -104,11 +108,13 @@ class RecordExporterTest {
         val csv = export()["items.csv"]!!
         val lines = csv.trim().lines()
         assertEquals(1 + 3, lines.size) // 表头 + 3 行明细
-        assertTrue(lines[0].startsWith("record_id,effective_time,time_source,meal_type,food_name"))
+        assertTrue(lines[0].endsWith(",name_source"))
         // 含逗号的菜名被引号包裹
         assertTrue(csv.contains("\"鸡蛋, 散装\""))
-        // record_id 关联列存在
+        // record_id 关联列存在;小票来源条目行尾 name_source=receipt,无来源为空
         assertTrue(lines[1].startsWith("m1,2026-10-18T08:30:00+08:00,exif,BREAKFAST"))
+        assertTrue(lines[1].endsWith(",,"))
+        assertTrue(lines[2].endsWith(",receipt"))
     }
 
     @Test
@@ -136,7 +142,7 @@ class RecordExporterTest {
             writeZipToBytes(emptyList(), emptyList(), emptyList())
         ).mapValues { (_, bytes) -> bytes.toString(Charsets.UTF_8) }
         assertEquals(
-            "record_id,effective_time,time_source,meal_type,food_name,portion,calories,protein_g,carbs_g,fat_g,value_source,photo_index,image_path",
+            "record_id,effective_time,time_source,meal_type,food_name,portion,calories,protein_g,carbs_g,fat_g,value_source,photo_index,image_path,name_source",
             files["items.csv"]!!.trim(),
         )
         assertTrue(files["meals.jsonl"]!!.isEmpty())
@@ -167,10 +173,14 @@ class RecordExporterTest {
 
         val jsonl = files["meals.jsonl"]!!.toString(Charsets.UTF_8)
         assertTrue(jsonl.contains("\"image_paths\":[\"images/uuid-a.jpg\",\"images/uuid-b.jpg\"]"))
+        // name_source 按条目输出(小写);receipt=小票真值,photo=纯视觉
+        assertTrue(jsonl.contains("\"name\":\"宫保鸡丁\",\"portion\":\"1份\""))
+        assertTrue(jsonl.contains("\"name_source\":\"receipt\""))
+        assertTrue(jsonl.contains("\"name_source\":\"photo\""))
         val itemsCsv = files["items.csv"]!!.toString(Charsets.UTF_8)
-        // photo_index 对应位次的图,行尾 image_path 列
-        assertTrue(itemsCsv.contains("宫保鸡丁,1份,300.0,15.0,20.0,10.0,estimated,0,images/uuid-a.jpg"))
-        assertTrue(itemsCsv.contains("米饭,1碗,200.0,10.0,40.0,5.0,estimated,1,images/uuid-b.jpg"))
+        // photo_index 对应位次的图,行尾 image_path + name_source 列
+        assertTrue(itemsCsv.contains("宫保鸡丁,1份,300.0,15.0,20.0,10.0,estimated,0,images/uuid-a.jpg,receipt"))
+        assertTrue(itemsCsv.contains("米饭,1碗,200.0,10.0,40.0,5.0,estimated,1,images/uuid-b.jpg,photo"))
         val purchasesCsv = files["purchases.csv"]!!.toString(Charsets.UTF_8)
         assertTrue(purchasesCsv.contains("三文鱼,,1.0,份,39.9,0,images/uuid-c.jpg"))
         val manifest = files["manifest.json"]!!.toString(Charsets.UTF_8)
@@ -193,7 +203,7 @@ class RecordExporterTest {
         // 按位对齐:缺失文件的位次是 null,photo_index 引用不错位
         assertTrue(jsonl.contains("\"image_paths\":[\"images/uuid-a.jpg\",null]"))
         val itemsCsv = files["items.csv"]!!.toString(Charsets.UTF_8)
-        assertTrue(itemsCsv.contains("米饭,1碗,200.0,10.0,40.0,5.0,estimated,1,"))
+        assertTrue(itemsCsv.contains("米饭,1碗,200.0,10.0,40.0,5.0,estimated,1,,"))
         val manifest = files["manifest.json"]!!.toString(Charsets.UTF_8)
         assertTrue(manifest.contains("\"image_count\":1"))
     }
@@ -221,7 +231,7 @@ class RecordExporterTest {
                     MealItemEntity(
                         recordId = "m1", name = "鸡蛋, 散装", portionText = "1个",
                         estCalories = 150.0, estProteinG = 8.0, estCarbsG = 5.0, estFatG = 7.0,
-                        isEstimate = false, photoIndex = 0,
+                        isEstimate = false, photoIndex = 0, nameSource = "RECEIPT",
                     ),
                 ),
             ),
@@ -284,12 +294,12 @@ class RecordExporterTest {
             MealItemEntity(
                 recordId = "m3", name = "宫保鸡丁", portionText = "1份",
                 estCalories = 300.0, estProteinG = 15.0, estCarbsG = 20.0, estFatG = 10.0,
-                isEstimate = true, photoIndex = 0,
+                isEstimate = true, photoIndex = 0, nameSource = "RECEIPT",
             ),
             MealItemEntity(
                 recordId = "m3", name = "米饭", portionText = "1碗",
                 estCalories = 200.0, estProteinG = 10.0, estCarbsG = 40.0, estFatG = 5.0,
-                isEstimate = true, photoIndex = 1,
+                isEstimate = true, photoIndex = 1, nameSource = "PHOTO",
             ),
         ),
     )

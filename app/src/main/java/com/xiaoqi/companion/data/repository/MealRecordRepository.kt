@@ -73,6 +73,7 @@ class MealRecordRepositoryImpl @Inject constructor(
                     estFatG = item.fatG,
                     isEstimate = item.isEstimate,
                     photoIndex = item.photoIndex,
+                    nameSource = item.nameSource?.name,
                 )
             },
         )

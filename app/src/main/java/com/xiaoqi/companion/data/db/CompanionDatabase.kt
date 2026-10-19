@@ -55,7 +55,7 @@ import com.xiaoqi.companion.data.db.entity.ToolCallEntity
         PurchaseItemEntity::class,
         InventoryItemEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -375,6 +375,13 @@ abstract class CompanionDatabase : RoomDatabase() {
                 executor.exec("ALTER TABLE `purchase_records` ADD COLUMN `lon` REAL")
                 executor.exec("ALTER TABLE `meal_items` ADD COLUMN `photoIndex` INTEGER")
                 executor.exec("ALTER TABLE `purchase_items` ADD COLUMN `photoIndex` INTEGER")
+            }
+        }
+
+        // 条目名字来源(多图小票对齐):RECEIPT/PHOTO,导出按 value_source 同级输出 name_source
+        val MIGRATION_13_14 = object : DualMigration(13, 14) {
+            override fun apply(executor: SqlExecutor) {
+                executor.exec("ALTER TABLE `meal_items` ADD COLUMN `nameSource` TEXT")
             }
         }
 

@@ -223,6 +223,12 @@
 - **实现**：`build.gradle.kts` 用 `providers.exec { git rev-parse --short HEAD }` 注入 `BuildConfig.BUILD_GIT_SHA`；`RecordExporter` 的 manifest 改从 BuildConfig 取 `app_version`(BRAND_VERSION_NAME)/`version_code`(BRAND_VERSION_CODE)/`build_id`(git 短 sha)，schema v3。注意：build_id 是**构建时刻**的 commit——本 commit 的构建会带前一个 sha，属正常先后关系。
 - **验证**：单测断言 manifest 三字段来自 BuildConfig；模拟器实测导出 `{"schema_version":3,"app_version":"0.1.6","version_code":7,"build_id":"be132a6",...}`。
 
+### 近期打磨（2026-10-19 · name_source 持久化（DB v14 + 导出 v4））
+
+- **动机**：多图小票对齐产出的 `nameSource`（RECEIPT/PHOTO）此前只活在确认页（徽标），落库即丢——无法事后统计"小票参与了多少条"、也无法在导出里做名字质量分级。
+- **实现**：`meal_items` 加 `nameSource` TEXT 列（DB v13→v14，`ALTER TABLE` 一条）；Repository 存库映射 `item.nameSource?.name`；`RecordExporter` 的 meals.jsonl 条目加 `name_source`（小写，null 省略）、items.csv 行尾加 `name_source` 列，schema v4。旧数据/手填/条码行为 null → JSONL 省略字段、CSV 空单元格。
+- **验证**：全量单测绿（exporter 断言 name_source 大小写转换/无来源省略/CSV 列位）；E2E 实测模拟器双图（菜品+合成小票）单次提取 → 保存 → 导出，新记录 4 条条目 3 条 `receipt`（牛肉面/凉拌黄瓜/酸梅汤）+ 1 条 `photo`（油条，小票上没有、菜品图可见），JSONL/CSV 输出正确；v13→v14 迁移在含 9 餐旧数据的库上静默完成，旧记录 nameSource 为空不报错。
+
 ### 近期打磨（2026-10-18 · MR 回看闭环 + P4 洞察联动）
 
 - **回看闭环落地**：主屏"记一餐"入口卡与**"今日热量"状态卡并排**（动作+状态同层，零记录时引导）；点击进**记录列表页**（`record-history` 路由）——餐食+采购合并按天分组（今天/昨天/M月d日），日小计合并进行头（"餐 2764 kcal · 购 3 件"）；条目两行卡：摘要单行（时间+餐次+kcal+菜名列表），点行展开明细+原图缩略；**左滑删除**（SwipeToDismissBox 露红色垃圾桶，点击或滑满触发，E2E 验证 `history_entry_deleted`）。

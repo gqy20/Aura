@@ -30,13 +30,15 @@ import kotlinx.serialization.json.Json
  * - effective_time = photoTakenAt(EXIF 拍摄时刻)优先,缺失回退 createdAt/purchasedAt;
  *   time_source 标注 exif/recorded,下游不需要猜用哪个时间。
  * - value_source = user_verified(isEstimate=false) / estimated —— 数值质量分级。
+ * - name_source = receipt(小票/订单印刷文本,名字真值) / photo(纯视觉) —— 名字质量分级,
+ *   与 value_source 同级;DB 存枚举名,导出统一小写。
  * - image_paths 与 items 的 photo_index 按位对齐;文件缺失的位次为 null,不产生悬空引用。
  * - app_version/version_code/build_id 来自构建(Brand 版本 + git sha),
  *   用于对账"哪个构建产出的导出"——不再手写常量。
  */
 object RecordExporter {
 
-    const val SCHEMA_VERSION = 3
+    const val SCHEMA_VERSION = 4
     private const val IMAGE_DIR = "images"
 
     /** sourcePath 是 DB imageLocalPath 里的原始绝对路径,导出时改写为 images/<文件名>。 */
@@ -55,6 +57,8 @@ object RecordExporter {
         val fat_g: Double,
         val value_source: String,
         val photo_index: Int? = null,
+        // receipt=名字来自小票/订单印刷文本;旧数据/手填为 null
+        val name_source: String? = null,
     )
 
     @Serializable
@@ -171,6 +175,7 @@ object RecordExporter {
                             fat_g = item.estFatG,
                             value_source = if (item.isEstimate) "estimated" else "user_verified",
                             photo_index = item.photoIndex,
+                            name_source = item.nameSource?.lowercase(),
                         )
                     },
                 )
@@ -179,7 +184,7 @@ object RecordExporter {
     }
 
     private fun buildItemsCsv(meals: List<MealRecordWithItems>, zone: ZoneId, imageMap: Map<String, String>): String = buildString {
-        appendLine("record_id,effective_time,time_source,meal_type,food_name,portion,calories,protein_g,carbs_g,fat_g,value_source,photo_index,image_path")
+        appendLine("record_id,effective_time,time_source,meal_type,food_name,portion,calories,protein_g,carbs_g,fat_g,value_source,photo_index,image_path,name_source")
         meals.forEach { meal ->
             val (time, source) = effectiveTime(meal.record.photoTakenAt, meal.record.createdAt, zone)
             val imagePaths = relativePaths(meal.record.imageLocalPath, imageMap)
@@ -199,6 +204,7 @@ object RecordExporter {
                         if (item.isEstimate) "estimated" else "user_verified",
                         item.photoIndex ?: "",
                         csvCell(imageCell(imagePaths, item.photoIndex)),
+                        item.nameSource?.lowercase() ?: "",
                     ).joinToString(",")
                 )
             }
