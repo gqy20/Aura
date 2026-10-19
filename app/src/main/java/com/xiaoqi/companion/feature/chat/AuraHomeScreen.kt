@@ -362,7 +362,7 @@ private fun LongTaskEntry(
     }
 }
 
-// 今日餐食状态卡:与"记一餐"动作卡同构三层(标签/主行/副行),零记录时引导
+// 今日餐食状态卡:与"记一餐"动作卡同构两层(标签/主行),零记录时引导
 @Composable
 private fun TodayMealCard(
     totals: com.xiaoqi.companion.data.db.dao.MealTotalsRow,
@@ -373,9 +373,10 @@ private fun TodayMealCard(
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        color = Color.White.copy(alpha = 0.72f),
+        // 实心白:半透明色 + shadowElevation 会在边缘合成出灰框(用户反馈的双层观感)
+        color = Color.White,
         tonalElevation = 0.dp,
-        shadowElevation = 1.dp,
+        shadowElevation = 0.dp,
         border = BorderStroke(0.5.dp, borderColor),
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -386,7 +387,7 @@ private fun TodayMealCard(
             )
             Spacer(Modifier.height(2.dp))
             if (totals.recordCount > 0) {
-                // 主数值行:数字大、单位小,baseline 对齐;蛋白/条数并入副行,不与数值挤一行
+                // 主数值行:数字大、单位小,baseline 对齐
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = "%,d".format(totals.calories.toInt()),
@@ -401,12 +402,6 @@ private fun TodayMealCard(
                         modifier = Modifier.padding(bottom = 2.dp),
                     )
                 }
-                Text(
-                    text = "蛋白 ${totals.proteinG.toInt()}g · ${totals.recordCount} 项记录",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
             } else {
                 Text(
                     text = "0 kcal",
@@ -432,9 +427,9 @@ private fun RecordCaptureEntry(onClick: () -> Unit, modifier: Modifier = Modifie
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        color = Color.White.copy(alpha = 0.72f),
+        color = Color.White,
         tonalElevation = 0.dp,
-        shadowElevation = 1.dp,
+        shadowElevation = 0.dp,
         border = BorderStroke(0.5.dp, borderColor),
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -457,12 +452,6 @@ private fun RecordCaptureEntry(onClick: () -> Unit, modifier: Modifier = Modifie
                 text = "拍照识别",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
-            Text(
-                text = "热量与营养自动估算",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
         }
@@ -607,8 +596,8 @@ private fun PresenceStage(
             Spacer(Modifier.height(12.dp))
             Surface(
                 shape = RoundedCornerShape(18.dp),
-                color = Color.White.copy(alpha = 0.72f),
-                shadowElevation = 1.dp,
+                color = Color.White,
+                shadowElevation = 0.dp,
                 tonalElevation = 0.dp,
                 modifier = Modifier
                     .clickable(onClick = onOpenChat),

@@ -253,6 +253,9 @@ private fun HistoryEntryCard(
                             else if (totalDrag > 40f) isRevealed = false
                             totalDrag = 0f
                         },
+                        // 滑动被列表滚动等打断时 end 不会回调,必须同样清零,
+                        // 否则残值跨手势累积,后续轻点也会误触"露出删除"
+                        onDragCancel = { totalDrag = 0f },
                     )
                 }
                 .clickable(onClick = {
