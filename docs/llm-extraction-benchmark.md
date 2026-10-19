@@ -73,6 +73,41 @@ GLM off 输出 token 极少（~153）是因为 schema 填充本身就是短输�
 
 MiniMax `/anthropic/v1/messages` 的 `usage.input_tokens` 恒返回 1（60 次调用全部如此），不影响功能但**用量监控和成本核算不可信**——如有计费争议以此为准向 MiniMax 反馈。
 
+## 补充：MiniMax-M3.1-Flash-Preview（2026-10-19 追加）
+
+用户要求补测 M3.1。模型列表（`/v1/models`）确认实际名称为 `MiniMax-M3.1-Flash-Preview`（普通 `MiniMax-M3.1` 名会被宽松路由到 M3）。
+
+### 协议差异（关键）
+
+**M3.1 强制 thinking，不可禁用**：发送 `thinking: {"type": "disabled"}` 直接 400——
+`"requires adaptive thinking; thinking.type=\"disabled\" (including reasoning.effo..."`。
+"Flash" 变体不是"更快"，而是"轻量推理不可关"。这从协议层堵死了提取场景的"关思考提速"路径。
+
+### 基准数据（15 次，仅此一种模式）
+
+| 指标 | M3.1-Flash-Preview | 对照：M3 off | 对照：M3 on | 对照：GLM off |
+|------|:---:|:---:|:---:|:---:|
+| 成功率 | **11/15（73%）** | 15/15 | 14/15 | 15/15 |
+| 耗时中位 | 16.1s | 7.3s | 8.8s | 8.0s |
+| kcal 中位 | 1114 | 1115 | 1000 | 810 |
+| kcal 标准差 | **±194** | ±175 | ±119 | ±100 |
+| 条目数 | 4-9 | 2-7 | 全 2 | 全 2 |
+| output tokens | ~970 | ~446 | ~696 | ~153 |
+
+### 结论
+
+**M3.1-Flash-Preview 不适合本场景**，理由按严重性排序：
+
+1. **27% 失败率**（15 次里 4 次 400/异常）——提取是高频操作，这个成功率不可接受
+2. **强制 thinking**——无法走"关思考提速"路径，从协议层堵死了 30 秒闭环的优化方向
+3. **方差最大**（±194 vs GLM off 的 ±100）——自动 thinking 反而让"过度思考"更严重
+4. **条目粒度过细**（4-9 项）——把"红油汤底"、"葱花"都单独算一项，破坏一致性
+5. **最慢的 MiniMax 选项**（16.1s vs M3 off 的 7.3s）
+
+名字里的 "Flash-Preview" 有误导性——它不是"更快"，而是"推理不可关的轻量模式"，且是 Preview 状态。
+
+**维持原有结论**：GLM glm-5.3-flash + thinking off 为默认生产配置。MiniMax M3（非 M3.1）继续作为备用 Provider。
+
 ## 复现
 
 ```bash
