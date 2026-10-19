@@ -68,6 +68,7 @@ import coil.compose.AsyncImage
 import com.xiaoqi.companion.core.record.MealItemDraft
 import com.xiaoqi.companion.core.record.PurchaseItemDraft
 import com.xiaoqi.companion.core.record.RecordDomain
+import com.xiaoqi.companion.core.record.RecordNameSource
 import com.xiaoqi.companion.data.db.converter.MealType
 import com.xiaoqi.companion.feature.chat.AuraLoadingIndicator
 import com.xiaoqi.companion.ui.theme.ChatCardSurface
@@ -622,6 +623,20 @@ private fun EstimateBadge() {
     )
 }
 
+// 名字来自小票印刷文本(真值),区别于纯视觉识别的"估算"
+@Composable
+private fun ReceiptBadge() {
+    Text(
+        "小票",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onTertiaryContainer,
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .clip(MaterialTheme.shapes.small),
+    )
+}
+
 /**
  * 两行卡片(用户分层原则:非必要不加行,文字组织进单行):
  * 行 1 = 菜名 + 估算徽标 + 份量小/中/大 chips + 删除(都是"这条是什么"的信息)
@@ -647,6 +662,9 @@ private fun MealItemCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
+                if (item.nameSource == RecordNameSource.RECEIPT) {
+                    ReceiptBadge()
+                }
                 if (item.isEstimate) {
                     EstimateBadge()
                 }

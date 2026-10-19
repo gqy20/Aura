@@ -47,6 +47,9 @@ internal const val GRAMS_MAX_PER_ITEM = 5_000.0
  * submit_meal_record / submit_purchase_record 间自选完成域分类(design.md §6:
  * 提取器分类,确认页域切换兜底 —— [domainHint] 供手动切换后按指定域重提)。
  *
+ * 多图走单次请求(路线 A):整组图一起给模型,小票印刷文本做名字真值、菜品照片做
+ * 份量锚点,条目带 photo_index(归属图)与 name_source(名字来源)。
+ *
  * 餐食营养走两段式(MR 精度策略):模型只负责菜名 + 可食部克重,密度命中时营养
  * 由《成分表》密度 × 克重本地计算,消掉"同一道菜每次估的热量都不同"的方差;
  * 密度未命中再降级模型估算。用户修正过的条目(isEstimate=false)优先级最高。
@@ -70,13 +73,27 @@ class VisionRecordExtractor(
         mealRepository: MealRecordRepository,
     ) : this(configRepository, clientFactory, foodDensitySource, mealRepository, { System.currentTimeMillis() })
 
+    /** 单图兼容入口(旧调用/单图测试);多图走 [extract] 的 List 版本。 */
     suspend fun extract(
         imageBase64: String,
-        mediaType: String,
+        mediaType: String = "image/jpeg",
+        note: String? = null,
+        domainHint: RecordDomain? = null,
+        photoTakenAtMillis: Long? = null,
+    ): RecordExtractionResult = extract(
+        images = listOf(ExtractionImage(imageBase64, mediaType)),
+        note = note,
+        domainHint = domainHint,
+        photoTakenAtMillis = photoTakenAtMillis,
+    )
+
+    suspend fun extract(
+        images: List<ExtractionImage>,
         note: String? = null,
         domainHint: RecordDomain? = null,
         photoTakenAtMillis: Long? = null,
     ): RecordExtractionResult {
+        if (images.isEmpty()) return RecordExtractionResult.Failed("没有可提取的图片")
         val config = configRepository.getCurrentLlmConfig().first()
         if (config.provider == LlmProvider.LOCAL_QWEN) {
             return RecordExtractionResult.Failed("本地模型不支持图片结构化提取,请切换云端 Provider")
@@ -90,18 +107,28 @@ class VisionRecordExtractor(
             id = config.modelName,
             capabilities = listOf(LLMCapability.Completion, LLMCapability.Vision.Image),
         )
-        val domainText = note?.takeIf { it.isNotBlank() } ?: "提取这张照片里的结构化记录。"
+        val multiImage = images.size > 1
+        val domainText = note?.takeIf { it.isNotBlank() }
+            ?: if (multiImage) "提取这组照片里的结构化记录。" else "提取这张照片里的结构化记录。"
+        val systemPrompt = if (multiImage) {
+            EXTRACTION_SYSTEM_PROMPT + multiImageAddendum(images.size)
+        } else {
+            EXTRACTION_SYSTEM_PROMPT
+        }
         val requestPrompt = prompt("record-extraction") {
-            system(EXTRACTION_SYSTEM_PROMPT)
+            system(systemPrompt)
             user {
                 text(domainText)
-                image(
-                    ContentPart.Image(
-                        content = AttachmentContent.Binary.Base64(imageBase64),
-                        format = "base64",
-                        mimeType = mediaType,
-                    ),
-                )
+                images.forEachIndexed { index, image ->
+                    if (multiImage) text("图片 ${index + 1}:")
+                    image(
+                        ContentPart.Image(
+                            content = AttachmentContent.Binary.Base64(image.imageBase64),
+                            format = "base64",
+                            mimeType = image.mediaType,
+                        ),
+                    )
+                }
             }
         }
         val (tools, forceName) = when (domainHint) {
@@ -137,16 +164,23 @@ class VisionRecordExtractor(
         val hour = photoTakenAtMillis?.let { takenAt ->
             Instant.ofEpochMilli(takenAt).atZone(ZoneId.systemDefault()).hour
         } ?: Instant.ofEpochMilli(nowProvider()).atZone(ZoneId.systemDefault()).hour
+        AppLogger.info(
+            LogTags.Record,
+            "record_extraction_completed",
+            "imageCount" to images.size,
+            "domainHint" to domainHint?.name,
+            "tool" to call.name,
+        )
         return when (call.name.ifBlank { forceName ?: "" }) {
             MEAL_TOOL_NAME -> {
-                val parsed = parseMealToolInput(call.inputJson, note, hour)
+                val parsed = parseMealToolInput(call.inputJson, note, hour, images.size)
                 if (parsed is RecordExtractionResult.Meal) {
                     RecordExtractionResult.Meal(resolveMealNutrition(parsed.draft))
                 } else {
                     parsed
                 }
             }
-            PURCHASE_TOOL_NAME -> parsePurchaseToolInput(call.inputJson, note)
+            PURCHASE_TOOL_NAME -> parsePurchaseToolInput(call.inputJson, note, images.size)
             else -> {
                 AppLogger.warn(LogTags.Record, "record_extraction_unknown_tool", "tool" to call.name)
                 RecordExtractionResult.Failed("提取返回了未知记录类型,可重试或手动填写")
@@ -261,6 +295,23 @@ class VisionRecordExtractor(
                 "Nutrition fields are fallbacks only — the app recomputes them from a food composition table when the " +
                 "dish name matches, so put your effort into naming the dish precisely (generic core name, e.g. " +
                 "牛肉面 not 张记招牌牛肉拉面) and estimating grams."
+
+        // 多图时追加:小票名字真值 + 图片克重锚点的跨图对齐规则(路线 A 的核心)
+        private fun multiImageAddendum(imageCount: Int): String =
+            "\n\n## Multiple images ($imageCount total, numbered 1..$imageCount in request order)\n" +
+                "The images may mix dish photos and a receipt/bill of the SAME meal, or product photos and a " +
+                "purchase receipt.\n" +
+                "- Item names: when a receipt/bill is present and readable, its printed item names are ground " +
+                "truth — use them (without quantity/price suffixes) and set name_source=\"receipt\"; use the " +
+                "receipt's store name for purchases. Items not printed on the receipt get name_source=\"photo\".\n" +
+                "- estimated_grams / quantity: judge ONLY from the matching dish/product photo. Never infer " +
+                "weight from prices or receipt text.\n" +
+                "- Items printed on the receipt but not visible in any photo (e.g. packed takeout): still record " +
+                "them, photo_index = the receipt's image number, estimate grams from a typical portion.\n" +
+                "- Items visible in photos but not printed on the receipt (e.g. a self-brought drink): still " +
+                "record them with name_source=\"photo\".\n" +
+                "- If the receipt is blurry or unreadable, ignore it entirely and treat every name as " +
+                "name_source=\"photo\"."
     }
 }
 
@@ -273,6 +324,9 @@ private data class MealItemDto(
     val carbs_g: Double = 0.0,
     val fat_g: Double = 0.0,
     val estimated_grams: Double = 0.0,
+    // 模型输出的 1-based 图序号,parse 时换算为 0-based photoIndex
+    val photo_index: Int? = null,
+    val name_source: String? = null,
 )
 
 @Serializable
@@ -288,6 +342,7 @@ private data class PurchaseItemDto(
     val quantity: Double = 0.0,
     val unit: String = "",
     val unit_price: Double? = null,
+    val photo_index: Int? = null,
 )
 
 @Serializable
@@ -331,6 +386,18 @@ internal val MEAL_TOOL_SCHEMA: JsonObject = buildJsonObject {
                         put("estimated_grams", buildJsonObject {
                             put("type", "number")
                             put("description", "Estimated weight of the edible portion in grams")
+                        })
+                        put("photo_index", buildJsonObject {
+                            put("type", "integer")
+                            put("description", "1-based index of the image this item comes from: the dish photo where it is visible, or the receipt photo that lists it")
+                        })
+                        put("name_source", buildJsonObject {
+                            put("type", "string")
+                            put("enum", buildJsonArray {
+                                add(JsonPrimitive("receipt"))
+                                add(JsonPrimitive("photo"))
+                            })
+                            put("description", "receipt = name read from printed receipt text (ground truth); photo = name guessed from the image")
                         })
                     })
                     put("required", buildJsonArray {
@@ -385,6 +452,10 @@ internal val PURCHASE_TOOL_SCHEMA: JsonObject = buildJsonObject {
                             put("description", "Counting unit, e.g. 个 / 板 / 盒 / 斤 / 袋")
                         })
                         put("unit_price", buildJsonObject { put("type", "number"); put("description", "Price per unit if visible") })
+                        put("photo_index", buildJsonObject {
+                            put("type", "integer")
+                            put("description", "1-based index of the image this item comes from: the product photo where it is visible, or the receipt photo that lists it")
+                        })
                     })
                     put("required", buildJsonArray {
                         add(JsonPrimitive("name"))
@@ -399,10 +470,25 @@ internal val PURCHASE_TOOL_SCHEMA: JsonObject = buildJsonObject {
     })
 }
 
+// 模型输出 1-based photo_index → 0-based photoIndex;单图恒为 0,越界/缺失归 null
+internal fun photoIndexFromDto(raw: Int?, imageCount: Int): Int? = when {
+    imageCount <= 1 -> 0
+    raw == null -> null
+    raw in 1..imageCount -> raw - 1
+    else -> null
+}
+
+internal fun nameSourceFromDto(raw: String?): RecordNameSource? = when (raw?.trim()?.lowercase()) {
+    "receipt" -> RecordNameSource.RECEIPT
+    "photo" -> RecordNameSource.PHOTO
+    else -> null
+}
+
 internal fun parseMealToolInput(
     inputJson: String,
     note: String?,
     hour: Int,
+    imageCount: Int = 1,
 ): RecordExtractionResult {
     val dto = try {
         extractionJson.decodeFromString<MealRecordDto>(inputJson)
@@ -421,6 +507,8 @@ internal fun parseMealToolInput(
                 carbsG = item.carbs_g.coerceIn(0.0, CARB_MAX_PER_ITEM),
                 fatG = item.fat_g.coerceIn(0.0, FAT_MAX_PER_ITEM),
                 estimatedGrams = item.estimated_grams.coerceIn(0.0, GRAMS_MAX_PER_ITEM),
+                photoIndex = photoIndexFromDto(item.photo_index, imageCount),
+                nameSource = nameSourceFromDto(item.name_source),
             )
         }
     if (items.isEmpty()) {
@@ -438,7 +526,7 @@ internal fun parseMealToolInput(
     )
 }
 
-internal fun parsePurchaseToolInput(inputJson: String, note: String?): RecordExtractionResult {
+internal fun parsePurchaseToolInput(inputJson: String, note: String?, imageCount: Int = 1): RecordExtractionResult {
     val dto = try {
         extractionJson.decodeFromString<PurchaseRecordDto>(inputJson)
     } catch (error: Exception) {
@@ -454,6 +542,7 @@ internal fun parsePurchaseToolInput(inputJson: String, note: String?): RecordExt
                 quantity = item.quantity.coerceIn(0.01, PURCHASE_QUANTITY_MAX),
                 unit = item.unit.trim().ifBlank { "个" },
                 unitPrice = item.unit_price?.coerceIn(0.0, PURCHASE_PRICE_MAX),
+                photoIndex = photoIndexFromDto(item.photo_index, imageCount),
             )
         }
     if (items.isEmpty()) {

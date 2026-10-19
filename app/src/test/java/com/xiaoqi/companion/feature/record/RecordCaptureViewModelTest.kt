@@ -1,11 +1,13 @@
 package com.xiaoqi.companion.feature.record
 
+import com.xiaoqi.companion.core.record.ExtractionImage
 import com.xiaoqi.companion.core.record.MealItemDraft
 import com.xiaoqi.companion.core.record.MealRecordDraft
 import com.xiaoqi.companion.core.record.PurchaseItemDraft
 import com.xiaoqi.companion.core.record.PurchaseRecordDraft
 import com.xiaoqi.companion.core.record.RecordDomain
 import com.xiaoqi.companion.core.record.RecordExtractionResult
+import com.xiaoqi.companion.core.record.RecordNameSource
 import com.xiaoqi.companion.core.record.VisionRecordExtractor
 import com.xiaoqi.companion.data.db.converter.MealType
 import com.xiaoqi.companion.data.db.converter.RecordSource
@@ -83,7 +85,6 @@ class RecordCaptureViewModelTest {
         assertEquals(2, state.items.size)
         assertEquals(listOf(1.0, 1.0), state.portionScales)
     }
-
     @Test
     fun onImagePicked_purchaseExtraction_switchesToPurchaseTable() = runTest {
         stubExtraction(extractedPurchase())
@@ -204,7 +205,7 @@ class RecordCaptureViewModelTest {
         stubExtraction(extractedMeal())
         viewModel.onImagePicked("content://photo/1")
         coEvery {
-            extractor.extract("prepared-base64", "image/jpeg", null, RecordDomain.PURCHASE, null)
+            extractor.extract(any<List<ExtractionImage>>(), any(), RecordDomain.PURCHASE, any())
         } returns extractedPurchase()
 
         viewModel.switchDomain(RecordDomain.PURCHASE)
@@ -222,7 +223,25 @@ class RecordCaptureViewModelTest {
 
         assertEquals(RecordDomain.PURCHASE, viewModel.state.value.domain)
         assertEquals(RecordCapturePhase.CONFIRMING, viewModel.state.value.phase)
-        coVerify(exactly = 0) { extractor.extract(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { extractor.extract(any<List<ExtractionImage>>(), any(), any(), any()) }
+    }
+
+    @Test
+    fun switchDomain_reExtractFailure_keepsOldDomainAndItems() = runTest {
+        stubExtraction(extractedMeal())
+        viewModel.onImagePicked("content://photo/1")
+        coEvery {
+            extractor.extract(any<List<ExtractionImage>>(), any(), RecordDomain.PURCHASE, any())
+        } returns RecordExtractionResult.Failed("切域重提失败")
+
+        viewModel.switchDomain(RecordDomain.PURCHASE)
+
+        // 事务性:域与条目都保持提取失败前的状态,失败只提示
+        val state = viewModel.state.value
+        assertEquals(RecordDomain.MEAL, state.domain)
+        assertEquals(RecordCapturePhase.CONFIRMING, state.phase)
+        assertEquals(2, state.items.size)
+        assertEquals("切域重提失败", state.appendFailure)
     }
 
     @Test
@@ -330,28 +349,33 @@ class RecordCaptureViewModelTest {
         assertEquals(true, state.purchaseItems.isEmpty())
     }
 
-    // --- 多图追加(B 批次) ---
+    // --- 多图单调用(路线 A:整组图一次提取,小票与菜品图跨图对齐) ---
 
     @Test
-    fun onImagesPicked_twoImages_appendsItemsWithPhotoIndex() = runTest {
-        val first = RecordExtractionResult.Meal(
+    fun onImagesPicked_dishAndReceiptPhotos_extractedInOneCall() = runTest {
+        val imagesSlot = slot<List<ExtractionImage>>()
+        coEvery { extractor.extract(capture(imagesSlot), any(), any(), any()) } returns extractedMeal()
+
+        viewModel.onImagesPicked(listOf("content://photo/dish", "content://photo/receipt"))
+
+        assertEquals(2, imagesSlot.captured.size)
+        coVerify(exactly = 1) { extractor.extract(any<List<ExtractionImage>>(), any(), any(), any()) }
+        assertEquals(2, viewModel.state.value.photos.size)
+    }
+
+    @Test
+    fun onImagesPicked_twoImages_singleDraftItemsCarryPhotoIndexAndNameSource() = runTest {
+        coEvery { extractor.extract(any<List<ExtractionImage>>(), any(), any(), any()) } returns RecordExtractionResult.Meal(
             MealRecordDraft(
                 mealType = MealType.LUNCH,
                 source = RecordSource.PHOTO,
-                items = listOf(MealItemDraft("牛肉面", "1碗", 550.0, 30.0, 70.0, 12.0)),
+                items = listOf(
+                    MealItemDraft("牛肉面", "1碗", 550.0, 30.0, 70.0, 12.0, photoIndex = 0, nameSource = RecordNameSource.RECEIPT),
+                    MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0, photoIndex = 1),
+                ),
                 confidence = 0.9,
             )
         )
-        val second = RecordExtractionResult.Meal(
-            MealRecordDraft(
-                mealType = MealType.DINNER,
-                source = RecordSource.PHOTO,
-                items = listOf(MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0)),
-                confidence = 0.8,
-            )
-        )
-        // FakeChatImageProcessor 对所有 uri 返回同一 base64,多图场景按调用序区分
-        coEvery { extractor.extract(any(), any(), any(), any(), any()) } returnsMany listOf(first, second)
 
         viewModel.onImagesPicked(listOf("content://photo/1", "content://photo/2"))
 
@@ -360,24 +384,26 @@ class RecordCaptureViewModelTest {
         assertEquals(2, state.photos.size)
         assertEquals(2, state.items.size)
         assertEquals(0, state.items[0].photoIndex)
+        assertEquals(RecordNameSource.RECEIPT, state.items[0].nameSource)
         assertEquals(1, state.items[1].photoIndex)
+        assertNull(state.items[1].nameSource)
         assertEquals(listOf(1.0, 1.0), state.portionScales)
-        // 追加图不覆盖首图的餐次
         assertEquals(MealType.LUNCH, state.mealType)
     }
 
     @Test
-    fun removePhoto_dropsOnlyThatPhotosItems() = runTest {
-        coEvery { extractor.extract(any(), any(), any(), any(), any()) } returnsMany listOf(
-            extractedMeal(),
-            RecordExtractionResult.Meal(
-                MealRecordDraft(
-                    mealType = MealType.LUNCH,
-                    source = RecordSource.PHOTO,
-                    items = listOf(MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0)),
-                    confidence = 0.8,
-                )
-            ),
+    fun removePhoto_dropsOnlyThatPhotosItemsAndShifts() = runTest {
+        coEvery { extractor.extract(any<List<ExtractionImage>>(), any(), any(), any()) } returns RecordExtractionResult.Meal(
+            MealRecordDraft(
+                mealType = MealType.LUNCH,
+                source = RecordSource.PHOTO,
+                items = listOf(
+                    MealItemDraft("牛肉面", "1碗", 400.0, 20.0, 60.0, 8.0, photoIndex = 0),
+                    MealItemDraft("卤蛋", "1 个", 130.0, 6.0, 1.0, 10.0, photoIndex = 0),
+                    MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0, photoIndex = 1),
+                ),
+                confidence = 0.9,
+            )
         )
         viewModel.onImagesPicked(listOf("content://photo/1", "content://photo/2"))
 
@@ -389,21 +415,69 @@ class RecordCaptureViewModelTest {
         assertEquals(1, state.photos.size)
         assertEquals(1, state.items.size)
         assertEquals("酸奶", state.items.single().name)
-        assertEquals(1, state.items.single().photoIndex)
+        // 后续图的条目 photoIndex 前移对齐剩余图片下标
+        assertEquals(0, state.items.single().photoIndex)
+        assertEquals(listOf(1.0), state.portionScales)
     }
 
     @Test
-    fun onImagesPicked_appendFailure_doesNotBlockExistingItems() = runTest {
-        coEvery { extractor.extract(any(), any(), any(), any(), any()) } returnsMany listOf(
-            extractedMeal(),
+    fun onImagesPicked_appendReExtractFailure_keepsOldItemsTransactionally() = runTest {
+        val first = RecordExtractionResult.Meal(
+            MealRecordDraft(
+                mealType = MealType.LUNCH,
+                source = RecordSource.PHOTO,
+                items = listOf(MealItemDraft("牛肉面", "1碗", 550.0, 30.0, 70.0, 12.0, photoIndex = 0)),
+                confidence = 0.9,
+            )
+        )
+        coEvery { extractor.extract(any<List<ExtractionImage>>(), any(), any(), any()) } returnsMany listOf(
+            first,
             RecordExtractionResult.Failed("未识别出食物"),
         )
-        viewModel.onImagesPicked(listOf("content://photo/1", "content://photo/2"))
+        viewModel.onImagePicked("content://photo/1")
+        viewModel.onImagePicked("content://photo/2")
 
+        // 事务性追加:重提失败不丢首图条目,新图已入列可删可重试
         val state = viewModel.state.value
         assertEquals(RecordCapturePhase.CONFIRMING, state.phase)
-        assertEquals(2, state.items.size)
+        assertEquals(1, state.items.size)
+        assertEquals("牛肉面", state.items.single().name)
+        assertEquals(2, state.photos.size)
         assertEquals("未识别出食物", state.appendFailure)
+    }
+
+    @Test
+    fun onImagesPicked_appendSuccess_replacesItemsWithWholeNewDraft() = runTest {
+        val first = RecordExtractionResult.Meal(
+            MealRecordDraft(
+                mealType = MealType.LUNCH,
+                source = RecordSource.PHOTO,
+                items = listOf(MealItemDraft("牛肉面", "1碗", 550.0, 30.0, 70.0, 12.0, photoIndex = 0)),
+                confidence = 0.9,
+            )
+        )
+        val appended = RecordExtractionResult.Meal(
+            MealRecordDraft(
+                mealType = MealType.DINNER,
+                source = RecordSource.PHOTO,
+                items = listOf(
+                    MealItemDraft("牛肉面", "1碗", 550.0, 30.0, 70.0, 12.0, photoIndex = 0),
+                    MealItemDraft("凉拌黄瓜", "1份", 80.0, 2.0, 10.0, 4.0, photoIndex = 1, nameSource = RecordNameSource.RECEIPT),
+                ),
+                confidence = 0.85,
+            )
+        )
+        coEvery { extractor.extract(any<List<ExtractionImage>>(), any(), any(), any()) } returnsMany listOf(first, appended)
+        viewModel.onImagePicked("content://photo/1")
+        viewModel.onImagePicked("content://photo/2")
+
+        val state = viewModel.state.value
+        // 整单重提:条目是第二份草稿(跨图对齐后的结果),不是两批拼接
+        assertEquals(2, state.items.size)
+        assertEquals(RecordNameSource.RECEIPT, state.items[1].nameSource)
+        // 追加不覆盖用户已确认的餐次/置信度
+        assertEquals(MealType.LUNCH, state.mealType)
+        assertEquals(0.9, state.confidence, 0.001)
     }
 
     @Test
@@ -411,7 +485,7 @@ class RecordCaptureViewModelTest {
         val takenAt = 1_700_000_000_000L
         coEvery { photoMetadataReader.read("content://photo/1") } returns
             com.xiaoqi.companion.core.record.PhotoMeta(takenAtMillis = takenAt, lat = 30.2, lon = 120.1)
-        coEvery { extractor.extract("prepared-base64", "image/jpeg", null, RecordDomain.MEAL, takenAt) } returns extractedMeal()
+        coEvery { extractor.extract(any<List<ExtractionImage>>(), any(), any(), takenAt) } returns extractedMeal()
 
         viewModel.onImagePicked("content://photo/1")
 
@@ -423,16 +497,17 @@ class RecordCaptureViewModelTest {
 
     @Test
     fun save_meal_persistsJoinedImagePathsAndExif() = runTest {
-        coEvery { extractor.extract(any(), any(), any(), any(), any()) } returnsMany listOf(
-            extractedMeal(),
-            RecordExtractionResult.Meal(
-                MealRecordDraft(
-                    mealType = MealType.LUNCH,
-                    source = RecordSource.PHOTO,
-                    items = listOf(MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0)),
-                    confidence = 0.8,
-                )
-            ),
+        coEvery { extractor.extract(any<List<ExtractionImage>>(), any(), any(), any()) } returns RecordExtractionResult.Meal(
+            MealRecordDraft(
+                mealType = MealType.LUNCH,
+                source = RecordSource.PHOTO,
+                items = listOf(
+                    MealItemDraft("牛肉面", "一碗", 400.0, 20.0, 60.0, 8.0, photoIndex = 0),
+                    MealItemDraft("卤蛋", "1 个", 130.0, 6.0, 1.0, 10.0, photoIndex = 0),
+                    MealItemDraft("酸奶", "1杯", 120.0, 6.0, 15.0, 4.0, photoIndex = 1),
+                ),
+                confidence = 0.9,
+            )
         )
         viewModel.onImagesPicked(listOf("content://photo/1", "content://photo/2"))
         val draftSlot = slot<MealRecordDraft>()
@@ -447,7 +522,7 @@ class RecordCaptureViewModelTest {
     }
 
     private fun stubExtraction(result: RecordExtractionResult) {
-        coEvery { extractor.extract("prepared-base64", "image/jpeg", null, RecordDomain.MEAL, null) } returns result
+        coEvery { extractor.extract(any<List<ExtractionImage>>(), any(), any(), any()) } returns result
     }
 
     private fun extractedMeal() = RecordExtractionResult.Meal(

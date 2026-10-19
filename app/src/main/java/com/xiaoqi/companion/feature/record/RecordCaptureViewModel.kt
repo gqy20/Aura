@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.xiaoqi.companion.core.logging.AppLogger
 import com.xiaoqi.companion.core.logging.LogTags
 import com.xiaoqi.companion.core.record.BarcodeScannerSource
+import com.xiaoqi.companion.core.record.ExtractionImage
 import com.xiaoqi.companion.core.record.MealItemDraft
 import com.xiaoqi.companion.core.record.MealRecordDraft
 import com.xiaoqi.companion.core.record.PhotoMetadataReader
@@ -44,11 +45,9 @@ data class RecordCaptureUiState(
     val phase: RecordCapturePhase = RecordCapturePhase.PICK_IMAGE,
     val domain: RecordDomain = RecordDomain.MEAL,
     val note: String = "",
-    // --- 图片(多图追加流) ---
+    // --- 图片(多图单调用提取:全部图进同一次请求,小票与菜品图跨图对齐) ---
     val photos: List<PhotoEntry> = emptyList(),
-    // photos[i] 贡献的条目索引范围;删除某图 = 删该范围的条目(图-条目对应)
-    val photoRanges: List<IntRange> = emptyList(),
-    // 正在提取的照片数(0 = 空闲);追加时用户可继续编辑已出条目
+    // 正在提取的照片数(0 = 空闲);提取中新图已入列,条目成功后整体替换
     val extractingCount: Int = 0,
     val appendFailure: String? = null,
     // --- 餐食域 ---
@@ -92,12 +91,13 @@ class RecordCaptureViewModel @Inject constructor(
     fun onImagePicked(uriString: String) = onImagesPicked(listOf(uriString))
 
     /**
-     * 多图入口:逐张 prepare(EXIF)→ 提取 → 条目追加进同一张表。
-     * 第一张失败且无已出条目 → FAILED(可手填);追加途中单张失败只提示不阻塞。
+     * 多图入口(路线 A):prepare 全部新图 → 与已有图合并成一次提取请求。
+     * 新图 prepare 后立即入列(缩略图可见);提取成功才整体替换条目,失败保留旧条目
+     * 只报 appendFailure —— 追加是事务性的,重提失败不会丢已确认的内容。
+     * 追加(已有图)会整单重跑,用户的份量微调不保留 —— 跨图对齐的代价,重调即可。
      */
     fun onImagesPicked(uriStrings: List<String>) {
         if (uriStrings.isEmpty()) return
-        val isFirstBatch = _state.value.photos.isEmpty()
         _state.update {
             it.copy(
                 phase = RecordCapturePhase.EXTRACTING,
@@ -106,17 +106,20 @@ class RecordCaptureViewModel @Inject constructor(
                 appendFailure = null,
             )
         }
-        val domainHint = _state.value.domain
         viewModelScope.launch {
-            uriStrings.forEach { uri -> processPhoto(uri, append = !isFirstBatch, domainHint = domainHint) }
+            val failures = mutableListOf<String>()
+            val newEntries = uriStrings.mapNotNull { uri -> preparePhotoEntry(uri, failures) }
+            if (newEntries.isNotEmpty()) {
+                _state.update { it.copy(photos = it.photos + newEntries) }
+            }
+            extractAllPhotos(extraFailures = failures)
             _state.update { state ->
-                val done = state.extractingCount - uriStrings.size
-                val hasContent = state.hasExtractedContent
+                val done = (state.extractingCount - uriStrings.size).coerceAtLeast(0)
                 state.copy(
                     extractingCount = done,
                     phase = when {
                         done > 0 -> RecordCapturePhase.EXTRACTING
-                        hasContent -> RecordCapturePhase.CONFIRMING
+                        state.hasExtractedContent -> RecordCapturePhase.CONFIRMING
                         state.failureReason != null -> RecordCapturePhase.FAILED
                         else -> RecordCapturePhase.PICK_IMAGE
                     },
@@ -125,79 +128,83 @@ class RecordCaptureViewModel @Inject constructor(
         }
     }
 
-    private suspend fun processPhoto(uriString: String, append: Boolean, domainHint: RecordDomain? = null) {
+    /** 对当前全部图跑一次批量提取;失败时已有条目原样保留。[domainHint] 供切域重提,成功才提交新域。 */
+    private suspend fun extractAllPhotos(extraFailures: List<String>, domainHint: RecordDomain? = null) {
+        val photos = _state.value.photos
+        if (photos.isEmpty()) {
+            _state.update { it.copy(phase = RecordCapturePhase.FAILED, failureReason = extraFailures.firstOrNull() ?: "没有可提取的图片") }
+            return
+        }
+        val state = _state.value
+        val result = extractor.extract(
+            images = photos.map { ExtractionImage(it.base64, it.mediaType) },
+            note = state.note.takeIf { it.isNotBlank() },
+            domainHint = domainHint ?: state.domain,
+            photoTakenAtMillis = photos.firstOrNull()?.takenAt,
+        )
+        // 已有内容(追加/切域/重试)时保留用户已选餐次与置信度;首提以提取结果为准
+        val keepUserChoices = state.hasExtractedContent
+        when (result) {
+            is RecordExtractionResult.Meal -> {
+                val ordered = result.draft.items.sortedBy { it.photoIndex ?: Int.MAX_VALUE }
+                _state.update { s ->
+                    s.copy(
+                        domain = RecordDomain.MEAL,
+                        mealType = if (keepUserChoices) s.mealType else result.draft.mealType,
+                        items = ordered,
+                        baseItems = ordered,
+                        portionScales = List(ordered.size) { 1.0 },
+                        purchaseItems = emptyList(),
+                        confidence = if (keepUserChoices) s.confidence else result.draft.confidence,
+                        appendFailure = extraFailures.takeIf { it.isNotEmpty() }?.joinToString(";"),
+                        failureReason = null,
+                    )
+                }
+            }
+            is RecordExtractionResult.Purchase -> {
+                val ordered = result.draft.items.sortedBy { it.photoIndex ?: Int.MAX_VALUE }
+                _state.update { s ->
+                    s.copy(
+                        domain = RecordDomain.PURCHASE,
+                        storeName = if (keepUserChoices && s.storeName.isNotBlank()) s.storeName else (result.draft.storeName ?: s.storeName),
+                        purchaseItems = ordered,
+                        items = emptyList(),
+                        baseItems = emptyList(),
+                        portionScales = emptyList(),
+                        confidence = if (keepUserChoices) s.confidence else 0.5,
+                        appendFailure = extraFailures.takeIf { it.isNotEmpty() }?.joinToString(";"),
+                        failureReason = null,
+                    )
+                }
+            }
+            is RecordExtractionResult.Failed -> {
+                if (keepUserChoices) {
+                    // 事务性追加:旧条目原样保留,失败只提示
+                    _state.update { it.copy(appendFailure = result.reason) }
+                } else {
+                    _state.update { it.copy(phase = RecordCapturePhase.FAILED, failureReason = result.reason) }
+                }
+            }
+        }
+    }
+
+    private suspend fun preparePhotoEntry(uriString: String, failures: MutableList<String>): PhotoEntry? {
         val prepared = try {
             imageProcessor.prepare(uriString)
         } catch (error: Exception) {
             AppLogger.warn(LogTags.Record, "record_image_prepare_failed", "error" to (error.message ?: ""))
-            handlePhotoFailure(append, "图片读取失败: ${error.message ?: "无法打开"}")
-            return
+            failures += "图片读取失败:${error.message ?: "无法打开"}"
+            return null
         }
         val meta = photoMetadataReader.read(uriString)
-        val photoIndex = _state.value.photos.size
-        when (val result = extractor.extract(
-            imageBase64 = prepared.imageBase64,
+        return PhotoEntry(
+            uriString = uriString,
+            base64 = prepared.imageBase64,
             mediaType = prepared.mediaType,
-            note = _state.value.note.takeIf { it.isNotBlank() },
-            domainHint = domainHint,
-            photoTakenAtMillis = meta?.takenAtMillis,
-        )) {
-            is RecordExtractionResult.Meal -> _state.update { state ->
-                val start = state.items.size
-                val newItems = result.draft.items.map { it.copy(photoIndex = photoIndex) }
-                state.copy(
-                    domain = RecordDomain.MEAL,
-                    photos = state.photos + PhotoEntry(
-                        uriString = uriString,
-                        base64 = prepared.imageBase64,
-                        mediaType = prepared.mediaType,
-                        takenAt = meta?.takenAtMillis,
-                        lat = meta?.lat,
-                        lon = meta?.lon,
-                    ),
-                    photoRanges = state.photoRanges + listOf(IntRange(start, start + newItems.size - 1)),
-                    // 第一张图决定餐次(EXIF 判定在 extractor 内完成),追加图不覆盖用户已选餐次
-                    mealType = if (state.photos.isEmpty()) result.draft.mealType else state.mealType,
-                    items = state.items + newItems,
-                    baseItems = state.baseItems + newItems,
-                    portionScales = state.portionScales + List(newItems.size) { 1.0 },
-                    confidence = if (state.photos.isEmpty()) result.draft.confidence else state.confidence,
-                    failureReason = null,
-                )
-            }
-            is RecordExtractionResult.Purchase -> _state.update { state ->
-                val start = state.purchaseItems.size
-                val newItems = result.draft.items.map { it.copy(photoIndex = photoIndex) }
-                state.copy(
-                    domain = RecordDomain.PURCHASE,
-                    photos = state.photos + PhotoEntry(
-                        uriString = uriString,
-                        base64 = prepared.imageBase64,
-                        mediaType = prepared.mediaType,
-                        takenAt = meta?.takenAtMillis,
-                        lat = meta?.lat,
-                        lon = meta?.lon,
-                    ),
-                    photoRanges = state.photoRanges + listOf(IntRange(start, start + newItems.size - 1)),
-                    storeName = result.draft.storeName ?: state.storeName,
-                    purchaseItems = state.purchaseItems + newItems,
-                    confidence = if (state.photos.isEmpty()) 0.5 else state.confidence,
-                    failureReason = null,
-                )
-            }
-            is RecordExtractionResult.Failed -> handlePhotoFailure(append, result.reason)
-        }
-    }
-
-    private fun handlePhotoFailure(append: Boolean, reason: String) {
-        _state.update { state ->
-            if (append || state.hasExtractedContent) {
-                // 追加图失败不阻塞已有条目
-                state.copy(appendFailure = reason)
-            } else {
-                state.copy(phase = RecordCapturePhase.FAILED, failureReason = reason)
-            }
-        }
+            takenAt = meta?.takenAtMillis,
+            lat = meta?.lat,
+            lon = meta?.lon,
+        )
     }
 
     fun setNote(note: String) = _state.update { it.copy(note = note) }
@@ -208,41 +215,10 @@ class RecordCaptureViewModel @Inject constructor(
             _state.update { it.copy(phase = RecordCapturePhase.PICK_IMAGE, failureReason = null) }
             return
         }
-        // 重试 = 清条目重提全部图(失败态时 photos 为空,此路径只在 append 失败后手动重试单图场景外使用)
-        reExtractPhotos(photos)
-    }
-
-    /** 域切换:已有图时按目标域重提全部图(替换条目);无图只切表格。 */
-    fun switchDomain(domain: RecordDomain) {
-        val current = _state.value
-        if (current.domain == domain) return
-        if (current.photos.isEmpty()) {
-            _state.update { it.copy(domain = domain, phase = RecordCapturePhase.CONFIRMING, failureReason = null) }
-            return
-        }
-        _state.update { it.copy(domain = domain, phase = RecordCapturePhase.EXTRACTING, failureReason = null) }
-        viewModelScope.launch {
-            val photos = current.photos
-            _state.update { it.copy(items = emptyList(), baseItems = emptyList(), portionScales = emptyList(), purchaseItems = emptyList(), photoRanges = emptyList(), photos = emptyList()) }
-            photos.forEach { photo -> processPhoto(photo.uriString, append = false, domainHint = domain) }
-            _state.update { state ->
-                state.copy(
-                    phase = if (state.extractingCount > 0 || !state.hasExtractedContent && state.failureReason != null) {
-                        if (state.failureReason != null && !state.hasExtractedContent) RecordCapturePhase.FAILED else RecordCapturePhase.CONFIRMING
-                    } else {
-                        RecordCapturePhase.CONFIRMING
-                    },
-                )
-            }
-        }
-    }
-
-    private fun reExtractPhotos(photos: List<PhotoEntry>) {
-        val domainHint = _state.value.domain
         _state.update { it.copy(phase = RecordCapturePhase.EXTRACTING, extractingCount = photos.size, failureReason = null, appendFailure = null) }
         viewModelScope.launch {
-            _state.update { it.copy(items = emptyList(), baseItems = emptyList(), portionScales = emptyList(), purchaseItems = emptyList(), photoRanges = emptyList(), photos = emptyList()) }
-            photos.forEach { photo -> processPhoto(photo.uriString, append = false, domainHint = domainHint) }
+            // 重试 = 对当前全部图(含追加失败后已入列的新图)再跑一次批量提取
+            extractAllPhotos(extraFailures = emptyList())
             _state.update { state ->
                 state.copy(
                     extractingCount = 0,
@@ -256,24 +232,56 @@ class RecordCaptureViewModel @Inject constructor(
         }
     }
 
-    /** 删除某张图及其贡献的条目(图-条目对应的核心操作)。 */
+    /** 域切换:已有图时按目标域整单重提(事务性,失败保留原域原条目);无图只切表格。 */
+    fun switchDomain(domain: RecordDomain) {
+        val current = _state.value
+        if (current.domain == domain) return
+        if (current.photos.isEmpty()) {
+            _state.update { it.copy(domain = domain, phase = RecordCapturePhase.CONFIRMING, failureReason = null) }
+            return
+        }
+        _state.update { it.copy(phase = RecordCapturePhase.EXTRACTING, extractingCount = current.photos.size, failureReason = null, appendFailure = null) }
+        viewModelScope.launch {
+            // 域不先提交:提取成功后由结果分支落位,失败时原域原条目原样保留
+            extractAllPhotos(extraFailures = emptyList(), domainHint = domain)
+            _state.update { state ->
+                state.copy(
+                    extractingCount = 0,
+                    phase = when {
+                        state.hasExtractedContent -> RecordCapturePhase.CONFIRMING
+                        state.failureReason != null -> RecordCapturePhase.CONFIRMING // 旧条目仍在,不进 FAILED
+                        else -> RecordCapturePhase.CONFIRMING
+                    },
+                )
+            }
+        }
+    }
+
+    /**
+     * 删除某张图及其归属条目(条目 photoIndex 随身携带,删除即过滤,无需范围表)。
+     * 大于被删序号的 photoIndex 整体前移,保持与剩余图片下标对齐。
+     */
     fun removePhoto(photoIndex: Int) {
         _state.update { state ->
             if (photoIndex !in state.photos.indices) return@update state
-            val range = state.photoRanges[photoIndex]
-            // ranges 在被删范围之后的所有索引平移
-            val removedCount = range.count()
+            // portionScales 与 items 按索引对齐,同步过滤
+            val keptIndices = state.items.indices.filter { state.items[it].photoIndex != photoIndex }
             state.copy(
                 photos = state.photos.filterIndexed { i, _ -> i != photoIndex },
-                photoRanges = state.photoRanges.filterIndexed { i, _ -> i != photoIndex }
-                    .map { r -> if (r.first >= range.last + 1) (r.first - removedCount)..(r.last - removedCount) else r },
-                items = state.items.filterIndexed { i, _ -> i !in range },
-                baseItems = state.baseItems.filterIndexed { i, _ -> i !in range },
-                portionScales = state.portionScales.filterIndexed { i, _ -> i !in range },
-                purchaseItems = state.purchaseItems.filterIndexed { i, _ -> i !in range },
+                items = keptIndices.map { state.items[it] }.shiftPhotoIndexAfter(photoIndex),
+                baseItems = keptIndices.map { state.baseItems[it] }.shiftPhotoIndexAfter(photoIndex),
+                portionScales = keptIndices.map { state.portionScales[it] },
+                purchaseItems = state.purchaseItems.filterNot { it.photoIndex == photoIndex }
+                    .map { if ((it.photoIndex ?: -1) > photoIndex) it.copy(photoIndex = it.photoIndex!! - 1) else it },
             )
         }
     }
+
+    // meal items 的 photoIndex 位移(baseItems 同步);null(无归属条目)不动
+    private fun List<MealItemDraft>.shiftPhotoIndexAfter(removedIndex: Int): List<MealItemDraft> =
+        map { item ->
+            if ((item.photoIndex ?: -1) > removedIndex) item.copy(photoIndex = item.photoIndex!! - 1) else item
+        }
 
     // 提取失败不挡记录:降级为当前域的空表格手填(design.md 事务面规范)
     fun startManualEntry() {
@@ -313,17 +321,11 @@ class RecordCaptureViewModel @Inject constructor(
     fun deleteItem(index: Int) {
         _state.update { state ->
             if (index !in state.items.indices) return@update state
+            // 条目自带 photoIndex,删除无需位置簿记
             state.copy(
                 items = state.items.filterIndexed { i, _ -> i != index },
                 baseItems = state.baseItems.filterIndexed { i, _ -> i != index },
                 portionScales = state.portionScales.filterIndexed { i, _ -> i != index },
-                photoRanges = state.photoRanges.map { r ->
-                    when {
-                        index > r.last -> r
-                        r.count() == 1 && index == r.first -> r // 空范围由 removePhoto 负责清理,这里保留原位
-                        else -> (r.first)..(r.last - 1)
-                    }
-                },
             )
         }
     }

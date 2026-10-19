@@ -20,6 +20,7 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -257,6 +258,89 @@ class VisionRecordExtractorTest {
         val result = extractor.extract("aGk=", "image/jpeg")
 
         assertTrue((result as RecordExtractionResult.Failed).reason.contains("未知记录类型"))
+    }
+
+    // --- 多图单调用(路线 A:小票名字真值 + 菜品图克重锚点) ---
+
+    @Test
+    fun extract_multiImage_sendsOneRequestWithLabelsAndAddendum() = runTest {
+        server.enqueue(
+            toolUseResponse(
+                "submit_meal_record",
+                """{"confidence":0.9,"items":[
+                    {"name":"凉拌黄瓜","portion_text":"1份","calories":80,"estimated_grams":150,"photo_index":1,"name_source":"receipt"},
+                    {"name":"酸梅汤","portion_text":"1杯","calories":90,"estimated_grams":250,"photo_index":2,"name_source":"photo"}
+                ]}""",
+            )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM)
+
+        val result = extractor.extract(listOf(ExtractionImage("aGk="), ExtractionImage("aG8=")))
+
+        val draft = (result as RecordExtractionResult.Meal).draft
+        assertEquals(2, draft.items.size)
+        assertEquals(0, draft.items[0].photoIndex)
+        assertEquals(RecordNameSource.RECEIPT, draft.items[0].nameSource)
+        assertEquals(1, draft.items[1].photoIndex)
+        assertEquals(RecordNameSource.PHOTO, draft.items[1].nameSource)
+
+        // 整组图一次请求:两个 image 块,每图带位置标签,系统提示含跨图对齐规则
+        assertEquals(1, server.requestCount)
+        val body = server.takeRequest().body.readUtf8()
+        assertEquals(2, Regex(""""type":"image"""").findAll(body).count())
+        assertTrue(body.contains("图片 1:"))
+        assertTrue(body.contains("图片 2:"))
+        assertTrue(body.contains("Multiple images (2 total"))
+    }
+
+    @Test
+    fun extract_multiImage_purchaseMapsPhotoIndex() = runTest {
+        server.enqueue(
+            toolUseResponse(
+                "submit_purchase_record",
+                """{"store_name":"永辉超市","items":[{"name":"鸡蛋","brand":"德清源","quantity":15,"unit":"个","unit_price":1.6,"photo_index":2}]}""",
+            )
+        )
+        val extractor = extractor(provider = LlmProvider.GLM)
+
+        val result = extractor.extract(listOf(ExtractionImage("aGk="), ExtractionImage("aG8=")))
+
+        val item = (result as RecordExtractionResult.Purchase).draft.items.single()
+        assertEquals(1, item.photoIndex)
+    }
+
+    @Test
+    fun parse_photoIndexValidation() {
+        // 单图恒为 0(无论模型给什么);多图按 1-based 换算,越界/缺失归 null
+        assertEquals(0, photoIndexFromDto(null, imageCount = 1))
+        assertEquals(0, photoIndexFromDto(5, imageCount = 1))
+        assertEquals(0, photoIndexFromDto(1, imageCount = 3))
+        assertEquals(2, photoIndexFromDto(3, imageCount = 3))
+        assertNull(photoIndexFromDto(4, imageCount = 3))
+        assertNull(photoIndexFromDto(0, imageCount = 3))
+        assertNull(photoIndexFromDto(null, imageCount = 3))
+    }
+
+    @Test
+    fun parse_nameSourceValidation() {
+        assertEquals(RecordNameSource.RECEIPT, nameSourceFromDto("receipt"))
+        assertEquals(RecordNameSource.PHOTO, nameSourceFromDto(" Photo "))
+        assertNull(nameSourceFromDto("menu"))
+        assertNull(nameSourceFromDto(null))
+    }
+
+    @Test
+    fun parse_receiptOnlyItem_withoutPhotoIndexKeepsNull() {
+        val result = parseMealToolInput(
+            """{"items":[{"name":"打包菜","portion_text":"1份","calories":100,"estimated_grams":200,"name_source":"receipt"}]}""",
+            note = null,
+            hour = 12,
+            imageCount = 2,
+        )
+
+        val item = (result as RecordExtractionResult.Meal).draft.items.single()
+        assertNull(item.photoIndex)
+        assertEquals(RecordNameSource.RECEIPT, item.nameSource)
     }
 
     // --- 两段式营养解析 ---
